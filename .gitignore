@@ -1,69 +1,47 @@
-# === Java / Spring Boot ===
-*.class
-*.jar
-*.war
-*.iml
-*.log
-*.hprof
-
-# IntelliJ IDEA
-.idea/
-*.iws
-*.ipr
-*.iml
-out/
-
-# Gradle
-.gradle/
-build/
-!gradle/wrapper/gradle-wrapper.jar
-**/build/
-
-# Spring Boot devtools
-spring-boot-devtools.*
-
-# === Node.js / Next.js ===
-node_modules/
-.next/
-dist/
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
-
-# === macOS ===
+# System files
 .DS_Store
 
-# === Docker ===
-**/Dockerfile
-**/docker-compose.override.yml
-**/.docker/
+# Docker
+.dockerignore
+docker-compose.override.yml
 
-# === Logs ===
+# Build logs
 *.log
-logs/
 *.pid
+logs/
 
-# === OS Generated ===
-*.swp
-*.swo
-Thumbs.db
-ehthumbs.db
-Desktop.ini
+# Gradle
+.gradle
+build/
+!gradle/wrapper/gradle-wrapper.jar
 
-# === VSCode / Cursor IDE ===
+# IntelliJ
+.idea/
+*.iws
+*.iml
+*.ipr
+out/
+
+# VSCode / Cursor
 .vscode/
 .cursor/
 
-# === Optional: IDE-specific ===
-*.idea/
-*.classpath
-*.project
-*.settings/
-*.factorypath
+# Environment variables
+.env
+.env.*
 
-# === Git ===
-*.orig
+# Node/Next.js
+node_modules/
+.next/
+out/
+.vercel
+*.tsbuildinfo
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Spring resources (정상적인 경우엔 포함시켜야 함)
+backend/src/main/resources/*.yml
+
+# Typescript generated
+next-env.d.ts

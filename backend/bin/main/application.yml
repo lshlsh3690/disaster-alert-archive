@@ -1,0 +1,34 @@
+spring:
+  application:
+    name: "backend"
+  datasource:
+    url: jdbc:postgresql://disaster-postgres:5432/disaster_archive
+    username: postgres
+    password: asdf
+    driver-class-name: org.postgresql.Driver
+
+
+  jpa:
+    hibernate:
+      ddl-auto: create
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+
+  redis:
+    host: localhost
+    port: 6379
+
+  profiles:
+    active: local
+
+logging:
+  level:
+    org.hibernate.SQL: debug
+    org.springframework.web: debug
+
+
+server:
+  port: 8080
