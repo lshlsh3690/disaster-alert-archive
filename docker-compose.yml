@@ -1,0 +1,41 @@
+version: '3.8'
+
+services:
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: disaster-frontend
+    ports:
+      - "3000:3000"
+    networks:
+      - disaster-net
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: disaster-backend
+    ports:
+      - "8080:8080"
+    depends_on:
+      - postgres
+    networks:
+      - disaster-net
+    environment:
+      SPRING_PROFILES_ACTIVE: local
+
+  postgres:
+    image: postgres:15
+    container_name: disaster-postgres
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    ports:
+      - "5432:5432"
+    networks:
+      - disaster-net
+
+networks:
+  disaster-net:

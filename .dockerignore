@@ -1,0 +1,17 @@
+# 시스템/IDE
+.DS_Store
+.idea
+.vscode
+.cursor
+*.iml
+
+# Git
+.git
+.gitignore
+
+# 환경파일
+.env
+.env.*
+
+# 로그
+*.log

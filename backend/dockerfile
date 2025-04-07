@@ -1,0 +1,21 @@
+FROM gradle:8.5-jdk17 AS build
+
+WORKDIR /app
+
+COPY settings.gradle ./
+COPY build.gradle ./
+
+COPY . .
+
+RUN gradle build
+
+# 2단계: 실행 이미지 (최소한의 경량 이미지)
+FROM eclipse-temurin:17-jdk
+WORKDIR /app
+
+# 빌드한 JAR 복사
+COPY --from=build /app/build/libs/*.jar app.jar
+
+EXPOSE 8080
+
+ENTRYPOINT ["java", "-jar", "app.jar"]

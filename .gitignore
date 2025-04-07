@@ -1,0 +1,69 @@
+# === Java / Spring Boot ===
+*.class
+*.jar
+*.war
+*.iml
+*.log
+*.hprof
+
+# IntelliJ IDEA
+.idea/
+*.iws
+*.ipr
+*.iml
+out/
+
+# Gradle
+.gradle/
+build/
+!gradle/wrapper/gradle-wrapper.jar
+**/build/
+
+# Spring Boot devtools
+spring-boot-devtools.*
+
+# === Node.js / Next.js ===
+node_modules/
+.next/
+dist/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# === macOS ===
+.DS_Store
+
+# === Docker ===
+**/Dockerfile
+**/docker-compose.override.yml
+**/.docker/
+
+# === Logs ===
+*.log
+logs/
+*.pid
+
+# === OS Generated ===
+*.swp
+*.swo
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# === VSCode / Cursor IDE ===
+.vscode/
+.cursor/
+
+# === Optional: IDE-specific ===
+*.idea/
+*.classpath
+*.project
+*.settings/
+*.factorypath
+
+# === Git ===
+*.orig
