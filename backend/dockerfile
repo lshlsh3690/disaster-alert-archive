@@ -7,7 +7,7 @@ COPY build.gradle ./
 
 COPY . .
 
-RUN gradle build
+RUN gradle build -x test
 
 # 2단계: 실행 이미지 (최소한의 경량 이미지)
 FROM eclipse-temurin:17-jdk

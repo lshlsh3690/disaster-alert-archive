@@ -22,20 +22,26 @@ services:
       - postgres
     networks:
       - disaster-net
-    environment:
-      SPRING_PROFILES_ACTIVE: local
+    env_file:
+      - .env.dev
 
   postgres:
     image: postgres:15
-    container_name: disaster-postgres
-    environment:
-      POSTGRES_DB: ${POSTGRES_DB}
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    container_name: postgres
+    restart: always
+
     ports:
       - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
     networks:
       - disaster-net
+    env_file:
+      - .env.dev
+      
+volumes:
+  postgres-data:
+
 
 networks:
   disaster-net:

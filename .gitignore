@@ -29,6 +29,12 @@ out/
 # Environment variables
 .env
 .env.*
+*.env
+.env*
+.env.dev
+.env.prod
+
+
 
 # Node/Next.js
 node_modules/
