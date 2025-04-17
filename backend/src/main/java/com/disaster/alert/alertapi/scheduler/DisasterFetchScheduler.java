@@ -16,13 +16,11 @@ public class DisasterFetchScheduler {
     private final DisasterAlertService alertService;
 
     // 매 10분마다 실행
-//    @Scheduled(cron = "0 0/10 * * * *")
+    @Scheduled(cron = "0 0/10 * * * *")
     public void fetchAndSaveDisasterAlerts() {
-        log.info("🚨 재난문자 수집 시작");
+        log.info("재난문자 수집 시작");
 
-        String raw = openApiClient.fetchRawData();
-        alertService.saveFromRawData(raw);
-
-        log.info("✅ 재난문자 수집 완료");
+        String raw = openApiClient.fetchData();
+        alertService.saveData(raw);
     }
 }

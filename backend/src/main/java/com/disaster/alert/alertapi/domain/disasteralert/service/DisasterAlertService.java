@@ -1,16 +1,67 @@
 package com.disaster.alert.alertapi.domain.disasteralert.service;
 
+import com.disaster.alert.alertapi.domain.disasteralert.dto.DisasterAlertDto;
+import com.disaster.alert.alertapi.domain.disasteralert.dto.DisasterApiResponse;
 import com.disaster.alert.alertapi.domain.disasteralert.model.DisasterAlert;
 import com.disaster.alert.alertapi.domain.disasteralert.repository.DisasterAlertRepository;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.List;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class DisasterAlertService {
     private final DisasterAlertRepository disasterAlertRepository;
+    private final ObjectMapper objectMapper;
 
-    public void saveFromRawData(String raw) {
+    public void saveData(String raw) {
+        try {
+            DisasterApiResponse response = objectMapper.readValue(raw, DisasterApiResponse.class);
 
+            if (!"00".equals(response.getHeader().getResultCode())) {
+                log.warn("재난문자 API 응답 오류: {}", response.getHeader().getResultMsg());
+                return;
+            }
+
+            List<DisasterAlertDto> dtos = response.getBody();
+
+            // 중복 제거: DB에 이미 있는 SN은 제외
+            List<DisasterAlert> alerts = dtos.stream()
+                    .filter(dto -> !disasterAlertRepository.existsBySn(dto.getSn()))
+                    .map(this::toEntity)
+                    .toList();
+
+            disasterAlertRepository.saveAll(alerts);
+            log.info("재난문자 {}건 저장 완료", alerts.size());
+
+        } catch (Exception e) {
+            log.error("재난문자 저장 중 오류 발생", e);
+        }
+    }
+    private DisasterAlert toEntity(DisasterAlertDto dto) {
+        return DisasterAlert.builder()
+                .sn(dto.getSn())
+                .message(dto.getMessage())
+                .region(dto.getRegion())
+                .createdAt(parseDateTime(dto.getCreatedAt()))
+                .emergencyStep(dto.getEmergencyStep())
+                .disasterType(dto.getDisasterType())
+                .modifiedDate(parseDate(dto.getModifiedDate()))
+                .build();
+    }
+
+    private LocalDateTime parseDateTime(String str) {
+        return LocalDateTime.parse(str, DateTimeFormatter.ofPattern("yyyy/MM/dd HH:mm:ss"));
+    }
+
+    private LocalDate parseDate(String str) {
+        return LocalDate.parse(str, DateTimeFormatter.ofPattern("yyyy-MM-dd"));
     }
 }

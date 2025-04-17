@@ -17,7 +17,10 @@ public class DisasterAlert {
     @Id
     @Column(name = "disaster_alert_id", unique = true)
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;  // 고유 식별자 (중복 방지)
+    private Long id;
+
+    @Column(name = "sn", unique = true, nullable = false)
+    private Long sn;                // SN 외부 OPEN API에서 제공하는 고유번호
 
     @Column(columnDefinition = "TEXT")
     private String message;           // MSG_CN

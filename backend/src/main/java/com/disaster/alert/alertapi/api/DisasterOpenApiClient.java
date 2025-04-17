@@ -18,9 +18,7 @@ public class DisasterOpenApiClient {
     private String serviceKey;
 
 
-    public String fetchRawData() {
-        log.info("serviceKey: {}", serviceKey);
-
+    public String fetchData() {
         String url = URL + serviceKey;
 
         String forObject = restTemplate.getForObject(url, String.class);
