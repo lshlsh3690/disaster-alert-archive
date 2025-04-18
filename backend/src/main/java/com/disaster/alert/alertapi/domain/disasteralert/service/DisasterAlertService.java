@@ -12,7 +12,9 @@ import org.springframework.stereotype.Service;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
@@ -32,15 +34,20 @@ public class DisasterAlertService {
 
             List<DisasterAlertDto> dtos = response.getBody();
 
-            // 중복 제거: DB에 이미 있는 SN은 제외
-            List<DisasterAlert> alerts = dtos.stream()
-                    .filter(dto -> !disasterAlertRepository.existsBySn(dto.getSn()))
+            List<Long> incomingSnList = dtos.stream()
+                    .map(DisasterAlertDto::getSn)
+                    .toList();
+
+            List<Long> existingSnList = disasterAlertRepository.findExistingSn(incomingSnList);
+
+            Set<Long> existingSnSet = new HashSet<>(existingSnList);
+
+            List<DisasterAlert> newAlerts = dtos.stream()
+                    .filter(dto -> !existingSnSet.contains(dto.getSn()))
                     .map(this::toEntity)
                     .toList();
 
-            disasterAlertRepository.saveAll(alerts);
-            log.info("재난문자 {}건 저장 완료", alerts.size());
-
+            disasterAlertRepository.saveAll(newAlerts);
         } catch (Exception e) {
             log.error("재난문자 저장 중 오류 발생", e);
         }

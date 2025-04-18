@@ -13,7 +13,7 @@ import lombok.*;
 public class MissingPerson {
 
     @Id
-    private Long msspsnIdntfccd; // 실종자 식별자
+    private Long msspsnIdntfccd;    // 실종자 식별자
 
     @Column(length = 50)
     private String name;
@@ -21,21 +21,21 @@ public class MissingPerson {
     private Integer age;
 
     @Column(length = 10)
-    private String gender; // sexdstnDscd
+    private String gender;          // sexdstnDscd
 
     @Column(length = 10)
-    private String targetTypeCode; // writngTrgetDscd
+    private String targetTypeCode;  // writngTrgetDscd
 
     @Column(length = 200)
-    private String address; // occrAdres
+    private String address;         // occrAdres
 
     @Column(length = 500)
-    private String specialFeature; // etcSpfeatr
+    private String specialFeature;  // etcSpfeatr
 
     @Lob
     @Column(columnDefinition = "TEXT")
-    private String photoBase64; // tknphotoFile
+    private String photoBase64;     // tknphotoFile
 
-    private Integer photoSize; // tknphotolength
+    private Integer photoSize;      // tknphotolength
 }
 

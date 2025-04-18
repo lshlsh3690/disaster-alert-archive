@@ -36,5 +36,5 @@ server:
 
 disaster-alert:
   api:
-    service-key: ${SERVICE_KEY}
+    service-key: ${DISASTER_ALERT_SERVICE_KEY}
 
