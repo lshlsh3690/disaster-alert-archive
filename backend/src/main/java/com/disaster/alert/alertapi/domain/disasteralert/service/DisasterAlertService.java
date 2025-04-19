@@ -52,13 +52,14 @@ public class DisasterAlertService {
             log.error("재난문자 저장 중 오류 발생", e);
         }
     }
+
     private DisasterAlert toEntity(DisasterAlertDto dto) {
         return DisasterAlert.builder()
                 .sn(dto.getSn())
                 .message(dto.getMessage())
                 .region(dto.getRegion())
                 .createdAt(parseDateTime(dto.getCreatedAt()))
-                .emergencyStep(dto.getEmergencyStep())
+                .emergencyLevel(dto.getEmergencyLevel())
                 .disasterType(dto.getDisasterType())
                 .modifiedDate(parseDate(dto.getModifiedDate()))
                 .build();

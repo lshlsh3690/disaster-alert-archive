@@ -30,8 +30,8 @@ public class DisasterAlert {
     @Column(name = "created_at")
     private LocalDateTime createdAt;  // CRT_DT
 
-    @Column(name = "emergency_step")
-    private String emergencyStep;     // EMRG_STEP_NM
+    @Column(name = "emergency_level")
+    private String emergencyLevel;     // EMRG_STEP_NM
 
     @Column(name = "disaster_type")
     private String disasterType;      // DST_SE_NM

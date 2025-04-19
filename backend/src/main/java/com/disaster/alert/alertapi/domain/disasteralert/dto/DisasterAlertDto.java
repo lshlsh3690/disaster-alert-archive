@@ -20,7 +20,7 @@ public class DisasterAlertDto {
     private String createdAt;
 
     @JsonProperty("EMRG_STEP_NM")
-    private String emergencyStep;
+    private String emergencyLevel;
 
     @JsonProperty("DST_SE_NM")
     private String disasterType;
