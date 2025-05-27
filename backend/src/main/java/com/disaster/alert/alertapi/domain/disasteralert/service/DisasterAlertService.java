@@ -15,6 +15,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -47,7 +48,13 @@ public class DisasterAlertService {
                     .map(this::toEntity)
                     .toList();
 
+            // 2. 지역명 추출 → 한번에 조회
+//            Set<String> allRegionNames = newAlerts.stream()
+//                    .flatMap(dto -> parseRegionNames(dto.getRegion()).stream())
+//                    .collect(Collectors.toSet());
+
             disasterAlertRepository.saveAll(newAlerts);
+            log.info("재난문자 {}건 저장 완료", newAlerts.size());
         } catch (Exception e) {
             log.error("재난문자 저장 중 오류 발생", e);
         }
@@ -57,7 +64,6 @@ public class DisasterAlertService {
         return DisasterAlert.builder()
                 .sn(dto.getSn())
                 .message(dto.getMessage())
-                .region(dto.getRegion())
                 .createdAt(parseDateTime(dto.getCreatedAt()))
                 .emergencyLevel(dto.getEmergencyLevel())
                 .disasterType(dto.getDisasterType())

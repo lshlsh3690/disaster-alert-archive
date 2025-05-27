@@ -22,6 +22,8 @@ build/
 *.ipr
 out/
 
+/bin/
+
 # VSCode / Cursor
 .vscode/
 .cursor/

@@ -1,10 +1,12 @@
 package com.disaster.alert.alertapi.domain.disasteralert.model;
 
+import com.disaster.alert.alertapi.domain.region.LegalDistrict;
 import jakarta.persistence.*;
 import lombok.*;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Entity
 @Table(name = "disaster_alert")
@@ -13,19 +15,19 @@ import java.time.LocalDateTime;
 @AllArgsConstructor
 @Builder
 public class DisasterAlert {
-
     @Id
     @Column(name = "disaster_alert_id", unique = true)
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+
+    @OneToMany(mappedBy = "alert", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<DisasterAlertRegion> alertRegions;
 
     @Column(name = "sn", unique = true, nullable = false)
     private Long sn;                // SN 외부 OPEN API에서 제공하는 고유번호
 
     @Column(columnDefinition = "TEXT")
     private String message;           // MSG_CN
-
-    private String region;            // RCPTN_RGN_NM
 
     @Column(name = "created_at")
     private LocalDateTime createdAt;  // CRT_DT
