@@ -21,6 +21,8 @@ build/
 *.iml
 *.ipr
 out/
+/backend/src/test/resources/application-test.yml
+
 
 /bin/
 

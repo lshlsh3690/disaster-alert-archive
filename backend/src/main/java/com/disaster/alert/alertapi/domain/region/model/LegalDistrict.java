@@ -1,9 +1,7 @@
-package com.disaster.alert.alertapi.domain.region;
+package com.disaster.alert.alertapi.domain.region.model;
 
 import jakarta.persistence.*;
 import lombok.*;
-
-import java.util.List;
 
 @Entity
 @Table(name = "legal_district")
