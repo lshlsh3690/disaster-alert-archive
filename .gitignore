@@ -22,9 +22,7 @@ build/
 *.ipr
 out/
 /backend/src/test/resources/application-test.yml
-
-
-/bin/
+/backend/bin/
 
 # VSCode / Cursor
 .vscode/
