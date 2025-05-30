@@ -36,6 +36,10 @@ public class DisasterAlertService {
             }
 
             List<DisasterAlertDto> dtos = response.getBody();
+            if (dtos == null || dtos.isEmpty()) {
+                log.info("재난문자 데이터가 없습니다.");
+                return;
+            }
 
             List<Long> incomingSnList = dtos.stream()
                     .map(DisasterAlertDto::getSn)
