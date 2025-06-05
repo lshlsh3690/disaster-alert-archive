@@ -9,8 +9,10 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.TestPropertySource;
 
 import java.util.List;
 
@@ -18,11 +20,11 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.mockito.Mockito.*;
 
+@Slf4j
 @SpringBootTest
 @ActiveProfiles("test")
 @Slf4j
 class DisasterAlertServiceTest {
-
     @Autowired
     private DisasterAlertRepository disasterAlertRepository;
 
@@ -46,12 +48,12 @@ class DisasterAlertServiceTest {
           "body": [
             {
               "MSG_CN": "비상 상황입니다",
-              "RCPTN_RGN_NM": "서울시",
+              "RCPTN_RGN_NM": "경상남도 진주시",
               "CRT_DT": "2023/09/16 11:00:00",
               "EMRG_STEP_NM": "안전안내",
               "SN": 123456,
               "DST_SE_NM": "호우",
-              "MDFCN_YMD": "2023-09-16"
+              "MDFCN_YMD": "2023/09/16 08:32:00.000000000"
             },
             {
               "MSG_CN": "또 다른 경보",
@@ -60,7 +62,7 @@ class DisasterAlertServiceTest {
               "EMRG_STEP_NM": "안전안내",
               "SN": 123457,
               "DST_SE_NM": "지진",
-              "MDFCN_YMD": "2023-09-16"
+              "MDFCN_YMD": "2025/05/27 08:32:00.000000000"
             }
           ]
         }

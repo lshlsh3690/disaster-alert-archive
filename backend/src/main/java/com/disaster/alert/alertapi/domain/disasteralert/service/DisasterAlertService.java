@@ -25,6 +25,7 @@ import java.util.stream.Collectors;
 public class DisasterAlertService {
     private final DisasterAlertRepository disasterAlertRepository;
     private final LegalDistrictRepository legalDistrictRepository;
+
     private final DisasterOpenApiClient disasterOpenApiClient;
     private final ObjectMapper objectMapper;
 
@@ -35,6 +36,10 @@ public class DisasterAlertService {
             if (checkAPIFailure(response)) return;
 
             List<DisasterAlertDto> dtos = response.getBody();
+            if (dtos == null || dtos.isEmpty()) {
+                log.info("재난문자 데이터가 없습니다.");
+                return;
+            }
 
             // 지역 이름을 정리하여 공백 제거 및 "전체" 제거
             dtos.forEach(dto -> dto.setRegion(cleanRegionString(dto.getRegion())));

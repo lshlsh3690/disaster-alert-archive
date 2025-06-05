@@ -6,6 +6,9 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
 
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+
 @Component
 @RequiredArgsConstructor
 @Log4j2
@@ -19,9 +22,17 @@ public class DisasterOpenApiClient {
 
 
     public String fetchData() {
-        String url = URL + serviceKey;
+        LocalDateTime now = LocalDateTime.now();
+        String date = now.format(DateTimeFormatter.ofPattern("yyyyMMdd"));
 
-        String forObject = restTemplate.getForObject(url, String.class);
+        StringBuilder url = new StringBuilder();
+        url.append(URL);
+        url.append(serviceKey);
+        url.append("&crtDt=" + date.toString());
+        url.append("&numOfRows=1000");
+
+
+        String forObject = restTemplate.getForObject(url.toString(), String.class);
         log.info("Response from Disaster Open API: {}", forObject);
         return forObject;
     }
