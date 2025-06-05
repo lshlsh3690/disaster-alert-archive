@@ -1,5 +1,6 @@
 package com.disaster.alert.alertapi.domain.region.model;
 
+import com.disaster.alert.alertapi.domain.disasteralert.model.DisasterAlert;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -19,4 +20,8 @@ public class LegalDistrict {
 
     @Column(name = "is_active", nullable = false)
     private boolean isActive;   // true: 존재 / false: 폐지
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "disaster_alert_id")
+    private DisasterAlert disasterAlert; // 재난 알림과의 연관 관계
 }

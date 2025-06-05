@@ -1,0 +1,13 @@
+# src/test/resources/application-test.ymlAdd commentMore actions
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/disaster_archive
+    username: postgres
+    password: asdf
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: none
+    show-sql: true
+    database-platform: org.hibernate.dialect.PostgreSQLDialect

@@ -17,12 +17,13 @@ import org.springframework.test.context.TestPropertySource;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.mockito.Mockito.*;
 
 @Slf4j
 @SpringBootTest
 @ActiveProfiles("test")
+@Slf4j
 class DisasterAlertServiceTest {
     @Autowired
     private DisasterAlertRepository disasterAlertRepository;
@@ -56,7 +57,7 @@ class DisasterAlertServiceTest {
             },
             {
               "MSG_CN": "또 다른 경보",
-              "RCPTN_RGN_NM": "강원특별자치도 영월군",
+              "RCPTN_RGN_NM": "경상남도 부산시",
               "CRT_DT": "2023/09/16 11:01:00",
               "EMRG_STEP_NM": "안전안내",
               "SN": 123457,
@@ -70,9 +71,24 @@ class DisasterAlertServiceTest {
         // when
         disasterAlertService.saveData(rawJson);
 
+        List<DisasterAlert> alerts = disasterAlertRepository.findAll();
 
         // then
-        List<DisasterAlert> alerts = disasterAlertRepository.findAll();
         assertEquals(2, alerts.size());
+        assertEquals(123457L, alerts.get(1).getSn());
+        assertEquals("경상남도 부산시", alerts.get(1).getRegions().get(0).getLegalDistrict().getName()); // 부산시가 저장되어야 함
+    }
+
+    @Test
+    @Transactional
+    void initAllDisasterData() {
+        // given
+
+        // when
+        disasterAlertService.initAllDisasterData();
+
+        // then
+        List<DisasterAlert> all = disasterAlertRepository.findAll();
+        assertFalse(all.isEmpty(), "재난문자 데이터가 비어있지 않아야 합니다");
     }
 }
