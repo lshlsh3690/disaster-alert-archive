@@ -25,4 +25,12 @@ public class DisasterOpenApiClient {
         log.info("Response from Disaster Open API: {}", forObject);
         return forObject;
     }
+
+    public String fetchData(int pageNo, int numOfRows) {
+        String url = URL + serviceKey + "&pageNo=" + pageNo + "&numOfRows=" + numOfRows;
+
+        String forObject = restTemplate.getForObject(url, String.class);
+        //log.info("Response from Disaster Open API for page {}: {}", pageNo, forObject);
+        return forObject;
+    }
 }

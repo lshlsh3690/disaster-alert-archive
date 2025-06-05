@@ -38,3 +38,4 @@ disaster-alert:
   api:
     service-key: ${DISASTER_ALERT_SERVICE_KEY}
 
+

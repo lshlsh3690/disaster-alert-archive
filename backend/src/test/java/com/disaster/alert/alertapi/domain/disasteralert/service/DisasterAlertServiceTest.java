@@ -4,18 +4,23 @@ import com.disaster.alert.alertapi.domain.disasteralert.model.DisasterAlert;
 import com.disaster.alert.alertapi.domain.disasteralert.repository.DisasterAlertRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.transaction.Transactional;
+import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.test.context.ActiveProfiles;
 
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.mockito.Mockito.*;
 
 @SpringBootTest
+@ActiveProfiles("test")
+@Slf4j
 class DisasterAlertServiceTest {
 
     @Autowired
@@ -23,14 +28,6 @@ class DisasterAlertServiceTest {
 
     @Autowired
     private DisasterAlertService disasterAlertService;
-
-    private final ObjectMapper objectMapper = new ObjectMapper();
-
-    @BeforeEach
-    void setUp() {
-        disasterAlertRepository = mock(DisasterAlertRepository.class);
-    }
-
 
     @Test
     @Transactional
@@ -58,7 +55,7 @@ class DisasterAlertServiceTest {
             },
             {
               "MSG_CN": "또 다른 경보",
-              "RCPTN_RGN_NM": "부산시",
+              "RCPTN_RGN_NM": "경상남도 부산시",
               "CRT_DT": "2023/09/16 11:01:00",
               "EMRG_STEP_NM": "안전안내",
               "SN": 123457,
@@ -69,20 +66,27 @@ class DisasterAlertServiceTest {
         }
         """;
 
-        // 이미 저장된 SN 123456은 제외되어야 함
-        when(disasterAlertRepository.findExistingSn(List.of(123456L, 123457L)))
-                .thenReturn(List.of(123456L));
-
         // when
         disasterAlertService.saveData(rawJson);
 
-        // then: saveAll 호출된 Alert는 1개여야 함 (123457만 저장)
-        ArgumentCaptor<List<DisasterAlert>> captor = ArgumentCaptor.forClass(List.class);
-        verify(disasterAlertRepository, times(1)).saveAll(captor.capture());
+        List<DisasterAlert> alerts = disasterAlertRepository.findAll();
 
-        List<DisasterAlert> saved = captor.getValue();
-        assertEquals(1, saved.size());
-        assertEquals(123457L, saved.get(0).getSn());
-        assertEquals("부산시", saved.get(0).getRegion());
+        // then
+        assertEquals(2, alerts.size());
+        assertEquals(123457L, alerts.get(1).getSn());
+        assertEquals("경상남도 부산시", alerts.get(1).getRegions().get(0).getLegalDistrict().getName()); // 부산시가 저장되어야 함
+    }
+
+    @Test
+    @Transactional
+    void initAllDisasterData() {
+        // given
+
+        // when
+        disasterAlertService.initAllDisasterData();
+
+        // then
+        List<DisasterAlert> all = disasterAlertRepository.findAll();
+        assertFalse(all.isEmpty(), "재난문자 데이터가 비어있지 않아야 합니다");
     }
 }
