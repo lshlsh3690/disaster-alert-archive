@@ -1,5 +1,6 @@
 package com.disaster.alert.alertapi.domain.disasteralert.model;
 
+import com.disaster.alert.alertapi.domain.region.model.LegalDistrict;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -41,7 +42,7 @@ public class DisasterAlert {
 
     @Column(name = "modified_date")
     private LocalDateTime modifiedDate;   // MDFCN_YMD
-
+  
     public void setRegions(List<DisasterAlertRegion> regions) {
         this.regions = regions;
     }

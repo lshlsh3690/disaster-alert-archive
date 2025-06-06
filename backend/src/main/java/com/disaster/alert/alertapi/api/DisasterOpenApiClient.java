@@ -30,7 +30,7 @@ public class DisasterOpenApiClient {
         url.append(serviceKey);
         url.append("&crtDt=" + date.toString());
         url.append("&numOfRows=1000");
-
+      
         String forObject = restTemplate.getForObject(url.toString(), String.class);
         log.info("Response from Disaster Open API: {}", forObject);
         return forObject;
