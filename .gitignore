@@ -23,6 +23,10 @@ build/
 out/
 /backend/bin/
 
+# QueryDSL generated Q-classes
+/backend/src/main/generated/
+
+
 # VSCode / Cursor
 .vscode/
 .cursor/

@@ -2,6 +2,7 @@ package com.disaster.alert.alertapi.domain.disasteralert.service;
 
 import com.disaster.alert.alertapi.api.DisasterOpenApiClient;
 import com.disaster.alert.alertapi.domain.disasteralert.dto.DisasterAlertDto;
+import com.disaster.alert.alertapi.domain.disasteralert.dto.DisasterAlertResponseDto;
 import com.disaster.alert.alertapi.domain.disasteralert.dto.DisasterApiResponse;
 import com.disaster.alert.alertapi.domain.disasteralert.model.DisasterAlert;
 import com.disaster.alert.alertapi.domain.disasteralert.model.DisasterAlertRegion;
@@ -12,8 +13,11 @@ import com.disaster.alert.alertapi.domain.region.repository.LegalDistrictReposit
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
@@ -219,6 +223,10 @@ public class DisasterAlertService {
         } catch (Exception e) {
             log.error("재난문자 초기화 중 오류 발생", e);
         }
+    }
+
+    public Page<DisasterAlertResponseDto> searchAlerts(String region, String districtCode, LocalDate startDate, LocalDate endDate, String type, DisasterLevel level, String keyword, Pageable pageable) {
+        return null;
     }
 }
 
