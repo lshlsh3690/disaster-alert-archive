@@ -1,94 +1,187 @@
 package com.disaster.alert.alertapi.domain.disasteralert.service;
 
+import com.disaster.alert.alertapi.domain.disasteralert.dto.DisasterAlertResponseDto;
 import com.disaster.alert.alertapi.domain.disasteralert.model.DisasterAlert;
+import com.disaster.alert.alertapi.domain.disasteralert.model.DisasterLevel;
 import com.disaster.alert.alertapi.domain.disasteralert.repository.DisasterAlertRepository;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import com.disaster.alert.alertapi.domain.region.model.LegalDistrict;
+import com.disaster.alert.alertapi.domain.region.repository.LegalDistrictRepository;
 import jakarta.transaction.Transactional;
 import lombok.extern.slf4j.Slf4j;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
 import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.context.TestPropertySource;
 
+import java.time.LocalDate;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.mockito.Mockito.*;
 
-@Slf4j
 @SpringBootTest
 @ActiveProfiles("test")
 @Slf4j
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class DisasterAlertServiceTest {
+
     @Autowired
     private DisasterAlertRepository disasterAlertRepository;
 
     @Autowired
     private DisasterAlertService disasterAlertService;
 
-    @Test
-    @Transactional
-    void saveData() {
-        // given
-        String rawJson = """
-        {
-          "header": {
-            "resultMsg": "NORMAL SERVICE",
-            "resultCode": "00",
-            "errorMsg": null
-          },
-          "numOfRows": 10,
-          "pageNo": 1,
-          "totalCount": 2,
-          "body": [
-            {
-              "MSG_CN": "비상 상황입니다",
-              "RCPTN_RGN_NM": "경상남도 진주시",
-              "CRT_DT": "2023/09/16 11:00:00",
-              "EMRG_STEP_NM": "안전안내",
-              "SN": 123456,
-              "DST_SE_NM": "호우",
-              "MDFCN_YMD": "2023/09/16 08:32:00.000000000"
-            },
-            {
-              "MSG_CN": "또 다른 경보",
-              "RCPTN_RGN_NM": "경상남도 부산시",
-              "CRT_DT": "2023/09/16 11:01:00",
-              "EMRG_STEP_NM": "안전안내",
-              "SN": 123457,
-              "DST_SE_NM": "지진",
-              "MDFCN_YMD": "2025/05/27 08:32:00.000000000"
-            }
-          ]
-        }
-        """;
+    @Autowired
+    private LegalDistrictRepository legalDistrictRepository;
 
-        // when
-        disasterAlertService.saveData(rawJson);
+    @BeforeAll
+    public void setUpLegalDistrict() {
+        // 테스트용 지역 데이터 추가
+        LegalDistrict legalDistrict = LegalDistrict.builder()
+                .name("서울특별시")
+                .code("1100000000")
+                .build();
+        legalDistrictRepository.save(legalDistrict);
 
-        List<DisasterAlert> alerts = disasterAlertRepository.findAll();
+        LegalDistrict jongro = LegalDistrict.builder()
+                .name("서울특별시 종로구")
+                .code("1111000000")
+                .build();
+        legalDistrictRepository.save(jongro);
 
-        // then
-        assertEquals(2, alerts.size());
-        assertEquals(123457L, alerts.get(1).getSn());
-        assertEquals("경상남도 부산시", alerts.get(1).getRegions().get(0).getLegalDistrict().getName()); // 부산시가 저장되어야 함
+        LegalDistrict gwangju = LegalDistrict.builder()
+                .name("광주광역시")
+                .code("2900000000")
+                .build();
+        legalDistrictRepository.save(gwangju);
+
+        LegalDistrict gwangjuDongu = LegalDistrict.builder()
+                .name("광주광역시 동구")
+                .code("2911000000")
+                .build();
+
+        legalDistrictRepository.save(gwangjuDongu);
+    }
+
+    @BeforeEach
+    void setUp() {
+        LegalDistrict legalDistrict = legalDistrictRepository.findByName("서울특별시")
+                .orElseThrow(() -> new IllegalArgumentException("지역이 존재하지 않습니다."));
+        LegalDistrict legalDistrict1 = legalDistrictRepository.findByName("광주광역시 동구")
+                .orElseThrow(() -> new IllegalArgumentException("지역이 존재하지 않습니다."));
+
+
+        // 테스트 데이터 추가
+        DisasterAlert alert1 = DisasterAlert.builder()
+                .sn(123456L)
+                .message("호우 경보 발령")
+                .createdAt(LocalDate.of(2024, 6, 1).atStartOfDay())
+                .emergencyLevel(DisasterLevel.LEVEL_2)
+                .disasterType("호우")
+                .legalDistrict(legalDistrict)
+                .build();
+
+
+
+        DisasterAlert alert2 = DisasterAlert.builder()
+                .sn(123457L)
+                .message("지진 발생 주의")
+                .createdAt(LocalDate.of(2024, 6, 2).atStartOfDay())
+                .emergencyLevel(DisasterLevel.LEVEL_3)
+                .disasterType("지진")
+                .legalDistrict(legalDistrict1)
+                .build();
+
+        disasterAlertRepository.saveAll(List.of(alert1, alert2));
     }
 
     @Test
     @Transactional
-    void initAllDisasterData() {
+    void saveData() {
+        List<DisasterAlert> all = disasterAlertRepository.findAll();
+
+        assertEquals(2, all.size());
+    }
+
+
+    @Test
+    @Transactional
+    void searchAlerts_조건없이조회() {
         // given
+        Pageable pageable = PageRequest.of(0, 10);
 
         // when
-        disasterAlertService.initAllDisasterData();
+        Page<DisasterAlertResponseDto> result = disasterAlertService.searchAlerts(
+                null, null, null, null, null, null, null, pageable
+        );
 
         // then
-        List<DisasterAlert> all = disasterAlertRepository.findAll();
-        assertFalse(all.isEmpty(), "재난문자 데이터가 비어있지 않아야 합니다");
+        assertEquals(2, result.getTotalElements());
+    }
+
+    @Test
+    @Transactional
+    void searchAlerts_지역명기반조회() {
+        Pageable pageable = PageRequest.of(0, 10);
+
+        Page<DisasterAlertResponseDto> result = disasterAlertService.searchAlerts(
+                "강남구", null, null, null, null, null, null, pageable
+        );
+
+        assertEquals(2, result.getTotalElements());
+    }
+
+    @Test
+    @Transactional
+    void searchAlerts_기간조회() {
+        Pageable pageable = PageRequest.of(0, 10);
+
+        Page<DisasterAlertResponseDto> result = disasterAlertService.searchAlerts(
+                null, null,
+                LocalDate.of(2024, 6, 2),
+                LocalDate.of(2024, 6, 2),
+                null, null, null, pageable
+        );
+
+        assertEquals(1, result.getTotalElements());
+        assertEquals("호우 경보 발령", result.getContent().get(0).getMessage());
+    }
+
+    @Test
+    @Transactional
+    void searchAlerts_키워드조회() {
+        Pageable pageable = PageRequest.of(0, 10);
+
+        Page<DisasterAlertResponseDto> result = disasterAlertService.searchAlerts(
+                null, null, null, null, null, null,
+                "지진", pageable
+        );
+
+        assertEquals(1, result.getTotalElements());
+        assertEquals("지진 발생 주의", result.getContent().get(0).getMessage());
+    }
+
+    @Test
+    @Transactional
+    void searchAlerts_종합조건조회() {
+        Pageable pageable = PageRequest.of(0, 10);
+
+        Page<DisasterAlertResponseDto> result = disasterAlertService.searchAlerts(
+                "강남구", "11680",
+                LocalDate.of(2024, 6, 1),
+                LocalDate.of(2024, 6, 1),
+                "지진", DisasterLevel.LEVEL_3,
+                "주의", pageable
+        );
+
+        assertEquals(1, result.getTotalElements());
+        assertEquals("지진 발생 주의", result.getContent().get(0).getMessage());
     }
 }

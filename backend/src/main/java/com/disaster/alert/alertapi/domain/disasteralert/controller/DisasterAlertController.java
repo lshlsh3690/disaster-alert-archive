@@ -26,11 +26,11 @@ public class DisasterAlertController {
     /**
      * 전체 재난문자 조회
      */
-    @GetMapping
-    public ResponseEntity<List<DisasterAlertResponseDto>> getAllDisasterAlerts() {
-        List<DisasterAlertResponseDto> alerts = disasterAlertService.findAllAsDto();
-        return ResponseEntity.ok(alerts);
-    }
+//    @GetMapping
+//    public ResponseEntity<List<DisasterAlertResponseDto>> getAllDisasterAlerts() {
+//        List<DisasterAlertResponseDto> alerts = disasterAlertService.findAllAsDto();
+//        return ResponseEntity.ok(alerts);
+//    }
 
 
     @GetMapping("/search")

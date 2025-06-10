@@ -1,11 +1,11 @@
 package com.disaster.alert.alertapi.domain.disasteralert.service;
 
 import com.disaster.alert.alertapi.api.DisasterOpenApiClient;
+import com.disaster.alert.alertapi.domain.disasteralert.dto.AlertSearchCondition;
 import com.disaster.alert.alertapi.domain.disasteralert.dto.DisasterAlertDto;
 import com.disaster.alert.alertapi.domain.disasteralert.dto.DisasterAlertResponseDto;
 import com.disaster.alert.alertapi.domain.disasteralert.dto.DisasterApiResponse;
 import com.disaster.alert.alertapi.domain.disasteralert.model.DisasterAlert;
-import com.disaster.alert.alertapi.domain.disasteralert.model.DisasterAlertRegion;
 import com.disaster.alert.alertapi.domain.disasteralert.model.DisasterLevel;
 import com.disaster.alert.alertapi.domain.disasteralert.repository.DisasterAlertRepository;
 import com.disaster.alert.alertapi.domain.region.model.LegalDistrict;
@@ -57,7 +57,7 @@ public class DisasterAlertService {
 
             List<DisasterAlert> newAlerts = dtos.stream()
                     .filter(dto -> !existingSnSet.contains(dto.getSn()))
-                    .map(this::toEntity)
+                    .flatMap(dto -> toEntities(dto).stream())
                     .toList();
 
             if (newAlerts.isEmpty()) {
@@ -72,7 +72,7 @@ public class DisasterAlertService {
         }
     }
 
-    private DisasterAlert toEntity(DisasterAlertDto dto) {
+    private List<DisasterAlert> toEntities(DisasterAlertDto dto) {
         // 지역 이름을 쉼표로 분리하고 공백 제거
         // example: "서울시 , 경기 전체" → ["서울시", "경기"]
         List<String> regionNames = Arrays.stream(dto.getRegion().split(","))
@@ -86,39 +86,22 @@ public class DisasterAlertService {
             regionNames = List.of("경기도 연천군", "경기도 파주시");
         }
 
-        // 각 이름으로 LegalDistrict 조회
-        List<LegalDistrict> legalDistricts = legalDistrictRepository.findByNameInOrderByCodeAsc(regionNames);
+        return regionNames.stream()
+                .map(regionName -> {
+                    LegalDistrict legalDistrict = legalDistrictRepository.findByName(regionName)
+                            .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 법정동: " + regionName));
 
-        // 폐지된 법정동의 개수는 다수이기 때문
-        if (legalDistricts.size() < regionNames.size()) {
-            // 조회된 지역 수가 요청한 지역 수와 다르면 예외 발생
-            regionNames = sanitizeRegionNames(dto.getRegion());
-            legalDistricts = legalDistrictRepository.findByNameInOrderByCodeAsc(regionNames);
-
-            if (legalDistricts.size() < regionNames.size()) {
-                // 여전히 조회된 지역 수가 요청한 지역 수와 다르면 예외 발생
-                log.info("일부 지역이 데이터베이스에 존재하지 않습니다: " + regionNames);
-                log.info("조회된 지역 수: {}, 요청한 지역 수: {}", legalDistricts.size(), regionNames.size());
-            }
-        }
-
-        // DisasterAlert 생성 (id는 아직 없음 → 중간 엔티티는 나중에 id 설정)
-        DisasterAlert alert = DisasterAlert.builder()
-                .sn(dto.getSn())
-                .message(dto.getMessage())
-                .createdAt(parseDateTime(dto.getCreatedAt()))
-                .emergencyLevel(dto.getEmergencyLevel() == null ? null : DisasterLevel.fromDescription(dto.getEmergencyLevel()))
-                .disasterType(dto.getDisasterType())
-                .modifiedDate(dto.getModifiedDate() == null ? null : parseDateTime(dto.getModifiedDate()))
-                .build();
-
-        // 연관 중간 테이블 생성
-        List<DisasterAlertRegion> regionLinks = legalDistricts.stream()
-                .map(district -> new DisasterAlertRegion(alert, district))
+                    return DisasterAlert.builder()
+                            .sn(dto.getSn())
+                            .message(dto.getMessage())
+                            .createdAt(parseDateTime(dto.getCreatedAt()))
+                            .emergencyLevel(dto.getEmergencyLevel() == null ? null : DisasterLevel.fromDescription(dto.getEmergencyLevel()))
+                            .disasterType(dto.getDisasterType())
+                            .legalDistrict(legalDistrict)
+                            .modifiedDate(dto.getModifiedDate() == null ? null : parseDateTime(dto.getModifiedDate()))
+                            .build();
+                })
                 .toList();
-
-        alert.setRegions(regionLinks);
-        return alert;
     }
 
     private LocalDateTime parseDateTime(String str) {
@@ -226,10 +209,18 @@ public class DisasterAlertService {
     }
 
     public Page<DisasterAlertResponseDto> searchAlerts(String region, String districtCode, LocalDate startDate, LocalDate endDate, String type, DisasterLevel level, String keyword, Pageable pageable) {
-        return null;
+        AlertSearchCondition alertSearchCondition = AlertSearchCondition.builder()
+                .region(region)
+                .districtCode(districtCode)
+                .startDate(startDate)
+                .endDate(endDate)
+                .type(type)
+                .level(level)
+                .keyword(keyword)
+                .build();
+
+        Page<DisasterAlert> result = disasterAlertRepository.searchAlerts(alertSearchCondition, pageable);
+
+        return result.map(DisasterAlertResponseDto::from);
     }
 }
-
-
-
-

@@ -13,7 +13,6 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @AllArgsConstructor
 public class DisasterAlertRegion {
-
     @EmbeddedId
     private DisasterAlertRegionId id = new DisasterAlertRegionId();
 

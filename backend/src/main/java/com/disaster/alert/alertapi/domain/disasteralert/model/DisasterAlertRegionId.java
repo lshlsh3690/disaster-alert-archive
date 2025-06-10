@@ -14,7 +14,6 @@ import java.io.Serializable;
 @EqualsAndHashCode
 @Setter
 public class DisasterAlertRegionId implements Serializable {
-
     @Column(name = "disaster_alert_id")
     private Long alertId;
 
