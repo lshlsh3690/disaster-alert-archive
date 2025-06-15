@@ -1,19 +1,23 @@
 package com.disaster.alert.alertapi.domain.disasteralert.service;
 
 import com.disaster.alert.alertapi.api.DisasterOpenApiClient;
+import com.disaster.alert.alertapi.domain.disasteralert.dto.AlertSearchCondition;
 import com.disaster.alert.alertapi.domain.disasteralert.dto.DisasterAlertDto;
+import com.disaster.alert.alertapi.domain.disasteralert.dto.DisasterAlertResponseDto;
 import com.disaster.alert.alertapi.domain.disasteralert.dto.DisasterApiResponse;
 import com.disaster.alert.alertapi.domain.disasteralert.model.DisasterAlert;
-import com.disaster.alert.alertapi.domain.disasteralert.model.DisasterAlertRegion;
 import com.disaster.alert.alertapi.domain.disasteralert.model.DisasterLevel;
 import com.disaster.alert.alertapi.domain.disasteralert.repository.DisasterAlertRepository;
-import com.disaster.alert.alertapi.domain.region.model.LegalDistrict;
-import com.disaster.alert.alertapi.domain.region.repository.LegalDistrictRepository;
+import com.disaster.alert.alertapi.domain.legaldistrict.model.LegalDistrict;
+import com.disaster.alert.alertapi.domain.legaldistrict.repository.LegalDistrictRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
@@ -53,13 +57,14 @@ public class DisasterAlertService {
 
             List<DisasterAlert> newAlerts = dtos.stream()
                     .filter(dto -> !existingSnSet.contains(dto.getSn()))
-                    .map(this::toEntity)
+                    .flatMap(dto -> toEntities(dto).stream())
                     .toList();
 
             if (newAlerts.isEmpty()) {
                 log.info("새로운 재난문자가 없습니다.");
                 return;
             }
+
 
             disasterAlertRepository.saveAll(newAlerts);
             log.info("재난문자 {}건 저장 완료", newAlerts.size());
@@ -68,12 +73,15 @@ public class DisasterAlertService {
         }
     }
 
-    private DisasterAlert toEntity(DisasterAlertDto dto) {
+    private List<DisasterAlert> toEntities(DisasterAlertDto dto) {
         // 지역 이름을 쉼표로 분리하고 공백 제거
         // example: "서울시 , 경기 전체" → ["서울시", "경기"]
         List<String> regionNames = Arrays.stream(dto.getRegion().split(","))
-                .map(String::trim)
-                .map(r -> r.replace("전체", "").trim())
+                .flatMap(region -> {
+                    // 법정동 이름을 정리하여 중복된 단어 제거
+                    String cleanedRegion = cleanRegionString(region);
+                    return sanitizeRegionNames(cleanedRegion).stream();
+                })
                 .toList();
 
         //법정동에 존재하지 않는 지역명
@@ -82,39 +90,39 @@ public class DisasterAlertService {
             regionNames = List.of("경기도 연천군", "경기도 파주시");
         }
 
-        // 각 이름으로 LegalDistrict 조회
-        List<LegalDistrict> legalDistricts = legalDistrictRepository.findByNameInOrderByCodeAsc(regionNames);
+        return regionNames.stream()
+                .map(regionName -> {
+                    List<LegalDistrict> legalDistricts = legalDistrictRepository.findAllByName(regionName);
 
-        // 폐지된 법정동의 개수는 다수이기 때문
-        if (legalDistricts.size() < regionNames.size()) {
-            // 조회된 지역 수가 요청한 지역 수와 다르면 예외 발생
-            regionNames = sanitizeRegionNames(dto.getRegion());
-            legalDistricts = legalDistrictRepository.findByNameInOrderByCodeAsc(regionNames);
+                    if (legalDistricts.isEmpty()) {
+                        log.warn("법정동 데이터가 없습니다: {}", regionName);
+                        return null; // 법정동이 없으면 null 반환
+                    }
 
-            if (legalDistricts.size() < regionNames.size()) {
-                // 여전히 조회된 지역 수가 요청한 지역 수와 다르면 예외 발생
-                log.info("일부 지역이 데이터베이스에 존재하지 않습니다: " + regionNames);
-                log.info("조회된 지역 수: {}, 요청한 지역 수: {}", legalDistricts.size(), regionNames.size());
-            }
-        }
+                    LegalDistrict legalDistrict = null;
+                    if (legalDistricts.size() > 1) {
+                        // 중복된 법정동이 있다면 우선적으로 활성화된 법정동을 찾고, 없으면 첫 번째 것을 사용
+                        legalDistrict = legalDistricts.stream()
+                                .filter(ld -> ld.isActive() || ld.getIsActiveString().equals("존재"))
+                                .findFirst()
+                                .orElse(legalDistricts.get(0)); // 활성화된 법정동이 없으면 첫 번째 것 사용
+                        log.warn("법정동 이름이 중복됩니다: {}", regionName);
+                    }else {
+                        // 법정동이 하나만 있다면 그 법정동 사용
+                        legalDistrict = legalDistricts.get(0);
+                    }
 
-        // DisasterAlert 생성 (id는 아직 없음 → 중간 엔티티는 나중에 id 설정)
-        DisasterAlert alert = DisasterAlert.builder()
-                .sn(dto.getSn())
-                .message(dto.getMessage())
-                .createdAt(parseDateTime(dto.getCreatedAt()))
-                .emergencyLevel(dto.getEmergencyLevel() == null ? null : DisasterLevel.fromDescription(dto.getEmergencyLevel()))
-                .disasterType(dto.getDisasterType())
-                .modifiedDate(dto.getModifiedDate() == null ? null : parseDateTime(dto.getModifiedDate()))
-                .build();
-
-        // 연관 중간 테이블 생성
-        List<DisasterAlertRegion> regionLinks = legalDistricts.stream()
-                .map(district -> new DisasterAlertRegion(alert, district))
+                    return DisasterAlert.builder()
+                            .sn(dto.getSn())
+                            .message(dto.getMessage())
+                            .createdAt(parseDateTime(dto.getCreatedAt()))
+                            .emergencyLevel(dto.getEmergencyLevel() == null ? null : DisasterLevel.fromDescription(dto.getEmergencyLevel()))
+                            .disasterType(dto.getDisasterType())
+                            .legalDistrict(legalDistrict)
+                            .modifiedDate(dto.getModifiedDate() == null ? null : parseDateTime(dto.getModifiedDate()))
+                            .build();
+                })
                 .toList();
-
-        alert.setRegions(regionLinks);
-        return alert;
     }
 
     private LocalDateTime parseDateTime(String str) {
@@ -217,11 +225,23 @@ public class DisasterAlertService {
 
             log.info("총 {}건 재난문자 초기화 완료", totalCount);
         } catch (Exception e) {
-            log.error("재난문자 초기화 중 오류 발생", e);
+            log.error("DisasterAlertService.initAllDisasterData() 오류 발생", e);
         }
     }
+
+    public Page<DisasterAlertResponseDto> searchAlerts(String region, String districtCode, LocalDate startDate, LocalDate endDate, String type, DisasterLevel level, String keyword, Pageable pageable) {
+        AlertSearchCondition alertSearchCondition = AlertSearchCondition.builder()
+                .region(region)
+                .districtCode(districtCode)
+                .startDate(startDate)
+                .endDate(endDate)
+                .type(type)
+                .level(level)
+                .keyword(keyword)
+                .build();
+
+        Page<DisasterAlert> result = disasterAlertRepository.searchAlerts(alertSearchCondition, pageable);
+
+        return result.map(DisasterAlertResponseDto::from);
+    }
 }
-
-
-
-

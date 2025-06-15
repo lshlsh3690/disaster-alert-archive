@@ -1,6 +1,6 @@
 package com.disaster.alert.alertapi.domain.disasteralert.model;
 
-import com.disaster.alert.alertapi.domain.region.model.LegalDistrict;
+import com.disaster.alert.alertapi.domain.legaldistrict.model.LegalDistrict;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
@@ -13,7 +13,6 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @AllArgsConstructor
 public class DisasterAlertRegion {
-
     @EmbeddedId
     private DisasterAlertRegionId id = new DisasterAlertRegionId();
 

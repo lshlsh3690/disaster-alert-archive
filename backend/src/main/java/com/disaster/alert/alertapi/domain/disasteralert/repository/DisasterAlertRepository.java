@@ -7,7 +7,7 @@ import org.springframework.data.jpa.repository.Query;
 
 import java.util.List;
 
-public interface DisasterAlertRepository extends JpaRepository<DisasterAlert, Long> {
+public interface DisasterAlertRepository extends JpaRepository<DisasterAlert, Long>, DisasterAlertRepositoryCustom {
     boolean existsBySn(Long sn);
 
     @Query("SELECT d.sn FROM DisasterAlert d WHERE d.sn IN :snList")

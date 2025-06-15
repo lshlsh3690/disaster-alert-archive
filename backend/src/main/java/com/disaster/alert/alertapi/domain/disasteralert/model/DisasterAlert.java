@@ -1,12 +1,10 @@
 package com.disaster.alert.alertapi.domain.disasteralert.model;
 
-import com.disaster.alert.alertapi.domain.region.model.LegalDistrict;
+import com.disaster.alert.alertapi.domain.legaldistrict.model.LegalDistrict;
 import jakarta.persistence.*;
 import lombok.*;
 
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.List;
 
 @Entity
 @Table(name = "disaster_alert")
@@ -21,10 +19,12 @@ public class DisasterAlert {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @OneToMany(mappedBy = "disasterAlert", orphanRemoval = true)
-    private List<DisasterAlertRegion> regions = new ArrayList<>(); // 재난 알림과 연관된 지역 정보
+    @ManyToOne(fetch = FetchType.LAZY)
+    @Setter
+    @JoinColumn(name = "legal_district_code", nullable = false)
+    private LegalDistrict legalDistrict;
 
-    @Column(name = "sn", unique = true, nullable = false)
+    @Column(name = "sn", nullable = false)
     private Long sn;                // SN 외부 OPEN API에서 제공하는 고유번호
 
     @Column(columnDefinition = "TEXT")
@@ -42,8 +42,4 @@ public class DisasterAlert {
 
     @Column(name = "modified_date")
     private LocalDateTime modifiedDate;   // MDFCN_YMD
-  
-    public void setRegions(List<DisasterAlertRegion> regions) {
-        this.regions = regions;
-    }
 }

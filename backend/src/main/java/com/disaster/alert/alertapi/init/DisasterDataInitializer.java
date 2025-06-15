@@ -2,6 +2,7 @@ package com.disaster.alert.alertapi.init;
 
 import com.disaster.alert.alertapi.api.DisasterOpenApiClient;
 import com.disaster.alert.alertapi.domain.disasteralert.service.DisasterAlertService;
+import com.disaster.alert.alertapi.domain.legaldistrict.service.LegalDistrictService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.CommandLineRunner;
@@ -18,10 +19,17 @@ public class DisasterDataInitializer implements CommandLineRunner {
      * init 프로파일이 활성화된 경우에만 실행됩니다.
      */
     private final DisasterAlertService disasterAlertService;
+    private final LegalDistrictService legalDistrictService;
 
     @Override
     public void run(String... args) {
         log.info("DisasterDataInitializer 실행: 재난 데이터 초기화 시작");
-        disasterAlertService.initAllDisasterData();
+
+        try {
+            legalDistrictService.saveAllLegalDistricts();
+            disasterAlertService.initAllDisasterData();
+        } catch (Exception e) {
+            log.error("DisasterDataInitializer.run 재난 데이터 초기화 중 오류 발생: {}", e.getMessage(), e);
+        }
     }
 }
