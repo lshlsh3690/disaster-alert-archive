@@ -1,6 +1,6 @@
-package com.disaster.alert.alertapi.domain.region.repository;
+package com.disaster.alert.alertapi.domain.legaldistrict.repository;
 
-import com.disaster.alert.alertapi.domain.region.model.LegalDistrict;
+import com.disaster.alert.alertapi.domain.legaldistrict.model.LegalDistrict;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.List;
@@ -11,9 +11,13 @@ public interface LegalDistrictRepository extends JpaRepository<LegalDistrict, St
 
     Optional<LegalDistrict> findByName(String name);
 
+    List<LegalDistrict> findAllByName(String name);
+
     List<LegalDistrict> findByIsActiveTrue();
 
     List<LegalDistrict> findByNameInOrderByCodeAsc(List<String> names);
 
     boolean existsByName(String combined);
+
+    boolean existsByCode(String code);
 }

@@ -8,8 +8,8 @@ import com.disaster.alert.alertapi.domain.disasteralert.dto.DisasterApiResponse;
 import com.disaster.alert.alertapi.domain.disasteralert.model.DisasterAlert;
 import com.disaster.alert.alertapi.domain.disasteralert.model.DisasterLevel;
 import com.disaster.alert.alertapi.domain.disasteralert.repository.DisasterAlertRepository;
-import com.disaster.alert.alertapi.domain.region.model.LegalDistrict;
-import com.disaster.alert.alertapi.domain.region.repository.LegalDistrictRepository;
+import com.disaster.alert.alertapi.domain.legaldistrict.model.LegalDistrict;
+import com.disaster.alert.alertapi.domain.legaldistrict.repository.LegalDistrictRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -65,6 +65,7 @@ public class DisasterAlertService {
                 return;
             }
 
+
             disasterAlertRepository.saveAll(newAlerts);
             log.info("재난문자 {}건 저장 완료", newAlerts.size());
         } catch (Exception e) {
@@ -76,8 +77,11 @@ public class DisasterAlertService {
         // 지역 이름을 쉼표로 분리하고 공백 제거
         // example: "서울시 , 경기 전체" → ["서울시", "경기"]
         List<String> regionNames = Arrays.stream(dto.getRegion().split(","))
-                .map(String::trim)
-                .map(r -> r.replace("전체", "").trim())
+                .flatMap(region -> {
+                    // 법정동 이름을 정리하여 중복된 단어 제거
+                    String cleanedRegion = cleanRegionString(region);
+                    return sanitizeRegionNames(cleanedRegion).stream();
+                })
                 .toList();
 
         //법정동에 존재하지 않는 지역명
@@ -88,8 +92,25 @@ public class DisasterAlertService {
 
         return regionNames.stream()
                 .map(regionName -> {
-                    LegalDistrict legalDistrict = legalDistrictRepository.findByName(regionName)
-                            .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 법정동: " + regionName));
+                    List<LegalDistrict> legalDistricts = legalDistrictRepository.findAllByName(regionName);
+
+                    if (legalDistricts.isEmpty()) {
+                        log.warn("법정동 데이터가 없습니다: {}", regionName);
+                        return null; // 법정동이 없으면 null 반환
+                    }
+
+                    LegalDistrict legalDistrict = null;
+                    if (legalDistricts.size() > 1) {
+                        // 중복된 법정동이 있다면 우선적으로 활성화된 법정동을 찾고, 없으면 첫 번째 것을 사용
+                        legalDistrict = legalDistricts.stream()
+                                .filter(ld -> ld.isActive() || ld.getIsActiveString().equals("존재"))
+                                .findFirst()
+                                .orElse(legalDistricts.get(0)); // 활성화된 법정동이 없으면 첫 번째 것 사용
+                        log.warn("법정동 이름이 중복됩니다: {}", regionName);
+                    }else {
+                        // 법정동이 하나만 있다면 그 법정동 사용
+                        legalDistrict = legalDistricts.get(0);
+                    }
 
                     return DisasterAlert.builder()
                             .sn(dto.getSn())
@@ -204,7 +225,7 @@ public class DisasterAlertService {
 
             log.info("총 {}건 재난문자 초기화 완료", totalCount);
         } catch (Exception e) {
-            log.error("재난문자 초기화 중 오류 발생", e);
+            log.error("DisasterAlertService.initAllDisasterData() 오류 발생", e);
         }
     }
 

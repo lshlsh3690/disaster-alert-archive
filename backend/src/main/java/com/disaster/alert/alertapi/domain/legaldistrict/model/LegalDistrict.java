@@ -1,6 +1,5 @@
-package com.disaster.alert.alertapi.domain.region.model;
+package com.disaster.alert.alertapi.domain.legaldistrict.model;
 
-import com.disaster.alert.alertapi.domain.disasteralert.model.DisasterAlert;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -20,4 +19,7 @@ public class LegalDistrict {
 
     @Column(name = "is_active", nullable = false)
     private boolean isActive;   // true: 존재 / false: 폐지
+
+    @Column(name = "is_active_string", nullable = false)
+    private String isActiveString;
 }

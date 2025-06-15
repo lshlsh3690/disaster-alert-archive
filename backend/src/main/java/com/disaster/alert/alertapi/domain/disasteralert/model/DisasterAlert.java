@@ -1,6 +1,6 @@
 package com.disaster.alert.alertapi.domain.disasteralert.model;
 
-import com.disaster.alert.alertapi.domain.region.model.LegalDistrict;
+import com.disaster.alert.alertapi.domain.legaldistrict.model.LegalDistrict;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -24,7 +24,7 @@ public class DisasterAlert {
     @JoinColumn(name = "legal_district_code", nullable = false)
     private LegalDistrict legalDistrict;
 
-    @Column(name = "sn", unique = true, nullable = false)
+    @Column(name = "sn", nullable = false)
     private Long sn;                // SN 외부 OPEN API에서 제공하는 고유번호
 
     @Column(columnDefinition = "TEXT")

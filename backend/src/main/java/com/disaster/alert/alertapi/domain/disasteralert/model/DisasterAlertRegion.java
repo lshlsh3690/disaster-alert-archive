@@ -1,6 +1,6 @@
 package com.disaster.alert.alertapi.domain.disasteralert.model;
 
-import com.disaster.alert.alertapi.domain.region.model.LegalDistrict;
+import com.disaster.alert.alertapi.domain.legaldistrict.model.LegalDistrict;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;

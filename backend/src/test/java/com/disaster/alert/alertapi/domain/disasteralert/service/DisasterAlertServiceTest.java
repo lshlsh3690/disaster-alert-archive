@@ -4,15 +4,14 @@ import com.disaster.alert.alertapi.domain.disasteralert.dto.DisasterAlertRespons
 import com.disaster.alert.alertapi.domain.disasteralert.model.DisasterAlert;
 import com.disaster.alert.alertapi.domain.disasteralert.model.DisasterLevel;
 import com.disaster.alert.alertapi.domain.disasteralert.repository.DisasterAlertRepository;
-import com.disaster.alert.alertapi.domain.region.model.LegalDistrict;
-import com.disaster.alert.alertapi.domain.region.repository.LegalDistrictRepository;
+import com.disaster.alert.alertapi.domain.legaldistrict.model.LegalDistrict;
+import com.disaster.alert.alertapi.domain.legaldistrict.repository.LegalDistrictRepository;
 import jakarta.transaction.Transactional;
 import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
-import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.data.domain.Page;
@@ -24,7 +23,6 @@ import java.time.LocalDate;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.mockito.Mockito.*;
 
 @SpringBootTest
 @ActiveProfiles("test")
@@ -92,7 +90,7 @@ class DisasterAlertServiceTest {
 
         DisasterAlert alert2 = DisasterAlert.builder()
                 .sn(123457L)
-                .message("지진 발생 주의")
+                .message("지진 경보 발령")
                 .createdAt(LocalDate.of(2024, 6, 2).atStartOfDay())
                 .emergencyLevel(DisasterLevel.LEVEL_3)
                 .disasterType("지진")
@@ -132,10 +130,10 @@ class DisasterAlertServiceTest {
         Pageable pageable = PageRequest.of(0, 10);
 
         Page<DisasterAlertResponseDto> result = disasterAlertService.searchAlerts(
-                "강남구", null, null, null, null, null, null, pageable
+                "서울특별시", null, null, null, null, null, null, pageable
         );
 
-        assertEquals(2, result.getTotalElements());
+        assertEquals(1, result.getTotalElements());
     }
 
     @Test
@@ -151,7 +149,7 @@ class DisasterAlertServiceTest {
         );
 
         assertEquals(1, result.getTotalElements());
-        assertEquals("호우 경보 발령", result.getContent().get(0).getMessage());
+        assertEquals("지진 경보 발령", result.getContent().get(0).getMessage());
     }
 
     @Test
@@ -165,7 +163,7 @@ class DisasterAlertServiceTest {
         );
 
         assertEquals(1, result.getTotalElements());
-        assertEquals("지진 발생 주의", result.getContent().get(0).getMessage());
+        assertEquals("지진 경보 발령", result.getContent().get(0).getMessage());
     }
 
     @Test
@@ -174,14 +172,14 @@ class DisasterAlertServiceTest {
         Pageable pageable = PageRequest.of(0, 10);
 
         Page<DisasterAlertResponseDto> result = disasterAlertService.searchAlerts(
-                "강남구", "11680",
+                "광주광역시 동구", "2911000000",
                 LocalDate.of(2024, 6, 1),
-                LocalDate.of(2024, 6, 1),
+                LocalDate.of(2024, 6, 2),
                 "지진", DisasterLevel.LEVEL_3,
-                "주의", pageable
+                "경보", pageable
         );
 
         assertEquals(1, result.getTotalElements());
-        assertEquals("지진 발생 주의", result.getContent().get(0).getMessage());
+        assertEquals("지진 경보 발령", result.getContent().get(0).getMessage());
     }
 }
