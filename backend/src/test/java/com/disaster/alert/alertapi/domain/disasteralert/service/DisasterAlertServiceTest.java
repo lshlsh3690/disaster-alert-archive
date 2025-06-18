@@ -45,30 +45,35 @@ class DisasterAlertServiceTest {
         LegalDistrict legalDistrict = LegalDistrict.builder()
                 .name("서울특별시")
                 .code("1100000000")
+                .isActiveString("존재")
                 .build();
         legalDistrictRepository.save(legalDistrict);
 
         LegalDistrict jongro = LegalDistrict.builder()
                 .name("서울특별시 종로구")
                 .code("1111000000")
+                .isActiveString("존재")
                 .build();
         legalDistrictRepository.save(jongro);
 
         LegalDistrict gwangju = LegalDistrict.builder()
                 .name("광주광역시")
                 .code("2900000000")
+                .isActiveString("존재")
                 .build();
         legalDistrictRepository.save(gwangju);
 
         LegalDistrict gwangjuDongu = LegalDistrict.builder()
                 .name("광주광역시 동구")
                 .code("2911000000")
+                .isActiveString("존재")
                 .build();
 
         legalDistrictRepository.save(gwangjuDongu);
     }
 
     @BeforeEach
+    @Transactional
     void setUp() {
         LegalDistrict legalDistrict = legalDistrictRepository.findByName("서울특별시")
                 .orElseThrow(() -> new IllegalArgumentException("지역이 존재하지 않습니다."));
@@ -83,9 +88,9 @@ class DisasterAlertServiceTest {
                 .createdAt(LocalDate.of(2024, 6, 1).atStartOfDay())
                 .emergencyLevel(DisasterLevel.LEVEL_2)
                 .disasterType("호우")
-                .legalDistrict(legalDistrict)
                 .build();
 
+        alert1.addRegion(legalDistrict); // 서울특별시 종로구 지역 추가
 
 
         DisasterAlert alert2 = DisasterAlert.builder()
@@ -94,8 +99,9 @@ class DisasterAlertServiceTest {
                 .createdAt(LocalDate.of(2024, 6, 2).atStartOfDay())
                 .emergencyLevel(DisasterLevel.LEVEL_3)
                 .disasterType("지진")
-                .legalDistrict(legalDistrict1)
                 .build();
+
+        alert2.addRegion(legalDistrict1); // 광주광역시 동구 지역 추가
 
         disasterAlertRepository.saveAll(List.of(alert1, alert2));
     }

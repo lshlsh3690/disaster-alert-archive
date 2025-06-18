@@ -1,8 +1,11 @@
 package com.disaster.alert.alertapi.domain.disasteralert.repository;
 
 import com.disaster.alert.alertapi.domain.disasteralert.dto.AlertSearchCondition;
+import com.disaster.alert.alertapi.domain.disasteralert.dto.DisasterAlertRegionStatDto;
 import com.disaster.alert.alertapi.domain.disasteralert.model.DisasterAlert;
 import com.disaster.alert.alertapi.domain.disasteralert.model.DisasterLevel;
+import com.querydsl.core.BooleanBuilder;
+import com.querydsl.core.types.Projections;
 import com.querydsl.core.types.dsl.BooleanExpression;
 import com.querydsl.jpa.impl.JPAQueryFactory;
 import lombok.RequiredArgsConstructor;
@@ -15,6 +18,8 @@ import java.time.LocalDate;
 import java.util.List;
 
 import static com.disaster.alert.alertapi.domain.disasteralert.model.QDisasterAlert.disasterAlert;
+import static com.disaster.alert.alertapi.domain.disasteralert.model.QDisasterAlertRegion.disasterAlertRegion;
+import static com.disaster.alert.alertapi.domain.legaldistrict.model.QLegalDistrict.legalDistrict;
 
 @RequiredArgsConstructor
 public class DisasterAlertRepositoryImpl implements DisasterAlertRepositoryCustom{
@@ -31,15 +36,7 @@ public class DisasterAlertRepositoryImpl implements DisasterAlertRepositoryCusto
     public Page<DisasterAlert> searchAlerts(AlertSearchCondition condition, Pageable pageable) {
         List<DisasterAlert> contents = queryFactory
                 .selectFrom(disasterAlert)
-                .where(
-                        regionEq(condition.getRegion()),
-                        districtCodeEq(condition.getDistrictCode()),
-                        dateGoe(condition.getStartDate()),
-                        dateLoe(condition.getEndDate()),
-                        typeEq(condition.getType()),
-                        levelEq(condition.getLevel()),
-                        keywordContains(condition.getKeyword())
-                )
+                .where(byAlertCondition(condition))
                 .offset(pageable.getOffset())
                 .limit(pageable.getPageSize())
                 .orderBy(disasterAlert.createdAt.desc())
@@ -49,27 +46,44 @@ public class DisasterAlertRepositoryImpl implements DisasterAlertRepositoryCusto
         long total = queryFactory
                 .select(disasterAlert.count())
                 .from(disasterAlert)
-                .where(
-                        regionEq(condition.getRegion()),
-                        districtCodeEq(condition.getDistrictCode()),
-                        dateGoe(condition.getStartDate()),
-                        dateLoe(condition.getEndDate()),
-                        typeEq(condition.getType()),
-                        levelEq(condition.getLevel()),
-                        keywordContains(condition.getKeyword())
-                )
+                .where(byAlertCondition(condition))
                 .fetchOne();
 
         return new PageImpl<>(contents, pageable, total);
     }
 
+    @Override
+    public List<DisasterAlert> getRegionStats(AlertSearchCondition condition) {
+        return queryFactory
+                .selectFrom(disasterAlert)
+                .distinct()
+                .join(disasterAlert.disasterAlertRegions, disasterAlertRegion).fetchJoin()
+                .join(disasterAlertRegion.legalDistrict, legalDistrict).fetchJoin()
+                .where(byAlertCondition(condition))
+                .fetch();
+    }
+
+
+    private BooleanBuilder byAlertCondition(AlertSearchCondition condition) {
+        BooleanBuilder builder = new BooleanBuilder();
+
+        if (condition.getRegion() != null) builder.and(regionEq(condition.getRegion()));
+        if (condition.getDistrictCode() != null) builder.and(districtCodeEq(condition.getDistrictCode()));
+        if (condition.getStartDate() != null) builder.and(dateGoe(condition.getStartDate()));
+        if (condition.getEndDate() != null) builder.and(dateLoe(condition.getEndDate()));
+        if (condition.getType() != null) builder.and(typeEq(condition.getType()));
+        if (condition.getLevel() != null) builder.and(levelEq(condition.getLevel()));
+        if (condition.getKeyword() != null) builder.and(keywordContains(condition.getKeyword()));
+
+        return builder;
+    }
 
     private BooleanExpression regionEq(String region) {
-        return StringUtils.hasText(region) ? disasterAlert.legalDistrict.name.contains(region) : null;
+        return StringUtils.hasText(region) ? disasterAlertRegion.legalDistrict.name.contains(region) : null;
     }
 
     private BooleanExpression districtCodeEq(String code) {
-        return StringUtils.hasText(code) ? disasterAlert.legalDistrict.code.eq(code) : null;
+        return StringUtils.hasText(code) ? disasterAlertRegion.legalDistrict.code.eq(code) : null;
     }
 
     private BooleanExpression dateGoe(LocalDate startDate) {
@@ -77,7 +91,7 @@ public class DisasterAlertRepositoryImpl implements DisasterAlertRepositoryCusto
     }
 
     private BooleanExpression dateLoe(LocalDate endDate) {
-        return endDate != null ? disasterAlert.createdAt.loe(endDate.atTime(23, 59, 59)) : null;
+        return endDate != null ? disasterAlert.createdAt.loe(endDate.atTime(23, 59, 59,999)) : null;
     }
 
     private BooleanExpression typeEq(String type) {

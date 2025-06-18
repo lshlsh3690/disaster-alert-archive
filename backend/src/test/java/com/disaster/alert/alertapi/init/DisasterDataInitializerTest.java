@@ -10,6 +10,7 @@ import org.springframework.test.context.ActiveProfiles;
 import static org.junit.jupiter.api.Assertions.*;
 
 @SpringBootTest
+@ActiveProfiles("test")  // test 프로파일을 활성화하여 테스트 실행
 class DisasterDataInitializerTest {
 
     @Autowired

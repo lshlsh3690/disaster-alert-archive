@@ -30,9 +30,11 @@ public class DisasterAlertResponseDto {
                 .emergencyLevel(disasterAlert.getEmergencyLevel())
                 .disasterType(disasterAlert.getDisasterType())
                 .createdAt(disasterAlert.getCreatedAt())
-//                .regionNames(disasterAlert.getRegions().stream()
-//                        .map(region -> region.getLegalDistrict().getName())
-//                        .collect(Collectors.toList()))
+                .modifiedDate(disasterAlert.getModifiedDate())
+                .regionNames(disasterAlert.getDisasterAlertRegions()
+                        .stream()
+                        .map(region -> region.getLegalDistrict().getName())
+                        .collect(Collectors.toList()))
                 .build();
     }
 }

@@ -27,6 +27,7 @@ public class DisasterDataInitializer implements CommandLineRunner {
 
         try {
             legalDistrictService.saveAllLegalDistricts();
+            log.info("법정동 데이터 초기화 완료");
             disasterAlertService.initAllDisasterData();
         } catch (Exception e) {
             log.error("DisasterDataInitializer.run 재난 데이터 초기화 중 오류 발생: {}", e.getMessage(), e);
