@@ -24,15 +24,17 @@ public class DisasterAlertController {
     private final DisasterAlertService disasterAlertService;
 
     /**
-     * 전체 재난문자 조회
+     * 재난 경고 조회 API
+     * @param region 지역명
+     * @param districtCode 법정동 코드
+     * @param startDate 시작 날짜 (ISO 8601 형식)
+     * @param endDate 종료 날짜 (ISO 8601 형식)
+     * @param type 재난 유형
+     * @param level 재난 수준
+     * @param keyword 검색 키워드
+     * @param pageable 페이지 정보
+     * @return 재난 안전문자 목록
      */
-//    @GetMapping
-//    public ResponseEntity<List<DisasterAlertResponseDto>> getAllDisasterAlerts() {
-//        List<DisasterAlertResponseDto> alerts = disasterAlertService.findAllAsDto();
-//        return ResponseEntity.ok(alerts);
-//    }
-
-
     @GetMapping("/search")
     public ResponseEntity<Page<DisasterAlertResponseDto>> searchAlerts(
             @RequestParam(required = false) String region,
@@ -48,6 +50,17 @@ public class DisasterAlertController {
         return ResponseEntity.ok(result);
     }
 
+    /**
+     * 재난 안전문자 통계 조회 API
+     * @param region 지역명
+     * @param districtCode 법정동 코드
+     * @param startDate 시작 날짜 (ISO 8601 형식)
+     * @param endDate 종료 날짜 (ISO 8601 형식)
+     * @param type 재난 유형
+     * @param level 재난 수준
+     * @param keyword 검색 키워드
+     * @return 재난 안전문자 통계 정보
+     */
     @GetMapping("/stats")
     public ResponseEntity<DisasterAlertStatResponse> getStats(
             @RequestParam(required = false) String region,
@@ -62,6 +75,12 @@ public class DisasterAlertController {
         return ResponseEntity.ok(stats);
     }
 
+
+    /**
+     * 재난 안전문자 상세 조회 API
+     * @param id 재난 경고 ID
+     * @return 재난 안전문자 상세 정보
+     */
     @GetMapping("/{id}")
     public ResponseEntity<DisasterAlertDetailDto> getDisasterAlert(@PathVariable Long id) {
         DisasterAlertDetailDto dto = disasterAlertService.getAlertDetail(id);

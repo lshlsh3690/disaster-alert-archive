@@ -12,4 +12,7 @@ public interface DisasterAlertRepository extends JpaRepository<DisasterAlert, Lo
 
     @Query("SELECT d.sn FROM DisasterAlert d WHERE d.sn IN :snList")
     List<Long> findExistingSn(@Param("snList") List<Long> snList);
+
+    @Query("SELECT d.legalDistrict.name FROM DisasterAlertRegion d WHERE d.disasterAlert.id = :id")
+    List<String> legalDistrictNamesByAlertId(Long id);
 }

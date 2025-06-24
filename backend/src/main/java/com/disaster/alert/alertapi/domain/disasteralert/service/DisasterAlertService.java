@@ -9,6 +9,7 @@ import com.disaster.alert.alertapi.domain.legaldistrict.model.LegalDistrict;
 import com.disaster.alert.alertapi.domain.legaldistrict.repository.LegalDistrictRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.persistence.EntityManager;
+import jakarta.persistence.EntityNotFoundException;
 import jakarta.persistence.PersistenceContext;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
@@ -359,7 +360,18 @@ public class DisasterAlertService {
         return new DisasterAlertStatResponse(totalCount, regionStats, levelStats, typeStats);
     }
 
+    /**
+     * 재난문자 상세 정보를 조회합니다.
+     *
+     * @param id 재난문자 ID
+     * @return 재난문자 상세 정보 DTO
+     */
     public DisasterAlertDetailDto getAlertDetail(Long id) {
-        return null;
+        DisasterAlert alert = disasterAlertRepository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("재난문자를 찾을 수 없습니다: id=" + id));
+
+        List<String> regionNames = disasterAlertRepository.legalDistrictNamesByAlertId(id);
+
+        return new DisasterAlertDetailDto(alert, regionNames);
     }
 }
