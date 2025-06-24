@@ -57,8 +57,8 @@ public class DisasterAlertController {
             @RequestParam(required = false) DisasterLevel level,
             @RequestParam(required = false) String keyword
     ) {
-        disasterAlertService.getStats(region, districtCode, startDate, endDate, type, level, keyword);
-        return null;
+        DisasterAlertStatResponse stats = disasterAlertService.getStats(region, districtCode, startDate, endDate, type, level, keyword);
+        return ResponseEntity.ok(stats);
     }
 
     // 추후 지역, 날짜, 유형 필터를 위한 파라미터 예시:

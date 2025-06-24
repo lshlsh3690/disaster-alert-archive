@@ -316,9 +316,46 @@ public class DisasterAlertService {
                 .build();
 
 
-        List<DisasterAlert> alerts = disasterAlertRepository.getRegionStats(alertSearchCondition);
+        List<DisasterAlert> alerts = disasterAlertRepository.disasterAlertsBySearchCondition(alertSearchCondition);
+        long totalCount = alerts.size();
 
+        // 지역별 카운트
+        Map<String, Long> regionCountMap = alerts.stream()
+                .flatMap(alert -> alert.getDisasterAlertRegions().stream())
+                .collect(Collectors.groupingBy(
+                        r -> r.getLegalDistrict().getName(),
+                        Collectors.counting()
+                ));
 
-        return null;
+        // 레벨별 카운트
+        Map<DisasterLevel, Long> levelCountMap = alerts.stream()
+                .filter(a -> a.getEmergencyLevel() != null)
+                .collect(Collectors.groupingBy(
+                        DisasterAlert::getEmergencyLevel,
+                        Collectors.counting()
+                ));
+
+        // 타입별 카운트
+        Map<String, Long> typeCountMap = alerts.stream()
+                .filter(a -> a.getDisasterType() != null)
+                .collect(Collectors.groupingBy(
+                        DisasterAlert::getDisasterType,
+                        Collectors.counting()
+                ));
+
+        // DTO로 변환
+        List<DisasterAlertStatResponse.RegionStat> regionStats = regionCountMap.entrySet().stream()
+                .map(e -> new DisasterAlertStatResponse.RegionStat(e.getKey(), e.getValue()))
+                .toList();
+
+        List<DisasterAlertStatResponse.LevelStat> levelStats = levelCountMap.entrySet().stream()
+                .map(e -> new DisasterAlertStatResponse.LevelStat(e.getKey(), e.getValue()))
+                .toList();
+
+        List<DisasterAlertStatResponse.TypeStat> typeStats = typeCountMap.entrySet().stream()
+                .map(e -> new DisasterAlertStatResponse.TypeStat(e.getKey(), e.getValue()))
+                .toList();
+
+        return new DisasterAlertStatResponse(totalCount, regionStats, levelStats, typeStats);
     }
 }

@@ -53,7 +53,7 @@ public class DisasterAlertRepositoryImpl implements DisasterAlertRepositoryCusto
     }
 
     @Override
-    public List<DisasterAlert> getRegionStats(AlertSearchCondition condition) {
+    public List<DisasterAlert> disasterAlertsBySearchCondition(AlertSearchCondition condition) {
         return queryFactory
                 .selectFrom(disasterAlert)
                 .distinct()
