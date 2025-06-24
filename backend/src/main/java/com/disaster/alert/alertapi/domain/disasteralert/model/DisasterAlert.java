@@ -5,6 +5,8 @@ import jakarta.persistence.*;
 import lombok.*;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 @Entity
 @Table(name = "disaster_alert")
@@ -19,12 +21,11 @@ public class DisasterAlert {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @Setter
-    @JoinColumn(name = "legal_district_code", nullable = false)
-    private LegalDistrict legalDistrict;
+    @Builder.Default
+    @OneToMany(mappedBy = "disasterAlert", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<DisasterAlertRegion> disasterAlertRegions = new ArrayList<>(); // 법정동 코드
 
-    @Column(name = "sn", nullable = false)
+    @Column(name = "sn", unique = true, nullable = false)
     private Long sn;                // SN 외부 OPEN API에서 제공하는 고유번호
 
     @Column(columnDefinition = "TEXT")
@@ -42,4 +43,12 @@ public class DisasterAlert {
 
     @Column(name = "modified_date")
     private LocalDateTime modifiedDate;   // MDFCN_YMD
+
+    @Column(name = "original_region", length = 1000)
+    private String OriginalRegion; // 수신지역명 (RCPTN_RGN_NM) - 원본 지역명
+
+    public void addRegion(LegalDistrict region) {
+        DisasterAlertRegion link = new DisasterAlertRegion(this, region);
+        this.disasterAlertRegions.add(link);
+    }
 }

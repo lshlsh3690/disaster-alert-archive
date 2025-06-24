@@ -1,16 +1,16 @@
 package com.disaster.alert.alertapi.domain.disasteralert.service;
 
 import com.disaster.alert.alertapi.api.DisasterOpenApiClient;
-import com.disaster.alert.alertapi.domain.disasteralert.dto.AlertSearchCondition;
-import com.disaster.alert.alertapi.domain.disasteralert.dto.DisasterAlertDto;
-import com.disaster.alert.alertapi.domain.disasteralert.dto.DisasterAlertResponseDto;
-import com.disaster.alert.alertapi.domain.disasteralert.dto.DisasterApiResponse;
+import com.disaster.alert.alertapi.domain.disasteralert.dto.*;
 import com.disaster.alert.alertapi.domain.disasteralert.model.DisasterAlert;
 import com.disaster.alert.alertapi.domain.disasteralert.model.DisasterLevel;
 import com.disaster.alert.alertapi.domain.disasteralert.repository.DisasterAlertRepository;
 import com.disaster.alert.alertapi.domain.legaldistrict.model.LegalDistrict;
 import com.disaster.alert.alertapi.domain.legaldistrict.repository.LegalDistrictRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
+import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -33,6 +33,10 @@ public class DisasterAlertService {
     private final DisasterOpenApiClient disasterOpenApiClient;
     private final ObjectMapper objectMapper;
 
+    @PersistenceContext
+    private EntityManager entityManager;
+
+    @Transactional
     public void saveData(String raw) {
         try {
             DisasterApiResponse response = objectMapper.readValue(raw, DisasterApiResponse.class);
@@ -57,7 +61,7 @@ public class DisasterAlertService {
 
             List<DisasterAlert> newAlerts = dtos.stream()
                     .filter(dto -> !existingSnSet.contains(dto.getSn()))
-                    .flatMap(dto -> toEntities(dto).stream())
+                    .map(this::toEntity)
                     .toList();
 
             if (newAlerts.isEmpty()) {
@@ -65,12 +69,61 @@ public class DisasterAlertService {
                 return;
             }
 
-
             disasterAlertRepository.saveAll(newAlerts);
             log.info("재난문자 {}건 저장 완료", newAlerts.size());
         } catch (Exception e) {
             log.error("재난문자 저장 중 오류 발생", e);
         }
+    }
+
+    private DisasterAlert toEntity(DisasterAlertDto dto) {
+        List<String> regionNames = new ArrayList<>(
+                Arrays.stream(dto.getRegion().split(","))
+                        .flatMap(region -> {
+                            String cleanedRegion = cleanRegionString(region);
+                            return sanitizeRegionNames(cleanedRegion).stream();
+                        })
+                        .toList()
+        );
+
+        if (dto.getRegion().contains("임진강 수계지역(경기도 연천군,파주시),경기도 임진강")) {
+            regionNames.add("경기도 연천군");
+            regionNames.add("경기도 파주시");
+        }
+
+        DisasterAlert alert = DisasterAlert.builder()
+                .sn(dto.getSn())
+                .message(dto.getMessage())
+                .createdAt(parseDateTime(dto.getCreatedAt()))
+                .emergencyLevel(dto.getEmergencyLevel() == null ? null : DisasterLevel.fromDescription(dto.getEmergencyLevel()))
+                .disasterType(dto.getDisasterType())
+                .modifiedDate(dto.getModifiedDate() == null ? null : parseDateTime(dto.getModifiedDate()))
+                .OriginalRegion(dto.getRegion())
+                .build();
+
+        for (String regionName : regionNames) {
+            List<LegalDistrict> legalDistricts = legalDistrictRepository.findAllByName(regionName);
+
+            if (legalDistricts.isEmpty()) {
+                log.warn("법정동 데이터가 없습니다: {}", regionName);
+                continue;
+            }
+
+            LegalDistrict legalDistrict;
+            if (legalDistricts.size() > 1) {
+                legalDistrict = legalDistricts.stream()
+                        .filter(ld -> ld.isActive() || "존재".equals(ld.getIsActiveString()))
+                        .findFirst()
+                        .orElse(legalDistricts.get(0));
+                log.warn("법정동 이름이 중복됩니다: {}", regionName);
+            } else {
+                legalDistrict = legalDistricts.get(0);
+            }
+
+            alert.addRegion(legalDistrict);
+        }
+
+        return alert;
     }
 
     private List<DisasterAlert> toEntities(DisasterAlertDto dto) {
@@ -94,6 +147,7 @@ public class DisasterAlertService {
                 .map(regionName -> {
                     List<LegalDistrict> legalDistricts = legalDistrictRepository.findAllByName(regionName);
 
+
                     if (legalDistricts.isEmpty()) {
                         log.warn("법정동 데이터가 없습니다: {}", regionName);
                         return null; // 법정동이 없으면 null 반환
@@ -107,20 +161,23 @@ public class DisasterAlertService {
                                 .findFirst()
                                 .orElse(legalDistricts.get(0)); // 활성화된 법정동이 없으면 첫 번째 것 사용
                         log.warn("법정동 이름이 중복됩니다: {}", regionName);
-                    }else {
+                    } else {
                         // 법정동이 하나만 있다면 그 법정동 사용
                         legalDistrict = legalDistricts.get(0);
                     }
 
-                    return DisasterAlert.builder()
+                    DisasterAlert build = DisasterAlert.builder()
                             .sn(dto.getSn())
                             .message(dto.getMessage())
                             .createdAt(parseDateTime(dto.getCreatedAt()))
                             .emergencyLevel(dto.getEmergencyLevel() == null ? null : DisasterLevel.fromDescription(dto.getEmergencyLevel()))
                             .disasterType(dto.getDisasterType())
-                            .legalDistrict(legalDistrict)
                             .modifiedDate(dto.getModifiedDate() == null ? null : parseDateTime(dto.getModifiedDate()))
+                            .OriginalRegion(dto.getRegion()) // 원본 지역명 저장
                             .build();
+                    build.addRegion(legalDistrict); // 재난문자와 법정동 연결
+
+                    return build;
                 })
                 .toList();
     }
@@ -195,6 +252,7 @@ public class DisasterAlertService {
     /**
      * 재난문자 데이터를 초기화합니다.
      */
+    @Transactional
     public void initAllDisasterData() {
         try {
             // 1. 첫 번째 호출로 totalCount만 확인
@@ -226,6 +284,7 @@ public class DisasterAlertService {
             log.info("총 {}건 재난문자 초기화 완료", totalCount);
         } catch (Exception e) {
             log.error("DisasterAlertService.initAllDisasterData() 오류 발생", e);
+            return;
         }
     }
 
@@ -243,5 +302,60 @@ public class DisasterAlertService {
         Page<DisasterAlert> result = disasterAlertRepository.searchAlerts(alertSearchCondition, pageable);
 
         return result.map(DisasterAlertResponseDto::from);
+    }
+
+    public DisasterAlertStatResponse getStats(String region, String districtCode, LocalDate startDate, LocalDate endDate, String type, DisasterLevel level, String keyword) {
+        AlertSearchCondition alertSearchCondition = AlertSearchCondition.builder()
+                .region(region)
+                .districtCode(districtCode)
+                .startDate(startDate)
+                .endDate(endDate)
+                .type(type)
+                .level(level)
+                .keyword(keyword)
+                .build();
+
+
+        List<DisasterAlert> alerts = disasterAlertRepository.disasterAlertsBySearchCondition(alertSearchCondition);
+        long totalCount = alerts.size();
+
+        // 지역별 카운트
+        Map<String, Long> regionCountMap = alerts.stream()
+                .flatMap(alert -> alert.getDisasterAlertRegions().stream())
+                .collect(Collectors.groupingBy(
+                        r -> r.getLegalDistrict().getName(),
+                        Collectors.counting()
+                ));
+
+        // 레벨별 카운트
+        Map<DisasterLevel, Long> levelCountMap = alerts.stream()
+                .filter(a -> a.getEmergencyLevel() != null)
+                .collect(Collectors.groupingBy(
+                        DisasterAlert::getEmergencyLevel,
+                        Collectors.counting()
+                ));
+
+        // 타입별 카운트
+        Map<String, Long> typeCountMap = alerts.stream()
+                .filter(a -> a.getDisasterType() != null)
+                .collect(Collectors.groupingBy(
+                        DisasterAlert::getDisasterType,
+                        Collectors.counting()
+                ));
+
+        // DTO로 변환
+        List<DisasterAlertStatResponse.RegionStat> regionStats = regionCountMap.entrySet().stream()
+                .map(e -> new DisasterAlertStatResponse.RegionStat(e.getKey(), e.getValue()))
+                .toList();
+
+        List<DisasterAlertStatResponse.LevelStat> levelStats = levelCountMap.entrySet().stream()
+                .map(e -> new DisasterAlertStatResponse.LevelStat(e.getKey(), e.getValue()))
+                .toList();
+
+        List<DisasterAlertStatResponse.TypeStat> typeStats = typeCountMap.entrySet().stream()
+                .map(e -> new DisasterAlertStatResponse.TypeStat(e.getKey(), e.getValue()))
+                .toList();
+
+        return new DisasterAlertStatResponse(totalCount, regionStats, levelStats, typeStats);
     }
 }

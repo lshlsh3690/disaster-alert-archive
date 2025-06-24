@@ -1,6 +1,7 @@
 package com.disaster.alert.alertapi.domain.disasteralert.service;
 
 import com.disaster.alert.alertapi.domain.disasteralert.dto.DisasterAlertResponseDto;
+import com.disaster.alert.alertapi.domain.disasteralert.dto.DisasterAlertStatResponse;
 import com.disaster.alert.alertapi.domain.disasteralert.model.DisasterAlert;
 import com.disaster.alert.alertapi.domain.disasteralert.model.DisasterLevel;
 import com.disaster.alert.alertapi.domain.disasteralert.repository.DisasterAlertRepository;
@@ -27,7 +28,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 @SpringBootTest
 @ActiveProfiles("test")
 @Slf4j
-@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class DisasterAlertServiceTest {
 
     @Autowired
@@ -39,65 +39,84 @@ class DisasterAlertServiceTest {
     @Autowired
     private LegalDistrictRepository legalDistrictRepository;
 
-    @BeforeAll
+    @BeforeEach
+    @Transactional
     public void setUpLegalDistrict() {
         // 테스트용 지역 데이터 추가
         LegalDistrict legalDistrict = LegalDistrict.builder()
                 .name("서울특별시")
                 .code("1100000000")
+                .isActiveString("존재")
                 .build();
         legalDistrictRepository.save(legalDistrict);
 
         LegalDistrict jongro = LegalDistrict.builder()
                 .name("서울특별시 종로구")
                 .code("1111000000")
+                .isActiveString("존재")
                 .build();
         legalDistrictRepository.save(jongro);
 
         LegalDistrict gwangju = LegalDistrict.builder()
                 .name("광주광역시")
                 .code("2900000000")
+                .isActiveString("존재")
                 .build();
         legalDistrictRepository.save(gwangju);
 
         LegalDistrict gwangjuDongu = LegalDistrict.builder()
                 .name("광주광역시 동구")
                 .code("2911000000")
+                .isActiveString("존재")
                 .build();
 
         legalDistrictRepository.save(gwangjuDongu);
     }
 
     @BeforeEach
+    @Transactional
     void setUp() {
-        LegalDistrict legalDistrict = legalDistrictRepository.findByName("서울특별시")
+        LegalDistrict seoul = legalDistrictRepository.findByName("서울특별시")
                 .orElseThrow(() -> new IllegalArgumentException("지역이 존재하지 않습니다."));
-        LegalDistrict legalDistrict1 = legalDistrictRepository.findByName("광주광역시 동구")
+        LegalDistrict jongro = legalDistrictRepository.findByName("서울특별시 종로구")
                 .orElseThrow(() -> new IllegalArgumentException("지역이 존재하지 않습니다."));
-
-
+        LegalDistrict gwangjuDongu = legalDistrictRepository.findByName("광주광역시 동구")
+                .orElseThrow(() -> new IllegalArgumentException("지역이 존재하지 않습니다."));
+        LegalDistrict gwangju = legalDistrictRepository.findByName("광주광역시")
+                .orElseThrow(() -> new IllegalArgumentException("지역이 존재하지 않습니다."));
         // 테스트 데이터 추가
+        // alert1 - 서울특별시, 종로구
         DisasterAlert alert1 = DisasterAlert.builder()
                 .sn(123456L)
                 .message("호우 경보 발령")
                 .createdAt(LocalDate.of(2024, 6, 1).atStartOfDay())
                 .emergencyLevel(DisasterLevel.LEVEL_2)
                 .disasterType("호우")
-                .legalDistrict(legalDistrict)
                 .build();
+        alert1.addRegion(seoul);
+        alert1.addRegion(jongro);
 
-
-
+        // alert2 - 광주광역시 동구
         DisasterAlert alert2 = DisasterAlert.builder()
                 .sn(123457L)
                 .message("지진 경보 발령")
                 .createdAt(LocalDate.of(2024, 6, 2).atStartOfDay())
                 .emergencyLevel(DisasterLevel.LEVEL_3)
                 .disasterType("지진")
-                .legalDistrict(legalDistrict1)
                 .build();
+        alert2.addRegion(gwangjuDongu);
 
-        disasterAlertRepository.saveAll(List.of(alert1, alert2));
+        // alert3 - 광주광역시
+        DisasterAlert alert3 = DisasterAlert.builder()
+                .sn(123458L)
+                .message("폭염 경보 발령")
+                .createdAt(LocalDate.of(2024, 6, 3).atStartOfDay())
+                .emergencyLevel(DisasterLevel.LEVEL_1)
+                .disasterType("폭염")
+                .build();
+        alert3.addRegion(gwangju);
+
+        disasterAlertRepository.saveAll(List.of(alert1, alert2, alert3));
     }
 
     @Test
@@ -182,4 +201,71 @@ class DisasterAlertServiceTest {
         assertEquals(1, result.getTotalElements());
         assertEquals("지진 경보 발령", result.getContent().get(0).getMessage());
     }
+
+    @Test
+    @Transactional
+    void getStats_조건없이조회() {
+        DisasterAlertStatResponse stats = disasterAlertService.getStats(null, null, null, null, null, null, null);
+
+        assertEquals(2, stats.getTotalCount());
+        assertEquals(2, stats.getRegionStats().size());
+        assertEquals("서울특별시", stats.getRegionStats().get(0).getRegion());
+        assertEquals(1, stats.getRegionStats().get(0).getCount());
+        assertEquals(2, stats.getLevelStats().size());
+        assertEquals(DisasterLevel.LEVEL_3, stats.getLevelStats().get(0).getLevel());
+        assertEquals(1, stats.getLevelStats().get(0).getCount());
+    }
+
+    @Test
+    @Transactional
+    void getStats_지역기반조회() {
+        DisasterAlertStatResponse stats = disasterAlertService.getStats("서울특별시", null, null, null, null, null, null);
+
+        assertEquals(1, stats.getTotalCount());
+        assertEquals(1, stats.getRegionStats().size());
+        assertEquals("서울특별시", stats.getRegionStats().get(0).getRegion());
+        assertEquals(1, stats.getRegionStats().get(0).getCount());
+    }
+
+    @Test
+    @Transactional
+    void getStats_기간조회() {
+        DisasterAlertStatResponse stats = disasterAlertService.getStats(null, null,
+                LocalDate.of(2024, 6, 2), LocalDate.of(2024, 6, 2), null, null, null);
+
+        assertEquals(1, stats.getTotalCount());
+        assertEquals(1, stats.getRegionStats().size());
+        assertEquals("광주광역시 동구", stats.getRegionStats().get(0).getRegion());
+        assertEquals(1, stats.getRegionStats().get(0).getCount());
+    }
+
+    @Test
+    @Transactional
+    void getStats_키워드조회() {
+        DisasterAlertStatResponse stats = disasterAlertService.getStats(null, null, null, null, "지진", null, null);
+
+        assertEquals(1, stats.getTotalCount());
+        assertEquals(1, stats.getTypeStats().size());
+        assertEquals("지진", stats.getTypeStats().get(0).getType());
+        assertEquals(1, stats.getTypeStats().get(0).getCount());
+    }
+
+    @Test
+    @Transactional
+    void getStats_종합조건조회() {
+        DisasterAlertStatResponse stats = disasterAlertService.getStats(
+                "광주광역시 동구", "2911000000",
+                LocalDate.of(2024, 6, 1), LocalDate.of(2024, 6, 2),
+                "지진", DisasterLevel.LEVEL_3, null
+        );
+
+        assertEquals(1, stats.getTotalCount());
+        assertEquals(1, stats.getRegionStats().size());
+        assertEquals("광주광역시 동구", stats.getRegionStats().get(0).getRegion());
+        assertEquals(1, stats.getRegionStats().get(0).getCount());
+        assertEquals(1, stats.getLevelStats().size());
+        assertEquals(DisasterLevel.LEVEL_3, stats.getLevelStats().get(0).getLevel());
+        assertEquals(1, stats.getLevelStats().get(0).getCount());
+    }
+
 }

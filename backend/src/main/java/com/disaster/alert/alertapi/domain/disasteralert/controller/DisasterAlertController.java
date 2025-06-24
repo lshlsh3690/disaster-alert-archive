@@ -1,7 +1,7 @@
 package com.disaster.alert.alertapi.domain.disasteralert.controller;
 
 import com.disaster.alert.alertapi.domain.disasteralert.dto.DisasterAlertResponseDto;
-import com.disaster.alert.alertapi.domain.disasteralert.model.DisasterAlert;
+import com.disaster.alert.alertapi.domain.disasteralert.dto.DisasterAlertStatResponse;
 import com.disaster.alert.alertapi.domain.disasteralert.model.DisasterLevel;
 import com.disaster.alert.alertapi.domain.disasteralert.service.DisasterAlertService;
 import lombok.RequiredArgsConstructor;
@@ -14,7 +14,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
-import java.util.List;
 
 @RestController
 @RequestMapping("/api/disaster-alerts")
@@ -46,6 +45,20 @@ public class DisasterAlertController {
     ) {
         Page<DisasterAlertResponseDto> result = disasterAlertService.searchAlerts(region, districtCode, startDate, endDate, type, level, keyword, pageable);
         return ResponseEntity.ok(result);
+    }
+
+    @GetMapping("/api/disasters/stats")
+    public ResponseEntity<DisasterAlertStatResponse> getStats(
+            @RequestParam(required = false) String region,
+            @RequestParam(required = false) String districtCode,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
+            @RequestParam(required = false) String type,
+            @RequestParam(required = false) DisasterLevel level,
+            @RequestParam(required = false) String keyword
+    ) {
+        DisasterAlertStatResponse stats = disasterAlertService.getStats(region, districtCode, startDate, endDate, type, level, keyword);
+        return ResponseEntity.ok(stats);
     }
 
     // 추후 지역, 날짜, 유형 필터를 위한 파라미터 예시:

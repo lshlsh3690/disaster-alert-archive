@@ -18,10 +18,12 @@ public class DisasterAlertRegion {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @MapsId("alertId")
+    @JoinColumn(name = "disaster_alert_id")
     private DisasterAlert disasterAlert;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @MapsId("districtCode")
+    @JoinColumn(name = "legal_district_code")
     private LegalDistrict legalDistrict;
 
     public DisasterAlertRegion(DisasterAlert alert, LegalDistrict district) {
