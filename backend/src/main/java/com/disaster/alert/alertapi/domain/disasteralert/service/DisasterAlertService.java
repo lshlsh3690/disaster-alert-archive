@@ -358,4 +358,8 @@ public class DisasterAlertService {
 
         return new DisasterAlertStatResponse(totalCount, regionStats, levelStats, typeStats);
     }
+
+    public DisasterAlertDetailDto getAlertDetail(Long id) {
+        return null;
+    }
 }
