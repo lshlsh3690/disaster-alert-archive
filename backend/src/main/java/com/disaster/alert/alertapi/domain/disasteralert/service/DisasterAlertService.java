@@ -44,7 +44,7 @@ public class DisasterAlertService {
 
             if (checkAPIFailure(response)) return;
 
-            List<DisasterAlertDto> dtos = response.getBody();
+            List<DisasterAlertDto> dtos = response.getBody().getItems();
             if (dtos == null || dtos.isEmpty()) {
                 log.info("재난문자 데이터가 없습니다.");
                 return;
@@ -199,7 +199,7 @@ public class DisasterAlertService {
         if (!"00".equals(response.getHeader().getResultCode())) {
             log.warn("재난문자 API 응답 오류: {}", response.getHeader().getResultMsg());
             return true;
-        } else if (response.getBody() == null || response.getBody().isEmpty()) {
+        } else if (response.getBody() == null || response.getBody().getTotalCount() == 0) {
             log.warn("재난문자 데이터가 없습니다.");
             return true;
 
@@ -264,7 +264,7 @@ public class DisasterAlertService {
 
             if (checkAPIFailure(response)) return;
 
-            int totalCount = response.getTotalCount();
+            int totalCount = response.getBody().getTotalCount();
             long existingCount = disasterAlertRepository.count();
 
             // 2. 이미 저장된 데이터 수와 같으면 중단

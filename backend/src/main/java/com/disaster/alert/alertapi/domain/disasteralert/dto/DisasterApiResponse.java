@@ -10,7 +10,6 @@ import java.util.List;
 @Setter
 @NoArgsConstructor
 public class DisasterApiResponse {
-
     private Header header;
     private Body body;
 
