@@ -10,11 +10,9 @@ import java.util.List;
 @Setter
 @NoArgsConstructor
 public class DisasterApiResponse {
+
     private Header header;
-    private int numOfRows;
-    private int pageNo;
-    private int totalCount;
-    private List<DisasterAlertDto> body;
+    private Body body;
 
     @Getter
     @Setter
@@ -24,4 +22,15 @@ public class DisasterApiResponse {
         private String resultCode;
         private String errorMsg;
     }
+
+    @Getter
+    @Setter
+    @NoArgsConstructor
+    public static class Body {
+        private int numOfRows;
+        private int pageNo;
+        private int totalCount;
+        private List<DisasterAlertDto> items;
+    }
 }
+
