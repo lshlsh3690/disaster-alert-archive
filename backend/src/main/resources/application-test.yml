@@ -11,3 +11,9 @@ spring:
       ddl-auto: none
     show-sql: true
     database-platform: org.hibernate.dialect.PostgreSQLDialect
+
+jwt:
+  secret: ${JWT_SECRET}
+  expiration: 3600 # in seconds
+  header: Authorization
+  prefix: Bearer

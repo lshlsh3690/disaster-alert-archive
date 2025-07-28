@@ -1,6 +1,7 @@
 package com.disaster.alert.alertapi.domain.member.service;
 
 import com.disaster.alert.alertapi.domain.member.model.Member;
+import lombok.Getter;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 
@@ -8,7 +9,6 @@ import java.util.Collection;
 import java.util.Collections;
 
 public record MemberDetails(Member member) implements UserDetails {
-
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
         return Collections.singleton(() -> "ROLE_" + member.getRole().name());

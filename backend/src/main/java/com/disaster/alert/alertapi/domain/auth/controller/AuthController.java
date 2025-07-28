@@ -1,4 +1,4 @@
-package com.disaster.alert.alertapi.domain.auth;
+package com.disaster.alert.alertapi.domain.auth.controller;
 
 import com.disaster.alert.alertapi.domain.auth.service.AuthService;
 import com.disaster.alert.alertapi.domain.member.dto.LoginRequest;

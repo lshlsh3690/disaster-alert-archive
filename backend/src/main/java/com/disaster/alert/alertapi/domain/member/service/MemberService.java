@@ -1,6 +1,7 @@
 package com.disaster.alert.alertapi.domain.member.service;
 
 
+import com.disaster.alert.alertapi.domain.member.dto.MemberInfoResponse;
 import com.disaster.alert.alertapi.domain.member.dto.SignUpRequest;
 import com.disaster.alert.alertapi.domain.member.model.Member;
 import com.disaster.alert.alertapi.domain.member.model.MemberRole;
@@ -27,6 +28,7 @@ public class MemberService {
                 .email(request.getEmail())
                 .password(passwordEncoder.encode(request.getPassword()))
                 .nickname(request.getNickname())
+                .name(request.getName())
                 .role(MemberRole.USER)
                 .build();
 
@@ -37,5 +39,12 @@ public class MemberService {
     public Member findByEmail(String email) {
         return memberRepository.findByEmail(email)
                 .orElseThrow(() -> new UsernameNotFoundException("회원을 찾을 수 없습니다."));
+    }
+
+    @Transactional(readOnly = true)
+    public MemberInfoResponse getMyInfo(Long memberId) {
+        Member member = memberRepository.findById(memberId)
+                .orElseThrow(() -> new RuntimeException("사용자를 찾을 수 없습니다."));
+        return MemberInfoResponse.from(member);
     }
 }
