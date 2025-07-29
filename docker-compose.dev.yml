@@ -20,6 +20,7 @@ services:
       - "8080:8080"
     depends_on:
       - postgres
+      - redis
     networks:
       - disaster-net
     env_file:
@@ -37,6 +38,14 @@ services:
       - disaster-net
     env_file:
       - .env.dev
+
+  redis:
+    image: redis:latest
+    container_name: redis
+    ports:
+      - "6379:6379"
+    networks:
+      - disaster-net
       
 volumes:
   postgres-data:

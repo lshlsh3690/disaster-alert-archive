@@ -1,4 +1,4 @@
-package com.disaster.alert.alertapi.config;
+package com.disaster.alert.alertapi.global.config;
 
 import com.querydsl.jpa.impl.JPAQueryFactory;
 import jakarta.persistence.EntityManager;

@@ -7,8 +7,6 @@ spring:
     password: ${POSTGRES_PASSWORD}
     driver-class-name: org.postgresql.Driver
 
-
-
   jpa:
     hibernate:
       ddl-auto: update
@@ -16,12 +14,11 @@ spring:
     properties:
       hibernate:
         format_sql: true
-        #dialect: org.hibernate.dialect.PostgreSQLDialect
 
   data:
     redis:
-      host: localhost
-      port: 6379
+      host: ${REDIS_HOST}
+      port: ${REDIS_PORT}
 
 
 logging:
@@ -37,5 +34,12 @@ server:
 disaster-alert:
   api:
     service-key: ${DISASTER_ALERT_SERVICE_KEY}
+
+jwt:
+  secret: ${JWT_SECRET}
+  access-token-expiration: 3600 # in seconds
+  refresh-token-expiration: 604800 # in seconds
+  header: Authorization
+  prefix: Bearer
 
 
