@@ -2,6 +2,7 @@ package com.disaster.alert.alertapi.global.security.jwt;
 
 import io.jsonwebtoken.*;
 import jakarta.annotation.PostConstruct;
+import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -18,10 +19,13 @@ public class JwtTokenProvider {
     @Value("${jwt.secret}")
     private String secretKey;
 
-    @Value("${jwt.expiration}")
-    private long expiration;
+    @Value("${jwt.access-token-expiration}")
+    private long accessTokenExpiration;
 
-    private final long expirationMs = expiration * 60 * 60; // 1시간
+    @Value("${jwt.refresh-token-expiration}")
+    @Getter
+    private long refreshTokenExpiration;
+
 
     @PostConstruct
     public void init() {
@@ -34,10 +38,24 @@ public class JwtTokenProvider {
         claims.put("role", role);
 
         Date now = new Date();
-        Date expiry = new Date(now.getTime() + expiration * 1000L); // 밀리초 환산
+        Date expiry = new Date(now.getTime() + accessTokenExpiration * 1000L); // 밀리초 환산
 
         System.out.println("now: " + now);
         System.out.println("expiry: " + expiry);
+
+        return Jwts.builder()
+                .setClaims(claims)
+                .setIssuedAt(now)
+                .setExpiration(expiry)
+                .signWith(SignatureAlgorithm.HS256, secretKey)
+                .compact();
+    }
+
+    public String generateRefreshToken(String email) {
+        Claims claims = Jwts.claims().setSubject(email);
+
+        Date now = new Date();
+        Date expiry = new Date(now.getTime() + refreshTokenExpiration * 1000L); // 보통 7일 (60 * 60 * 24 * 7 * 1000)
 
         return Jwts.builder()
                 .setClaims(claims)

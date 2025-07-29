@@ -1,4 +1,4 @@
-package com.disaster.alert.alertapi.config;
+package com.disaster.alert.alertapi.global.config;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;

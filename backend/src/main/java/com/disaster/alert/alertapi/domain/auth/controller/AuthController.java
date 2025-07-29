@@ -1,5 +1,7 @@
 package com.disaster.alert.alertapi.domain.auth.controller;
 
+import com.disaster.alert.alertapi.domain.auth.dto.ReissueRequest;
+import com.disaster.alert.alertapi.domain.auth.dto.ReissueResponse;
 import com.disaster.alert.alertapi.domain.auth.service.AuthService;
 import com.disaster.alert.alertapi.domain.member.dto.LoginRequest;
 import com.disaster.alert.alertapi.domain.member.dto.LoginResponse;
@@ -27,5 +29,11 @@ public class AuthController {
     @PostMapping("/signup")
     public ResponseEntity<SignUpResponse> signUp(@RequestBody SignUpRequest request) {
         return ResponseEntity.ok(authService.signUp(request));
+    }
+
+    @PostMapping("/reissue")
+    public ResponseEntity<ReissueResponse> reissue(@RequestBody ReissueRequest request) {
+        ReissueResponse response = authService.reissue(request);
+        return ResponseEntity.ok(response);
     }
 }

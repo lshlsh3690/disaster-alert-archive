@@ -1,4 +1,4 @@
-package com.disaster.alert.alertapi.config;
+package com.disaster.alert.alertapi.global.config;
 
 import com.disaster.alert.alertapi.domain.member.service.CustomUserDetailsService;
 import com.disaster.alert.alertapi.global.security.jwt.JwtAuthenticationFilter;
