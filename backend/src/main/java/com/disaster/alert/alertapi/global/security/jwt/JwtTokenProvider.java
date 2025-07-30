@@ -65,15 +65,6 @@ public class JwtTokenProvider {
                 .compact();
     }
 
-//    public boolean validateToken(String token) {
-//        try {
-//            Jwts.parser().setSigningKey(secretKey).parseClaimsJws(token);
-//            return true;
-//        } catch (Exception e) {
-//            return false;
-//        }
-//    }
-
     public boolean validateToken(String token) {
         try {
             Jwts.parserBuilder()
@@ -96,5 +87,11 @@ public class JwtTokenProvider {
 
     public Claims getClaims(String token) {
         return Jwts.parser().setSigningKey(secretKey).parseClaimsJws(token).getBody();
+    }
+
+    public long getRemainingExpiration(String token) {
+        Claims claims = getClaims(token);
+        Date expiration = claims.getExpiration();
+        return expiration.getTime() - System.currentTimeMillis();
     }
 }

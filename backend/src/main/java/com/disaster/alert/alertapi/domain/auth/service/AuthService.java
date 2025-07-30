@@ -17,7 +17,7 @@ import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
-import org.springframework.security.core.userdetails.UsernameNotFoundException;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -80,5 +80,18 @@ public class AuthService {
     public SignUpResponse signUp(SignUpRequest request) {
         Long id = memberService.signUp(request);
         return new SignUpResponse(id, "회원가입이 완료되었습니다.");
+    }
+
+    public void logout(String email, String token) {
+        if (redisService.hasKey(email)) {
+            redisService.deleteRefreshToken(email);
+        }
+
+        // AccessToken 남은 시간 계산
+        long expiration = jwtTokenProvider.getRemainingExpiration(token);
+
+        // AccessToken 블랙리스트 등록
+        redisService.saveBlackListToken(token, expiration);
+        SecurityContextHolder.clearContext();
     }
 }
