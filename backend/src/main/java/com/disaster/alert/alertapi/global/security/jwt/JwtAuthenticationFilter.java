@@ -1,6 +1,7 @@
 package com.disaster.alert.alertapi.global.security.jwt;
 
 import com.disaster.alert.alertapi.domain.member.service.CustomUserDetailsService;
+import com.disaster.alert.alertapi.global.redis.RedisService;
 import io.jsonwebtoken.Claims;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -25,6 +26,7 @@ import java.util.stream.Collectors;
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private final JwtTokenProvider jwtTokenProvider;
     private final CustomUserDetailsService userDetailsService;
+    private final RedisService redisService;
 
     @Override
     protected void doFilterInternal(HttpServletRequest request,
@@ -35,10 +37,13 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
         String token = resolveToken(request);
 
-        log.info("Resolved token: {}", token);
-
-        boolean isValid = jwtTokenProvider.validateToken(token);
-        log.info("Token valid: {}", isValid);
+        if (token != null && redisService.isBlackListToken(token)) {
+            log.warn("블랙리스트에 등록된 토큰입니다.");
+            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+            response.setContentType("application/json");
+            response.getWriter().write("{\"message\":\"Access token is blacklisted.\"}");
+            return;
+        }
 
         if (token != null && jwtTokenProvider.validateToken(token)) {
             Claims claims = jwtTokenProvider.getClaims(token);
@@ -53,9 +58,6 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                             null,
                             userDetails.getAuthorities()
                     );
-
-
-            authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
             SecurityContextHolder.getContext().setAuthentication(authentication);
         }
 

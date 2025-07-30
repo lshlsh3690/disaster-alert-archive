@@ -285,7 +285,6 @@ public class DisasterAlertService {
             log.info("총 {}건 재난문자 초기화 완료", totalCount);
         } catch (Exception e) {
             log.error("DisasterAlertService.initAllDisasterData() 오류 발생", e);
-            return;
         }
     }
 

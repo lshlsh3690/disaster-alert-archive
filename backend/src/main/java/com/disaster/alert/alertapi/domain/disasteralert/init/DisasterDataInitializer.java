@@ -1,4 +1,4 @@
-package com.disaster.alert.alertapi.init;
+package com.disaster.alert.alertapi.domain.disasteralert.init;
 
 import com.disaster.alert.alertapi.api.DisasterOpenApiClient;
 import com.disaster.alert.alertapi.domain.disasteralert.service.DisasterAlertService;
@@ -10,7 +10,7 @@ import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 
 @Component
-@Profile("init")  // 배포할 때만 동작하게 프로파일 지정
+@Profile("init")  // env파일에서 특정속성값으로 실행되게 만듬
 @RequiredArgsConstructor
 @Slf4j
 public class DisasterDataInitializer implements CommandLineRunner {
