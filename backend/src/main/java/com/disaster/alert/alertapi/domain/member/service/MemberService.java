@@ -47,4 +47,8 @@ public class MemberService {
                 .orElseThrow(() -> new RuntimeException("사용자를 찾을 수 없습니다."));
         return MemberInfoResponse.from(member);
     }
+
+    public boolean isNicknameDuplicate(String nickname) {
+        return memberRepository.existsByNickname(nickname);
+    }
 }
