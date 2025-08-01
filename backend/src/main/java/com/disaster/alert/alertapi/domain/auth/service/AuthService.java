@@ -45,7 +45,7 @@ public class AuthService {
 
             redisService.saveRefreshToken(member.getEmail(), refreshToken, jwtTokenProvider.getRefreshTokenExpiration() * 1000L);
 
-            return LoginResponse.of(member, accessToken, refreshToken);
+            return LoginResponse.of(member, accessToken);
         } catch (BadCredentialsException e) {
             throw new BadCredentialsException("이메일 또는 비밀번호가 일치하지 않습니다.");
         }
@@ -73,7 +73,7 @@ public class AuthService {
 
         redisService.saveRefreshToken(member.getEmail(), newRefreshToken, jwtTokenProvider.getRefreshTokenExpiration() * 1000L);
 
-        return ReissueResponse.of(newAccessToken, newRefreshToken);
+        return ReissueResponse.of(newAccessToken);
     }
 
 

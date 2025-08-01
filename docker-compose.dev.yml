@@ -5,6 +5,8 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      args:
+        ENV: docker    #env 파일 선택 docker,local
     container_name: disaster-frontend
     ports:
       - "3000:3000"

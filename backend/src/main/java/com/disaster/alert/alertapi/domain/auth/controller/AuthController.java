@@ -8,7 +8,9 @@ import com.disaster.alert.alertapi.domain.member.dto.LoginResponse;
 import com.disaster.alert.alertapi.domain.member.dto.SignUpRequest;
 import com.disaster.alert.alertapi.domain.member.dto.SignUpResponse;
 import com.disaster.alert.alertapi.domain.member.service.MemberDetails;
+import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -25,8 +27,18 @@ public class AuthController {
     private final AuthService authService;
 
     @PostMapping("/login")
-    public ResponseEntity<LoginResponse> login(@RequestBody LoginRequest request) {
-        return ResponseEntity.ok(authService.login(request));
+    public ResponseEntity<LoginResponse> login(@RequestBody LoginRequest request,
+                                               HttpServletResponse response) {
+        LoginResponse loginResponse = authService.login(request);
+
+        Cookie cookie = new Cookie("accessToken", loginResponse.getAccessToken());
+        cookie.setHttpOnly(true);  // JS에서 접근 불가 (보안 강화)
+        cookie.setSecure(false);    // HTTPS에서만 전송
+        cookie.setPath("/");
+        cookie.setMaxAge(60 * 60); // 1시간
+
+        response.addCookie(cookie);
+        return ResponseEntity.ok(loginResponse);
     }
 
     @PostMapping("/signup")
@@ -35,9 +47,19 @@ public class AuthController {
     }
 
     @PostMapping("/reissue")
-    public ResponseEntity<ReissueResponse> reissue(@RequestBody ReissueRequest request) {
-        ReissueResponse response = authService.reissue(request);
-        return ResponseEntity.ok(response);
+    public ResponseEntity<ReissueResponse> reissue(@RequestBody ReissueRequest request,
+                                                   HttpServletResponse response) {
+        ReissueResponse reissue = authService.reissue(request);
+
+        Cookie cookie = new Cookie("accessToken", reissue.accessToken());
+        cookie.setHttpOnly(true);
+        cookie.setSecure(false); // HTTPS에서만 전송
+        cookie.setPath("/");
+        cookie.setMaxAge(60 * 60);
+
+        response.addCookie(cookie);
+
+        return ResponseEntity.ok(reissue);
     }
 
     @PostMapping("/logout")
