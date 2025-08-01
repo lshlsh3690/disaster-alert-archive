@@ -42,7 +42,6 @@
 ### ✅ CI/CD & 인프라
 - `GitHub Actions` (테스트, 빌드, 배포 자동화)
 - `Docker Hub` (백엔드 이미지 저장소)
-- (옵션) `Slack/Discord 알림` 연동 예정
 
 ---
 

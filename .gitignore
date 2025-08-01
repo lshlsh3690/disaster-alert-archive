@@ -32,13 +32,12 @@ out/
 .cursor/
 
 # Environment variables
-.env
-.env.*
-*.env
-.env*
-.env.dev
-.env.prod
+**/.env
+**/.env.*       
 
+
+!frontend/.env.docker
+!frontend/.env.local
 
 
 # Node/Next.js
