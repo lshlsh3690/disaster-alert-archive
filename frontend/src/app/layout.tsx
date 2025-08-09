@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import Header from "@components/Header";
+import ReactQueryProvider from "@/lib/reactQueryProvider";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -28,11 +29,13 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        <Header />
-        {children}
-        <footer className="bg-gray-100 p-4 text-center text-sm">
-          © 2024 재난 안전문자 플랫폼 | 문의: help@disaster-sms.com
-        </footer>
+        <ReactQueryProvider>
+          <Header />
+          {children}
+          <footer className="bg-gray-100 p-4 text-center text-sm">
+            © 2024 재난 안전문자 플랫폼 | 문의: help@disaster-sms.com
+          </footer>
+        </ReactQueryProvider>
       </body>
     </html>
   );

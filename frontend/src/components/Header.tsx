@@ -2,9 +2,9 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useAuthStore } from "store/auth";
-import { logout as logoutAPI } from "@api/api";
+import { useAuthStore } from "@/store/authStore";
 import { useEffect, useRef, useState } from "react";
+import { logoutApi } from "@/api/authApi";
 
 export default function Header() {
   const pathname = usePathname();
@@ -22,7 +22,7 @@ export default function Header() {
   ];
 
   const handleLogout = () => {
-    logoutAPI()
+    logoutApi()
       .then(() => {
         console.log("로그아웃 성공");
         logout();

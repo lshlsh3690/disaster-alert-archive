@@ -1,5 +1,5 @@
+import { useAuthStore } from "@/store/authStore";
 import axios from "axios";
-import { useAuthStore } from "store/auth";
 
 const instance = axios.create({
   baseURL: process.env.BASE_API_URL || "http://localhost:8080", // 환경 변수에서 API URL 가져오기

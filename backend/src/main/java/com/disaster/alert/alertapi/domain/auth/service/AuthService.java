@@ -11,8 +11,10 @@ import com.disaster.alert.alertapi.domain.member.service.MemberDetails;
 import com.disaster.alert.alertapi.domain.member.service.MemberService;
 import com.disaster.alert.alertapi.global.redis.RedisService;
 import com.disaster.alert.alertapi.global.security.jwt.JwtTokenProvider;
+import com.disaster.alert.alertapi.global.service.EmailService;
 import io.jsonwebtoken.JwtException;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -21,13 +23,19 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.security.NoSuchAlgorithmException;
+import java.security.SecureRandom;
+import java.time.Duration;
+
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class AuthService {
     private final AuthenticationManager authenticationManager;
     private final MemberService memberService;
     private final JwtTokenProvider jwtTokenProvider;
     private final RedisService redisService;
+    private final EmailService emailService;
 
     @Transactional(readOnly = true)
     public LoginResponse login(LoginRequest request) {
@@ -78,6 +86,12 @@ public class AuthService {
 
 
     public SignUpResponse signUp(SignUpRequest request) {
+        request.validatePasswordMatch();
+
+        if (!redisService.isEmailVerified(request.getEmail())) {
+            throw new IllegalStateException("이메일 인증이 완료되지 않았습니다.");
+        }
+
         Long id = memberService.signUp(request);
         return new SignUpResponse(id, "회원가입이 완료되었습니다.");
     }
@@ -93,5 +107,33 @@ public class AuthService {
         // AccessToken 블랙리스트 등록
         redisService.saveBlackListToken(token, expiration);
         SecurityContextHolder.clearContext();
+    }
+
+    public void sendVerificationEmail(String email) {
+        String code = generateRandomCode();
+        redisService.setEmailVerificationCode(email, code, Duration.ofMinutes(3));
+        log.info("이메일 인증 코드 생성: {} -> {}", email, code);
+        emailService.send(email, "이메일 인증 코드", "인증 코드는: " + code);
+    }
+
+    private String generateRandomCode() {
+        try {
+            SecureRandom secureRandom = SecureRandom.getInstanceStrong();
+            int upperLimit = (int) Math.pow(10, 6);
+            int code = secureRandom.nextInt(upperLimit);
+            return String.format("%06d", code); // 6자리 코드 생성
+        } catch (NoSuchAlgorithmException e) {
+            throw new RuntimeException("랜덤 코드 생성에 실패했습니다.", e);
+        }
+    }
+
+    public void verifyEmailCode(String email, String code) {
+        String storedCode = redisService.getEmailVerificationCode(email);
+
+        if (storedCode == null || !storedCode.equals(code)) {
+            throw new IllegalArgumentException("인증 코드가 일치하지 않거나 만료되었습니다.");
+        }
+        redisService.deleteEmailVerificationCode(email);
+        redisService.markEmailAsVerified(email);
     }
 }

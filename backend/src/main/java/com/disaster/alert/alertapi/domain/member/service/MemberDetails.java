@@ -9,6 +9,12 @@ import java.util.Collection;
 import java.util.Collections;
 
 public record MemberDetails(Member member) implements UserDetails {
+    public Long getId() {
+        return member.getId();
+    }
+    public String getNickname() {
+        return member.getNickname();
+    }
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
         return Collections.singleton(() -> "ROLE_" + member.getRole().name());
