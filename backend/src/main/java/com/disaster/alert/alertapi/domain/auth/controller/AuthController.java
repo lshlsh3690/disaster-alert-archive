@@ -1,5 +1,8 @@
 package com.disaster.alert.alertapi.domain.auth.controller;
 
+import com.disaster.alert.alertapi.common.dto.ApiResponse;
+import com.disaster.alert.alertapi.domain.auth.dto.EmailCodeVerificationRequest;
+import com.disaster.alert.alertapi.domain.auth.dto.EmailVerificationRequest;
 import com.disaster.alert.alertapi.domain.auth.dto.ReissueRequest;
 import com.disaster.alert.alertapi.domain.auth.dto.ReissueResponse;
 import com.disaster.alert.alertapi.domain.auth.service.AuthService;
@@ -12,18 +15,21 @@ import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import jakarta.validation.Valid;
+
 
 @RestController
 @RequestMapping("/api/v1/auth")
 @RequiredArgsConstructor
+@Slf4j
 public class AuthController {
-
     private final AuthService authService;
 
     @PostMapping("/login")
@@ -42,7 +48,8 @@ public class AuthController {
     }
 
     @PostMapping("/signup")
-    public ResponseEntity<SignUpResponse> signUp(@RequestBody SignUpRequest request) {
+    public ResponseEntity<SignUpResponse> signUp(@RequestBody @Valid SignUpRequest request) {
+        log.info(request.toString());
         return ResponseEntity.ok(authService.signUp(request));
     }
 
@@ -76,4 +83,21 @@ public class AuthController {
         return ResponseEntity.noContent().build();
     }
 
+    @PostMapping("/email/verify")
+    public ResponseEntity<ApiResponse<Void>> sendVerificationEmail(@RequestBody @Valid EmailVerificationRequest request) {
+        authService.sendVerificationEmail(request.email());
+        return ResponseEntity.ok(ApiResponse.success(
+                "인증 코드가 이메일로 전송되었습니다. 이메일을 확인해주세요.",
+                null
+        ));
+    }
+
+    @PostMapping("/email/verify/code")
+    public ResponseEntity<ApiResponse<Void>> verifyEmail(@RequestBody EmailCodeVerificationRequest request) {
+        authService.verifyEmailCode(request.email(), request.code());
+        return ResponseEntity.ok(ApiResponse.success(
+                "이메일 인증이 완료되었습니다.",
+                null
+        ));
+    }
 }

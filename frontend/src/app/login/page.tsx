@@ -3,8 +3,8 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { login } from "@api/api"; // ✅ API 함수 가져오기
-import { useAuthStore } from "store/auth";
+import { loginApi } from "@/api/authApi"; 
+import { useAuthStore } from "@/store/authStore";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -15,7 +15,7 @@ export default function LoginPage() {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    login(email, password)
+    loginApi(email, password)
       .then((data) => {
         useAuthStore.getState().setAuth({
           accessToken: data.accessToken,

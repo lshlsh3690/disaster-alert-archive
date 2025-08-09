@@ -11,7 +11,6 @@ public class MemberInfoResponse {
     private Long id;
     private String email;
     private String nickname;
-    private String name;
     private String role;
 
     public static MemberInfoResponse from(Member member) {
@@ -19,7 +18,6 @@ public class MemberInfoResponse {
                 member.getId(),
                 member.getEmail(),
                 member.getNickname(),
-                member.getName(),
                 member.getRole().name()
         );
     }

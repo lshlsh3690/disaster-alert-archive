@@ -19,13 +19,23 @@ spring:
     redis:
       host: ${REDIS_HOST}
       port: ${REDIS_PORT}
-
+  mail:
+    host: smtp.gmail.com
+    port: 587
+    username: ${GMAIL_USERNAME}
+    password: ${GMAIL_PASSWORD}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
 
 logging:
   level:
-#    org.springframework.beans.factory: debug
-#    org.hibernate.SQL: debug
-    com.disaster.alert: debug
+    #    org.springframework.beans.factory: debug
+    #    org.hibernate.SQL: debug
+    com.disaster.alert: info
     org.springframework.web: debug
 
 server:
