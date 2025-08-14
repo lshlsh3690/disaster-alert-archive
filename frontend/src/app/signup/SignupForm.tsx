@@ -1,7 +1,5 @@
 "use client";
 
-import type { SignupFormData, SignupFormValues } from "@/types/signup";
-
 import { useForm } from "react-hook-form";
 import { useRouter } from "next/navigation";
 import EmailInput from "@components/form/EmailInput";
@@ -14,14 +12,14 @@ import useSignup from "@/lib/mutations/useSignup";
 import Button from "@/components/Button";
 import NicknameInput from "@/components/form/NicknameInput";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { signupSchema } from "@/schemas/signup";
+import { SignupFormData, SignupFormValues, signupSchema } from "@/schemas/signupSchema";
 
 export default function SignupForm() {
   const router = useRouter();
-
   const formMethods = useForm<SignupFormValues>({
     resolver: zodResolver(signupSchema),
     mode: "onChange",
+    reValidateMode: "onChange",
     defaultValues: {
       email: "",
       password: "",
@@ -35,7 +33,7 @@ export default function SignupForm() {
     useSignupStore.getState().resetSignupState();
   }, []);
 
-  const { handleSubmit, setError } = formMethods;
+  const { handleSubmit, setError, clearErrors } = formMethods;
 
   const { mutate, isPending: isSignupPending } = useSignup({
     setError,
@@ -55,10 +53,7 @@ export default function SignupForm() {
       setError("verificationCode", { message: "인증 코드를 입력하세요." });
       return;
     }
-    if (isCodeSended && values.verificationCode?.trim().length !== 6) {
-      setError("verificationCode", { message: "인증 코드는 6자리입니다." });
-      return;
-    }
+
     const dto: SignupFormData = {
       email: values.email,
       password: values.password,
@@ -70,16 +65,19 @@ export default function SignupForm() {
   };
 
   useEffect(() => {
-    useSignupStore.getState().resetSignupState();
+    return () => {
+      useSignupStore.getState().resetSignupState();
+      clearErrors();
+    };
   }, []);
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
       <CountdownProvider>
-        <EmailInput<SignupFormValues> formMethods={formMethods} />
+        <EmailInput<SignupFormValues> formMethods={formMethods} showVerificationUI />
         <CodeInput<SignupFormValues> formMethods={formMethods} />
       </CountdownProvider>
-      <PasswordInputGroup<SignupFormValues> formMethods={formMethods} />
+      <PasswordInputGroup<SignupFormValues> formMethods={formMethods} showVerificationUI />
       <NicknameInput<SignupFormValues> formMethods={formMethods} />
       <Button
         className="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700 transition"

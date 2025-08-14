@@ -1,26 +1,47 @@
 import { verifyEmailCode } from "@/api/authApi";
-import { ApiResponse } from "@/types/ApiResponse";
-import { ErrorResponse } from "@/types/errorResponse";
+import { parseErrorResponse } from "@/schemas/errorResponseSchema";
+import { SuccessResponse } from "@/types/SuccessResponse";
+import { makeMutationFn } from "@/utils/makeMutationFn";
 import { useMutation } from "@tanstack/react-query";
 import { AxiosError } from "axios";
+import { z } from "zod";
+
+interface reqParams {
+  email: string;
+  code: string;
+}
 
 export function useEmailCodeVerify(options: {
   onErrorCallback: (errorMessage: string) => void;
   onSuccessCallback?: () => void;
 }) {
-  return useMutation<ApiResponse<null>, AxiosError<ErrorResponse>, { email: string; code: string }>({
-    mutationFn: ({ email, code }) => verifyEmailCode(email, code),
+  const resBodySchema = z.null();
+
+  return useMutation<SuccessResponse<null>, AxiosError, reqParams>({
+    mutationFn: ({ email, code }) =>
+      makeMutationFn<reqParams, null>(
+        ({ email, code }) => verifyEmailCode(email, code),
+        resBodySchema
+      )({ email, code }),
     onSuccess: () => {
       options.onSuccessCallback?.();
-      console.log("Verification code sent successfully.");
     },
-    onError: (error: AxiosError<ErrorResponse>) => {
-      const message = error?.response?.data?.message || "Failed to send verification code";
+    onError: (error: AxiosError) => {
+      const errorResponse = parseErrorResponse(error.response?.data);
+      if (!errorResponse) {
+        // 에러 응답을 파싱할 수 없을 때
+        console.error("알 수 없는 오류가 발생했습니다.", error);
+        options.onErrorCallback("알 수 없는 오류가 발생했습니다.");
+        return;
+      }
 
-      console.warn("Error status:", error.response?.data?.status);
-      console.warn("Error code:", error.response?.data?.code);
-
-      options.onErrorCallback(message);
+      const { message, field } = errorResponse;
+      if (field) {
+        console.error(`Field: ${field}`);
+        options.onErrorCallback(message);
+        return;
+      }
+      options.onErrorCallback(message!);
     },
   });
 }

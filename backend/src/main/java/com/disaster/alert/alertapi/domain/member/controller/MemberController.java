@@ -1,6 +1,6 @@
 package com.disaster.alert.alertapi.domain.member.controller;
 
-import com.disaster.alert.alertapi.common.dto.ApiResponse;
+import com.disaster.alert.alertapi.global.dto.ApiResponse;
 import com.disaster.alert.alertapi.domain.member.dto.MemberInfoResponse;
 import com.disaster.alert.alertapi.domain.member.dto.MemberResponse;
 import com.disaster.alert.alertapi.domain.member.dto.MemberUpdateRequest;
@@ -8,7 +8,6 @@ import com.disaster.alert.alertapi.domain.member.service.MemberDetails;
 import com.disaster.alert.alertapi.domain.member.service.MemberService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;

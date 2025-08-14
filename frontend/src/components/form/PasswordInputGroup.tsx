@@ -6,38 +6,34 @@ import { useDebounce } from "@/hooks/useDebounce";
 
 interface PasswordInputGroupProps<T extends FieldValues> {
   formMethods: UseFormReturn<T>;
+  showVerificationUI?: boolean;
 }
 
-export function PasswordInputGroup<T extends FieldValues>({ formMethods }: PasswordInputGroupProps<T>) {
+export function PasswordInputGroup<T extends FieldValues>({
+  formMethods,
+  showVerificationUI,
+}: PasswordInputGroupProps<T>) {
   const { control, formState } = formMethods;
   const setIsPasswordMatched = useSignupStore((s) => s.setIsPasswordMatched);
 
-  const password = useWatch({ control, name: "password" as Path<T> });
-  const confirmPassword = useWatch({ control, name: "confirmPassword" as Path<T> });
+  const pwd = useWatch({ control, name: "password" as Path<T> }) as string;
+  const cpw = useWatch({ control, name: "confirmPassword" as Path<T> }) as string;
 
-  const dPwd = useDebounce((password as Path<T>) ?? "", 1000);
-  const dCpw = useDebounce((confirmPassword as Path<T>) ?? "", 1000);
+  const dPwd = useDebounce(pwd, 300);
+  const dCpw = useDebounce(cpw, 300);
 
   useEffect(() => {
-    // 길이/형식 등 스키마 에러가 있는 동안은 매칭 플래그 false
+    if (!showVerificationUI) return;
+    const bothFilled = dPwd.length > 0 && dCpw.length > 0;
     const hasSchemaError = !!formState.errors.password || !!formState.errors.confirmPassword;
 
-    // 둘 다 비어있거나 확인값이 아직 없으면 false로
-    if (!dPwd && !dCpw) {
-      setIsPasswordMatched(false);
-      return;
-    }
-    if (!dPwd || !dCpw || hasSchemaError) {
-      setIsPasswordMatched(false);
-      return;
-    }
-    setIsPasswordMatched(dPwd === dCpw);
-  }, [dPwd, dCpw, formState.errors.password, formState.errors.confirmPassword, setIsPasswordMatched]);
+    setIsPasswordMatched(bothFilled && !hasSchemaError && dPwd === dCpw);
+  }, [dPwd, dCpw, !!formState.errors.password, !!formState.errors.confirmPassword, setIsPasswordMatched]);
 
   return (
-    <div className="space-y-4">
-      <PasswordInput<T> formMethods={formMethods} name={"password" as Path<T>} />
-      <PasswordInput<T> formMethods={formMethods} name={"confirmPassword" as Path<T>} />
+    <div className="space-y-2">
+      <PasswordInput<T> formMethods={formMethods} name={"password" as Path<T>} showVerificationUI />
+      <PasswordInput<T> formMethods={formMethods} name={"confirmPassword" as Path<T>} showVerificationUI />
     </div>
   );
 }

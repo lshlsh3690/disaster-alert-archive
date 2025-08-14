@@ -1,40 +1,27 @@
 import { create } from "zustand";
-import { persist, createJSONStorage } from "zustand/middleware";
+import { persist } from "zustand/middleware";
 
-type AuthState = {
-  accessToken: string | null;
+type User = {
   memberId: number | null;
   nickname: string | null;
   email: string | null;
-  setAuth: (auth: {
-    accessToken: string;
-    memberId: number;
-    nickname: string;
-    email: string;
-  }) => void;
+};
+
+type AuthStore = {
+  user: User | null;
+  setUser: (user: User) => void;
   logout: () => void;
 };
 
-export const useAuthStore = create<AuthState>()(
+export const useAuthStore = create<AuthStore>()(
   persist(
     (set) => ({
-      accessToken: null,
-      memberId: null,
-      nickname: null,
-      email: null,
-      setAuth: ({ accessToken, memberId, nickname, email }) =>
-        set({ accessToken, memberId, nickname, email }),
-      logout: () =>
-        set({
-          accessToken: null,
-          memberId: null,
-          nickname: null,
-          email: null,
-        }),
+      user: null,
+      setUser: (user) => set({ user }),
+      logout: () => set({ user: null }),
     }),
     {
-      name: "disaster-auth", // localStorage 키
-      storage: createJSONStorage(() => localStorage),
+      name: "disaster-alert-auth",
     }
   )
 );

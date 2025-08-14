@@ -1,6 +1,5 @@
 import instance from "@/api/axios";
-import { ApiResponse } from "@/types/ApiResponse";
-import { SignupFormData } from "@/types/signup";
+import { SignupFormData } from "@/schemas/signupSchema";
 
 const AUTH_API_BASE = "/api/v1/auth";
 
@@ -34,7 +33,7 @@ export const logoutApi = async () => {
  * @returns The response data from the email verification API.
  */
 export const sendEmailVerificationCode = async (email: string) => {
-  const res = await instance.post(`${AUTH_API_BASE}/email/verify`, {
+  const res = await instance.post(`${AUTH_API_BASE}/email/verify`,{
     email: email,
   });
   return res.data;
@@ -61,9 +60,12 @@ export const verifyEmailCode = async (email: string, code: string) => {
  * @param data - The signup form data containing user registration information.
  * @returns The response data from the signup API.
  */
-export const signupApi = async (data: SignupFormData): Promise<ApiResponse<null>> => {
+export const signupApi = async (data: SignupFormData) => {
   const res = await instance.post(`${AUTH_API_BASE}/signup`, data);
   return res.data;
 };
 
-
+export const reissue = async () => {
+  const res = await instance.post(`${AUTH_API_BASE}/reissue`);
+  return res.data;
+}

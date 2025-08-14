@@ -3,8 +3,8 @@ import React, { createContext, useContext, useState, useEffect, useCallback } fr
 interface CountdownContextType {
   secondsLeft: number;
   formatted: string;
-  start: (duration: number) => void;
-  reset: () => void;
+  countdownStart: (duration: number) => void;
+  countdownReset: () => void;
 }
 
 const CountdownContext = createContext<CountdownContextType | undefined>(undefined);
@@ -20,15 +20,23 @@ export const CountdownProvider = ({ children }: { children: React.ReactNode }) =
     setFormatted(`${minutes}:${secs}`);
   }, [secondsLeft]);
 
-  const start = useCallback(
+  useEffect(() => {
+    return () => {
+      countdownReset();
+    };
+  }, []);
+
+  const countdownStart = useCallback(
     (duration: number) => {
       if (timer) {
-        return;
+        clearInterval(timer);
+        setTimer(null);
       }
       setSecondsLeft(duration);
       const newTimer = setInterval(() => {
         setSecondsLeft((prev) => {
           if (prev <= 1) {
+            setTimer(null);
             clearInterval(newTimer);
             return 0;
           }
@@ -37,12 +45,13 @@ export const CountdownProvider = ({ children }: { children: React.ReactNode }) =
       }, 1000);
       setTimer(newTimer);
     },
-    [timer, secondsLeft]
+    [timer, secondsLeft, setSecondsLeft, setTimer]
   );
 
-  const reset = () => {
+  const countdownReset = () => {
     clearInterval(timer!);
     setSecondsLeft(0);
+    setTimer(null);
   };
 
   useEffect(() => {
@@ -52,7 +61,9 @@ export const CountdownProvider = ({ children }: { children: React.ReactNode }) =
   }, [timer]);
 
   return (
-    <CountdownContext.Provider value={{ secondsLeft, formatted, start, reset }}>{children}</CountdownContext.Provider>
+    <CountdownContext.Provider value={{ secondsLeft, formatted, countdownStart, countdownReset }}>
+      {children}
+    </CountdownContext.Provider>
   );
 };
 
@@ -62,4 +73,16 @@ export const useCountdownContext = () => {
     throw new Error("useCountdownContext must be used within a CountdownProvider");
   }
   return context;
+};
+
+export const useOptionalCountdownContext = () => {
+  const ctx = useContext(CountdownContext);
+  return (
+    ctx ?? {
+      secondsLeft: 0,
+      formatted: "",
+      countdownStart: () => {},
+      countdownReset: () => {},
+    }
+  );
 };

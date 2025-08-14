@@ -1,6 +1,8 @@
 package com.disaster.alert.alertapi.domain.member.dto;
 
 
+import com.disaster.alert.alertapi.domain.common.exception.CustomException;
+import com.disaster.alert.alertapi.domain.common.exception.ErrorCode;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import lombok.AllArgsConstructor;
@@ -25,7 +27,7 @@ public class SignUpRequest {
 
     public void validatePasswordMatch() {
         if (!password.equals(confirmPassword)) {
-            throw new IllegalArgumentException("비밀번호와 비밀번호 확인이 일치하지 않습니다.");
+            throw new CustomException(ErrorCode.PASSWORD_MISMATCH);
         }
     }
 }

@@ -44,7 +44,8 @@ export default function NicknameInput<T extends FieldValues>({ formMethods }: Ni
   useEffect(() => {
     if (debouncedNickname && debouncedNickname.length >= 2 && debouncedNickname.length <= 10) {
       trigger("nickname" as Path<T>, { shouldFocus: true });
-
+      clearErrors("nickname" as Path<T>);
+      setIsNicknameValid(false);
       checkNicknameDuplication(debouncedNickname);
     }
   }, [debouncedNickname]);
@@ -60,16 +61,12 @@ export default function NicknameInput<T extends FieldValues>({ formMethods }: Ni
         className="w-full border rounded px-3 py-2"
       />
 
-      {/* {errors["nickname" as Path<T>] && (
-        <p className="text-red-500 text-sm">{String(errors["nickname" as Path<T>]?.message)}</p>
-      )} */}
-
       <InputStatusMessage
         name={"nickname" as Path<T>}
         formMethods={formMethods}
         isPending={isPending}
         isValid={showSuccess}
-        message={showSuccess ? "유효한 닉네임입니다." : "닉네임을 입력해 주세요."}
+        message={showSuccess ? "유효한 닉네임입니다." : "닉네임을 입력하세요."}
       />
     </div>
   );

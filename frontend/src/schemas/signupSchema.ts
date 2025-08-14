@@ -53,10 +53,13 @@ export const signupSchema = z
       .min(6, "인증 코드는 6자리입니다.")
       .max(6, "인증 코드는 6자리입니다.")
       .optional(),
-  })
-  .refine((v) => v.password === v.confirmPassword, {
-    path: ["confirmPassword"],
-    message: "비밀번호가 일치하지 않습니다.",
   });
 
 export type SignupFormData = z.infer<typeof signupSchema>;
+
+// 폼 전용 값: UI에서만 쓰는 verificationCode 포함 (DTO 아님)
+// 실제 API 요청 시에는 verificationCode를 제외하고 SignupFormData를 사용
+// zod의 유효성 검증을 하기 위해서 임시적으로 지정
+export type SignupFormValues = SignupFormData & {
+  verificationCode?: string;
+};
