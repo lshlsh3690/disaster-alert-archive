@@ -1,59 +1,80 @@
 import { signupApi } from "@/api/authApi";
 import useSignupStore from "@/store/signupStore";
-import { ApiResponse } from "@/types/ApiResponse";
-import { ErrorResponse } from "@/types/errorResponse";
-import { SignupFormData } from "@/types/signup";
 import { useMutation } from "@tanstack/react-query";
 import { AxiosError } from "axios";
 import { UseFormSetError } from "react-hook-form";
+import { SignupFormData } from "@/schemas/signupSchema";
+import { SuccessResponse } from "@/types/SuccessResponse";
+import { z } from "zod";
+import { parseErrorResponse } from "@/schemas/errorResponseSchema";
+import { makeMutationFn } from "@/utils/makeMutationFn";
 
-/**
- * Custom hook for handling user signup mutation.
- *
- * @param options - Options for the mutation, including error and success callbacks.
- * @returns The mutation object for signup.
- */
 interface UseSignupMutationProps {
   setError: UseFormSetError<SignupFormData>;
   onSuccessCallback?: () => void;
   onErrorCallback: (errorMessage: string) => void;
 }
 
+interface SignupApiResponse {
+  memberId: number;
+  message: string;
+}
+
 export default function useSignup(options: UseSignupMutationProps) {
-  return useMutation<ApiResponse<null>, AxiosError<ErrorResponse>, SignupFormData>({
-    mutationFn: async (data) => {
-      // 회원가입 formdata 유효성 전체 검사
-      const isValid = useSignupStore.getState().validateSignupStateForForm(options.setError);
+  const dataSchema = z.object({
+    memberId: z.number(),
+    message: z.string(),
+  });
 
-      if (!isValid) {
-        console.error("회원가입 상태 미충족", isValid);
-        options.onErrorCallback("회원가입 상태 미충족");
-        throw new Error("회원가입 상태 미충족");
-      }
 
-      return await signupApi(data);
+  return useMutation<SuccessResponse<SignupApiResponse>, AxiosError, SignupFormData>({
+    mutationFn: async(data)  => {
+      useSignupStore.getState().validateSignupStateForForm(options.setError);
+      return await makeMutationFn<SignupFormData, SignupApiResponse>(
+        signupApi,
+        dataSchema
+      )(data);
     },
     onSuccess: () => {
       options.onSuccessCallback?.();
-      console.log("Signup successful.");
     },
-    onError: (error: AxiosError<ErrorResponse>) => {
-      if (error.message === "회원가입 상태 미충족") return;
+    onError: (error: AxiosError) => {
+      const errorResponse = parseErrorResponse(error.response?.data);
+      if (!errorResponse) {
+        options.onErrorCallback("알 수 없는 오류가 발생했습니다.");
+        return;
+      }
 
-      const code = error?.response?.data?.code;
-      const message = error?.response?.data?.message || "회원가입 실패";
+      // 일반적인 오류 처리
+      const { message, key, code, field } = errorResponse!;
+      const keyOrCode = key ?? code;
 
-      switch (String(code)) {
+      // field 우선 매핑
+      if (field) {
+        options.setError(field as keyof SignupFormData, { message });
+        options.onErrorCallback(message);
+        return;
+      }
+
+      switch (keyOrCode) {
         case "DUPLICATE_EMAIL":
+        case "M401":
           options.setError("email", { message });
           break;
         case "DUPLICATE_NICKNAME":
+        case "M402":
           options.setError("nickname", { message });
           break;
-        default:
-          alert(message);
+        case "EMAIL_NOT_VERIFIED":
+        case "A102":
+          options.setError("email", { message });
+          break;
+        case "PASSWORD_MISMATCH":
+        case "A103":
+          options.setError("password", { message });
+          options.setError("confirmPassword", { message });
+          break;
       }
-
       options.onErrorCallback(message);
     },
   });

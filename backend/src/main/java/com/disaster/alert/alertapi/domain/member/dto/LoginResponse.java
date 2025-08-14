@@ -11,16 +11,18 @@ import lombok.NoArgsConstructor;
 @Builder
 public class LoginResponse {
     private String accessToken;
+    private String refreshToken;
     private Long memberId;
     private String nickname;
     private String email;
 
-    public static LoginResponse of(Member member, String accessToken) {
+    public static LoginResponse of(Member member, String accessToken, String refreshToken) {
         return LoginResponse.builder()
                 .memberId(member.getId())
                 .email(member.getEmail())
                 .nickname(member.getNickname())
                 .accessToken(accessToken)
+                .refreshToken(refreshToken)
                 .build();
     }
 }

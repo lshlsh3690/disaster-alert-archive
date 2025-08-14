@@ -2,6 +2,8 @@ package com.disaster.alert.alertapi.domain.auth.service;
 
 import com.disaster.alert.alertapi.domain.auth.dto.ReissueRequest;
 import com.disaster.alert.alertapi.domain.auth.dto.ReissueResponse;
+import com.disaster.alert.alertapi.domain.common.exception.CustomException;
+import com.disaster.alert.alertapi.domain.common.exception.ErrorCode;
 import com.disaster.alert.alertapi.domain.member.dto.LoginRequest;
 import com.disaster.alert.alertapi.domain.member.dto.LoginResponse;
 import com.disaster.alert.alertapi.domain.member.dto.SignUpRequest;
@@ -16,9 +18,10 @@ import io.jsonwebtoken.JwtException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.authentication.AuthenticationManager;
-import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.AuthenticationException;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -37,41 +40,38 @@ public class AuthService {
     private final RedisService redisService;
     private final EmailService emailService;
 
-    @Transactional(readOnly = true)
+    @Transactional
     public LoginResponse login(LoginRequest request) {
-        Member member = memberService.findByEmail(request.getEmail());
-
         try {
             Authentication authentication = authenticationManager.authenticate(
                     new UsernamePasswordAuthenticationToken(request.getEmail(), request.getPassword())
             );
 
             MemberDetails memberDetails = (MemberDetails) authentication.getPrincipal();
+            Member member = memberDetails.member();
 
             String accessToken = jwtTokenProvider.generateToken(memberDetails.member().getId(), memberDetails.getUsername(), memberDetails.member().getRole().name());
             String refreshToken = jwtTokenProvider.generateRefreshToken(member.getEmail());
 
             redisService.saveRefreshToken(member.getEmail(), refreshToken, jwtTokenProvider.getRefreshTokenExpiration() * 1000L);
 
-            return LoginResponse.of(member, accessToken);
-        } catch (BadCredentialsException e) {
-            throw new BadCredentialsException("이메일 또는 비밀번호가 일치하지 않습니다.");
+            return LoginResponse.of(member, accessToken, refreshToken);
+        } catch (AuthenticationException e) {
+            throw new CustomException(ErrorCode.AUTH_INVALID_CREDENTIALS);
         }
     }
 
     @Transactional(readOnly = true)
-    public ReissueResponse reissue(ReissueRequest request) {
-        String refreshToken = request.refreshToken();
-
+    public ReissueResponse reissue(String refreshToken) {
         if (!jwtTokenProvider.validateToken(refreshToken)) {
-            throw new JwtException("Refresh Token 이 유효하지 않습니다.");
+            throw new CustomException(ErrorCode.INVALID_REFRESH_TOKEN);
         }
 
         String email = jwtTokenProvider.getClaims(refreshToken).getSubject();
         String storedToken = redisService.getRefreshToken(email);
 
         if (storedToken == null || !storedToken.equals(refreshToken)) {
-            throw new JwtException("Refresh Token 이 존재하지 않거나 일치하지 않습니다.");
+            throw new CustomException(ErrorCode.INVALID_REFRESH_TOKEN);
         }
 
         Member member = memberService.findByEmail(email);
@@ -79,9 +79,12 @@ public class AuthService {
         String newAccessToken = jwtTokenProvider.generateToken(member.getId(), member.getEmail(), member.getRole().name());
         String newRefreshToken = jwtTokenProvider.generateRefreshToken(member.getEmail());
 
+        long expiration = jwtTokenProvider.getRemainingExpiration(refreshToken);
+        redisService.saveBlackListToken(refreshToken, expiration);
+        redisService.deleteRefreshToken(email);
         redisService.saveRefreshToken(member.getEmail(), newRefreshToken, jwtTokenProvider.getRefreshTokenExpiration() * 1000L);
 
-        return ReissueResponse.of(newAccessToken);
+        return ReissueResponse.of(newAccessToken, newRefreshToken);
     }
 
 
@@ -89,27 +92,28 @@ public class AuthService {
         request.validatePasswordMatch();
 
         if (!redisService.isEmailVerified(request.getEmail())) {
-            throw new IllegalStateException("이메일 인증이 완료되지 않았습니다.");
+            throw new CustomException(ErrorCode.EMAIL_NOT_VERIFIED);
         }
 
         Long id = memberService.signUp(request);
         return new SignUpResponse(id, "회원가입이 완료되었습니다.");
     }
 
-    public void logout(String email, String token) {
-        if (redisService.hasKey(email)) {
-            redisService.deleteRefreshToken(email);
+    public void logout(String refreshToken) {
+        if (refreshToken == null || refreshToken.isBlank()) {
+            throw new CustomException(ErrorCode.INVALID_REFRESH_TOKEN);
         }
-
-        // AccessToken 남은 시간 계산
-        long expiration = jwtTokenProvider.getRemainingExpiration(token);
-
-        // AccessToken 블랙리스트 등록
-        redisService.saveBlackListToken(token, expiration);
+        String email = jwtTokenProvider.getClaims(refreshToken).getSubject(); // 이메일 추출
+        long expiration = jwtTokenProvider.getRemainingExpiration(refreshToken);// refreshToken 남은 시간 계산
+        redisService.saveBlackListToken(refreshToken, expiration);// 블랙리스트에 등록
+        redisService.deleteRefreshToken(email);// Redis에서 해당 이메일의 리프레시 토큰 삭제
         SecurityContextHolder.clearContext();
     }
 
     public void sendVerificationEmail(String email) {
+        if (memberService.existsByEmail(email)) {
+            throw new CustomException(ErrorCode.DUPLICATE_EMAIL);
+        }
         String code = generateRandomCode();
         redisService.setEmailVerificationCode(email, code, Duration.ofMinutes(3));
         log.info("이메일 인증 코드 생성: {} -> {}", email, code);
@@ -122,8 +126,8 @@ public class AuthService {
             int upperLimit = (int) Math.pow(10, 6);
             int code = secureRandom.nextInt(upperLimit);
             return String.format("%06d", code); // 6자리 코드 생성
-        } catch (NoSuchAlgorithmException e) {
-            throw new RuntimeException("랜덤 코드 생성에 실패했습니다.", e);
+        } catch (Exception e) {
+            throw new CustomException(ErrorCode.RANDOM_CODE_GENERATION_FAILED, e.getMessage());
         }
     }
 
@@ -131,9 +135,9 @@ public class AuthService {
         String storedCode = redisService.getEmailVerificationCode(email);
 
         if (storedCode == null || !storedCode.equals(code)) {
-            throw new IllegalArgumentException("인증 코드가 일치하지 않거나 만료되었습니다.");
+            throw new CustomException(ErrorCode.INVALID_EMAIL_VERIFICATION_CODE);
         }
-        redisService.deleteEmailVerificationCode(email);
+
         redisService.markEmailAsVerified(email);
     }
 }

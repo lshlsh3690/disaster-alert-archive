@@ -63,7 +63,7 @@ class AuthServiceTest {
         assertTrue(b, "Redis에 Refresh Token이 저장되어야 합니다.");
 
         ReissueRequest reissueRequest = new ReissueRequest(redisService.getRefreshToken(login.getEmail()));
-        ReissueResponse reissue = authService.reissue(reissueRequest);
+        ReissueResponse reissue = authService.reissue(reissueRequest.refreshToken());
 
         log.info("ReissueResponse: {}", reissue);
     }

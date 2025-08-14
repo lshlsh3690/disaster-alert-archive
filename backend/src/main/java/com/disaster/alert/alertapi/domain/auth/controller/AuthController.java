@@ -1,28 +1,25 @@
 package com.disaster.alert.alertapi.domain.auth.controller;
 
-import com.disaster.alert.alertapi.common.dto.ApiResponse;
+import com.disaster.alert.alertapi.domain.common.exception.CustomException;
+import com.disaster.alert.alertapi.domain.common.exception.ErrorCode;
+import com.disaster.alert.alertapi.global.dto.ApiResponse;
 import com.disaster.alert.alertapi.domain.auth.dto.EmailCodeVerificationRequest;
 import com.disaster.alert.alertapi.domain.auth.dto.EmailVerificationRequest;
-import com.disaster.alert.alertapi.domain.auth.dto.ReissueRequest;
 import com.disaster.alert.alertapi.domain.auth.dto.ReissueResponse;
 import com.disaster.alert.alertapi.domain.auth.service.AuthService;
 import com.disaster.alert.alertapi.domain.member.dto.LoginRequest;
 import com.disaster.alert.alertapi.domain.member.dto.LoginResponse;
 import com.disaster.alert.alertapi.domain.member.dto.SignUpRequest;
 import com.disaster.alert.alertapi.domain.member.dto.SignUpResponse;
-import com.disaster.alert.alertapi.domain.member.service.MemberDetails;
-import jakarta.servlet.http.Cookie;
-import jakarta.servlet.http.HttpServletRequest;
+import com.disaster.alert.alertapi.global.util.CookieUtil;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 import jakarta.validation.Valid;
+
+import java.time.Duration;
 
 
 @RestController
@@ -31,56 +28,58 @@ import jakarta.validation.Valid;
 @Slf4j
 public class AuthController {
     private final AuthService authService;
+    private final static boolean isSecureCookie = false; // 운영 환경에서는 true로 설정
 
     @PostMapping("/login")
-    public ResponseEntity<LoginResponse> login(@RequestBody LoginRequest request,
-                                               HttpServletResponse response) {
+    public ResponseEntity<ApiResponse<LoginResponse>> login(@Valid @RequestBody LoginRequest request,
+                                                            HttpServletResponse response) {
         LoginResponse loginResponse = authService.login(request);
 
-        Cookie cookie = new Cookie("accessToken", loginResponse.getAccessToken());
-        cookie.setHttpOnly(true);  // JS에서 접근 불가 (보안 강화)
-        cookie.setSecure(false);    // HTTPS에서만 전송
-        cookie.setPath("/");
-        cookie.setMaxAge(60 * 60); // 1시간
+        var accessCookie = CookieUtil.buildCookie("accessToken", loginResponse.getAccessToken(), Duration.ofHours(1), isSecureCookie);
+        var refreshCookie = CookieUtil.buildCookie("refreshToken", loginResponse.getRefreshToken(), Duration.ofDays(7), isSecureCookie);
 
-        response.addCookie(cookie);
-        return ResponseEntity.ok(loginResponse);
+        response.addHeader("Set-Cookie", accessCookie.toString());
+        response.addHeader("Set-Cookie", refreshCookie.toString());
+
+        return ResponseEntity.ok(ApiResponse.success(
+                loginResponse
+        ));
     }
 
     @PostMapping("/signup")
-    public ResponseEntity<SignUpResponse> signUp(@RequestBody @Valid SignUpRequest request) {
+    public ResponseEntity<ApiResponse<SignUpResponse>> signUp(@RequestBody @Valid SignUpRequest request) {
         log.info(request.toString());
-        return ResponseEntity.ok(authService.signUp(request));
+        SignUpResponse signUpResponse = authService.signUp(request);
+        return ResponseEntity.ok(ApiResponse.success(
+                signUpResponse
+        ));
     }
 
     @PostMapping("/reissue")
-    public ResponseEntity<ReissueResponse> reissue(@RequestBody ReissueRequest request,
+    public ResponseEntity<ReissueResponse> reissue(@CookieValue(value = "refreshToken", required = false) String refreshToken,
                                                    HttpServletResponse response) {
-        ReissueResponse reissue = authService.reissue(request);
+        if (refreshToken == null || refreshToken.isBlank()) {
+            throw new CustomException(ErrorCode.INVALID_REFRESH_TOKEN);
+        }
+        ReissueResponse reissue = authService.reissue(refreshToken);
 
-        Cookie cookie = new Cookie("accessToken", reissue.accessToken());
-        cookie.setHttpOnly(true);
-        cookie.setSecure(false); // HTTPS에서만 전송
-        cookie.setPath("/");
-        cookie.setMaxAge(60 * 60);
+        var accessCookie = CookieUtil.buildCookie("accessToken", reissue.accessToken(), Duration.ofHours(1), isSecureCookie);
+        var refreshCookie = CookieUtil.buildCookie("refreshToken", reissue.refreshToken(), Duration.ofDays(7), isSecureCookie);
 
-        response.addCookie(cookie);
+        response.addHeader("Set-Cookie", accessCookie.toString());
+        response.addHeader("Set-Cookie", refreshCookie.toString());
 
         return ResponseEntity.ok(reissue);
     }
 
     @PostMapping("/logout")
-    public ResponseEntity<Void> logout(@AuthenticationPrincipal MemberDetails memberDetails,
-                                       HttpServletRequest request) {
-        String bearerToken = request.getHeader("Authorization");
-
-        String token = null;
-        if (bearerToken != null && bearerToken.startsWith("Bearer ")) {
-            token = bearerToken.substring(7);
-        }
-
-        authService.logout(memberDetails.getUsername(), token);
-        return ResponseEntity.noContent().build();
+    public ResponseEntity<ApiResponse<Void>> logout(@CookieValue(value = "refreshToken", required = false) String refreshToken,
+                                       HttpServletResponse response) {
+        authService.logout(refreshToken);
+        var expired = Duration.ZERO;
+        response.addHeader("Set-Cookie", CookieUtil.buildCookie("accessToken",  "", expired, isSecureCookie).toString());
+        response.addHeader("Set-Cookie", CookieUtil.buildCookie("refreshToken", "", expired, isSecureCookie).toString());
+        return ResponseEntity.ok(ApiResponse.empty());
     }
 
     @PostMapping("/email/verify")

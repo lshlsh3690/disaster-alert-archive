@@ -1,4 +1,4 @@
-import { SignupFormData } from "@/types/signup";
+import { SignupFormData } from "@/schemas/signupSchema";
 import { UseFormSetError } from "react-hook-form";
 import { create } from "zustand";
 import { devtools } from "zustand/middleware";
@@ -8,10 +8,12 @@ interface SignupState {
   isCodeSended: boolean;
   isNicknameValid: boolean;
   isPasswordMatched: boolean;
+  isEmailCodeTimeout: boolean;
   setIsEmailVerified: (value: boolean) => void;
   setIsCodeSended: (value: boolean) => void;
   setIsNicknameValid: (value: boolean) => void;
   setIsPasswordMatched: (value: boolean) => void;
+  setIsEmailCodeTimeout: (value: boolean) => void;
   validateSignupStateForForm: (setError: UseFormSetError<SignupFormData>) => boolean;
   resetSignupState: () => void;
 }
@@ -22,16 +24,19 @@ const useSignupStore = create<SignupState>()(
     isCodeSended: false,
     isNicknameValid: false,
     isPasswordMatched: false,
+    isEmailCodeTimeout: false,
     setIsEmailVerified: (value: boolean) => set({ isEmailVerified: value }),
     setIsCodeSended: (value: boolean) => set({ isCodeSended: value }),
     setIsNicknameValid: (value: boolean) => set({ isNicknameValid: value }),
     setIsPasswordMatched: (value: boolean) => set({ isPasswordMatched: value }),
+    setIsEmailCodeTimeout: (value: boolean) => set({ isEmailCodeTimeout: value }),
     resetSignupState: () =>
       set({
         isEmailVerified: false,
         isCodeSended: false,
         isNicknameValid: false,
         isPasswordMatched: false,
+        isEmailCodeTimeout: false,
       }),
     validateSignupStateForForm: (setError) => {
       const { isCodeSended, isEmailVerified, isNicknameValid, isPasswordMatched } = useSignupStore.getState();

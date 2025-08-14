@@ -5,6 +5,7 @@ interface InputStatusMessageProps<T extends FieldValues> {
   formMethods: UseFormReturn<T>;
   isValid?: boolean;
   isPending?: boolean;
+  isError?: boolean;
   message?: string;
 }
 
@@ -13,6 +14,7 @@ export default function InputStatusMessage<T extends FieldValues>({
   formMethods,
   isValid,
   isPending,
+  isError,
   message,
 }: InputStatusMessageProps<T>) {
   const { formState } = formMethods;
@@ -22,7 +24,7 @@ export default function InputStatusMessage<T extends FieldValues>({
   return (
     <p
       className={`text-sm mt-1 ${
-        error
+        error || isError
           ? "text-red-500"
           : isValid
           ? "text-green-600"

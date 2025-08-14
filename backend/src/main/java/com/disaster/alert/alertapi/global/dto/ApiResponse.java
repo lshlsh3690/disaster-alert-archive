@@ -1,4 +1,4 @@
-package com.disaster.alert.alertapi.common.dto;
+package com.disaster.alert.alertapi.global.dto;
 
 import org.springframework.http.HttpStatus;
 

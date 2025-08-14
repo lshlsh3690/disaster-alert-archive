@@ -1,6 +1,8 @@
 package com.disaster.alert.alertapi.domain.member.service;
 
 
+import com.disaster.alert.alertapi.domain.common.exception.CustomException;
+import com.disaster.alert.alertapi.domain.common.exception.ErrorCode;
 import com.disaster.alert.alertapi.domain.member.dto.*;
 import com.disaster.alert.alertapi.domain.member.model.Member;
 import com.disaster.alert.alertapi.domain.member.model.MemberRole;
@@ -8,7 +10,6 @@ import com.disaster.alert.alertapi.domain.member.repository.MemberRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.annotation.Cacheable;
-import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -31,21 +32,26 @@ public class MemberService {
     @Transactional(readOnly = true)
     public Member findByEmail(String email) {
         return memberRepository.findByEmail(email)
-                .orElseThrow(() -> new UsernameNotFoundException("회원을 찾을 수 없습니다."));
+                .orElseThrow(() -> new CustomException(ErrorCode.MEMBER_NOT_FOUND, "이메일로 회원을 찾을 수 없습니다."));
+    }
+
+    @Transactional(readOnly = true)
+    public Boolean existsByEmail(String email) {
+        return memberRepository.existsByEmail(email);
     }
 
     public MemberInfoResponse getMemberInfo(Long memberId) {
         return memberRepository.findById(memberId)
                 .map(MemberInfoResponse::from)
-                .orElseThrow(() -> new RuntimeException("회원 정보를 찾을 수 없습니다."));
+                .orElseThrow(() -> new CustomException(ErrorCode.MEMBER_NOT_FOUND, "해당 ID의 회원을 찾을 수 없습니다."));
     }
 
     @Cacheable(value = "nicknameCheck", key = "#nickname")
     public boolean isNicknameDuplicate(String nickname) {
-        log.info("Checking nickname duplication for: {}", nickname);
         boolean existsByNickname = memberRepository.existsByNickname(nickname);
+        log.info("Nickname {} exists: {}", nickname, existsByNickname);
         if (existsByNickname){
-            throw new RuntimeException("이미 사용 중인 닉네임입니다.");
+            throw new CustomException(ErrorCode.DUPLICATE_NICKNAME);
         }
         return false;
     }
@@ -65,12 +71,12 @@ public class MemberService {
     @Transactional
     public MemberResponse updateMember(Long id, MemberUpdateRequest request) {
         Member member = memberRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("수정할 회원을 찾을 수 없습니다."));
+                .orElseThrow(() -> new CustomException(ErrorCode.MEMBER_NOT_FOUND, "해당 ID의 회원을 찾을 수 없습니다."));
 
         // 닉네임이 기존과 다르면 중복 검사
         if (!member.getNickname().equals(request.nickname()) &&
                 isNicknameDuplicate(request.nickname())) {
-            throw new RuntimeException("이미 사용 중인 닉네임입니다.");
+            throw new CustomException(ErrorCode.DUPLICATE_NICKNAME);
         }
         member.changeInfo(request.nickname());
 
@@ -80,23 +86,23 @@ public class MemberService {
     @Transactional
     public void deleteMember(Long id) {
         if (!memberRepository.existsById(id)) {
-            throw new RuntimeException("삭제할 회원을 찾을 수 없습니다.");
+            throw new CustomException(ErrorCode.MEMBER_NOT_FOUND, "해당 ID의 회원을 찾을 수 없습니다.");
         }
         Member member = memberRepository.findByIdAndIsDeletedFalse(id)
-                .orElseThrow(() -> new RuntimeException("삭제할 회원을 찾을 수 없습니다."));
+                .orElseThrow(() -> new CustomException(ErrorCode.MEMBER_NOT_FOUND, "해당 ID의 회원을 찾을 수 없습니다."));
 
         member.delete();
     }
 
     private void validateEmailDuplication(String email) {
         if (memberRepository.existsByEmail(email)) {
-            throw new RuntimeException("이미 사용 중인 이메일입니다.");
+            throw new CustomException(ErrorCode.DUPLICATE_EMAIL);
         }
     }
 
     private void validateNicknameDuplication(String nickname) {
         if (memberRepository.existsByNickname(nickname)) {
-            throw new RuntimeException("이미 사용 중인 닉네임입니다.");
+            throw new CustomException(ErrorCode.DUPLICATE_NICKNAME);
         }
     }
 }

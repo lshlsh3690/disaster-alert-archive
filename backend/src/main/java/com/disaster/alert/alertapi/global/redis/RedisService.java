@@ -51,7 +51,7 @@ public class RedisService {
 
     public void markEmailAsVerified(String email) {
         String key = getEmailVerifiedKey(email);
-        redisTemplate.opsForValue().set(key, "true", Duration.ofMinutes(10)); // 인증 후 10분간 유효
+        redisTemplate.opsForValue().set(key, "true", Duration.ofMinutes(3)); // 인증 후 10분간 유효
     }
 
     public boolean isEmailVerified(String email) {
