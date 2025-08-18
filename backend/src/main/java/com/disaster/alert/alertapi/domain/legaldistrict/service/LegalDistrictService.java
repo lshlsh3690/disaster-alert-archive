@@ -20,14 +20,15 @@ import java.util.List;
 @Slf4j
 public class LegalDistrictService {
     private final LegalDistrictRepository legalDistrictRepository;
+
     /**
      * 법정동 데이터를 초기화하는 메서드입니다.
      * 이 메서드는 애플리케이션 시작 시 호출되어 법정동 데이터를 초기화합니다.
      */
     public void saveAllLegalDistricts() {
-        try(InputStream inputStream = getClass().getClassLoader()
+        try (InputStream inputStream = getClass().getClassLoader()
                 .getResourceAsStream("data/legal_district_init_file.csv");
-            BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream))){
+             BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream))) {
 
             String line;
 
@@ -58,7 +59,10 @@ public class LegalDistrictService {
                         .isActiveString(isActiveStr)
                         .build());
             }
-            legalDistrictRepository.saveAll(districts);
+            if (!districts.isEmpty()) {
+                legalDistrictRepository.saveAll(districts);
+                log.info("법정동 {}건 저장 완료", districts.size());
+            }
         } catch (IOException e) {
             throw new RuntimeException(e);
         }

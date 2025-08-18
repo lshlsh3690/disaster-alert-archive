@@ -12,7 +12,7 @@ import java.time.LocalDate;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class AlertSearchCondition {
+public class AlertSearchRequest {
     private String region;
     private String districtCode;
     private LocalDate startDate;
