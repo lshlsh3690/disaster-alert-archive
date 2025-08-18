@@ -7,6 +7,7 @@ import com.disaster.alert.alertapi.domain.disasteralert.model.DisasterLevel;
 import com.disaster.alert.alertapi.domain.disasteralert.repository.DisasterAlertRepository;
 import com.disaster.alert.alertapi.domain.legaldistrict.model.LegalDistrict;
 import com.disaster.alert.alertapi.domain.legaldistrict.repository.LegalDistrictRepository;
+import com.disaster.alert.alertapi.global.service.LegalDistrictCache;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.EntityNotFoundException;
@@ -33,6 +34,8 @@ public class DisasterAlertService {
 
     private final DisasterOpenApiClient disasterOpenApiClient;
     private final ObjectMapper objectMapper;
+
+    private final LegalDistrictCache legalDistrictCache;
 
     @PersistenceContext
     private EntityManager entityManager;
@@ -77,112 +80,6 @@ public class DisasterAlertService {
         }
     }
 
-    private DisasterAlert toEntity(DisasterAlertDto dto) {
-        List<String> regionNames = new ArrayList<>(
-                Arrays.stream(dto.getRegion().split(","))
-                        .flatMap(region -> {
-                            String cleanedRegion = cleanRegionString(region);
-                            return sanitizeRegionNames(cleanedRegion).stream();
-                        })
-                        .toList()
-        );
-
-        if (dto.getRegion().contains("임진강 수계지역(경기도 연천군,파주시),경기도 임진강")) {
-            regionNames.add("경기도 연천군");
-            regionNames.add("경기도 파주시");
-        }
-
-        DisasterAlert alert = DisasterAlert.builder()
-                .sn(dto.getSn())
-                .message(dto.getMessage())
-                .createdAt(parseDateTime(dto.getCreatedAt()))
-                .emergencyLevel(dto.getEmergencyLevel() == null ? null : DisasterLevel.fromDescription(dto.getEmergencyLevel()))
-                .disasterType(dto.getDisasterType())
-                .modifiedDate(dto.getModifiedDate() == null ? null : parseDateTime(dto.getModifiedDate()))
-                .OriginalRegion(dto.getRegion())
-                .build();
-
-        for (String regionName : regionNames) {
-            List<LegalDistrict> legalDistricts = legalDistrictRepository.findAllByName(regionName);
-
-            if (legalDistricts.isEmpty()) {
-                log.warn("법정동 데이터가 없습니다: {}", regionName);
-                continue;
-            }
-
-            LegalDistrict legalDistrict;
-            if (legalDistricts.size() > 1) {
-                legalDistrict = legalDistricts.stream()
-                        .filter(ld -> ld.isActive() || "존재".equals(ld.getIsActiveString()))
-                        .findFirst()
-                        .orElse(legalDistricts.get(0));
-                log.warn("법정동 이름이 중복됩니다: {}", regionName);
-            } else {
-                legalDistrict = legalDistricts.get(0);
-            }
-
-            alert.addRegion(legalDistrict);
-        }
-
-        return alert;
-    }
-
-    private List<DisasterAlert> toEntities(DisasterAlertDto dto) {
-        // 지역 이름을 쉼표로 분리하고 공백 제거
-        // example: "서울시 , 경기 전체" → ["서울시", "경기"]
-        List<String> regionNames = Arrays.stream(dto.getRegion().split(","))
-                .flatMap(region -> {
-                    // 법정동 이름을 정리하여 중복된 단어 제거
-                    String cleanedRegion = cleanRegionString(region);
-                    return sanitizeRegionNames(cleanedRegion).stream();
-                })
-                .toList();
-
-        //법정동에 존재하지 않는 지역명
-        if (dto.getRegion().equals("임진강 수계지역(경기도 연천군,파주시),경기도 임진강")) {
-            // 임진강 수계지역은 특별한 예외 처리
-            regionNames = List.of("경기도 연천군", "경기도 파주시");
-        }
-
-        return regionNames.stream()
-                .map(regionName -> {
-                    List<LegalDistrict> legalDistricts = legalDistrictRepository.findAllByName(regionName);
-
-
-                    if (legalDistricts.isEmpty()) {
-                        log.warn("법정동 데이터가 없습니다: {}", regionName);
-                        return null; // 법정동이 없으면 null 반환
-                    }
-
-                    LegalDistrict legalDistrict = null;
-                    if (legalDistricts.size() > 1) {
-                        // 중복된 법정동이 있다면 우선적으로 활성화된 법정동을 찾고, 없으면 첫 번째 것을 사용
-                        legalDistrict = legalDistricts.stream()
-                                .filter(ld -> ld.isActive() || ld.getIsActiveString().equals("존재"))
-                                .findFirst()
-                                .orElse(legalDistricts.get(0)); // 활성화된 법정동이 없으면 첫 번째 것 사용
-                        log.warn("법정동 이름이 중복됩니다: {}", regionName);
-                    } else {
-                        // 법정동이 하나만 있다면 그 법정동 사용
-                        legalDistrict = legalDistricts.get(0);
-                    }
-
-                    DisasterAlert build = DisasterAlert.builder()
-                            .sn(dto.getSn())
-                            .message(dto.getMessage())
-                            .createdAt(parseDateTime(dto.getCreatedAt()))
-                            .emergencyLevel(dto.getEmergencyLevel() == null ? null : DisasterLevel.fromDescription(dto.getEmergencyLevel()))
-                            .disasterType(dto.getDisasterType())
-                            .modifiedDate(dto.getModifiedDate() == null ? null : parseDateTime(dto.getModifiedDate()))
-                            .OriginalRegion(dto.getRegion()) // 원본 지역명 저장
-                            .build();
-                    build.addRegion(legalDistrict); // 재난문자와 법정동 연결
-
-                    return build;
-                })
-                .toList();
-    }
-
     private LocalDateTime parseDateTime(String str) {
         if (str.contains("-")) {
             str = str.replace("-", "/"); // "-"를 "/"로 변경
@@ -207,6 +104,57 @@ public class DisasterAlertService {
         return false;
     }
 
+    private DisasterAlert toEntity(DisasterAlertDto dto) {
+        List<String> regionNames = new ArrayList<>(
+                Arrays.stream(dto.getRegion().split(","))
+                        .flatMap(region -> {
+                            String cleanedRegion = cleanRegionString(region);
+                            return sanitizeRegionNames(cleanedRegion).stream();
+                        })
+                        .toList()
+        );
+
+        if (dto.getRegion().contains("임진강 수계지역(경기도 연천군,파주시),경기도 임진강")) {
+            regionNames = new ArrayList<>(regionNames);
+            regionNames.add("경기도 연천군");
+            regionNames.add("경기도 파주시");
+        }
+
+        DisasterAlert alert = DisasterAlert.builder()
+                .sn(dto.getSn())
+                .message(dto.getMessage())
+                .createdAt(parseDateTime(dto.getCreatedAt()))
+                .emergencyLevel(dto.getEmergencyLevel() == null ? null : DisasterLevel.fromDescription(dto.getEmergencyLevel()))
+                .disasterType(dto.getDisasterType())
+                .modifiedDate(dto.getModifiedDate() == null ? null : parseDateTime(dto.getModifiedDate()))
+                .originalRegion(dto.getRegion())
+                .build();
+
+        Set<String> attachedCodes = new HashSet<>();
+        for (String regionName : regionNames) {
+            List<LegalDistrict> legalDistricts = legalDistrictCache.get(regionName);// 캐시에서 법정동 조회
+
+            if (legalDistricts.isEmpty()) {
+                log.warn("법정동 데이터가 없습니다: {}", regionName);
+                continue;
+            }
+
+            // 법정동이 여러 개일 경우 활성화된 법정동을 우선 선택
+            LegalDistrict picked = (legalDistricts.size() > 1)
+                    ? legalDistricts.stream()
+                    .filter(ld -> ld.isActive() || "존재".equals(ld.getIsActiveString()))
+                    .findFirst()
+                    .orElse(legalDistricts.get(0))
+                    : legalDistricts.get(0);
+
+            String code = picked.getCode();
+            if (!attachedCodes.add(code)) continue;
+            alert.addRegionCode(code);
+        }
+
+        return alert;
+    }
+
     private String cleanRegionString(String region) {
         return Arrays.stream(region.split(","))
                 .map(String::trim)
@@ -223,12 +171,16 @@ public class DisasterAlertService {
         List<String> result = new ArrayList<>();
 
         for (String region : regions) {
-            // 가장 긴 매칭만 가져오기
+            // 지역이름 : "세종특별자치시 가람동 1동"
             List<String> tokens = Arrays.asList(region.split(" "));
+            // 가장 긴 법정동 이름을 찾기 위해 뒤에서부터 검사
             for (int i = tokens.size(); i > 0; i--) {
+                // 첫번째 candidate : "세종특별자치시 가람동 1동"
+                // 두번째 candidate : "세종특별자치시 가람동"
+                // 세번째 candidate : "세종특별자치시"
                 String candidate = String.join(" ", tokens.subList(0, i));
-                if (legalDistrictRepository.existsByName(candidate)) {
-                    result.add(candidate); // 가장 긴 매칭 하나만 추가
+                if (!legalDistrictCache.get(candidate).isEmpty()) {
+                    result.add(candidate); // 법정동이 존재하면 추가
                     break;
                 }
             }
@@ -249,11 +201,9 @@ public class DisasterAlertService {
         return String.join(" ", seen);
     }
 
-
     /**
      * 재난문자 데이터를 초기화합니다.
      */
-    @Transactional
     public void initAllDisasterData() {
         try {
             // 1. 첫 번째 호출로 totalCount만 확인
@@ -288,24 +238,14 @@ public class DisasterAlertService {
         }
     }
 
-    public Page<DisasterAlertResponseDto> searchAlerts(String region, String districtCode, LocalDate startDate, LocalDate endDate, String type, DisasterLevel level, String keyword, Pageable pageable) {
-        AlertSearchCondition alertSearchCondition = AlertSearchCondition.builder()
-                .region(region)
-                .districtCode(districtCode)
-                .startDate(startDate)
-                .endDate(endDate)
-                .type(type)
-                .level(level)
-                .keyword(keyword)
-                .build();
-
+    public Page<DisasterAlertResponseDto> searchAlerts(AlertSearchRequest alertSearchCondition, Pageable pageable) {
         Page<DisasterAlert> result = disasterAlertRepository.searchAlerts(alertSearchCondition, pageable);
 
         return result.map(DisasterAlertResponseDto::from);
     }
 
     public DisasterAlertStatResponse getStats(String region, String districtCode, LocalDate startDate, LocalDate endDate, String type, DisasterLevel level, String keyword) {
-        AlertSearchCondition alertSearchCondition = AlertSearchCondition.builder()
+        AlertSearchRequest alertSearchCondition = AlertSearchRequest.builder()
                 .region(region)
                 .districtCode(districtCode)
                 .startDate(startDate)

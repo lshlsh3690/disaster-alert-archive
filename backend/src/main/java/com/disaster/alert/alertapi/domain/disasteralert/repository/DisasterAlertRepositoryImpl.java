@@ -1,7 +1,6 @@
 package com.disaster.alert.alertapi.domain.disasteralert.repository;
 
-import com.disaster.alert.alertapi.domain.disasteralert.dto.AlertSearchCondition;
-import com.disaster.alert.alertapi.domain.disasteralert.dto.DisasterAlertRegionStatDto;
+import com.disaster.alert.alertapi.domain.disasteralert.dto.AlertSearchRequest;
 import com.disaster.alert.alertapi.domain.disasteralert.model.DisasterAlert;
 import com.disaster.alert.alertapi.domain.disasteralert.model.DisasterLevel;
 import com.querydsl.core.BooleanBuilder;
@@ -33,7 +32,7 @@ public class DisasterAlertRepositoryImpl implements DisasterAlertRepositoryCusto
      * @return 검색 결과 페이지
      */
     @Override
-    public Page<DisasterAlert> searchAlerts(AlertSearchCondition condition, Pageable pageable) {
+    public Page<DisasterAlert> searchAlerts(AlertSearchRequest condition, Pageable pageable) {
         List<DisasterAlert> contents = queryFactory
                 .selectFrom(disasterAlert)
                 .where(byAlertCondition(condition))
@@ -53,7 +52,7 @@ public class DisasterAlertRepositoryImpl implements DisasterAlertRepositoryCusto
     }
 
     @Override
-    public List<DisasterAlert> disasterAlertsBySearchCondition(AlertSearchCondition condition) {
+    public List<DisasterAlert> disasterAlertsBySearchCondition(AlertSearchRequest condition) {
         return queryFactory
                 .selectFrom(disasterAlert)
                 .distinct()
@@ -64,7 +63,7 @@ public class DisasterAlertRepositoryImpl implements DisasterAlertRepositoryCusto
     }
 
 
-    private BooleanBuilder byAlertCondition(AlertSearchCondition condition) {
+    private BooleanBuilder byAlertCondition(AlertSearchRequest condition) {
         BooleanBuilder builder = new BooleanBuilder();
 
         if (condition.getRegion() != null) builder.and(regionEq(condition.getRegion()));

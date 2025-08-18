@@ -14,7 +14,6 @@ public class DisasterFetchScheduler {
 
     private final DisasterOpenApiClient openApiClient;
     private final DisasterAlertService alertService;
-
     // 매 10분마다 실행
     @Scheduled(cron = "0 0/10 * * * *")
     public void fetchAndSaveDisasterAlerts() {

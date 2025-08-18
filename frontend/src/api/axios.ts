@@ -6,7 +6,6 @@ const instance = axios.create({
   withCredentials: true, // 쿠키 기반 인증 시 필요
 });
 
-
 // 전역 플래그 & 대기열
 let isRefreshing = false;
 let waitQueue: Array<() => void> = [];
@@ -67,4 +66,3 @@ instance.interceptors.response.use(
 );
 
 export default instance;
-

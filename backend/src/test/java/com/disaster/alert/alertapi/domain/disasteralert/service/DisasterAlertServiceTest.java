@@ -1,5 +1,6 @@
 package com.disaster.alert.alertapi.domain.disasteralert.service;
 
+import com.disaster.alert.alertapi.domain.disasteralert.dto.AlertSearchRequest;
 import com.disaster.alert.alertapi.domain.disasteralert.dto.DisasterAlertResponseDto;
 import com.disaster.alert.alertapi.domain.disasteralert.dto.DisasterAlertStatResponse;
 import com.disaster.alert.alertapi.domain.disasteralert.model.DisasterAlert;
@@ -9,10 +10,8 @@ import com.disaster.alert.alertapi.domain.legaldistrict.model.LegalDistrict;
 import com.disaster.alert.alertapi.domain.legaldistrict.repository.LegalDistrictRepository;
 import jakarta.transaction.Transactional;
 import lombok.extern.slf4j.Slf4j;
-import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.TestInstance;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.data.domain.Page;
@@ -198,9 +197,18 @@ class DisasterAlertServiceTest {
         // given
         Pageable pageable = PageRequest.of(0, 10);
 
+        AlertSearchRequest request = AlertSearchRequest.builder()
+                .region(null)
+                .districtCode(null)
+                .startDate(null)
+                .endDate(null)
+                .type(null)
+                .level(null)
+                .keyword(null)
+                .build();
         // when
         Page<DisasterAlertResponseDto> result = disasterAlertService.searchAlerts(
-                null, null, null, null, null, null, null, pageable
+                request, pageable
         );
 
         // then
@@ -212,8 +220,20 @@ class DisasterAlertServiceTest {
     void searchAlerts_지역명기반조회() {
         Pageable pageable = PageRequest.of(0, 10);
 
+
+        // 서울특별시 지역명으로 조회
+        AlertSearchRequest request = AlertSearchRequest.builder()
+                .region("서울특별시")
+                .districtCode(null)
+                .startDate(null)
+                .endDate(null)
+                .type(null)
+                .level(null)
+                .keyword(null)
+                .build();
+
         Page<DisasterAlertResponseDto> result = disasterAlertService.searchAlerts(
-                "서울특별시", null, null, null, null, null, null, pageable
+                request, pageable
         );
 
         assertEquals(1, result.getTotalElements());
@@ -224,11 +244,20 @@ class DisasterAlertServiceTest {
     void searchAlerts_기간조회() {
         Pageable pageable = PageRequest.of(0, 10);
 
+
+        // 2024년 6월 2일에 발생한 재난 경고 조회
+        AlertSearchRequest request = AlertSearchRequest.builder()
+                .region(null)
+                .districtCode(null)
+                .startDate(LocalDate.of(2024, 6, 2))
+                .endDate(LocalDate.of(2024, 6, 2))
+                .type(null)
+                .level(null)
+                .keyword(null)
+                .build();
+
         Page<DisasterAlertResponseDto> result = disasterAlertService.searchAlerts(
-                null, null,
-                LocalDate.of(2024, 6, 2),
-                LocalDate.of(2024, 6, 2),
-                null, null, null, pageable
+                request, pageable
         );
 
         assertEquals(1, result.getTotalElements());
@@ -240,9 +269,18 @@ class DisasterAlertServiceTest {
     void searchAlerts_키워드조회() {
         Pageable pageable = PageRequest.of(0, 10);
 
+        // "지진" 키워드로 조회
+        AlertSearchRequest request = AlertSearchRequest.builder()
+                .region(null)
+                .districtCode(null)
+                .startDate(null)
+                .endDate(null)
+                .type("지진")
+                .level(null)
+                .keyword(null)
+                .build();
         Page<DisasterAlertResponseDto> result = disasterAlertService.searchAlerts(
-                null, null, null, null, null, null,
-                "지진", pageable
+                request, pageable
         );
 
         assertEquals(1, result.getTotalElements());
@@ -254,12 +292,18 @@ class DisasterAlertServiceTest {
     void searchAlerts_종합조건조회() {
         Pageable pageable = PageRequest.of(0, 10);
 
+        // 종합 조건으로 조회
+        AlertSearchRequest request = AlertSearchRequest.builder()
+                .region("광주광역시 동구")
+                .districtCode("2911000000")
+                .startDate(LocalDate.of(2024, 6, 1))
+                .endDate(LocalDate.of(2024, 6, 2))
+                .type("지진")
+                .level(DisasterLevel.LEVEL_3)
+                .keyword("경보")
+                .build();
         Page<DisasterAlertResponseDto> result = disasterAlertService.searchAlerts(
-                "광주광역시 동구", "2911000000",
-                LocalDate.of(2024, 6, 1),
-                LocalDate.of(2024, 6, 2),
-                "지진", DisasterLevel.LEVEL_3,
-                "경보", pageable
+                request, pageable
         );
 
         assertEquals(1, result.getTotalElements());
