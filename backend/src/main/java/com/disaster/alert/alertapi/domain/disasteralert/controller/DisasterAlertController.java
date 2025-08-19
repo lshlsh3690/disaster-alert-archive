@@ -39,26 +39,12 @@ public class DisasterAlertController {
     /**
      * 재난 안전문자 통계 조회 API
      *
-     * @param region       지역명
-     * @param districtCode 법정동 코드
-     * @param startDate    시작 날짜 (ISO 8601 형식)
-     * @param endDate      종료 날짜 (ISO 8601 형식)
-     * @param type         재난 유형
-     * @param level        재난 수준
-     * @param keyword      검색 키워드
+     * @param alertSearchRequest 검색 조건
      * @return 재난 안전문자 통계 정보
      */
     @GetMapping("/stats")
-    public ResponseEntity<DisasterAlertStatResponse> getStats(
-            @RequestParam(required = false) String region,
-            @RequestParam(required = false) String districtCode,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
-            @RequestParam(required = false) String type,
-            @RequestParam(required = false) DisasterLevel level,
-            @RequestParam(required = false) String keyword
-    ) {
-        DisasterAlertStatResponse stats = disasterAlertService.getStats(region, districtCode, startDate, endDate, type, level, keyword);
+    public ResponseEntity<DisasterAlertStatResponse> getStats(AlertSearchRequest alertSearchRequest) {
+        DisasterAlertStatResponse stats = disasterAlertService.getStats(alertSearchRequest);
         return ResponseEntity.ok(stats);
     }
 
