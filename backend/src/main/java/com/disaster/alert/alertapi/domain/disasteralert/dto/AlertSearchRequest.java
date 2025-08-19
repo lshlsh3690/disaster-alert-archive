@@ -15,8 +15,8 @@ import java.time.LocalDate;
 public class AlertSearchRequest {
     private String region;
     private String districtCode;
-    private LocalDate startDate;
-    private LocalDate endDate;
+    private LocalDate startDate; //ISO 8601 형식 (yyyy-MM-dd)
+    private LocalDate endDate;   //ISO 8601 형식 (yyyy-MM-dd)
     private String type;
     private DisasterLevel level;
     private String keyword;

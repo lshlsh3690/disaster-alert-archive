@@ -21,7 +21,7 @@ public class DisasterAlert {
     @SequenceGenerator(
             name = "disaster_alert_seq_gen",
             sequenceName = "disaster_alert_seq",
-            allocationSize = 500 // 미리 100개 묶음으로 가져와 배치 효율↑
+            allocationSize = 500 // 시퀀스 할당 크기
     )
     @Column(name = "disaster_alert_id", unique = true)
     private Long id;

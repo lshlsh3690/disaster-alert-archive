@@ -38,7 +38,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 || p.startsWith("/api/v1/auth/reissue")
                 || p.startsWith("/api/v1/auth/signup")
                 || p.startsWith("/api/v1/auth/email/verify")
-                || p.endsWith("check-nickname") || p.endsWith("logout");
+                || p.endsWith("check-nickname") || p.endsWith("logout")
+                || p.startsWith("/api/v1/alerts");
     }
 
     @Override
