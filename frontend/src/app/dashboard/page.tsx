@@ -1,6 +1,7 @@
-'use client'
+"use client";
 
-import Link from 'next/link'
+import Link from "next/link";
+import LatestAlertsSection from "./LatestAlertsSection";
 
 export default function DashboardPage() {
   return (
@@ -16,13 +17,7 @@ export default function DashboardPage() {
       {/* 최신 재난 문자 */}
       <section>
         <SectionHeader title="📩 최신 재난 문자" href="/alerts" />
-        <div className="bg-white rounded-xl p-4 shadow">
-          <ul className="text-sm text-gray-700 space-y-1">
-            <li>📍 [서울] 2024-06-01 12:30 - 누강읍 태풍 경보 발령</li>
-            <li>📍 [부산] 2024-06-01 11:00 - 호우주의보 발령</li>
-            <li>📍 [대전] 2024-06-01 09:10 - 미세먼지 주의보</li>
-          </ul>
-        </div>
+        <LatestAlertsSection limit={5}/>
       </section>
 
       {/* 지역별 재난 문자 지도 */}
@@ -57,7 +52,7 @@ export default function DashboardPage() {
         </div>
       </section>
     </main>
-  )
+  );
 }
 
 function SummaryCard({ title, value }: { title: string; value: string }) {
@@ -66,7 +61,7 @@ function SummaryCard({ title, value }: { title: string; value: string }) {
       <div className="text-gray-500 text-sm mb-1">{title}</div>
       <div className="text-2xl font-bold text-gray-900">{value}</div>
     </div>
-  )
+  );
 }
 
 function SectionHeader({ title, href }: { title: string; href?: string }) {
@@ -79,5 +74,5 @@ function SectionHeader({ title, href }: { title: string; href?: string }) {
         </Link>
       )}
     </div>
-  )
+  );
 }

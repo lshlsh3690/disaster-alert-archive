@@ -16,6 +16,7 @@ import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
@@ -264,5 +265,14 @@ public class DisasterAlertService {
         List<String> regionNames = disasterAlertRepository.legalDistrictNamesByAlertId(id);
 
         return new DisasterAlertDetailDto(alert, regionNames);
+    }
+
+    /**
+     * 최신 재난문자를 조회합니다.
+     *
+     * @return 최신 재난문자 DTO
+     */
+    public List<LatestAlertResponse> getLatestAlert(int limit) {
+        return disasterAlertRepository.latestAlerts(PageRequest.of(0, limit));
     }
 }

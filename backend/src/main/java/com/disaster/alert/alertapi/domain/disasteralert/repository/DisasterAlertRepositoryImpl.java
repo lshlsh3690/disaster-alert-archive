@@ -4,13 +4,12 @@ import com.disaster.alert.alertapi.domain.disasteralert.dto.AlertSearchRequest;
 import com.disaster.alert.alertapi.domain.disasteralert.dto.DisasterAlertStatResponse;
 import com.disaster.alert.alertapi.domain.disasteralert.model.DisasterAlert;
 import com.disaster.alert.alertapi.domain.disasteralert.model.DisasterLevel;
+import com.disaster.alert.alertapi.domain.disasteralert.model.QDisasterAlert;
 import com.disaster.alert.alertapi.domain.disasteralert.model.QDisasterAlertRegion;
 import com.disaster.alert.alertapi.domain.legaldistrict.model.QLegalDistrict;
 import com.querydsl.core.BooleanBuilder;
 import com.querydsl.core.types.Projections;
 import com.querydsl.core.types.dsl.BooleanExpression;
-import com.querydsl.core.types.dsl.Expressions;
-import com.querydsl.core.types.dsl.StringTemplate;
 import com.querydsl.jpa.JPAExpressions;
 import com.querydsl.jpa.impl.JPAQueryFactory;
 import lombok.RequiredArgsConstructor;
@@ -22,10 +21,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import java.time.LocalDate;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
+import java.util.*;
 import java.util.stream.Collectors;
 
 import static com.disaster.alert.alertapi.domain.disasteralert.model.QDisasterAlert.disasterAlert;
@@ -46,8 +42,7 @@ public class DisasterAlertRepositoryImpl implements DisasterAlertRepositoryCusto
      */
     @Override
     public Page<DisasterAlert> searchAlerts(AlertSearchRequest cond, Pageable pageable) {
-
-        // 1) 페이지 ID만 먼저 가져오기 (가볍게)
+        // 1) 페이지 ID만 먼저 가져오기
         List<Long> ids = queryFactory
                 .select(disasterAlert.id)
                 .from(disasterAlert)
@@ -150,7 +145,6 @@ public class DisasterAlertRepositoryImpl implements DisasterAlertRepositoryCusto
                 .orderBy(disasterAlert.id.countDistinct().desc(), disasterAlert.emergencyLevel.asc())
                 .fetch();
     }
-
 
     private BooleanBuilder byAlertCondition(AlertSearchRequest condition) {
         BooleanBuilder b = new BooleanBuilder();

@@ -1,6 +1,7 @@
 "use client";
 
 import { useSearchAlerts } from "@/lib/queries/useAlerts";
+import { Alert } from "@/types/alerts";
 import { LEVEL_OPTIONS, levelTextToCode } from "@/ui/level";
 import { zodResolver } from "@hookform/resolvers/zod";
 import Link from "next/link";
@@ -108,19 +109,21 @@ export default function DisasterListPage() {
         ) : (
           <>
             <ul className="space-y-2">
-              {data?.content.map((a) => (
-                <li key={a.id} className="border-b last:border-0 pb-2">
-                  <Link href={`/alerts/${a.id}`} className="hover:underline">
-                    <span className="text-gray-800">
-                      [{a.originalRegion ?? a.regions?.[0]?.name ?? "지역"}] {new Date(a.createdAt).toLocaleString()} -{" "}
-                      {a.message}
-                    </span>
-                  </Link>
-                  <div className="text-xs text-gray-500">
-                    {a.disasterType ?? "-"} · {a.emergencyLevelText ?? "-"}
-                  </div>
-                </li>
-              ))}
+              {data?.content.map((a: Alert) => {
+                const regionLabel = a.regionNames && a.regionNames.length > 0 ? a.regionNames.join(", ") : "-";
+                return (
+                  <li key={a.id} className="border-b last:border-0 pb-2">
+                    <Link href={`/alerts/${a.id}`} className="hover:underline">
+                      <span className="text-gray-800">
+                        [{regionLabel}] {new Date(a.createdAt).toLocaleString()} - {a.message}
+                      </span>
+                    </Link>
+                    <div className="text-xs text-gray-500">
+                      {a.disasterType ?? "-"} · {a.emergencyLevelText ?? "-"}
+                    </div>
+                  </li>
+                );
+              })}
             </ul>
 
             {/* 페이지네이션 */}
