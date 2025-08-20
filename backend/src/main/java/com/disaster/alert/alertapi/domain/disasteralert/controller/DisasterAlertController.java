@@ -1,11 +1,10 @@
 package com.disaster.alert.alertapi.domain.disasteralert.controller;
 
-import com.disaster.alert.alertapi.domain.disasteralert.dto.AlertSearchRequest;
-import com.disaster.alert.alertapi.domain.disasteralert.dto.DisasterAlertDetailDto;
-import com.disaster.alert.alertapi.domain.disasteralert.dto.DisasterAlertResponseDto;
-import com.disaster.alert.alertapi.domain.disasteralert.dto.DisasterAlertStatResponse;
+import com.disaster.alert.alertapi.domain.disasteralert.dto.*;
 import com.disaster.alert.alertapi.domain.disasteralert.model.DisasterLevel;
 import com.disaster.alert.alertapi.domain.disasteralert.service.DisasterAlertService;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -15,6 +14,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/v1/alerts")
@@ -62,5 +62,12 @@ public class DisasterAlertController {
     public ResponseEntity<DisasterAlertDetailDto> getDisasterAlert(@PathVariable Long id) {
         DisasterAlertDetailDto dto = disasterAlertService.getAlertDetail(id);
         return ResponseEntity.ok(dto);
+    }
+
+    @GetMapping("/latest")
+    public ResponseEntity<List<LatestAlertResponse>> getLatestAlert(
+            @RequestParam(defaultValue = "5") @Min(1) @Max(50) int limit
+    ) {
+       return ResponseEntity.ok(disasterAlertService.getLatestAlert(limit));
     }
 }

@@ -18,4 +18,5 @@ public interface DisasterAlertRepositoryCustom {
     List<DisasterAlertStatResponse.TypeStat> countByType(AlertSearchRequest request);
 
     List<DisasterAlertStatResponse.LevelStat> countByLevel(AlertSearchRequest request);
+
 }

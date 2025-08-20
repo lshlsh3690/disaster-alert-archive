@@ -9,13 +9,13 @@ export const ZAlert = z.object({
   id: z.number(),
   sn: z.number().optional(),
   message: z.string(),
-  createdAt: z.string(),              // ISO
-  emergencyLevel: z.string().nullable().optional(),
+  createdAt: z.string(),             
   emergencyLevelText: z.string().nullable().optional(),
   disasterType: z.string().nullable().optional(),
   originalRegion: z.string().nullable().optional(),
-  regions: z.array(ZRegion).optional(), // 백엔드 Dto에 맞춰 from()에서 채움
+  regionNames: z.array(z.string()).default([]), 
 });
+
 export type Alert = z.infer<typeof ZAlert>;
 
 export const ZPageMeta = z.object({

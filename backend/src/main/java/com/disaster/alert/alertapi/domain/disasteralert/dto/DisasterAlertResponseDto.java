@@ -7,6 +7,7 @@ import lombok.Getter;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 @Getter
@@ -33,7 +34,7 @@ public class DisasterAlertResponseDto {
                 .disasterType(disasterAlert.getDisasterType())
                 .createdAt(disasterAlert.getCreatedAt())
                 .modifiedDate(disasterAlert.getModifiedDate())
-                .regionNames(disasterAlert.getDisasterAlertRegions()
+                .regionNames(Optional.ofNullable(disasterAlert.getDisasterAlertRegions()).orElse(List.of())
                         .stream()
                         .map(region -> region.getLegalDistrict().getName())
                         .collect(Collectors.toList()))

@@ -56,7 +56,7 @@ export default function Home() {
   );
 }
 
-// 🔹 컴포넌트 분리해도 좋지만 여기선 인라인 정의
+//컴포넌트 분리해도 좋지만 여기선 인라인 정의
 function FeatureCard({ title, desc }: { title: string; desc: string }) {
   return (
     <div className="bg-white p-6 rounded-xl shadow hover:shadow-md transition">
