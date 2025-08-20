@@ -10,9 +10,13 @@ const instance = axios.create({
 let isRefreshing = false;
 let waitQueue: Array<() => void> = [];
 
-// 유틸: 재발급 요청인지 판별
+// 유틸: 재발급/로그인 요청 판별
 const isReissueRequest = (config?: InternalAxiosRequestConfig) =>
-  !!config?.url && config.url.includes("/api/v1/auth/reissue");
+  !!config?.url && config.url.includes('/api/v1/auth/reissue');
+
+const isAuthLoginRequest = (config?: InternalAxiosRequestConfig) =>
+  !!config?.url && config.url.includes('/api/v1/auth/login');
+
 
 // 응답 에러 처리 (예: 401 시 refresh 등)
 instance.interceptors.response.use(
@@ -22,6 +26,10 @@ instance.interceptors.response.use(
 
     // 1) 재발급 요청 자체는 재시도 금지 (여기서 루프 끊음)
     if (isReissueRequest(original)) {
+      return Promise.reject(error);
+    }
+    if (isAuthLoginRequest(original)) {
+      // 로그인 요청은 재시도하지 않음
       return Promise.reject(error);
     }
 

@@ -83,17 +83,6 @@ public class DisasterAlertRepositoryImpl implements DisasterAlertRepositoryCusto
     }
 
     @Override
-    public List<DisasterAlert> getStats(AlertSearchRequest condition) {
-        return queryFactory
-                .selectFrom(disasterAlert)
-                .distinct()
-                .join(disasterAlert.disasterAlertRegions, disasterAlertRegion).fetchJoin()
-                .join(disasterAlertRegion.legalDistrict, legalDistrict).fetchJoin()
-                .where(byAlertCondition(condition))
-                .fetch();
-    }
-
-    @Override
     public long countAlerts(AlertSearchRequest request) {
         return queryFactory
                 .select(disasterAlert.id.countDistinct())

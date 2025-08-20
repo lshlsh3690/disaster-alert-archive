@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export const errorResponseSchema = z.object({
+export const errorResponse = z.object({
   code: z.string(), // "A102", "M409" ...
   key: z.string().optional(), // "EMAIL_NOT_VERIFIED", "DUPLICATE_NICKNAME" ...
   message: z.string(),
@@ -11,6 +11,6 @@ export const errorResponseSchema = z.object({
 });
 
 export function parseErrorResponse(raw: unknown) {
-  const parsed = errorResponseSchema.safeParse(raw);
+  const parsed = errorResponse.safeParse(raw);
   return parsed.success ? parsed.data : null;
 }

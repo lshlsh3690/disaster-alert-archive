@@ -13,7 +13,7 @@ public class DisasterAlertDetailDto {
     private Long sn;
     private String message;
     private String disasterType;
-    private String emergencyLevel;
+    private String emergencyLevelText;
     private LocalDateTime createdAt;
     private LocalDateTime modifiedDate;
     private String originalRegion;
@@ -24,7 +24,7 @@ public class DisasterAlertDetailDto {
         this.sn = alert.getSn();
         this.message = alert.getMessage();
         this.disasterType = alert.getDisasterType();
-        this.emergencyLevel = alert.getEmergencyLevel() != null ? alert.getEmergencyLevel().name() : null;
+        this.emergencyLevelText = alert.getEmergencyLevel() != null ? alert.getEmergencyLevel().getDescription() : null;
         this.createdAt = alert.getCreatedAt();
         this.modifiedDate = alert.getModifiedDate();
         this.originalRegion = alert.getOriginalRegion();

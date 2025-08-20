@@ -1,4 +1,4 @@
-import { SignupFormData } from "@/schemas/signupSchema";
+import { SignupFormData } from "@/types/signup";
 import { UseFormSetError } from "react-hook-form";
 import { create } from "zustand";
 import { devtools } from "zustand/middleware";
