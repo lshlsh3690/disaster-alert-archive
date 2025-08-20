@@ -1,5 +1,5 @@
 import instance from "@/api/axios";
-import { SignupFormData } from "@/schemas/signupSchema";
+import { SignupFormData } from "@/types/signup";
 
 const AUTH_API_BASE = "/api/v1/auth";
 

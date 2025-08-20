@@ -15,7 +15,7 @@ export default function DashboardPage() {
 
       {/* 최신 재난 문자 */}
       <section>
-        <SectionHeader title="📩 최신 재난 문자" href="/disasters" />
+        <SectionHeader title="📩 최신 재난 문자" href="/alerts" />
         <div className="bg-white rounded-xl p-4 shadow">
           <ul className="text-sm text-gray-700 space-y-1">
             <li>📍 [서울] 2024-06-01 12:30 - 누강읍 태풍 경보 발령</li>

@@ -3,10 +3,10 @@ import useSignupStore from "@/store/signupStore";
 import { useMutation } from "@tanstack/react-query";
 import { AxiosError } from "axios";
 import { UseFormSetError } from "react-hook-form";
-import { SignupFormData } from "@/schemas/signupSchema";
-import { SuccessResponse } from "@/types/SuccessResponse";
+import { SignupFormData } from "@/types/signup";
+import { SuccessResponse } from "@/types/successResponse";
 import { z } from "zod";
-import { parseErrorResponse } from "@/schemas/errorResponseSchema";
+import { parseErrorResponse } from "@/types/errorResponse";
 import { makeMutationFn } from "@/utils/makeMutationFn";
 
 interface UseSignupMutationProps {

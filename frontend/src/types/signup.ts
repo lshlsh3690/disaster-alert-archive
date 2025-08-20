@@ -22,7 +22,7 @@ z.iso.time();
 z.iso.datetime();
 z.iso.duration();
  */
-export const signupSchema = z
+export const signup = z
   .object({
     email: z.email("올바른 이메일 형식이 아닙니다.").nonempty("이메일을 입력하세요."),
     password: z
@@ -55,7 +55,7 @@ export const signupSchema = z
       .optional(),
   });
 
-export type SignupFormData = z.infer<typeof signupSchema>;
+export type SignupFormData = z.infer<typeof signup>;
 
 // 폼 전용 값: UI에서만 쓰는 verificationCode 포함 (DTO 아님)
 // 실제 API 요청 시에는 verificationCode를 제외하고 SignupFormData를 사용

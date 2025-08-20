@@ -12,12 +12,12 @@ import useSignup from "@/lib/mutations/useSignup";
 import Button from "@/components/Button";
 import NicknameInput from "@/components/form/NicknameInput";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { SignupFormData, SignupFormValues, signupSchema } from "@/schemas/signupSchema";
+import { SignupFormData, SignupFormValues, signup } from "@/types/signup";
 
 export default function SignupForm() {
   const router = useRouter();
   const formMethods = useForm<SignupFormValues>({
-    resolver: zodResolver(signupSchema),
+    resolver: zodResolver(signup),
     mode: "onChange",
     reValidateMode: "onChange",
     defaultValues: {

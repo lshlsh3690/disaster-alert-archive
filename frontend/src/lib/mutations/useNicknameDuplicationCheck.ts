@@ -1,10 +1,10 @@
 import { useMutation } from "@tanstack/react-query";
 import { AxiosError } from "axios";
 import { sendNicknameDuplicationCheck } from "@/api/memberApi";
-import { SuccessResponse } from "@/types/SuccessResponse";
+import { SuccessResponse } from "@/types/successResponse";
 import { makeMutationFn } from "@/utils/makeMutationFn";
 import { z } from "zod";
-import { parseErrorResponse } from "@/schemas/errorResponseSchema";
+import { parseErrorResponse } from "@/types/errorResponse";
 
 export default function useNicknameDuplicationCheck(options: {
   onSuccessCallback?: () => void;

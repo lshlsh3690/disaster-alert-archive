@@ -1,9 +1,9 @@
 import { loginApi } from "@/api/authApi";
-import { parseErrorResponse } from "@/schemas/errorResponseSchema";
+import { parseErrorResponse } from "@/types/errorResponse";
 import { useAuthStore } from "@/store/authStore";
-import { SuccessResponse } from "@/types/SuccessResponse";
 import { useMutation } from "@tanstack/react-query";
 import { AxiosError } from "axios";
+import {SuccessResponse } from "@/types/successResponse";
 
 interface LoginFormData {
   email: string;

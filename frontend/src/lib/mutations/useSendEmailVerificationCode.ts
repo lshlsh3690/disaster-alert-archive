@@ -1,10 +1,10 @@
 import { useMutation } from "@tanstack/react-query";
 import { sendEmailVerificationCode } from "@/api/authApi";
 import { AxiosError } from "axios";
-import { SuccessResponse } from "@/types/SuccessResponse";
+import { SuccessResponse } from "@/types/successResponse";
 import { makeMutationFn } from "@/utils/makeMutationFn";
 import { z } from "zod";
-import { parseErrorResponse } from "@/schemas/errorResponseSchema";
+import { parseErrorResponse } from "@/types/errorResponse";
 import { FieldValues, Path, UseFormSetError } from "react-hook-form";
 
 export function useSendEmailVerificationCode<T extends FieldValues>(options: {

@@ -18,7 +18,7 @@ public class DisasterAlertResponseDto {
     private LocalDateTime createdAt;
     private LocalDateTime modifiedDate;
     private String disasterType;
-    private DisasterLevel emergencyLevel;
+    private String emergencyLevelText;
     private List<String> regionNames;
 
 
@@ -27,7 +27,9 @@ public class DisasterAlertResponseDto {
                 .id(disasterAlert.getId())
                 .sn(disasterAlert.getSn())
                 .message(disasterAlert.getMessage())
-                .emergencyLevel(disasterAlert.getEmergencyLevel())
+                .emergencyLevelText(
+                        disasterAlert.getEmergencyLevel() != null ? disasterAlert.getEmergencyLevel().getDescription() : null
+                )
                 .disasterType(disasterAlert.getDisasterType())
                 .createdAt(disasterAlert.getCreatedAt())
                 .modifiedDate(disasterAlert.getModifiedDate())

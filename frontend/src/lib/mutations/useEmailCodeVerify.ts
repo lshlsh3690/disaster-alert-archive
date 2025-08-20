@@ -1,9 +1,9 @@
 import { verifyEmailCode } from "@/api/authApi";
-import { parseErrorResponse } from "@/schemas/errorResponseSchema";
-import { SuccessResponse } from "@/types/SuccessResponse";
+import { parseErrorResponse } from "@/types/errorResponse";
 import { makeMutationFn } from "@/utils/makeMutationFn";
 import { useMutation } from "@tanstack/react-query";
 import { AxiosError } from "axios";
+import { SuccessResponse } from "@/types/successResponse";
 import { z } from "zod";
 
 interface reqParams {

@@ -5,8 +5,10 @@ import { usePathname } from "next/navigation";
 import { useAuthStore } from "@/store/authStore";
 import { useEffect, useRef, useState } from "react";
 import { logoutApi } from "@/api/authApi";
+import { useRouter } from "next/navigation";
 
 export default function Header() {
+  const router = useRouter();
   const pathname = usePathname();
   const isLoggedIn = useAuthStore((state) => state.user !== null);
   const logout = useAuthStore((state) => state.logout);
@@ -16,7 +18,7 @@ export default function Header() {
 
   const menu = [
     { name: "대시보드", href: "/dashboard" },
-    { name: "재난 문자", href: "/disasters" },
+    { name: "재난 문자", href: "/alerts" },
     { name: "통계", href: "/stats" },
     { name: "커뮤니티", href: "/community" },
   ];
@@ -27,6 +29,7 @@ export default function Header() {
         console.log("로그아웃 성공");
         logout();
         setOpen(false);
+        router.push("/");
       })
       .catch((error) => {
         console.error("로그아웃 실패:", error);

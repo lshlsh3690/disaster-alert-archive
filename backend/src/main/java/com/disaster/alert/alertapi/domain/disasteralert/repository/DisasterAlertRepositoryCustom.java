@@ -11,8 +11,6 @@ import java.util.List;
 public interface DisasterAlertRepositoryCustom {
     Page<DisasterAlert> searchAlerts(AlertSearchRequest alertSearchRequest, Pageable pageable);
 
-    List<DisasterAlert> getStats(AlertSearchRequest alertSearchRequest);
-
     long countAlerts(AlertSearchRequest request);
 
     List<DisasterAlertStatResponse.RegionStat> countByRegion(AlertSearchRequest request);

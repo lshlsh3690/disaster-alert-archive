@@ -39,7 +39,7 @@ public class DisasterAlert {
     @Column(name = "created_at")
     private LocalDateTime createdAt;  // CRT_DT
 
-    @Enumerated(EnumType.STRING)                // Enum을 문자열로 저장
+    @Enumerated(EnumType.STRING)              // Enum을 문자열로 저장
     @Column(name = "emergency_level")
     private DisasterLevel emergencyLevel;     // EMRG_STEP_NM
 

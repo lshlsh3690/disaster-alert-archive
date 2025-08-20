@@ -7,6 +7,7 @@ import com.disaster.alert.alertapi.domain.disasteralert.dto.DisasterAlertStatRes
 import com.disaster.alert.alertapi.domain.disasteralert.model.DisasterLevel;
 import com.disaster.alert.alertapi.domain.disasteralert.service.DisasterAlertService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -18,6 +19,7 @@ import java.time.LocalDate;
 @RestController
 @RequestMapping("/api/v1/alerts")
 @RequiredArgsConstructor
+@Slf4j
 public class DisasterAlertController {
 
     private final DisasterAlertService disasterAlertService;
@@ -32,6 +34,7 @@ public class DisasterAlertController {
     public ResponseEntity<Page<DisasterAlertResponseDto>> searchAlerts(
             AlertSearchRequest alertSearchRequest, Pageable pageable
     ) {
+        log.info("Searching alerts with condition: {}", alertSearchRequest);
         Page<DisasterAlertResponseDto> result = disasterAlertService.searchAlerts(alertSearchRequest, pageable);
         return ResponseEntity.ok(result);
     }
