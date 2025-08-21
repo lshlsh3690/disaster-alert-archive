@@ -12,13 +12,13 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.EntityNotFoundException;
 import jakarta.persistence.PersistenceContext;
-import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -274,5 +274,12 @@ public class DisasterAlertService {
      */
     public List<LatestAlertResponse> getLatestAlert(int limit) {
         return disasterAlertRepository.latestAlerts(PageRequest.of(0, limit));
+    }
+
+    @Transactional(readOnly = true)
+    public List<DisasterAlertStatResponse.RegionStat> countBySido(AlertSearchRequest request) {
+        List<DisasterAlertStatResponse.RegionStat> regionStats = disasterAlertRepository.getStatsSido(request);
+        log.info("지역별 재난문자 통계: {}", regionStats);
+        return regionStats;
     }
 }

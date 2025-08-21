@@ -1,6 +1,6 @@
 // hooks/useAlerts.ts
 import { useQuery, keepPreviousData } from "@tanstack/react-query";
-import { fetchLatestAlerts, searchAlerts, fetchAlert, fetchStats, type AlertSearchRequest } from "@/api/alertpi";
+import { fetchLatestAlerts, searchAlerts, fetchAlert, fetchStats, type AlertSearchRequest, fetchLatestAlertsBySido } from "@/api/alertpi";
 
 export function useLatestAlerts(limit = 5) {
   return useQuery({
@@ -30,6 +30,15 @@ export function useAlertStats(params: AlertSearchRequest) {
   return useQuery({
     queryKey: ["alert-stats", params],
     queryFn: () => fetchStats(params),
+    placeholderData: keepPreviousData,
     staleTime: 60_000,
+  });
+}
+
+export function useSidoStats(params: AlertSearchRequest) {
+  return useQuery({
+    queryKey: ["alert-stats-sido", params],
+    queryFn: () => fetchLatestAlertsBySido(params),
+    placeholderData: keepPreviousData,
   });
 }
