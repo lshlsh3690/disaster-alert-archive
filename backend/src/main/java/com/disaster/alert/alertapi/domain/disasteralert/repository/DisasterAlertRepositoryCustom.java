@@ -19,4 +19,5 @@ public interface DisasterAlertRepositoryCustom {
 
     List<DisasterAlertStatResponse.LevelStat> countByLevel(AlertSearchRequest request);
 
+    List<DisasterAlertStatResponse.RegionStat> getStatsSido(AlertSearchRequest request);
 }

@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import LatestAlertsSection from "./LatestAlertsSection";
+import KakaoMetroMap from "@/components/map/KakaoMetroMap";
 
 export default function DashboardPage() {
   return (
@@ -17,15 +18,13 @@ export default function DashboardPage() {
       {/* 최신 재난 문자 */}
       <section>
         <SectionHeader title="📩 최신 재난 문자" href="/alerts" />
-        <LatestAlertsSection limit={5}/>
+        <LatestAlertsSection limit={5} />
       </section>
 
       {/* 지역별 재난 문자 지도 */}
       <section>
         <SectionHeader title="🗺️ 지역별 재난 문자 지도" href="/disasters/map" />
-        <div className="h-[300px] bg-gray-200 rounded-xl flex items-center justify-center text-gray-500">
-          지도 컴포넌트 자리
-        </div>
+        <KakaoMetroMap todayOnly />
       </section>
 
       {/* 재난 통계 */}

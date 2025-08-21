@@ -20,9 +20,7 @@ export default function AlertDetailPage() {
         <div className="text-lg">{data.message}</div>
         <div className="text-sm text-gray-600">유형: {data.disasterType ?? "-"}</div>
         <div className="text-sm text-gray-600">레벨: {data.emergencyLevelText ?? "-"}</div>
-        <div className="text-sm text-gray-600">
-          지역: {data.originalRegion ?? data.regions?.map((r) => r.name).join(", ") ?? "-"}
-        </div>
+        <div className="text-sm text-gray-600">지역: {data.originalRegion ?? "-"}</div>
         <div className="text-xs text-gray-400">SN: {data.sn ?? "-"}</div>
       </div>
     </main>

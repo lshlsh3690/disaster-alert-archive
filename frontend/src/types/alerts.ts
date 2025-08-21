@@ -37,6 +37,7 @@ export const ZStats = z.object({
   levelStats: z.array(ZLevelStat),
   typeStats: z.array(ZTypeStat),
 });
+
 export type Stats = z.infer<typeof ZStats>;
 
 export const ZLatestAlert = z.object({

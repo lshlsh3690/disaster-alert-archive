@@ -10,6 +10,8 @@ import com.disaster.alert.alertapi.domain.legaldistrict.model.QLegalDistrict;
 import com.querydsl.core.BooleanBuilder;
 import com.querydsl.core.types.Projections;
 import com.querydsl.core.types.dsl.BooleanExpression;
+import com.querydsl.core.types.dsl.Expressions;
+import com.querydsl.core.types.dsl.StringTemplate;
 import com.querydsl.jpa.JPAExpressions;
 import com.querydsl.jpa.impl.JPAQueryFactory;
 import lombok.RequiredArgsConstructor;
@@ -145,6 +147,37 @@ public class DisasterAlertRepositoryImpl implements DisasterAlertRepositoryCusto
                 .orderBy(disasterAlert.id.countDistinct().desc(), disasterAlert.emergencyLevel.asc())
                 .fetch();
     }
+
+    @Override
+    public List<DisasterAlertStatResponse.RegionStat> getStatsSido(AlertSearchRequest request) {
+        // 공백 정규화 + trim
+        StringTemplate norm =
+                Expressions.stringTemplate(
+                        "function('btrim', function('regexp_replace', {0}, '\\\\s+', ' ', 'g'))",
+                        legalDistrict.name
+                );
+
+        // 시/도 = 첫 토큰
+        StringTemplate sido =
+                Expressions.stringTemplate("function('split_part', {0}, ' ', 1)", norm);
+
+        log.info(sido.toString());
+        log.info(norm.toString());
+        return queryFactory
+                .select(Projections.constructor(DisasterAlertStatResponse.RegionStat.class,
+                        sido,                     // region (시/도명)
+                        disasterAlert.id.countDistinct() // 해당 시/도 내 알림 건수(중복 제거)
+                ))
+                .from(disasterAlert)
+                .join(disasterAlert.disasterAlertRegions, disasterAlertRegion)
+                .join(disasterAlertRegion.legalDistrict, legalDistrict)
+                .where(
+                        byAlertCondition(request),     // 이미 쓰고 있는 공통 조건 (EXISTS 포함)
+                        regionFilterOnJoin(request)    // 지역 필터를 조인 대상에 적용하는 보조 조건
+                )
+                .groupBy(sido)
+                .orderBy(disasterAlert.id.countDistinct().desc(), sido.asc())
+                .fetch();    }
 
     private BooleanBuilder byAlertCondition(AlertSearchRequest condition) {
         BooleanBuilder b = new BooleanBuilder();
