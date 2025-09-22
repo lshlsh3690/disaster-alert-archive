@@ -5,6 +5,7 @@ import { Alert } from "@/types/alerts";
 import { LEVEL_OPTIONS, levelTextToCode } from "@/ui/level";
 import { zodResolver } from "@hookform/resolvers/zod";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -21,6 +22,10 @@ const ZSearch = z.object({
 type SearchForm = z.infer<typeof ZSearch>;
 
 export default function DisasterListPage() {
+  const sp = useSearchParams();
+
+
+
   const [page, setPage] = useState<number>(0);
   const [size, setSize] = useState<number>(10);
   const [formState, setFormState] = useState<SearchForm>({});

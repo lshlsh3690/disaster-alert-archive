@@ -161,11 +161,9 @@ public class DisasterAlertRepositoryImpl implements DisasterAlertRepositoryCusto
         StringTemplate sido =
                 Expressions.stringTemplate("function('split_part', {0}, ' ', 1)", norm);
 
-        log.info(sido.toString());
-        log.info(norm.toString());
         return queryFactory
                 .select(Projections.constructor(DisasterAlertStatResponse.RegionStat.class,
-                        sido,                     // region (시/도명)
+                        sido,                            // region (시/도명)
                         disasterAlert.id.countDistinct() // 해당 시/도 내 알림 건수(중복 제거)
                 ))
                 .from(disasterAlert)

@@ -9,7 +9,7 @@ export type AlertSearchRequest = {
   endDate?: string | null; // ISO-8601
   type?: string | null;
   level?: string | null;
-  keywords?: string | null;
+  keyword?: string | null;
   page?: number;
   size?: number;
   sort?: string | null;
@@ -22,7 +22,7 @@ export async function fetchLatestAlerts(limit = 5): Promise<LatestAlert[]> {
 }
 
 export async function searchAlerts(params: AlertSearchRequest) {
-  const res = await instance.get("/api/v1/alerts/search", { params });
+  const res = await instance.get("/api/v1/alerts/search?", { params });
   const data = ZPageMeta.parse(res.data);
   return data;
 }
@@ -39,7 +39,9 @@ export async function fetchStats(params: AlertSearchRequest): Promise<Stats> {
   return data;
 }
 
-export async function fetchLatestAlertsBySido(params: AlertSearchRequest): Promise<Array<{ region: string; count: number }>> {
+export async function fetchLatestAlertsBySido(
+  params: AlertSearchRequest
+): Promise<Array<{ region: string; count: number }>> {
   const res = await instance.get("/api/v1/alerts/stats/sido", { params });
   const data = z.array(ZRegionStat).parse(res.data);
   return data;

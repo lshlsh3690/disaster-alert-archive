@@ -1,7 +1,6 @@
 package com.disaster.alert.alertapi.domain.disasteralert.controller;
 
 import com.disaster.alert.alertapi.domain.disasteralert.dto.*;
-import com.disaster.alert.alertapi.domain.disasteralert.model.DisasterLevel;
 import com.disaster.alert.alertapi.domain.disasteralert.service.DisasterAlertService;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
@@ -9,11 +8,9 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.time.LocalDate;
 import java.util.List;
 
 @RestController
@@ -31,8 +28,7 @@ public class DisasterAlertController {
      * @return 재난 안전문자 목록
      */
     @GetMapping("/search")
-    public ResponseEntity<Page<DisasterAlertResponseDto>> searchAlerts(
-            AlertSearchRequest alertSearchRequest, Pageable pageable
+    public ResponseEntity<Page<DisasterAlertResponseDto>> searchAlerts(AlertSearchRequest alertSearchRequest, Pageable pageable
     ) {
         log.info("Searching alerts with condition: {}", alertSearchRequest);
         Page<DisasterAlertResponseDto> result = disasterAlertService.searchAlerts(alertSearchRequest, pageable);

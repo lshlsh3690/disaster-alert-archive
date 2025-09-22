@@ -2,10 +2,10 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { loadKakaoMapSdk } from "@/lib/kakaoMapLoader";
 import { groupToMetros, METRO_COORDS, type Metro } from "@/ui/metros";
-import { useAlertStats, useSidoStats } from "@/lib/queries/useAlerts";
+import { useSearchAlerts, useSidoStats } from "@/lib/queries/useAlerts";
 
 type OverlayRef = { setMap: (m: any | null) => void };
 
@@ -21,12 +21,20 @@ function todayRange() {
 //한국 경계 박스(대략): SW(제주 남서) ~ NE(강원 북동)
 const KOREA_SW = { lat: 32.5, lng: 124.5 };
 const KOREA_NE = { lat: 38.8, lng: 132.0 };
-//줌 레벨 제한(숫자 클수록 더 멀리). 1~14 정도 사용. 12면 전국이 꽉 차고 더 멀리 못 나감.
-const MAX_LEVEL = 12;
-//너무 과도한 확대도 방지하고 싶으면 최소 레벨도 제한
-const MIN_LEVEL = 3;
 
-export default function KakaoMetroMap({ todayOnly = true }: { todayOnly?: boolean }) {
+interface KakaoMapProps {
+  todayOnly?: boolean;
+  zoomable?: boolean;
+  zoomLevel_MAX?: number;
+  zoomLevel_MIN?: number;
+}
+
+export default function KakaoMetroMap({
+  todayOnly = true,
+  zoomable = true,
+  zoomLevel_MAX = 12,
+  zoomLevel_MIN = 3,
+}: KakaoMapProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
   const [{ ready, kakao }, setReady] = useState<{ ready: boolean; kakao: any | null }>({ ready: false, kakao: null });
@@ -44,10 +52,12 @@ export default function KakaoMetroMap({ todayOnly = true }: { todayOnly?: boolea
         setReady({ ready: true, kakao: kk });
         if (!containerRef.current) return;
 
+        const INITIAL_LEVEL = Math.min(Math.max(zoomLevel_MIN, zoomLevel_MAX), 12);
+
         const center = new kk.maps.LatLng(36.3, 127.8); // 대한민국 중심 좌표
         map = new kk.maps.Map(containerRef.current, {
           center,
-          level: 10, // 숫자 클수록 넓게
+          level: INITIAL_LEVEL,
         });
 
         // 2) 대한민국 경계(bounds) 설정 + 그 범위로 맞춤
@@ -57,13 +67,15 @@ export default function KakaoMetroMap({ todayOnly = true }: { todayOnly?: boolea
         );
         map.setBounds(bounds);
 
-        // 3) 줌 제한(더 멀리 못 보게)
-        if (typeof map.setMaxLevel === "function") {
-          map.setMaxLevel(MAX_LEVEL);
-        }
-        // (선택) 너무 많이 확대도 못 하게
-        if (typeof map.setMinLevel === "function") {
-          map.setMinLevel(MIN_LEVEL);
+        map.setZoomable(!!zoomable);
+
+        // 3) 줌 제한
+        if (zoomable) {
+          map.setMinLevel?.(zoomLevel_MIN);
+          map.setMaxLevel?.(zoomLevel_MAX);
+        } else {
+          map.setMinLevel?.(INITIAL_LEVEL);
+          map.setMaxLevel?.(INITIAL_LEVEL);
         }
 
         // 4) 범위 밖으로 드래그/줌 시 강제 복귀
@@ -80,21 +92,26 @@ export default function KakaoMetroMap({ todayOnly = true }: { todayOnly?: boolea
 
         const clampLevel = () => {
           const lv = map.getLevel();
-          if (lv > MAX_LEVEL) map.setLevel(MAX_LEVEL);
-          if (lv < MIN_LEVEL) map.setLevel(MIN_LEVEL);
+          const hi = zoomable ? zoomLevel_MAX : INITIAL_LEVEL;
+          const lo = zoomable ? zoomLevel_MIN : INITIAL_LEVEL;
+          if (lv > hi) map.setLevel(hi);
+          if (lv < lo) map.setLevel(lo);
         };
 
         kk.maps.event.addListener(map, "dragend", clampCenter);
-        kk.maps.event.addListener(map, "zoom_changed", clampLevel);
+
+        if (zoomable) {
+          kk.maps.event.addListener(map, "zoom_changed", clampLevel);
+          // 컨트롤(줌)
+          const zoomControl = new kk.maps.ZoomControl();
+          map.addControl(zoomControl, kk.maps.ControlPosition.RIGHT);
+        }
+
         // idle: 이동·확대/축소 후 유휴 상태 → 최종 보정
         kk.maps.event.addListener(map, "idle", () => {
           clampLevel();
           clampCenter();
         });
-
-        // 컨트롤(줌)
-        const zoomControl = new kk.maps.ZoomControl();
-        map.addControl(zoomControl, kk.maps.ControlPosition.RIGHT);
 
         // 오버레이 생성 함수
         const createOverlay = (name: Metro, count: number) => {
@@ -145,7 +162,7 @@ export default function KakaoMetroMap({ todayOnly = true }: { todayOnly?: boolea
       overlays.forEach((ov) => ov.setMap(null));
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ready, kakao]); // 최초 SDK 로드용
+  }, [ready, kakao, zoomable, zoomLevel_MAX, zoomLevel_MIN]); // 최초 SDK 로드용
 
   // metroCounts 변화에 반응해 오버레이 갱신
   useEffect(() => {
