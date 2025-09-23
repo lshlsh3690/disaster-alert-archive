@@ -23,6 +23,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -56,6 +57,8 @@ public class AuthService {
             redisService.saveRefreshToken(member.getEmail(), refreshToken, jwtTokenProvider.getRefreshTokenExpiration() * 1000L);
 
             return LoginResponse.of(member, accessToken, refreshToken);
+        } catch (UsernameNotFoundException e){
+            throw new CustomException(ErrorCode.MEMBER_NOT_FOUND, "이메일로 회원을 찾을 수 없습니다.");
         } catch (AuthenticationException e) {
             throw new CustomException(ErrorCode.AUTH_INVALID_CREDENTIALS);
         }

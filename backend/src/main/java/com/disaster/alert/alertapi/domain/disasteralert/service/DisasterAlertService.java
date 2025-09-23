@@ -30,7 +30,6 @@ import java.util.stream.Collectors;
 @Slf4j
 public class DisasterAlertService {
     private final DisasterAlertRepository disasterAlertRepository;
-    private final LegalDistrictRepository legalDistrictRepository;
 
     private final DisasterOpenApiClient disasterOpenApiClient;
     private final ObjectMapper objectMapper;
