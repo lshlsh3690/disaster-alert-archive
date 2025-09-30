@@ -2,10 +2,8 @@ package com.disaster.alert.alertapi.domain.auth.service;
 
 import com.disaster.alert.alertapi.domain.auth.dto.ReissueRequest;
 import com.disaster.alert.alertapi.domain.auth.dto.ReissueResponse;
-import com.disaster.alert.alertapi.domain.member.dto.LoginRequest;
-import com.disaster.alert.alertapi.domain.member.dto.LoginResponse;
-import com.disaster.alert.alertapi.domain.member.dto.SignUpRequest;
-import com.disaster.alert.alertapi.domain.member.dto.SignUpResponse;
+import com.disaster.alert.alertapi.domain.member.dto.*;
+import com.disaster.alert.alertapi.domain.member.service.MemberService;
 import com.disaster.alert.alertapi.global.redis.RedisService;
 import io.github.cdimascio.dotenv.Dotenv;
 import lombok.extern.slf4j.Slf4j;
@@ -30,6 +28,8 @@ class AuthServiceTest {
 
     @Autowired
     private RedisService redisService;
+    @Autowired
+    private MemberService memberService;
 
     @BeforeAll
     static void loadEnv() {
@@ -80,7 +80,7 @@ class AuthServiceTest {
 
         redisService.markEmailAsVerified(email);
 
-        SignUpResponse response = authService.signUp(SignUpRequest.builder()
+        MemberDtos.Response response = memberService.create(MemberDtos.CreateRequest.builder()
                 .email(email)
                 .password(password)
                 .nickname(nickname)
@@ -89,8 +89,7 @@ class AuthServiceTest {
 
         // then
         assertThat(response).isNotNull();
-        assertThat(response.getMessage()).contains("회원가입이 완료되었습니다."); // 메시지 내용 확인 (메시지 내용이 실제로 "회원가입 성공" 같은 거라면)
-        assertThat(response.getMemberId()).isNotNull();    // 실제 DB에 저장된 멤버 ID 반환되었는지
+        assertThat(response.getId()).isNotNull();    // 실제 DB에 저장된 멤버 ID 반환되었는지
     }
 
     @Test
@@ -103,7 +102,7 @@ class AuthServiceTest {
         String name = "이탈자";
 
         // Redis에 인증 여부 설정하지 않음
-        SignUpRequest request = SignUpRequest.builder()
+        MemberDtos.CreateRequest request = MemberDtos.CreateRequest.builder()
                 .email(email)
                 .password(password)
                 .confirmPassword(password)
@@ -111,7 +110,7 @@ class AuthServiceTest {
                 .build();
 
         // when & then
-        assertThatThrownBy(() -> authService.signUp(request))
+        assertThatThrownBy(() -> memberService.create(request))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("이메일 인증이 완료되지 않았습니다.");
     }

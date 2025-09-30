@@ -2,15 +2,13 @@ package com.disaster.alert.alertapi.domain.auth.controller;
 
 import com.disaster.alert.alertapi.domain.common.exception.CustomException;
 import com.disaster.alert.alertapi.domain.common.exception.ErrorCode;
+import com.disaster.alert.alertapi.domain.member.dto.*;
+import com.disaster.alert.alertapi.domain.member.service.MemberService;
 import com.disaster.alert.alertapi.global.dto.ApiResponse;
 import com.disaster.alert.alertapi.domain.auth.dto.EmailCodeVerificationRequest;
 import com.disaster.alert.alertapi.domain.auth.dto.EmailVerificationRequest;
 import com.disaster.alert.alertapi.domain.auth.dto.ReissueResponse;
 import com.disaster.alert.alertapi.domain.auth.service.AuthService;
-import com.disaster.alert.alertapi.domain.member.dto.LoginRequest;
-import com.disaster.alert.alertapi.domain.member.dto.LoginResponse;
-import com.disaster.alert.alertapi.domain.member.dto.SignUpRequest;
-import com.disaster.alert.alertapi.domain.member.dto.SignUpResponse;
 import com.disaster.alert.alertapi.global.util.CookieUtil;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
@@ -28,6 +26,7 @@ import java.time.Duration;
 @Slf4j
 public class AuthController {
     private final AuthService authService;
+    private final MemberService memberService;
     private final static boolean isSecureCookie = false; // 운영 환경에서는 true로 설정
 
     @PostMapping("/login")
@@ -47,12 +46,11 @@ public class AuthController {
     }
 
     @PostMapping("/signup")
-    public ResponseEntity<ApiResponse<SignUpResponse>> signUp(@RequestBody @Valid SignUpRequest request) {
+    public ApiResponse<MemberDtos.Response> signUp(@Valid @RequestBody MemberDtos.CreateRequest request) {
         log.info(request.toString());
-        SignUpResponse signUpResponse = authService.signUp(request);
-        return ResponseEntity.ok(ApiResponse.success(
-                signUpResponse
-        ));
+        return ApiResponse.success(
+                memberService.create(request)
+        );
     }
 
     @PostMapping("/reissue")

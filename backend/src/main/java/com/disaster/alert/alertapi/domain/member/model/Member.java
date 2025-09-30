@@ -1,5 +1,6 @@
 package com.disaster.alert.alertapi.domain.member.model;
 
+import com.disaster.alert.alertapi.domain.useralert.model.UserDisasterAlertRegion;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.Where;
@@ -8,6 +9,8 @@ import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 @Entity
 @Table(name = "member")
@@ -20,11 +23,14 @@ import java.time.LocalDateTime;
 // querydsl에서 @Where은 적용되지 않음
 @Where(clause = "is_deleted = false")
 public class Member {
-
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "member_id")
     private Long id;
+
+    @Builder.Default
+    @OneToMany(mappedBy = "userDisasterAlert", cascade = CascadeType.PERSIST, orphanRemoval = true)
+    private List<UserDisasterAlertRegion> regions = new ArrayList<>();
 
     @Column(nullable = false, unique = true)
     private String email;  // 로그인 ID

@@ -35,7 +35,6 @@ export default function DashboardPage() {
           <p>🗨️ 과거 문자 어디서 볼 수 있죠? - 댓글 3</p>
           <p>🗨️ 과거 문자 어디서 볼 수 있죠? - 댓글 3</p>
           <p>🗨️ 과거 문자 어디서 볼 수 있죠? - 댓글 3</p>
-
         </div>
       </section>
     </main>

@@ -22,4 +22,11 @@ public class LegalDistrict {
 
     @Column(name = "is_active_string", nullable = false)
     private String isActiveString;
+
+    //정적 팩토리: id(=code)만 채운 참조용 엔티티 생성. DB 조회 없음.
+    public static LegalDistrict referencedByCode(String code) {
+        LegalDistrict ld = new LegalDistrict();
+        ld.code = code;           // 클래스 내부라 private 필드에 직접 접근 가능
+        return ld;                // name/isActive 등은 null/기본값이므로 접근 금지(링크용으로만 사용)
+    }
 }

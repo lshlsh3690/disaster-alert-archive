@@ -1,5 +1,6 @@
 "use client";
 
+import ReportButton from "@/components/alerts/ReportButton";
 import { useSearchAlerts } from "@/lib/queries/useAlerts";
 import { Alert } from "@/types/alerts";
 import { LEVEL_OPTIONS, levelTextToCode } from "@/ui/level";
@@ -23,8 +24,6 @@ type SearchForm = z.infer<typeof ZSearch>;
 
 export default function DisasterListPage() {
   const sp = useSearchParams();
-
-
 
   const [page, setPage] = useState<number>(0);
   const [size, setSize] = useState<number>(10);
@@ -66,10 +65,15 @@ export default function DisasterListPage() {
 
   return (
     <main className="p-6 space-y-6">
-      <h1 className="text-xl font-semibold">🗂 재난 문자 아카이브</h1>
-      <p className="text-sm text-gray-500">
-        과거 수신된 모든 재난 문자 목록입니다. 지역/날짜/키워드로 검색할 수 있어요.
-      </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-xl font-semibold">🗂 재난 문자 아카이브</h1>
+          <p className="text-sm text-gray-500">
+            과거 수신된 모든 재난 문자 목록입니다. 지역/날짜/키워드로 검색할 수 있어요.
+          </p>
+        </div>
+        <ReportButton />
+      </div>
 
       {/* 검색 필터 바 */}
       <form
