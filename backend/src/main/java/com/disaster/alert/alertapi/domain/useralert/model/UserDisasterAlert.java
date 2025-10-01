@@ -16,6 +16,7 @@ import java.util.List;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
+@Setter
 public class UserDisasterAlert {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

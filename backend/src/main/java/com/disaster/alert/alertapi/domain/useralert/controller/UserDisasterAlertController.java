@@ -1,7 +1,9 @@
 package com.disaster.alert.alertapi.domain.useralert.controller;
 
 import com.disaster.alert.alertapi.domain.disasteralert.dto.UserAlertDtos;
+import com.disaster.alert.alertapi.domain.member.model.MemberRole;
 import com.disaster.alert.alertapi.domain.useralert.service.UserDisasterAlertService;
+import com.disaster.alert.alertapi.global.dto.ApiResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -9,11 +11,9 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.Authentication;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
-
-import java.net.URI;
 
 @RestController
 @RequiredArgsConstructor
@@ -24,16 +24,20 @@ public class UserDisasterAlertController {
     /**
      * 생성
      */
+    @PreAuthorize("isAuthenticated()")
     @PostMapping
-    public ResponseEntity<UserAlertDtos.Response> create(
-            @AuthenticationPrincipal(expression = "id") Long memberId, // 커스텀 UserDetails에 id 필드가 있다고 가정
+    public ApiResponse<UserAlertDtos.Response> create(
+            @AuthenticationPrincipal(expression = "id") Long memberId,
             @Valid @RequestBody UserAlertDtos.CreateRequest req
     ) {
-        // 비로그인 보호는 Security 설정(permitAll/Authenticated)로 걸어두는 게 베스트
-        UserAlertDtos.Response created = userDisasterAlertService.create(memberId, req);
-        return ResponseEntity
-                .created(URI.create("/api/v1/user-alerts/" + created.getId()))
-                .body(created);
+        return ApiResponse.success(userDisasterAlertService.create(memberId, req));
+    }
+
+
+    // 단건 조회
+    @GetMapping("/{id}")
+    public ApiResponse<UserAlertDtos.Response> get(@PathVariable Long id) {
+        return ApiResponse.success(userDisasterAlertService.get(id));
     }
 
     /**
@@ -57,36 +61,32 @@ public class UserDisasterAlertController {
 
     /**
      * 수정
+     * - 작성자 본인 또는 ADMIN만 가능
      */
-    @PutMapping("/{id}")
-    public ResponseEntity<UserAlertDtos.Response> update(
+    @PreAuthorize("@userDisasterAlertService.isOwnerOrAdmin(#id, authentication.principal.id, authentication.principal.role)")
+    @PatchMapping("/{id}")
+    public ApiResponse<UserAlertDtos.Response> update(
             @PathVariable Long id,
             @AuthenticationPrincipal(expression = "id") Long memberId,
-            Authentication authentication,
+            @AuthenticationPrincipal(expression = "role") MemberRole role,
             @Valid @RequestBody UserAlertDtos.UpdateRequest req
     ) {
-        boolean isAdmin = hasAdmin(authentication);
-        return ResponseEntity.ok(userDisasterAlertService.update(id, memberId, req, isAdmin));
+        return ApiResponse.success(userDisasterAlertService.update(id, req, memberId, role));
     }
 
     /**
      * 삭제
+     * - 작성자 본인 또는 ADMIN만 가능
      */
+    @PreAuthorize("@userDisasterAlertService.isOwnerOrAdmin(#id, authentication.principal.id, authentication.principal.role)")
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> delete(
+    public ApiResponse<Void> delete(
             @PathVariable Long id,
             @AuthenticationPrincipal(expression = "id") Long memberId,
-            Authentication authentication
+            @AuthenticationPrincipal(expression = "role") MemberRole role
     ) {
-        boolean isAdmin = hasAdmin(authentication);
-        userDisasterAlertService.delete(id, memberId, isAdmin);
-        return ResponseEntity.noContent().build();
-    }
-
-    private boolean hasAdmin(Authentication authentication) {
-        if (authentication == null) return false;
-        return authentication.getAuthorities().stream()
-                .anyMatch(a -> "ROLE_ADMIN".equals(a.getAuthority()));
+        userDisasterAlertService.delete(id, memberId, role);
+        return ApiResponse.empty();
     }
 }
 
