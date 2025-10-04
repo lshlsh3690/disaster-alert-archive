@@ -1,4 +1,4 @@
-import { parseSuccessResponse, SuccessResponse } from "@/types/successResponse";
+import { parseSuccessResponse, SuccessResponse } from "@/types/SuccessResponse";
 import { z } from "zod";
 
 export function makeMutationFn<Vars, T>(

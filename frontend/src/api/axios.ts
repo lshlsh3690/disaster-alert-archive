@@ -38,8 +38,13 @@ instance.interceptors.response.use(
       return Promise.reject(error);
     }
 
-    // 3) 401만 재발급 시도
+    // 3) 401만 재발급 시도 (단, 인증이 필요한 요청에 한함)
     if (error.response?.status === 401) {
+      const authRequired = (original?.headers as any)?.["X-Auth-Required"] === "true";
+      if (!authRequired) {
+        // 공개 API 요청이면 재발급 시도하지 않고 그대로 실패 반환
+        return Promise.reject(error);
+      }
       if (isRefreshing) {
         // 이미 재발급 중이면 대기 → 완료 후 원요청 1회 재시도
         await new Promise<void>((resolve) => waitQueue.push(resolve));

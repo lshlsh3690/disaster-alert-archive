@@ -1,7 +1,7 @@
 import { useMutation } from "@tanstack/react-query";
 import { sendEmailVerificationCode } from "@/api/authApi";
 import { AxiosError } from "axios";
-import { SuccessResponse } from "@/types/successResponse";
+import { SuccessResponse } from "@/types/SuccessResponse";
 import { makeMutationFn } from "@/utils/makeMutationFn";
 import { z } from "zod";
 import { parseErrorResponse } from "@/types/errorResponse";

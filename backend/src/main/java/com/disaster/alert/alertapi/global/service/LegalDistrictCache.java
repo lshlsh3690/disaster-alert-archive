@@ -18,25 +18,34 @@ import java.util.stream.Collectors;
 @Slf4j
 public class LegalDistrictCache {
     private final LegalDistrictRepository legalDistrictRepository;
-    private Map<String, List<LegalDistrict>> map;
+    private Map<String, List<LegalDistrict>> byName;
+    private Map<String, LegalDistrict> byCode;
 
     @PostConstruct
     public void loadCache() {
         List<LegalDistrict> all = legalDistrictRepository.findAll();
-        map = all.stream()
-                .collect(Collectors.groupingBy(LegalDistrict::getName)); // 이름 기준 그룹핑
-        log.info("법정동 캐시 초기화 완료: {}건", map.size());
+        byName = all.stream().collect(Collectors.groupingBy(LegalDistrict::getName)); // 이름 기준 그룹핑
+        byCode = all.stream().collect(Collectors.toMap(LegalDistrict::getCode, it -> it, (a, b) -> a));
+        log.info("법정동 캐시 초기화 완료: nameKeys={}, codeKeys={}", byName.size(), byCode.size());
     }
 
     public List<LegalDistrict> get(String name) {
-        return map.getOrDefault(name, List.of());
+        return byName.getOrDefault(name, List.of());
     }
 
     public Map<String, List<LegalDistrict>> getAll() {
-        return map;
+        return byName;
     }
 
     public void refresh() {
         loadCache();
+    }
+
+    public LegalDistrict getByCode(String code) {
+        return byCode.get(code);
+    }
+
+    public boolean existsCode(String code) {
+        return byCode.containsKey(code);
     }
 }

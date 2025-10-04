@@ -1,12 +1,11 @@
 "use client";
 
 import ReportButton from "@/components/alerts/ReportButton";
-import { useSearchAlerts } from "@/lib/queries/useAlerts";
+import { useSearchCombinedAlerts } from "@/lib/queries/useAlerts";
 import { Alert } from "@/types/alerts";
 import { LEVEL_OPTIONS, levelTextToCode } from "@/ui/level";
 import { zodResolver } from "@hookform/resolvers/zod";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
 import { useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -19,12 +18,11 @@ const ZSearch = z.object({
   type: z.string().optional(),
   levelText: z.string().optional(), // "안전안내" ...
   keyword: z.string().optional(),
+  source: z.enum(["ALL", "OFFICIAL", "USER"]).optional(),
 });
 type SearchForm = z.infer<typeof ZSearch>;
 
 export default function DisasterListPage() {
-  const sp = useSearchParams();
-
   const [page, setPage] = useState<number>(0);
   const [size, setSize] = useState<number>(10);
   const [formState, setFormState] = useState<SearchForm>({});
@@ -44,6 +42,7 @@ export default function DisasterListPage() {
       type: f.type || undefined,
       level: levelCode, // 백엔드 enum 코드로 전송
       keyword: f.keyword || undefined,
+      source: f.source || "ALL",
       page,
       size,
       sort: "createdAt,desc",
@@ -51,7 +50,7 @@ export default function DisasterListPage() {
   };
   const params = useMemo(() => buildParams(formState), [formState, page]);
 
-  const { data, isLoading, isFetching } = useSearchAlerts(params);
+  const { data, isLoading, isFetching } = useSearchCombinedAlerts(params);
 
   const onSubmit = (v: SearchForm) => {
     setPage(0);
@@ -95,6 +94,12 @@ export default function DisasterListPage() {
           ))}
         </select>
 
+        <select {...register("source")} className="input">
+          <option value="ALL">출처(전체)</option>
+          <option value="OFFICIAL">공공 알림만</option>
+          <option value="USER">사용자 제보만</option>
+        </select>
+
         <input {...register("keyword")} placeholder="키워드(예: 경보)" className="input col-span-2" />
 
         <div className="col-span-2 md:col-span-4 flex justify-end gap-2">
@@ -118,11 +123,12 @@ export default function DisasterListPage() {
         ) : (
           <>
             <ul className="space-y-2">
-              {data?.content.map((a: Alert) => {
+              {(data?.content ?? []).map((a: Alert & { source?: "OFFICIAL" | "USER" }) => {
                 const regionLabel = a.regionNames && a.regionNames.length > 0 ? a.regionNames.join(", ") : "-";
+                const href = a.source === "USER" ? `/alerts/${a.id}?source=USER` : `/alerts/${a.id}?source=OFFICIAL`;
                 return (
                   <li key={a.id} className="border-b last:border-0 pb-2">
-                    <Link href={`/alerts/${a.id}`} className="hover:underline">
+                    <Link href={href} className="hover:underline">
                       <span className="text-gray-800">
                         [{regionLabel}] {new Date(a.createdAt).toLocaleString()} - {a.message}
                       </span>

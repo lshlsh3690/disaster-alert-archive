@@ -2,6 +2,8 @@ package com.disaster.alert.alertapi.domain.disasteralert.controller;
 
 import com.disaster.alert.alertapi.domain.disasteralert.dto.*;
 import com.disaster.alert.alertapi.domain.disasteralert.service.DisasterAlertService;
+import com.disaster.alert.alertapi.domain.useralert.service.UserDisasterAlertService;
+import com.disaster.alert.alertapi.domain.disasteralert.dto.CombinedAlertResponse;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import lombok.RequiredArgsConstructor;
@@ -20,6 +22,7 @@ import java.util.List;
 public class DisasterAlertController {
 
     private final DisasterAlertService disasterAlertService;
+    private final UserDisasterAlertService userDisasterAlertService;
 
     /**
      * 재난 경고 조회 API
@@ -33,6 +36,14 @@ public class DisasterAlertController {
         log.info("Searching alerts with condition: {}", alertSearchRequest);
         Page<DisasterAlertResponseDto> result = disasterAlertService.searchAlerts(alertSearchRequest, pageable);
         return ResponseEntity.ok(result);
+    }
+    @GetMapping("/search/combined")
+    public ResponseEntity<Page<CombinedAlertResponse>> searchCombined(
+            AlertSearchRequest alertSearchRequest,
+            @RequestParam(defaultValue = "ALL") String source, // ALL | OFFICIAL | USER
+            Pageable pageable
+    ) {
+        return ResponseEntity.ok(disasterAlertService.searchCombined(alertSearchRequest, source, pageable));
     }
 
     /**

@@ -5,11 +5,15 @@ import com.disaster.alert.alertapi.domain.common.exception.ErrorCode;
 import com.disaster.alert.alertapi.domain.disasteralert.dto.UserAlertDtos;
 import com.disaster.alert.alertapi.domain.disasteralert.model.DisasterLevel;
 import com.disaster.alert.alertapi.domain.member.model.MemberRole;
+import com.disaster.alert.alertapi.domain.legaldistrict.model.LegalDistrict;
 import com.disaster.alert.alertapi.domain.useralert.model.UserDisasterAlert;
 import com.disaster.alert.alertapi.domain.useralert.model.UserDisasterAlertRegion;
 import com.disaster.alert.alertapi.domain.useralert.repository.UserDisasterAlertRegionRepository;
 import com.disaster.alert.alertapi.domain.useralert.repository.UserDisasterAlertRepository;
 import lombok.RequiredArgsConstructor;
+import jakarta.persistence.EntityManager;
+import com.disaster.alert.alertapi.global.service.LegalDistrictCache;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -17,6 +21,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Objects;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 @Transactional
@@ -24,6 +29,8 @@ public class UserDisasterAlertService {
 
     private final UserDisasterAlertRepository userDisasterAlertRepository;
     private final UserDisasterAlertRegionRepository userDisasterAlertRegionRepository;
+    private final EntityManager entityManager;
+    private final LegalDistrictCache legalDistrictCache;
 
     /**
      * 생성
@@ -35,7 +42,7 @@ public class UserDisasterAlertService {
                 .title(req.getTitle().trim())
                 .message(req.getMessage().trim())
                 .disasterType(trimToNull(req.getDisasterType()))
-                .disasterLevel(DisasterLevel.valueOf(req.getDisasterLevel()))
+                .disasterLevel(req.getDisasterLevel() != null ? DisasterLevel.valueOf(req.getDisasterLevel()) : null)
                 .occurredAt(req.getOccurredAt())
                 .build();
 
@@ -45,7 +52,15 @@ public class UserDisasterAlertService {
                 .map(String::trim)
                 .filter(code -> !code.isEmpty())
                 .distinct()
-                .forEach(code -> alert.getRegions().add(new UserDisasterAlertRegion(alert, code)));
+                .forEach(code -> {
+                    if (!legalDistrictCache.existsCode(code)) {
+                        throw new CustomException(ErrorCode.INVALID_REQUEST, "존재하지 않는 법정동 코드: " + code);
+                    }
+                    LegalDistrict ref = entityManager.getReference(LegalDistrict.class, code);
+                    alert.getRegions().add(new UserDisasterAlertRegion(alert, ref));
+                });
+
+        log.info("UserDisasterAlert created: id={}, memberId={} title={}", alert.getId(), memberId, alert.getTitle());
 
         return UserAlertDtos.Response.from(alert);
     }
@@ -104,7 +119,13 @@ public class UserDisasterAlertService {
                     .map(String::trim)
                     .filter(s -> !s.isBlank())
                     .distinct()
-                    .forEach(code -> e.getRegions().add(new UserDisasterAlertRegion(e, code)));
+                    .forEach(code -> {
+                        if (!legalDistrictCache.existsCode(code)) {
+                            throw new CustomException(ErrorCode.INVALID_REQUEST, "존재하지 않는 법정동 코드: " + code);
+                        }
+                        LegalDistrict ref = entityManager.getReference(LegalDistrict.class, code);
+                        e.getRegions().add(new UserDisasterAlertRegion(e, ref));
+                    });
         }
 
         // LAZY 초기화 트리거
