@@ -1,4 +1,4 @@
-import { Alert, LatestAlert, Stats, ZAlert, ZLatestAlert, ZPageMeta, ZRegionStat, ZStats } from "@/types/alerts";
+import { Alert, LatestAlert, Stats, ZAlert, ZLatestAlert, ZPageMeta, ZPageMetaCombined, ZRegionStat, ZStats } from "@/types/alerts";
 import instance from "./axios";
 import { z } from "zod";
 
@@ -13,6 +13,7 @@ export type AlertSearchRequest = {
   page?: number;
   size?: number;
   sort?: string | null;
+  source?: "ALL" | "OFFICIAL" | "USER" | null;
 };
 
 export async function fetchLatestAlerts(limit = 5): Promise<LatestAlert[]> {
@@ -27,8 +28,14 @@ export async function searchAlerts(params: AlertSearchRequest) {
   return data;
 }
 
+export async function searchCombinedAlerts(params: AlertSearchRequest & { source?: "ALL" | "OFFICIAL" | "USER" }) {
+  const res = await instance.get("/api/v1/alerts/search/combined", { params, headers: { "X-Auth-Required": "false" } });
+  const data = ZPageMetaCombined.parse(res.data);
+  return data;
+}
+
 export async function fetchAlert(id: number): Promise<Alert> {
-  const res = await instance.get(`/api/v1/alerts/${id}`);
+  const res = await instance.get(`/api/v1/alerts/${id}`, { headers: { "X-Auth-Required": "false" } });
   const data = ZAlert.parse(res.data);
   return data;
 }

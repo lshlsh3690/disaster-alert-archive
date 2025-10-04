@@ -6,7 +6,6 @@ import com.disaster.alert.alertapi.domain.disasteralert.model.DisasterAlert;
 import com.disaster.alert.alertapi.domain.disasteralert.model.DisasterLevel;
 import com.disaster.alert.alertapi.domain.disasteralert.repository.DisasterAlertRepository;
 import com.disaster.alert.alertapi.domain.legaldistrict.model.LegalDistrict;
-import com.disaster.alert.alertapi.domain.legaldistrict.repository.LegalDistrictRepository;
 import com.disaster.alert.alertapi.global.service.LegalDistrictCache;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.persistence.EntityManager;
@@ -241,6 +240,10 @@ public class DisasterAlertService {
         Page<DisasterAlert> result = disasterAlertRepository.searchAlerts(alertSearchCondition, pageable);
 
         return result.map(DisasterAlertResponseDto::from);
+    }
+
+    public Page<CombinedAlertResponse> searchCombined(AlertSearchRequest req, String source, Pageable pageable) {
+        return disasterAlertRepository.searchCombined(req, source, pageable);
     }
 
     public DisasterAlertStatResponse getStats(AlertSearchRequest request) {

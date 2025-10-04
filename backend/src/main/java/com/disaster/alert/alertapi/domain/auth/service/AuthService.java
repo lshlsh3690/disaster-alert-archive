@@ -4,10 +4,7 @@ import com.disaster.alert.alertapi.domain.auth.dto.ReissueRequest;
 import com.disaster.alert.alertapi.domain.auth.dto.ReissueResponse;
 import com.disaster.alert.alertapi.domain.common.exception.CustomException;
 import com.disaster.alert.alertapi.domain.common.exception.ErrorCode;
-import com.disaster.alert.alertapi.domain.member.dto.LoginRequest;
-import com.disaster.alert.alertapi.domain.member.dto.LoginResponse;
-import com.disaster.alert.alertapi.domain.member.dto.SignUpRequest;
-import com.disaster.alert.alertapi.domain.member.dto.SignUpResponse;
+import com.disaster.alert.alertapi.domain.member.dto.*;
 import com.disaster.alert.alertapi.domain.member.model.Member;
 import com.disaster.alert.alertapi.domain.member.service.MemberDetails;
 import com.disaster.alert.alertapi.domain.member.service.MemberService;
@@ -88,18 +85,6 @@ public class AuthService {
         redisService.saveRefreshToken(member.getEmail(), newRefreshToken, jwtTokenProvider.getRefreshTokenExpiration() * 1000L);
 
         return ReissueResponse.of(newAccessToken, newRefreshToken);
-    }
-
-
-    public SignUpResponse signUp(SignUpRequest request) {
-        request.validatePasswordMatch();
-
-        if (!redisService.isEmailVerified(request.getEmail())) {
-            throw new CustomException(ErrorCode.EMAIL_NOT_VERIFIED);
-        }
-
-        Long id = memberService.signUp(request);
-        return new SignUpResponse(id, "회원가입이 완료되었습니다.");
     }
 
     public void logout(String refreshToken) {

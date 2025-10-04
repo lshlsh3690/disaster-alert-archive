@@ -3,7 +3,7 @@ import { parseErrorResponse } from "@/types/errorResponse";
 import { makeMutationFn } from "@/utils/makeMutationFn";
 import { useMutation } from "@tanstack/react-query";
 import { AxiosError } from "axios";
-import { SuccessResponse } from "@/types/successResponse";
+import { SuccessResponse } from "@/types/SuccessResponse";
 import { z } from "zod";
 
 interface reqParams {

@@ -21,14 +21,6 @@ public class MemberService {
     private final MemberRepository memberRepository;
     private final PasswordEncoder passwordEncoder;
 
-    @Transactional
-    public Long signUp(SignUpRequest request) {
-        validateEmailDuplication(request.getEmail());
-        validateNicknameDuplication(request.getNickname());
-
-        return createMember(request).getId();
-    }
-
     @Transactional(readOnly = true)
     public Member findByEmail(String email) {
         return memberRepository.findByEmail(email)
@@ -57,15 +49,20 @@ public class MemberService {
     }
 
     @Transactional
-    public Member createMember(SignUpRequest request) {
-        Member member = Member.create(
-                request.getEmail(),
-                passwordEncoder.encode(request.getPassword()),
-                request.getNickname(),
-                MemberRole.USER
-        );
+    public MemberDtos.Response create(MemberDtos.CreateRequest req) {
+        req.validatePasswordMatch();
 
-        return memberRepository.save(member);
+        if (memberRepository.existsByEmail(req.getEmail().trim()))
+            throw new CustomException(ErrorCode.DUPLICATE_EMAIL, "이미 사용 중인 이메일입니다.");
+
+        Member m = Member.builder()
+                .email(req.getEmail().trim())
+                .password(passwordEncoder.encode(req.getPassword()))
+                .nickname(req.getNickname().trim())
+                .role(MemberRole.USER)
+                .build();
+
+        return MemberDtos.Response.from(memberRepository.save(m));
     }
 
     @Transactional
