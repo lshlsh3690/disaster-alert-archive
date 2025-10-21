@@ -40,7 +40,7 @@ instance.interceptors.response.use(
 
     // 3) 401만 재발급 시도 (단, 인증이 필요한 요청에 한함)
     if (error.response?.status === 401) {
-      const authRequired = (original?.headers as any)?.["X-Auth-Required"] === "true";
+      const authRequired = (original?.headers)?.["X-Auth-Required"] === "true";
       if (!authRequired) {
         // 공개 API 요청이면 재발급 시도하지 않고 그대로 실패 반환
         return Promise.reject(error);

@@ -1,6 +1,6 @@
 "use client";
 
-import { useParams, useRouter, useSearchParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -35,7 +35,6 @@ type EditForm = z.infer<typeof ZEdit>;
 export default function AlertEditPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
-  const sp = useSearchParams();
   const id = Number(params.id);
   const { data, isLoading } = useUserAlert(id);
   const { mutateAsync: update } = useUpdateUserAlert();
@@ -55,12 +54,12 @@ export default function AlertEditPage() {
   useEffect(() => {
     if (!isLoading && data) {
       // occurredAt(ISO)를 input type=datetime-local 형식(YYYY-MM-DDTHH:mm)으로 변환
-      const occurredAt = (data as any).occurredAt ? String((data as any).occurredAt).slice(0,16) : undefined;
+      const occurredAt = (data)?.occurredAt ? String((data)?.occurredAt).slice(0,16) : undefined;
       reset({
-        title: (data as any).title ?? "",
-        message: (data as any).message ?? "",
-        disasterType: (data as any).disasterType ?? undefined,
-        disasterLevel: (data as any).emergencyLevel ?? undefined,
+        title: (data)?.title ?? "",
+        message: (data)?.message ?? "",
+        disasterType: (data)?.disasterType ?? undefined,
+        disasterLevel: (data)?.emergencyLevel ?? undefined,
         occurredAt,
       });
     }
@@ -88,7 +87,7 @@ export default function AlertEditPage() {
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label className="block text-sm font-medium mb-1">유형</label>
-            <select {...register("disasterType")} className="input" defaultValue={(data as any)?.disasterType ?? ""}>
+            <select {...register("disasterType")} className="input" defaultValue={(data)?.disasterType ?? ""}>
               <option value="">선택</option>
               {DISASTER_TYPES.map((t) => (
                 <option key={t} value={t}>{t}</option>
@@ -97,7 +96,7 @@ export default function AlertEditPage() {
           </div>
           <div>
             <label className="block text-sm font-medium mb-1">레벨</label>
-            <select {...register("disasterLevel")} className="input" defaultValue={(data as any)?.emergencyLevel ?? ""}>
+            <select {...register("disasterLevel")} className="input" defaultValue={(data)?.emergencyLevel ?? ""}>
               {LEVEL_OPTIONS.map((o) => (
                 <option key={o.code} value={o.code}>{o.text}</option>
               ))}
