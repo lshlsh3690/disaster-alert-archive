@@ -1,10 +1,18 @@
 import axios, { AxiosError, InternalAxiosRequestConfig } from "axios";
 import { reissue } from "./authApi";
 
+const baseURL = process.env.NEXT_PUBLIC_API_BASE_URL;
+if (!baseURL) {
+  // 배포 환경에서 env가 비어있으면 바로 터지게 해서 원인 파악이 쉬워짐
+  throw new Error("NEXT_PUBLIC_API_BASE_URL is not set");
+}
+
 const instance = axios.create({
-  baseURL: process.env.BASE_API_URL || "http://localhost:8080", // 환경 변수에서 API URL 가져오기
+  baseURL: baseURL, // 환경 변수에서 API URL 가져오기
   withCredentials: true, // 쿠키 기반 인증 시 필요
 });
+
+
 
 // 전역 플래그 & 대기열
 let isRefreshing = false;
