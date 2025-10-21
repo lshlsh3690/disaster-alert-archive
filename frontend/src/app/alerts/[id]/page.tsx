@@ -21,24 +21,25 @@ export default function AlertDetailPage() {
   const { mutateAsync: deleteUser } = useDeleteUserAlert();
   const authUser = useAuthStore((s) => s.user);
   const canEdit = isUser && authUser && (
-    authUser.role === "ADMIN" || authUser.memberId === (userData as any)?.createdById
+    authUser.role === "ADMIN" || authUser.memberId === (userData)?.createdById
   );
 
   const { data: comments } = useComments({ source: isUser ? "USER" : "OFFICIAL", targetId: id });
   const infinite = useInfiniteComments({ source: isUser ? "USER" : "OFFICIAL", targetId: id, size: 10 });
+  const { hasNextPage, isFetchingNextPage, fetchNextPage } = infinite;
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
     if (!loadMoreRef.current) return;
     const el = loadMoreRef.current;
     const io = new IntersectionObserver((entries) => {
       const first = entries[0];
-      if (first.isIntersecting && infinite.hasNextPage && !infinite.isFetchingNextPage) {
-        infinite.fetchNextPage();
+      if (first.isIntersecting && hasNextPage && !isFetchingNextPage) {
+        fetchNextPage();
       }
     }, { rootMargin: "0px 0px -200px 0px", threshold: 0 });
     io.observe(el);
     return () => io.disconnect();
-  }, [infinite.hasNextPage, infinite.isFetchingNextPage]);
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
   const { mutateAsync: addComment } = useCreateComment();
   const { mutateAsync: removeComment } = useDeleteComment(isUser ? "USER" : "OFFICIAL", id);
   const { mutateAsync: editComment } = useUpdateComment(isUser ? "USER" : "OFFICIAL", id);
@@ -49,6 +50,10 @@ export default function AlertDetailPage() {
   if (isLoading) return <main className="p-6">불러오는 중...</main>;
   if (!data) return <main className="p-6">데이터가 없습니다.</main>;
 
+  const regionText = Array.isArray((data)?.regionNames) && (data)?.regionNames.length > 0
+    ? (data)?.regionNames.join(", ")
+    : (isUser ? "-" : (offData?.originalRegion ?? "-"));
+
   return (
     <main className="p-6 space-y-4">
       <h1 className="text-xl font-semibold">📨 재난 문자 상세</h1>
@@ -57,8 +62,8 @@ export default function AlertDetailPage() {
         <div className="text-lg">{data.message}</div>
         <div className="text-sm text-gray-600">유형: {data.disasterType ?? "-"}</div>
         <div className="text-sm text-gray-600">레벨: {data.emergencyLevelText ?? "-"}</div>
-        <div className="text-sm text-gray-600">지역: {Array.isArray((data as any).regionNames) && (data as any).regionNames.length > 0 ? (data as any).regionNames.join(", ") : (data as any).originalRegion ?? "-"}</div>
-        {!(isUser) && <div className="text-xs text-gray-400">SN: {(data as any).sn ?? "-"}</div>}
+        <div className="text-sm text-gray-600">지역: {regionText}</div>
+        {!(isUser) && <div className="text-xs text-gray-400">SN: {offData?.sn ?? "-"}</div>}
         {canEdit && (
           <div className="pt-2 flex gap-2">
             <button
@@ -114,7 +119,7 @@ export default function AlertDetailPage() {
         )}
         <ul className="divide-y">
           {(infinite.data?.pages.flatMap(p => p.content) ?? comments?.content ?? []).map((c) => {
-            const canModify = authUser && (authUser.role === "ADMIN" || authUser.memberId === (c as any).authorId);
+            const canModify = authUser && (authUser.role === "ADMIN" || authUser.memberId === (c)?.authorId);
             const isEditing = editingId === c.id;
             return (
               <li key={c.id} className="py-2 flex items-start justify-between gap-3">

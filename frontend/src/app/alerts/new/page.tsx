@@ -18,6 +18,15 @@ const DISASTER_TYPES = [
   "해일",
 ];
 
+type JusoItem = {
+  jibunAddr?: string;
+  roadAddr?: string;
+  siNm?: string;
+  sggNm?: string;
+  emdNm?: string;
+  admCd: string;
+};
+
 export default function RegisterAlertsPage() {
   const router = useRouter();
   const { mutate, isPending, isError, error } = useCreateUserAlert();
@@ -95,7 +104,7 @@ export default function RegisterAlertsPage() {
       if (jsonRes.ok) {
         const json = await jsonRes.json().catch(() => null);
         const juso = json?.results?.juso || [];
-        items = juso.map((it: any) => ({
+        items = juso.map((it: JusoItem) => ({
           name: it.jibunAddr || it.roadAddr || `${it.siNm ?? ""} ${it.sggNm ?? ""} ${it.emdNm ?? ""}`.trim(),
           code: it.admCd, // 법정동코드(10자리)
         }));
@@ -136,7 +145,7 @@ export default function RegisterAlertsPage() {
 
       setAddrResults(items);
     } catch (e) {
-      setAddrError("주소 검색 중 오류가 발생했습니다.");
+      setAddrError("주소 검색 중 오류가 발생했습니다. " + String(e));
     } finally {
       setAddrLoading(false);
     }

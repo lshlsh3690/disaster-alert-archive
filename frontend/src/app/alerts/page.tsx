@@ -6,7 +6,7 @@ import { Alert } from "@/types/alerts";
 import { LEVEL_OPTIONS, levelTextToCode } from "@/ui/level";
 import { zodResolver } from "@hookform/resolvers/zod";
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import { useSearchParams } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -25,7 +25,7 @@ type SearchForm = z.infer<typeof ZSearch>;
 
 export default function DisasterListPage() {
   const [page, setPage] = useState<number>(0);
-  const [size, setSize] = useState<number>(10);
+  const size = 10;
   const [formState, setFormState] = useState<SearchForm>({});
   const searchParams = useSearchParams();
 
@@ -34,7 +34,7 @@ export default function DisasterListPage() {
     defaultValues: {},
   });
 
-  const buildParams = (f: SearchForm) => {
+  const buildParams = useCallback((f: SearchForm) => {
     const levelCode = levelTextToCode(f.levelText);
     return {
       region: f.region || undefined,
@@ -49,8 +49,8 @@ export default function DisasterListPage() {
       size,
       sort: "createdAt,desc",
     };
-  };
-  const params = useMemo(() => buildParams(formState), [formState, page]);
+  }, [page, size]);
+  const params = useMemo(() => buildParams(formState), [buildParams, formState]);
 
   const { data, isLoading, isFetching } = useSearchCombinedAlerts(params);
 
