@@ -4,7 +4,7 @@ import { useMutation } from "@tanstack/react-query";
 import { AxiosError } from "axios";
 import { UseFormSetError } from "react-hook-form";
 import { SignupFormData } from "@/types/signup";
-import { SuccessResponse } from "@/types/successResponse";
+import { SuccessResponse } from "@/types/SuccessResponse";
 import { z } from "zod";
 import { parseErrorResponse } from "@/types/errorResponse";
 import { makeMutationFn } from "@/utils/makeMutationFn";
