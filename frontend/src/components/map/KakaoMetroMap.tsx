@@ -132,7 +132,7 @@ export default function KakaoMetroMap({
               <div style="font-size:14px;font-weight:700;">${count.toLocaleString("ko-KR")}</div>
             `;
           div.addEventListener("click", () => {
-            router.push(`/alerts?region=${encodeURIComponent(name)}`);
+            router.push(`/alerts?region=${encodeURIComponent(name)}#list`);
           });
 
           const overlay = new kk.maps.CustomOverlay({

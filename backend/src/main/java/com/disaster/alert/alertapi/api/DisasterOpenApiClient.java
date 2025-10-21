@@ -28,19 +28,27 @@ public class DisasterOpenApiClient {
         StringBuilder url = new StringBuilder();
         url.append(URL);
         url.append(serviceKey);
-        url.append("&crtDt=" + date.toString());
+        url.append("&crtDt=" + date);
         url.append("&numOfRows=1000");
-      
-        String forObject = restTemplate.getForObject(url.toString(), String.class);
-        log.info("Response from Disaster Open API: {}", forObject);
-        return forObject;
+
+        try {
+            String forObject = restTemplate.getForObject(url.toString(), String.class);
+            log.info("Response from Disaster Open API fetched (length={}): {}", forObject != null ? forObject.length() : 0, "...");
+            return forObject;
+        } catch (Exception e) {
+            log.warn("DisasterOpenApiClient.fetchData() 실패 - url={}, msg={}", url, e.getMessage());
+            return null; // 장애 시 null 반환
+        }
     }
 
     public String fetchData(int pageNo, int numOfRows) {
         String url = URL + serviceKey + "&pageNo=" + pageNo + "&numOfRows=" + numOfRows;
-
-        String forObject = restTemplate.getForObject(url, String.class);
-        //log.info("Response from Disaster Open API for page {}: {}", pageNo, forObject);
-        return forObject;
+        try {
+            String forObject = restTemplate.getForObject(url, String.class);
+            return forObject;
+        } catch (Exception e) {
+            log.warn("DisasterOpenApiClient.fetchData(page={}, size={}) 실패 - msg={} ", pageNo, numOfRows, e.getMessage());
+            return null;
+        }
     }
 }

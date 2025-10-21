@@ -21,12 +21,13 @@ export default function SignupPage() {
           </Link>
         </p>
 
-        <div className="border-t pt-4 space-y-3">
+        {/* TODO: OAuth 기능 추가 */}
+        {/* <div className="border-t pt-4 space-y-3">
           <p className="text-sm text-center text-gray-500">간편 로그인</p>
           <OAuthButton provider="google" />
           <OAuthButton provider="kakao" />
           <OAuthButton provider="naver" />
-        </div>
+        </div> */}
       </div>
     </main>
   );

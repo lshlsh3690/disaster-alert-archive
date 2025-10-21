@@ -61,3 +61,11 @@ export const ZLatestAlert = z.object({
   disasterType: z.string().nullable().optional(),
 });
 export type LatestAlert = z.infer<typeof ZLatestAlert>;
+
+export const ZDashboardSummary = z.object({
+  todayOfficialCount: z.number(),
+  todayUserCount: z.number(),
+  totalUserCount: z.number(),
+  totalCombinedCount: z.number(),
+});
+export type DashboardSummary = z.infer<typeof ZDashboardSummary>;

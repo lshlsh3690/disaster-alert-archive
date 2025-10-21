@@ -40,6 +40,10 @@ public class DisasterAlertService {
 
     @Transactional
     public void saveData(String raw) {
+        if (raw == null || raw.isBlank()) {
+            log.warn("saveData: 원시 응답이 null/blank 입니다. 저장을 건너뜁니다.");
+            return;
+        }
         try {
             DisasterApiResponse response = objectMapper.readValue(raw, DisasterApiResponse.class);
 
@@ -208,6 +212,10 @@ public class DisasterAlertService {
             int numOfRows = 1000;
             int firstPage = 1;
             String raw = disasterOpenApiClient.fetchData(firstPage, numOfRows);
+            if (raw == null || raw.isBlank()) {
+                log.warn("initAllDisasterData: 첫 페이지 응답이 없습니다. 초기화를 중단합니다.");
+                return;
+            }
             DisasterApiResponse response = objectMapper.readValue(raw, DisasterApiResponse.class);
 
             if (checkAPIFailure(response)) return;
@@ -226,6 +234,10 @@ public class DisasterAlertService {
 
             for (int page = 1; page <= totalPages; page++) {
                 raw = disasterOpenApiClient.fetchData(page, numOfRows);
+                if (raw == null || raw.isBlank()) {
+                    log.warn("initAllDisasterData: page {} 응답이 없어 해당 페이지를 건너뜁니다.", page);
+                    continue;
+                }
                 this.saveData(raw);
                 log.info("page {} 저장 완료", page);
             }
@@ -252,6 +264,13 @@ public class DisasterAlertService {
         List<DisasterAlertStatResponse.LevelStat> levelStats = disasterAlertRepository.countByLevel(request);
         List<DisasterAlertStatResponse.TypeStat> typeStats = disasterAlertRepository.countByType(request);
         return new DisasterAlertStatResponse(total, regionStats, levelStats, typeStats);
+    }
+
+    public DashboardSummaryResponse getDashboardSummary(long todayUserCount, long totalUserCount) {
+        long todayOfficial = disasterAlertRepository.countToday();
+        long totalOfficial = disasterAlertRepository.count();
+        long combined = totalOfficial + totalUserCount;
+        return new DashboardSummaryResponse(todayOfficial, todayUserCount, totalUserCount, combined);
     }
 
     /**

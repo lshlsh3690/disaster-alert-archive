@@ -54,6 +54,7 @@ public class UserAlertDtos {
     public static class Response {
         private Long id;
         private Long createdById;
+        private String createdByNickname;
         private String title;
         private String message;
         private String disasterType;
@@ -66,9 +67,14 @@ public class UserAlertDtos {
         private List<String> regionNames;
 
         public static Response from(UserDisasterAlert u) {
+            return fromWithNickname(u, null);
+        }
+
+        public static Response fromWithNickname(UserDisasterAlert u, String nickname) {
             return Response.builder()
                     .id(u.getId())
                     .createdById(u.getCreatedById())
+                    .createdByNickname(nickname)
                     .title(u.getTitle())
                     .message(u.getMessage())
                     .disasterType(u.getDisasterType())

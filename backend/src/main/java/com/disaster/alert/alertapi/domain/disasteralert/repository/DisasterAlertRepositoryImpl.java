@@ -300,6 +300,8 @@ public class DisasterAlertRepositoryImpl implements DisasterAlertRepositoryCusto
     private BooleanBuilder byUserAlertCondition(AlertSearchRequest condition) {
         QUserDisasterAlert ua = QUserDisasterAlert.userDisasterAlert;
         BooleanBuilder b = new BooleanBuilder();
+        // 소프트 삭제 제외
+        b.and(ua.isDeleted.isFalse());
         if (condition.getStartDate() != null) b.and(ua.createdAt.goe(condition.getStartDate().atStartOfDay()));
         if (condition.getEndDate() != null) b.and(ua.createdAt.loe(condition.getEndDate().atTime(23, 59, 59, 999)));
         if (condition.getType() != null) b.and(StringUtils.hasText(condition.getType()) ? ua.disasterType.eq(condition.getType()) : null);
@@ -341,10 +343,33 @@ public class DisasterAlertRepositoryImpl implements DisasterAlertRepositoryCusto
         boolean includeOfficial = source == null || source.equalsIgnoreCase("ALL") || source.equalsIgnoreCase("OFFICIAL");
         boolean includeUser = source == null || source.equalsIgnoreCase("ALL") || source.equalsIgnoreCase("USER");
 
+        // 단일 소스만 포함되는 경우에는 해당 소스의 페이지네이션을 그대로 이용한다
+        if (includeOfficial && !includeUser) {
+            Page<DisasterAlert> page = this.searchAlerts(req, pageable);
+            List<CombinedAlertResponse> mapped = page.getContent().stream()
+                    .map(DisasterAlertResponseDto::from)
+                    .map(CombinedAlertResponse::fromOfficial)
+                    .toList();
+            return new PageImpl<>(mapped, pageable, page.getTotalElements());
+        }
+
+        if (includeUser && !includeOfficial) {
+            Page<UserDisasterAlert> page = this.searchUserAlerts(req, pageable);
+            List<CombinedAlertResponse> mapped = page.getContent().stream()
+                    .map(UserAlertDtos.Response::from)
+                    .map(CombinedAlertResponse::fromUser)
+                    .toList();
+            return new PageImpl<>(mapped, pageable, page.getTotalElements());
+        }
+
         List<CombinedAlertResponse> merged = new ArrayList<>();
 
+        // ALL 케이스: 현재 페이지 윈도우를 정확히 계산하기 위해 offset+size 만큼을 각 소스에서 가져와 병합 후 슬라이싱
+        int need = (int) Math.min(Integer.MAX_VALUE, pageable.getOffset() + pageable.getPageSize());
+        int fetchSize = Math.max(need, pageable.getPageSize());
+
         if (includeOfficial) {
-            Page<DisasterAlert> off = this.searchAlerts(req, PageRequest.of(0, Math.max(pageable.getPageSize(), 50)));
+            Page<DisasterAlert> off = this.searchAlerts(req, PageRequest.of(0, fetchSize));
             merged.addAll(
                     off.getContent().stream()
                             .map(DisasterAlertResponseDto::from)
@@ -354,7 +379,7 @@ public class DisasterAlertRepositoryImpl implements DisasterAlertRepositoryCusto
         }
 
         if (includeUser) {
-            Page<UserDisasterAlert> ua = this.searchUserAlerts(req, PageRequest.of(0, Math.max(pageable.getPageSize(), 50)));
+            Page<UserDisasterAlert> ua = this.searchUserAlerts(req, PageRequest.of(0, fetchSize));
             merged.addAll(
                     ua.getContent().stream()
                             .map(UserAlertDtos.Response::from)
@@ -367,6 +392,11 @@ public class DisasterAlertRepositoryImpl implements DisasterAlertRepositoryCusto
         int start = Math.min((int) pageable.getOffset(), merged.size());
         int end = Math.min(start + pageable.getPageSize(), merged.size());
         List<CombinedAlertResponse> slice = merged.subList(start, end);
-        return new PageImpl<>(slice, pageable, merged.size());
+
+        // total은 각 소스의 total 합으로 계산해 정확한 totalPages 제공
+        long total = 0L;
+        if (includeOfficial) total += this.countAlertsDistinct(req);
+        if (includeUser) total += this.countUserAlertsDistinct(req);
+        return new PageImpl<>(slice, pageable, total);
     }
 }

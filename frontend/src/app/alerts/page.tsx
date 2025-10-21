@@ -6,7 +6,8 @@ import { Alert } from "@/types/alerts";
 import { LEVEL_OPTIONS, levelTextToCode } from "@/ui/level";
 import { zodResolver } from "@hookform/resolvers/zod";
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 
@@ -26,6 +27,7 @@ export default function DisasterListPage() {
   const [page, setPage] = useState<number>(0);
   const [size, setSize] = useState<number>(10);
   const [formState, setFormState] = useState<SearchForm>({});
+  const searchParams = useSearchParams();
 
   const { register, handleSubmit, reset } = useForm<SearchForm>({
     resolver: zodResolver(ZSearch),
@@ -51,6 +53,32 @@ export default function DisasterListPage() {
   const params = useMemo(() => buildParams(formState), [formState, page]);
 
   const { data, isLoading, isFetching } = useSearchCombinedAlerts(params);
+
+  // URL 쿼리(region 등) -> 초기 폼/검색 상태 반영
+  useEffect(() => {
+    const region = searchParams.get("region") || undefined;
+    const startDate = searchParams.get("startDate") || undefined;
+    const endDate = searchParams.get("endDate") || undefined;
+    const source = (searchParams.get("source") as "ALL" | "OFFICIAL" | "USER" | null) || undefined;
+
+    if (region || startDate || endDate || source) {
+      setPage(0);
+      setFormState((prev) => ({
+        ...prev,
+        region,
+        startDate,
+        endDate,
+        source: source ?? prev.source,
+      }));
+    }
+    // 해시가 #list라면 바로 스크롤
+    if (typeof window !== "undefined" && window.location.hash === "#list") {
+      setTimeout(() => {
+        const el = document.getElementById("list");
+        if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+      }, 0);
+    }
+  }, [searchParams]);
 
   const onSubmit = (v: SearchForm) => {
     setPage(0);
@@ -117,7 +145,7 @@ export default function DisasterListPage() {
       </form>
 
       {/* 목록 */}
-      <div className="bg-white rounded-xl shadow p-4">
+      <div id="list" className="bg-white rounded-xl shadow p-4">
         {isLoading ? (
           <div className="text-sm text-gray-500">불러오는 중...</div>
         ) : (

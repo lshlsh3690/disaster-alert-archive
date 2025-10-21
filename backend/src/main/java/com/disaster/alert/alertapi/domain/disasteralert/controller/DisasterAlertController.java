@@ -83,4 +83,11 @@ public class DisasterAlertController {
     ) {
        return ResponseEntity.ok(disasterAlertService.getLatestAlert(limit));
     }
+
+    @GetMapping("/dashboard/summary")
+    public ResponseEntity<DashboardSummaryResponse> getDashboardSummary() {
+        long totalUserCount = userDisasterAlertService.countAllActive();
+        long todayUserCount = userDisasterAlertService.countTodayActive();
+        return ResponseEntity.ok(disasterAlertService.getDashboardSummary(todayUserCount, totalUserCount));
+    }
 }

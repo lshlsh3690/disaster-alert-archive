@@ -10,6 +10,7 @@ import com.disaster.alert.alertapi.domain.useralert.model.UserDisasterAlert;
 import com.disaster.alert.alertapi.domain.useralert.model.UserDisasterAlertRegion;
 import com.disaster.alert.alertapi.domain.useralert.repository.UserDisasterAlertRegionRepository;
 import com.disaster.alert.alertapi.domain.useralert.repository.UserDisasterAlertRepository;
+import com.disaster.alert.alertapi.domain.member.service.MemberService;
 import lombok.RequiredArgsConstructor;
 import jakarta.persistence.EntityManager;
 import com.disaster.alert.alertapi.global.service.LegalDistrictCache;
@@ -31,6 +32,7 @@ public class UserDisasterAlertService {
     private final UserDisasterAlertRegionRepository userDisasterAlertRegionRepository;
     private final EntityManager entityManager;
     private final LegalDistrictCache legalDistrictCache;
+    private final MemberService memberService;
 
     /**
      * 생성
@@ -70,11 +72,15 @@ public class UserDisasterAlertService {
      */
     @Transactional(readOnly = true)
     public UserAlertDtos.Response get(Long id) {
-        UserDisasterAlert e = userDisasterAlertRepository.findById(id)
+        UserDisasterAlert e = userDisasterAlertRepository.findByIdAndIsDeletedFalse(id)
                 .orElseThrow(() -> new CustomException(ErrorCode.USER_ALERT_NOT_FOUND, "제보가 존재하지 않습니다."));
         // LAZY 초기화 트리거
         e.getRegions().size();
-        return UserAlertDtos.Response.from(e);
+        String nickname = null;
+        try {
+            nickname = memberService.getMemberInfo(e.getCreatedById()).getNickname();
+        } catch (Exception ignored) {}
+        return UserAlertDtos.Response.fromWithNickname(e, nickname);
     }
 
     /**
@@ -83,7 +89,7 @@ public class UserDisasterAlertService {
      */
     public UserAlertDtos.Response update(Long id, UserAlertDtos.UpdateRequest req, Long principalId, MemberRole role) {
         // 엔티티 조회
-        UserDisasterAlert e = userDisasterAlertRepository.findById(id)
+        UserDisasterAlert e = userDisasterAlertRepository.findByIdAndIsDeletedFalse(id)
                 .orElseThrow(() -> new CustomException(ErrorCode.USER_ALERT_NOT_FOUND, "제보가 존재하지 않습니다."));
 
         // 일반 사용자는 본인 글만 수정 가능 (이중 체크)
@@ -151,7 +157,7 @@ public class UserDisasterAlertService {
      */
     public void delete(Long id, Long memberId, MemberRole role) {
         // 엔티티 조회
-        UserDisasterAlert e = userDisasterAlertRepository.findById(id)
+        UserDisasterAlert e = userDisasterAlertRepository.findByIdAndIsDeletedFalse(id)
                 .orElseThrow(() -> new CustomException(ErrorCode.USER_ALERT_NOT_FOUND, "제보가 존재하지 않습니다."));
 
         // 일반 사용자는 본인 글만 삭제 가능 (이중 체크)
@@ -159,8 +165,18 @@ public class UserDisasterAlertService {
             throw new CustomException(ErrorCode.FORBIDDEN, "작성자 본인만 삭제할 수 있습니다.");
         }
 
-        // 삭제 실행 (cascade로 연관된 region도 함께 삭제됨)
-        userDisasterAlertRepository.delete(e);
+        // 소프트 삭제
+        e.setDeleted(true);
+    }
+
+    @Transactional(readOnly = true)
+    public long countAllActive() {
+        return userDisasterAlertRepository.countAllActive();
+    }
+
+    @Transactional(readOnly = true)
+    public long countTodayActive() {
+        return userDisasterAlertRepository.countTodayActive();
     }
 
     /* -------------------- 헬퍼 -------------------- */

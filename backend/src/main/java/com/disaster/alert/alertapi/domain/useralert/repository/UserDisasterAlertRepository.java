@@ -9,6 +9,7 @@ import org.springframework.data.jpa.repository.Query;
 import java.util.Optional;
 
 public interface UserDisasterAlertRepository extends JpaRepository<UserDisasterAlert, Long> {
+    Optional<UserDisasterAlert> findByIdAndIsDeletedFalse(Long id);
     /**
      * 특정 ID와 작성자 ID로 조회
      */
@@ -17,12 +18,19 @@ public interface UserDisasterAlertRepository extends JpaRepository<UserDisasterA
     /**
      * 특정 작성자의 제보 목록 조회
      */
+    @Query("SELECT ua FROM UserDisasterAlert ua WHERE ua.createdById = :createdById AND ua.isDeleted = false")
     Page<UserDisasterAlert> findByCreatedById(Pageable pageable, Long createdById);
 
     /**
      * 전체 제보 목록 조회 (Regions 포함)
      * N+1 문제 방지를 위한 fetch join
      */
-    @Query("SELECT DISTINCT ua FROM UserDisasterAlert ua LEFT JOIN FETCH ua.regions")
+    @Query("SELECT DISTINCT ua FROM UserDisasterAlert ua LEFT JOIN FETCH ua.regions WHERE ua.isDeleted = false")
     Page<UserDisasterAlert> findAllWithRegions(Pageable pageable);
+
+    @Query("select count(ua) from UserDisasterAlert ua where ua.isDeleted = false")
+    long countAllActive();
+
+    @Query("select count(ua) from UserDisasterAlert ua where ua.isDeleted = false and ua.createdAt >= CURRENT_DATE")
+    long countTodayActive();
 }
