@@ -2,17 +2,16 @@ import axios, { AxiosError, InternalAxiosRequestConfig } from "axios";
 import { reissue } from "./authApi";
 
 const baseURL = process.env.NEXT_PUBLIC_API_BASE_URL;
+
+console.log("baseURL", baseURL);
 if (!baseURL) {
-  // 배포 환경에서 env가 비어있으면 바로 터지게 해서 원인 파악이 쉬워짐
   throw new Error("NEXT_PUBLIC_API_BASE_URL is not set");
 }
 
 const instance = axios.create({
-  baseURL: baseURL, // 환경 변수에서 API URL 가져오기
-  withCredentials: true, // 쿠키 기반 인증 시 필요
+  baseURL: baseURL || undefined,
+  withCredentials: true,
 });
-
-
 
 // 전역 플래그 & 대기열
 let isRefreshing = false;
@@ -20,17 +19,18 @@ let waitQueue: Array<() => void> = [];
 
 // 유틸: 재발급/로그인 요청 판별
 const isReissueRequest = (config?: InternalAxiosRequestConfig) =>
-  !!config?.url && config.url.includes('/api/v1/auth/reissue');
+  !!config?.url && config.url.includes("/api/v1/auth/reissue");
 
 const isAuthLoginRequest = (config?: InternalAxiosRequestConfig) =>
-  !!config?.url && config.url.includes('/api/v1/auth/login');
-
+  !!config?.url && config.url.includes("/api/v1/auth/login");
 
 // 응답 에러 처리 (예: 401 시 refresh 등)
 instance.interceptors.response.use(
   (res) => res,
   async (error: AxiosError) => {
-    const original = error.config as InternalAxiosRequestConfig & { _retry?: boolean };
+    const original = error.config as InternalAxiosRequestConfig & {
+      _retry?: boolean;
+    };
 
     // 1) 재발급 요청 자체는 재시도 금지 (여기서 루프 끊음)
     if (isReissueRequest(original)) {
@@ -48,7 +48,7 @@ instance.interceptors.response.use(
 
     // 3) 401만 재발급 시도 (단, 인증이 필요한 요청에 한함)
     if (error.response?.status === 401) {
-      const authRequired = (original?.headers)?.["X-Auth-Required"] === "true";
+      const authRequired = original?.headers?.["X-Auth-Required"] === "true";
       if (!authRequired) {
         // 공개 API 요청이면 재발급 시도하지 않고 그대로 실패 반환
         return Promise.reject(error);
