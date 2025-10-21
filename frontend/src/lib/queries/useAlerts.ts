@@ -1,6 +1,6 @@
 // hooks/useAlerts.ts
 import { useQuery, keepPreviousData } from "@tanstack/react-query";
-import { fetchLatestAlerts, searchAlerts, fetchAlert, fetchStats, type AlertSearchRequest, fetchLatestAlertsBySido, searchCombinedAlerts } from "@/api/alertApi";
+import { fetchLatestAlerts, searchAlerts, fetchAlert, fetchStats, type AlertSearchRequest, fetchLatestAlertsBySido, searchCombinedAlerts, fetchDashboardSummary } from "@/api/alertApi";
 import { fetchUserAlert } from "@/api/userAlertApi";
 import { fetchUserAlerts } from "@/api/userAlertApi";
 
@@ -66,5 +66,13 @@ export function useUserAlerts(params: { page?: number; size?: number; mine?: boo
     queryKey: ["user-alerts", params],
     queryFn: () => fetchUserAlerts(params),
     placeholderData: keepPreviousData,
+  });
+}
+
+export function useDashboardSummary() {
+  return useQuery({
+    queryKey: ["dashboard-summary"],
+    queryFn: () => fetchDashboardSummary(),
+    staleTime: 30_000,
   });
 }

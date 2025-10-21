@@ -44,8 +44,9 @@ public class SecurityConfig {
                         .requestMatchers("/api/v1/auth/**").permitAll()
                         .requestMatchers("/api/v1/members/me").authenticated()
                         .requestMatchers("/api/v1/members/check-nickname").permitAll()
-                        // 공개 조회 허용: 사용자 제보 단건/목록 GET은 비회원도 접근 가능
                         .requestMatchers(HttpMethod.GET, "/api/v1/user-alerts/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/v1/comments/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/v1/community/**").permitAll()
                         .requestMatchers("/api/v1/alerts/**").permitAll()
                         .anyRequest().authenticated()
                 )

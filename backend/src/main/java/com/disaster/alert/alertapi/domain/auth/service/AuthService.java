@@ -1,6 +1,5 @@
 package com.disaster.alert.alertapi.domain.auth.service;
 
-import com.disaster.alert.alertapi.domain.auth.dto.ReissueRequest;
 import com.disaster.alert.alertapi.domain.auth.dto.ReissueResponse;
 import com.disaster.alert.alertapi.domain.common.exception.CustomException;
 import com.disaster.alert.alertapi.domain.common.exception.ErrorCode;
@@ -11,20 +10,17 @@ import com.disaster.alert.alertapi.domain.member.service.MemberService;
 import com.disaster.alert.alertapi.global.redis.RedisService;
 import com.disaster.alert.alertapi.global.security.jwt.JwtTokenProvider;
 import com.disaster.alert.alertapi.global.service.EmailService;
-import io.jsonwebtoken.JwtException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.AuthenticationException;
-import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.time.Duration;
 
@@ -88,13 +84,22 @@ public class AuthService {
     }
 
     public void logout(String refreshToken) {
+        // 로그아웃은 멱등하게 동작해야 하므로 토큰이 없거나 유효하지 않아도 성공 처리한다.
         if (refreshToken == null || refreshToken.isBlank()) {
-            throw new CustomException(ErrorCode.INVALID_REFRESH_TOKEN);
+            SecurityContextHolder.clearContext();
+            return;
         }
-        String email = jwtTokenProvider.getClaims(refreshToken).getSubject(); // 이메일 추출
-        long expiration = jwtTokenProvider.getRemainingExpiration(refreshToken);// refreshToken 남은 시간 계산
-        redisService.saveBlackListToken(refreshToken, expiration);// 블랙리스트에 등록
-        redisService.deleteRefreshToken(email);// Redis에서 해당 이메일의 리프레시 토큰 삭제
+
+        // 토큰이 유효하지 않으면 블랙리스트/삭제 없이 그대로 종료
+        if (!jwtTokenProvider.validateToken(refreshToken)) {
+            SecurityContextHolder.clearContext();
+            return;
+        }
+
+        String email = jwtTokenProvider.getClaims(refreshToken).getSubject();
+        long expiration = jwtTokenProvider.getRemainingExpiration(refreshToken);
+        redisService.saveBlackListToken(refreshToken, expiration);
+        redisService.deleteRefreshToken(email);
         SecurityContextHolder.clearContext();
     }
 

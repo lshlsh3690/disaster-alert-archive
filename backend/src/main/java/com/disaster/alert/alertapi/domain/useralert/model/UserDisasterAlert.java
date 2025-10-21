@@ -52,4 +52,8 @@ public class UserDisasterAlert {
 
     @LastModifiedDate
     private LocalDateTime modifiedAt;
+
+    @Builder.Default
+    @Column(columnDefinition = "boolean default false")
+    private boolean isDeleted = false;
 }

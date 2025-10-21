@@ -42,7 +42,7 @@ export const ZUserAlertResponse = z.object({
 export type UserAlertResponse = z.infer<typeof ZUserAlertResponse>;
 
 export async function createUserAlert(req: UserAlertCreateRequest): Promise<UserAlertResponse> {
-  const res = await instance.post("/api/v1/user-alerts", req);
+  const res = await instance.post("/api/v1/user-alerts", req, { headers: { "X-Auth-Required": "true" } });
   const parsed = parseSuccessResponse(res.data, ZUserAlertResponse);
   if (!parsed) throw new Error("Unexpected response format");
   return parsed.data;

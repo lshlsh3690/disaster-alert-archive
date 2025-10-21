@@ -1,4 +1,4 @@
-import { Alert, LatestAlert, Stats, ZAlert, ZLatestAlert, ZPageMeta, ZPageMetaCombined, ZRegionStat, ZStats } from "@/types/alerts";
+import { Alert, LatestAlert, Stats, ZAlert, ZLatestAlert, ZPageMeta, ZPageMetaCombined, ZRegionStat, ZStats, ZDashboardSummary, type DashboardSummary } from "@/types/alerts";
 import instance from "./axios";
 import { z } from "zod";
 
@@ -51,5 +51,11 @@ export async function fetchLatestAlertsBySido(
 ): Promise<Array<{ region: string; count: number }>> {
   const res = await instance.get("/api/v1/alerts/stats/sido", { params });
   const data = z.array(ZRegionStat).parse(res.data);
+  return data;
+}
+
+export async function fetchDashboardSummary(): Promise<DashboardSummary> {
+  const res = await instance.get("/api/v1/alerts/dashboard/summary");
+  const data = ZDashboardSummary.parse(res.data);
   return data;
 }

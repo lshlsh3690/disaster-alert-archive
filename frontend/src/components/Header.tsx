@@ -19,7 +19,7 @@ export default function Header() {
   const menu = [
     { name: "대시보드", href: "/dashboard" },
     { name: "재난 문자", href: "/alerts" },
-    { name: "통계", href: "/stats" },
+    // { name: "통계", href: "/stats" },
     { name: "커뮤니티", href: "/community" },
   ];
 

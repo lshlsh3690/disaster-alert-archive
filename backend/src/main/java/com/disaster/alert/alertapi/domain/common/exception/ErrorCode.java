@@ -19,6 +19,9 @@ public enum ErrorCode {
 
     USER_ALERT_NOT_FOUND(404, "A108", "사용자 재난 알림을 찾을 수 없습니다."),
 
+    DISASTER_ALERT_NOT_FOUND(404, "D404", "공식 재난문자를 찾을 수 없습니다."),
+    COMMENT_NOT_FOUND(404, "CM404", "댓글을 찾을 수 없습니다."),
+
 
     DUPLICATE_EMAIL(409, "M401", "이미 사용 중인 이메일입니다."),
     DUPLICATE_NICKNAME(409, "M402", "이미 사용 중인 닉네임입니다."),
