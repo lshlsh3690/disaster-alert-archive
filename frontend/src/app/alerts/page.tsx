@@ -6,7 +6,7 @@ import { Alert } from "@/types/alerts";
 import { LEVEL_OPTIONS, levelTextToCode } from "@/ui/level";
 import { zodResolver } from "@hookform/resolvers/zod";
 import Link from "next/link";
-import { useEffect, useMemo, useState, useCallback } from "react";
+import { useEffect, useMemo, useState, useCallback, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -24,6 +24,14 @@ const ZSearch = z.object({
 type SearchForm = z.infer<typeof ZSearch>;
 
 export default function DisasterListPage() {
+  return (
+    <Suspense fallback={<main className="p-6">불러오는 중...</main>}>
+      <DisasterListPageInner />
+    </Suspense>
+  );
+}
+
+function DisasterListPageInner() {
   const [page, setPage] = useState<number>(0);
   const size = 10;
   const [formState, setFormState] = useState<SearchForm>({});
