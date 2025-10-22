@@ -2,10 +2,10 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { loadKakaoMapSdk } from "@/lib/kakaoMapLoader";
 import { groupToMetros, METRO_COORDS, type Metro } from "@/ui/metros";
-import { useSearchAlerts, useSidoStats } from "@/lib/queries/useAlerts";
+import { useSidoStats } from "@/lib/queries/useAlerts";
 
 type OverlayRef = { setMap: (m: any | null) => void };
 

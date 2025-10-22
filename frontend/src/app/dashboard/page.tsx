@@ -3,7 +3,7 @@
 import Link from "next/link";
 import LatestAlertsSection from "./LatestAlertsSection";
 import { useDashboardSummary } from "@/lib/queries/useAlerts";
-import KakaoMetroMap from "@/components/map/KakaoMetroMap";
+import KakaoMetroMap from "@/components/KakaoMetroMap";
 import { useLatestComments } from "@/lib/queries/useComments";
 
 export default function DashboardPage() {
