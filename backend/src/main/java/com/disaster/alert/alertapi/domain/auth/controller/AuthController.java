@@ -27,7 +27,7 @@ import java.time.Duration;
 public class AuthController {
     private final AuthService authService;
     private final MemberService memberService;
-    private final static boolean isSecureCookie = false; // 운영 환경에서는 true로 설정
+    private final static boolean isSecureCookie = true; // 운영 환경에서는 true로 설정
 
     @PostMapping("/login")
     public ResponseEntity<ApiResponse<LoginResponse>> login(@Valid @RequestBody LoginRequest request,
