@@ -36,7 +36,7 @@ public class DisasterOpenApiClient {
             log.info("Response from Disaster Open API fetched (length={}): {}", forObject != null ? forObject.length() : 0, "...");
             return forObject;
         } catch (Exception e) {
-            log.warn("DisasterOpenApiClient.fetchData() 실패 - url={}, msg={}", url, e.getMessage());
+            log.warn("DisasterOpenApiClient.fetchData() 실패 - url={}", url );
             return null; // 장애 시 null 반환
         }
     }
