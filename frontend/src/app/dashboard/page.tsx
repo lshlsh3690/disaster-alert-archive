@@ -26,7 +26,7 @@ export default function DashboardPage() {
 
       {/* 지역별 재난 문자 지도 */}
       <section>
-        <SectionHeader title="🗺️ 지역별 재난 문자 지도" href="/disasters/map" />
+        <SectionHeader title="🗺️ 지역별 재난 문자 지도" href="/alerts/map" />
         <KakaoMetroMap todayOnly zoomable={false} />
       </section>
 
