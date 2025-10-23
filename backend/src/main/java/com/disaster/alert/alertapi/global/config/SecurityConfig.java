@@ -83,7 +83,8 @@ public class SecurityConfig {
 
         config.setAllowedOriginPatterns(List.of(
                 "https://*.vercel.app",
-                "http://localhost:3000"
+                "http://localhost:3000",
+                "https://www.disaster-alert-archive.co.kr"
         ));
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"));
         config.setAllowedHeaders(List.of("*"));
