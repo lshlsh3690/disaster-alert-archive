@@ -13,7 +13,7 @@ services:
       - backend
 
   backend:
-    image: lsh3690/disaster-backend:1.0.7 #<- image에 맞추기
+    image: ${DOCKER_USER}/disaster-backend:${API_TAG:-latest}
     restart: unless-stopped
     env_file:
       - .env.prod

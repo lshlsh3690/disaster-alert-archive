@@ -7,6 +7,8 @@ on:
       - "backend/**"
       - ".github/workflows/backend-deploy.yml"
       - "deploy/**"
+      - "docker-compose.prod.yml"
+
 
 env:
   IMAGE_NAME: disaster-backend
@@ -47,11 +49,13 @@ jobs:
           host: ${{ secrets.EC2_HOST }}
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_SSH_KEY }}
-          script: |
+           script: |
             set -e
             cd ~/apps/disaster
+            export DOCKER_USER=${{ secrets.DOCKERHUB_USERNAME }}
+            export API_TAG=latest
             echo "🟢 Pulling latest image..."
-            docker compose -f docker-compose.prod.yml pull
+            DOCKER_USER=$DOCKER_USER API_TAG=$API_TAG docker compose -f docker-compose.prod.yml pull
             echo "🚀 Restarting containers..."
-            docker compose -f docker-compose.prod.yml up -d --remove-orphans
+            DOCKER_USER=$DOCKER_USER API_TAG=$API_TAG docker compose -f docker-compose.prod.yml up -d --remove-orphans
             echo "✅ Deployment completed!"
