@@ -49,7 +49,7 @@ jobs:
           host: ${{ secrets.EC2_HOST }}
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_SSH_KEY }}
-           script: |
+          script: |
             set -e
             cd ~/apps/disaster
             export DOCKER_USER=${{ secrets.DOCKERHUB_USERNAME }}
