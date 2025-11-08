@@ -26,29 +26,30 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private final CustomUserDetailsService userDetailsService;
     private final RedisService redisService;
 
-    // 모든 요청에 대해 필터는 지나가되, 토큰이 없으면 바로 다음 체인으로 넘깁니다.
 
+    @Override
+    protected boolean shouldNotFilter(HttpServletRequest request) throws ServletException {
+        if ("OPTIONS".equalsIgnoreCase(request.getMethod())) return true; // CORS preflight 요청은 필터링하지 않음
+        String uri = request.getRequestURI();
+        if (uri.startsWith("/api/v1/auth/oauth/")) return true; // OAuth 관련 경로는 필터링하지 않음
+        return false;
+    }
+
+    // 모든 요청에 대해 필터는 지나가되, 토큰이 없으면 바로 다음 체인으로 넘깁니다.
     @Override
     protected void doFilterInternal(HttpServletRequest request,
                                     HttpServletResponse response,
                                     FilterChain filterChain)
             throws ServletException, IOException {
-        if ("OPTIONS".equalsIgnoreCase(request.getMethod())) {
-            filterChain.doFilter(request, response);
-            return;
-        }
-
         log.info("JWT Authentication Filter invoked");
 
         String token = resolveToken(request);
 
-        //토큰이 없으면 그냥 다음 필터로 넘김 (로그인/회원가입/공개 API가 동작해야 함)
+        // 토큰이 없으면 다음 필터로
         if (token == null || token.isBlank()) {
-            log.info("토큰이 없습니다. 다음 필터로 이동합니다.");
             filterChain.doFilter(request, response);
             return;
         }
-
 
         if (redisService.isBlackListToken(token)) {
             log.warn("블랙리스트에 등록된 토큰입니다.");
@@ -96,4 +97,6 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         response.setContentType("application/json");
         response.getWriter().write("{\"message\":\"" + msg + "\"}");
     }
+
+
 }
