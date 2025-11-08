@@ -27,7 +27,8 @@ import java.time.Duration;
 public class AuthController {
     private final AuthService authService;
     private final MemberService memberService;
-    private final static boolean isSecureCookie = true; // 운영 환경에서는 true로 설정
+    @org.springframework.beans.factory.annotation.Value("${cookie.secure:true}")
+    private boolean isSecureCookie; // 운영 true, 로컬 false
 
     @PostMapping("/login")
     public ResponseEntity<ApiResponse<LoginResponse>> login(@Valid @RequestBody LoginRequest request,

@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { useAuthStore } from "@/store/authStore";
 import { useEffect, useRef, useState } from "react";
 import { logoutApi } from "@/api/authApi";
+import { getMyInfo } from "@/api/memberApi";
 import { useRouter } from "next/navigation";
 
 export default function Header() {
@@ -12,6 +13,7 @@ export default function Header() {
   const pathname = usePathname();
   const isLoggedIn = useAuthStore((state) => state.user !== null);
   const logout = useAuthStore((state) => state.logout);
+  const setUser = useAuthStore((state) => state.setUser);
   const [open, setOpen] = useState<boolean>(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const nickname = useAuthStore((state) => state.user?.nickname);
@@ -45,6 +47,25 @@ export default function Header() {
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
+
+  // OAuth 로그인 후 새로고침 시 쿠키 기반으로 사용자 정보를 동기화
+  useEffect(() => {
+    if (isLoggedIn) return;
+    (async () => {
+      try {
+        const me: any = await getMyInfo();
+        if (!me) return;
+        setUser({
+          memberId: me.memberId ?? me.id ?? 0,
+          nickname: me.nickname ?? "",
+          email: me.email ?? "",
+          role: me.role ?? null,
+        });
+      } catch (_) {
+        // noop
+      }
+    })();
+  }, [isLoggedIn, setUser]);
 
   return (
     <header className="bg-white shadow px-6 py-3 flex items-center justify-between">

@@ -13,11 +13,9 @@ export default function OAuthButton({
     naver: "네이버 계정으로 로그인",
   }[provider];
 
-  const loginUrl = {
-    google: "/api/oauth/google",
-    kakao: "/api/oauth/kakao",
-    naver: "/api/oauth/naver",
-  }[provider];
+  const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL;
+  const redirect = typeof window !== "undefined" ? window.location.origin + "/dashboard" : "";
+  const loginUrl = `${apiBase}/api/v1/auth/oauth/${provider}/authorize${redirect ? `?redirect=${encodeURIComponent(redirect)}` : ""}`;
 
   const logo = {
     google: "/oauth/google.svg", // public 폴더에 이미지 넣어두기
