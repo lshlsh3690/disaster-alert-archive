@@ -9,9 +9,9 @@ on:
       - "deploy/**"
       - "docker-compose.yml"
 
-
 env:
   IMAGE_NAME: disaster-backend
+  DEPLOY_PATH: /home/user/apps/disaster
 
 jobs:
   build-and-push:
@@ -19,43 +19,50 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Set image tag (short sha)
+        id: vars
+        run: echo "TAG=${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+
       - name: Log in to Docker Hub
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Set image tag
-        id: vars
-        run: echo "TAG=${GITHUB_SHA::7}" >> $GITHUB_OUTPUT
-
-      - name: Build & Push Docker Image
+      - name: Build & Push (linux/amd64 + linux/arm64)
         uses: docker/build-push-action@v6
         with:
           context: ./backend
           file: ./backend/Dockerfile
           push: true
+          platforms: linux/amd64,linux/arm64
           tags: |
             ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}:latest
             ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}:${{ steps.vars.outputs.TAG }}
 
   remote-deploy:
     needs: build-and-push
-    runs-on: ubuntu-latest
+    # 라즈베리 self-hosted 러너 (기본 라벨: self-hosted, Linux, ARM64)
+    runs-on: [ self-hosted, Linux, ARM64 ]
     steps:
-      - name: Deploy to EC2
-        uses: appleboy/ssh-action@v1.2.0
-        with:
-          host: ${{ secrets.EC2_HOST }}
-          username: ${{ secrets.EC2_USER }}
-          key: ${{ secrets.EC2_SSH_KEY }}
-          script: |
-            set -e
-            cd ~/apps/disaster
-            export DOCKER_USER=${{ secrets.DOCKERHUB_USERNAME }}
-            export API_TAG=latest
-            echo "🟢 Pulling latest image..."
-            DOCKER_USER=$DOCKER_USER API_TAG=$API_TAG docker compose -f docker-compose.prod.yml pull
-            echo "🚀 Restarting containers..."
-            DOCKER_USER=$DOCKER_USER API_TAG=$API_TAG docker compose -f docker-compose.prod.yml up -d --remove-orphans
-            echo "✅ Deployment completed!"
+      - name: Docker login (on Pi)
+        run: |
+          echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u "${{ secrets.DOCKERHUB_USERNAME }}" --password-stdin
+
+      - name: Pull newest images (compose)
+        working-directory: ${{ env.DEPLOY_PATH }}
+        env:
+          DOCKER_USER: ${{ secrets.DOCKERHUB_USERNAME }}
+          IMAGE_NAME: ${{ env.IMAGE_NAME }}
+          API_TAG: latest
+        run: |
+          DOCKER_USER="$DOCKER_USER" IMAGE_NAME="$IMAGE_NAME" API_TAG="$API_TAG" docker compose pull
+
+      - name: Reload stack via systemd (pull+up -d)
+        run: sudo systemctl reload disaster
+
+      - name: Cleanup old images
+        run: docker image prune -af || true
