@@ -7,7 +7,7 @@ on:
       - "backend/**"
       - ".github/workflows/backend-deploy.yml"
       - "deploy/**"
-      - "docker-compose.prod.yml"
+      - "docker-compose.yml"
 
 
 env:
