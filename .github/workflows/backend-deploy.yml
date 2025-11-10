@@ -1,34 +1,31 @@
 name: backend-deploy
-
 on:
   push:
     branches: [ "develop" ]
     paths:
       - "backend/**"
       - ".github/workflows/backend-deploy.yml"
-      - "deploy/**"
       - "docker-compose.yml"
 
 env:
-  IMAGE_NAME: disaster-backend
   DEPLOY_PATH: /home/user/apps/disaster
+  BACK_IMAGE: disaster-backend
+  IMAGE_TAG: latest
 
 jobs:
   deploy-on-pi:
     runs-on: [ self-hosted, Linux, ARM64 ]
-
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-      - name: Build image on Pi (single arch, arm64)
-        run: |
-          docker build \
-            -f backend/Dockerfile \
-            -t ${{ env.IMAGE_NAME }}:latest \
-            ./backend
-      - name: Compose up (no pull)
+      - uses: actions/checkout@v4
+
+      - name: Docker login
+        run: echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u "${{ secrets.DOCKERHUB_USERNAME }}" --password-stdin
+
+      - name: Pull & Recreate only backend
         working-directory: ${{ env.DEPLOY_PATH }}
         run: |
-          docker compose up -d --remove-orphans
+          docker compose pull backend
+          docker compose up -d --force-recreate --no-deps backend
+
       - name: Cleanup dangling images (optional)
         run: docker image prune -f || true
