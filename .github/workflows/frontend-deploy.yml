@@ -12,20 +12,13 @@ env:
   IMAGE_TAG: latest
 
 jobs:
-  build-push-on-pi:
+  frontend-deploy-on-pi:
     runs-on: [ self-hosted, Linux, ARM64 ]
     steps:
       - uses: actions/checkout@v4
 
       - name: Docker login
         run: echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u "${{ secrets.DOCKERHUB_USERNAME }}" --password-stdin
-
-      - name: Build (arm64) & Push
-        run: |
-          docker build -f frontend/Dockerfile \
-            -t ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.FRONT_IMAGE }}:${{ env.IMAGE_TAG }} \
-            --build-arg ENV=docker ./frontend
-          docker push ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.FRONT_IMAGE }}:${{ env.IMAGE_TAG }}
 
       - name: Pull & Recreate only frontend
         working-directory: ${{ env.DEPLOY_PATH }}
