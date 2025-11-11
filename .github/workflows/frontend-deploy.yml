@@ -7,7 +7,10 @@ on:
       - ".github/workflows/frontend-deploy.yml"
       - "docker-compose.yml"
 
-
+permissions:
+  contents: read
+  packages: write
+  
 env:
   IMAGE_NAME: ghcr.io/lshlsh3690/disaster-frontend
   IMAGE_TAG: latest
