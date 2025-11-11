@@ -1,12 +1,9 @@
 import axios, { AxiosError, InternalAxiosRequestConfig } from "axios";
 import { reissue } from "./authApi";
 
-const baseURL = process.env.NEXT_PUBLIC_API_BASE_URL;
+const baseURL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8080";
 
 console.log("baseURL", baseURL);
-if (!baseURL) {
-  throw new Error("NEXT_PUBLIC_API_BASE_URL is not set");
-}
 
 const instance = axios.create({
   baseURL: baseURL || undefined,
