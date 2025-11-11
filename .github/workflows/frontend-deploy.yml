@@ -5,6 +5,7 @@ on:
     paths:
       - "frontend/**"
       - ".github/workflows/frontend-deploy.yml"
+      - "docker-compose.yml"
 
 env:
   DEPLOY_PATH: /home/user/apps/disaster
