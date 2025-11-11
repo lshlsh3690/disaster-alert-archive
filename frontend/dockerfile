@@ -9,13 +9,6 @@ RUN npm install
 # 코드 및 환경 변수 복사
 COPY . .
 
-COPY .env.docker .env
-
-
-# NODE_ENV를 통해 .env 파일 선택 복사 (실무 기준)
-ARG ENV=docker
-ENV ENV=$ENV
-
 # 빌드
 RUN npm run build
 
