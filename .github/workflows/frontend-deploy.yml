@@ -34,7 +34,7 @@ jobs:
             --provenance=false \
             -t ${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }} \
             -f frontend/Dockerfile \
-            frontend \
+             . \
             --push
 
   frontend-deploy-on-pi:
