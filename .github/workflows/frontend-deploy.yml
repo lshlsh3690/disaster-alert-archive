@@ -10,7 +10,7 @@ on:
 permissions:
   contents: read
   packages: write
-  
+
 env:
   IMAGE_NAME: ghcr.io/lshlsh3690/disaster-frontend
   IMAGE_TAG: latest
@@ -23,11 +23,11 @@ jobs:
       - uses: actions/checkout@v4
       
       # QEMU 설치
-      - name : Set up QEMU
+      - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
 
       # Docker Buildx 설치
-      - name : Set up Docker Buildx
+      - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
       # GHCR 로그인 (GITHUB_TOKEN 사용)
