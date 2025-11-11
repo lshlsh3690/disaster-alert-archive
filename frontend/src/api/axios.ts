@@ -1,7 +1,7 @@
 import axios, { AxiosError, InternalAxiosRequestConfig } from "axios";
 import { reissue } from "./authApi";
 
-const baseURL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8080";
+const baseURL = process.env.NEXT_PUBLIC_API_BASE_URL || "/api";
 
 console.log("baseURL", baseURL);
 

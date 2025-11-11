@@ -12,13 +12,14 @@ permissions:
   packages: write
 
 env:
-  IMAGE_NAME: ghcr.io/lshlsh3690/disaster-frontend
+  IMAGE_NAME: ghcr.io/${{ github.repository }}/frontend
   IMAGE_TAG: latest
   DEPLOY_PATH: /home/user/apps/disaster
 
 jobs:
   frontend-build-and-push:
     runs-on: ubuntu-latest
+    
     steps:
       - uses: actions/checkout@v4
       
