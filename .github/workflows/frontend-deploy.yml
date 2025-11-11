@@ -7,22 +7,46 @@ on:
       - ".github/workflows/frontend-deploy.yml"
       - "docker-compose.yml"
 
+
 env:
-  DEPLOY_PATH: /home/user/apps/disaster
-  FRONT_IMAGE: disaster-frontend
+  IMAGE_NAME: ghcr.io/lshlsh3690/disaster-alert-archive-frontend
   IMAGE_TAG: latest
+  DEPLOY_PATH: /home/user/apps/disaster
 
 jobs:
-  frontend-deploy-on-pi:
-    runs-on: [ self-hosted, Linux, ARM64 ]
+  frontend-build-and-push:
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      # GHCR 로그인 (GITHUB_TOKEN 사용)
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Docker login
-        run: echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u "${{ secrets.DOCKERHUB_USERNAME }}" --password-stdin
+      # ARM64 이미지로 빌드 & 푸시 (라즈베리파이용)
+      - name: Build and Push (arm64)
+        run: |
+          docker buildx build \
+            --platform linux/arm64 \
+            --provenance=false \
+            -t ${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }} \
+            -f frontend/Dockerfile \
+            frontend \
+            --push
+
+  frontend-deploy-on-pi:
+    runs-on: [ self-hosted, Linux, ARM64 ]
+    needs: frontend-build-and-push
+    steps:
+      - name: Login to GHCR
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
 
       - name: Pull & Recreate only frontend
         working-directory: ${{ env.DEPLOY_PATH }}
         run: |
           docker compose pull frontend
           docker compose up -d --force-recreate --no-deps frontend
+          docker image prune -f
