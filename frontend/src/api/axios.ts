@@ -1,9 +1,7 @@
 import axios, { AxiosError, InternalAxiosRequestConfig } from "axios";
 import { reissue } from "./authApi";
 
-const baseURL = process.env.NEXT_PUBLIC_API_BASE_URL || "/api";
-
-console.log("baseURL", baseURL);
+const baseURL = "";
 
 const instance = axios.create({
   baseURL: baseURL || undefined,
