@@ -1,58 +1,22 @@
-# FROM gradle:8.5-jdk17 AS build
-
-# WORKDIR /app
-
-# COPY settings.gradle ./
-# COPY build.gradle ./
-
-# COPY . .
-
-# RUN gradle build -x test
-
-# # 2단계: 실행 이미지 (최소한의 경량 이미지)
-# FROM eclipse-temurin:17-jdk
-# WORKDIR /app
-
-# # 빌드한 JAR 복사
-# COPY --from=build /app/build/libs/*.jar app.jar
-
-# EXPOSE 8080
-
-# ENTRYPOINT ["java", "-jar", "app.jar"]
-
-
 # ---------- build stage ----------
 FROM eclipse-temurin:17-jdk AS build
 WORKDIR /app
     
-# Gradle wrapper / 스크립트만 먼저 복사 (캐시 최적화)
-COPY gradlew settings.gradle build.gradle ./
-COPY gradle ./gradle
-RUN chmod +x gradlew
+# 프로젝트 전체 복사(단, .dockerignore로 불필요 파일 제외 권장)
+COPY . .
     
-# 의존성만 미리 당겨서 캐시 확보 (소스 의존 플러그인 있을 수 있어 실패해도 계속)
-RUN ./gradlew --no-daemon dependencies -x test || true
+# gradlew 실행권한이 없다면 한 줄 추가
+RUN chmod +x ./gradlew
     
-# 소스 복사
-COPY src ./src
-    
-# ★ 테스트 스킵 빌드 (bootJar 권장)
+# 테스트 스킵하고 JAR 빌드
 RUN ./gradlew --no-daemon clean bootJar -x test
     
 # ---------- run stage ----------
 FROM eclipse-temurin:17-jre
 WORKDIR /app
     
-# JAR 복사 (이름이 고정돼 있으면 패턴보다 정확한 파일명으로 바꿔도 OK)
+# 빌드 산출물만 런타임 이미지로 복사
 COPY --from=build /app/build/libs/*.jar app.jar
-    
-ENV TZ=Asia/Seoul \
-    JAVA_OPTS="-XX:+UseContainerSupport -XX:MaxRAMPercentage=75 -Duser.timezone=Asia/Seoul"
-    
-# 비루트 실행
-RUN adduser --disabled-password --gecos "" appuser && chown -R appuser:appuser /app
-USER appuser
-    
+
 EXPOSE 8080
-ENTRYPOINT ["sh","-c","java $JAVA_OPTS -jar /app/app.jar"]
-    
+ENTRYPOINT ["sh","-c","java $JAVA_OPTS -jar app.jar"]
