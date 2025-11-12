@@ -7,19 +7,52 @@ on:
       - ".github/workflows/backend-deploy.yml"
       - "docker-compose.yml"
 
+permissions:
+  contents: read
+  packages: write
+
 env:
   DEPLOY_PATH: /home/user/apps/disaster
-  BACK_IMAGE: disaster-backend
+  IMAGE_NAME: ghcr.io/${{ github.repository }}/backend
   IMAGE_TAG: latest
 
+
 jobs:
-  deploy-on-pi:
-    runs-on: [ self-hosted, Linux, ARM64 ]
+  backend-build-and-push:
+    run-on: [ self-hosted, Linux, ARM64 ]
+    permissions:
+      contents: read
+      packages: write
     steps:
       - uses: actions/checkout@v4
 
-      - name: Docker login
-        run: echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u "${{ secrets.DOCKERHUB_USERNAME }}" --password-stdin
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and Push Backend (arm64)
+        run: |
+          docker buildx build \
+            --platform linux/arm64 \
+            --provenance=false \
+            -t ${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }} \
+            -f backend/Dockerfile backend \
+            --push
+  backend-deploy-on-pi:
+    run-on: [self-hosted, Linux, ARM64]
+    needs: backend-build-and-push
+    steps:
+      - name: Login to GHCR
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
 
       - name: Pull & Recreate only backend
         working-directory: ${{ env.DEPLOY_PATH }}
