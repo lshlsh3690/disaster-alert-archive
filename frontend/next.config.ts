@@ -2,9 +2,6 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  // SWC 미니파이어 사용(기본이지만 명시 추천)
-  swcMinify: true,
-
   // SWC 전용 변환 옵션
   compiler: {
     // Styled-Components 사용 시: Babel 플러그인 없이 이걸로만 처리
