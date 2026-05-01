@@ -22,6 +22,9 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.stream.Collectors;
 
 @Service
@@ -75,7 +78,19 @@ public class DisasterAlertService {
                 return;
             }
 
-            disasterAlertRepository.saveAll(newAlerts);
+            // 변경 - 충돌 시 무시
+            try {
+                disasterAlertRepository.saveAll(newAlerts);
+            } catch (Exception e) {
+                // 중복 키 충돌 시 한 건씩 저장 시도
+                for (DisasterAlert alert : newAlerts) {
+                    try {
+                        disasterAlertRepository.save(alert);
+                    } catch (Exception ex) {
+                        log.warn("중복 SN 건너뜀: {}", alert.getSn());
+                    }
+                }
+            }
             log.info("재난문자 {}건 저장 완료", newAlerts.size());
         } catch (Exception e) {
             log.error("재난문자 저장 중 오류 발생", e);
@@ -232,16 +247,29 @@ public class DisasterAlertService {
             // 3. 저장 시작 (1000개 단위 페이지 순차 저장)
             int totalPages = (int) Math.ceil((double) totalCount / numOfRows);
 
+            ExecutorService executor = Executors.newFixedThreadPool(10);
+            List<CompletableFuture<Void>> futures = new ArrayList<>();
+
             for (int page = 1; page <= totalPages; page++) {
-                raw = disasterOpenApiClient.fetchData(page, numOfRows);
-                if (raw == null || raw.isBlank()) {
-                    log.warn("initAllDisasterData: page {} 응답이 없어 해당 페이지를 건너뜁니다.", page);
-                    continue;
-                }
-                this.saveData(raw);
-                log.info("page {} 저장 완료", page);
+                final int currentPage = page;
+                CompletableFuture<Void> future = CompletableFuture.runAsync(() -> {
+                    try {
+                        String pageRaw = disasterOpenApiClient.fetchData(currentPage, numOfRows);
+                        if (pageRaw == null || pageRaw.isBlank()) {
+                            log.warn("page {} 응답 없음, 건너뜀", currentPage);
+                            return;
+                        }
+                        this.saveData(pageRaw);
+                        log.info("page {} 저장 완료", currentPage);
+                    } catch (Exception e) {
+                        log.error("page {} 저장 오류: {}", currentPage, e.getMessage());
+                    }
+                }, executor);
+                futures.add(future);
             }
 
+            CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).join();
+            executor.shutdown();
             log.info("총 {}건 재난문자 초기화 완료", totalCount);
         } catch (Exception e) {
             log.error("DisasterAlertService.initAllDisasterData() 오류 발생", e);
