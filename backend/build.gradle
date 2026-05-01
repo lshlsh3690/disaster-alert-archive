@@ -66,6 +66,8 @@ dependencies {
     implementation 'org.flywaydb:flyway-core'
     implementation 'org.flywaydb:flyway-database-postgresql' // PostgreSQL 전용 드라이버 지원
 
+    implementation 'org.apache.httpcomponents.client5:httpclient5'
+
 
 }
 
