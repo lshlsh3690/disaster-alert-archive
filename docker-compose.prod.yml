@@ -13,6 +13,9 @@ services:
       - backend
 
   backend:
+    build:
+      context: ./backend
+    container_name: disaster-backend
     image: ${DOCKER_USER}/disaster-backend:${API_TAG:-latest}
     restart: unless-stopped
     env_file:
@@ -20,9 +23,13 @@ services:
     depends_on:
       - db
       - redis
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+
 
   db:
     image: postgres:16
+    container_name: disaster-db
     restart: unless-stopped
     env_file:
       - .env.prod
@@ -33,6 +40,7 @@ services:
 
   redis:
     image: redis:7-alpine
+    container_name: disaster-redis
     restart: unless-stopped
     command: ["redis-server", "--appendonly", "yes"]
     volumes:

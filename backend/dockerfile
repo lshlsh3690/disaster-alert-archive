@@ -1,18 +1,16 @@
-# ---------- build stage ----------
 FROM eclipse-temurin:17-jdk AS build
 WORKDIR /app
     
 # 프로젝트 전체 복사(단, .dockerignore로 불필요 파일 제외 권장)
 COPY . .
-    
-# gradlew 실행권한이 없다면 한 줄 추가
+
+#RUN gradle build -x test
+# 변경 후 (원래 dockerfile 방식으로)
 RUN chmod +x ./gradlew
-    
-# 테스트 스킵하고 JAR 빌드
 RUN ./gradlew --no-daemon clean bootJar -x test
-    
-# ---------- run stage ----------
-FROM eclipse-temurin:17-jre
+
+# 2단계: 실행 이미지 (최소한의 경량 이미지)
+FROM eclipse-temurin:17-jdk
 WORKDIR /app
     
 # 빌드 산출물만 런타임 이미지로 복사
