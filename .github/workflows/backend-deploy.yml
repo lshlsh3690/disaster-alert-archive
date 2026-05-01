@@ -5,7 +5,7 @@ on:
     paths:
       - "backend/**"
       - ".github/workflows/backend-deploy.yml"
-      - "docker-compose.yml"
+      - "docker-compose.prod.yml"
 
 permissions:
   contents: read
@@ -23,6 +23,7 @@ jobs:
       packages: write
     steps:
       - uses: actions/checkout@v4
+
       - name: Login to GHCR
         uses: docker/login-action@v3
         with:
@@ -32,11 +33,12 @@ jobs:
 
       - name: Build image
         run: |
-          docker build -t ${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }} -f backend/Dockerfile backend
+          docker build -t ${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }} -f backend/dockerfile backend
+
       - name: Push image
         run: docker push ${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}
 
-backend-deploy-on-ec2:
+  backend-deploy-on-ec2:
     runs-on: ubuntu-latest
     needs: backend-build-and-push
     steps:
