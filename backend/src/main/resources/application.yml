@@ -18,7 +18,8 @@ spring:
         order_inserts: true
         order_updates: true
         generate_statistics: true  # 배치 적용 여부 로그로 확인
-
+        id:
+          new_generator_mappings: true  # 추가
   data:
     redis:
       host: ${REDIS_HOST}
