@@ -16,10 +16,11 @@ services:
     build:
       context: ./backend
     container_name: disaster-backend
-    image: ${DOCKER_USER}/disaster-backend:${API_TAG:-latest}
+    image: ghcr.io/disaster-alert-archive-team/disaster-alert-archive/backend:${API_TAG:-latest}
+    #image: ${DOCKER_USER}/disaster-backend:${API_TAG:-latest}
     restart: unless-stopped
     env_file:
-      - .env.prod
+      - .env
     depends_on:
       - redis
     environment:
