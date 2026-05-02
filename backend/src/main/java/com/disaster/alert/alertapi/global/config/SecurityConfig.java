@@ -41,6 +41,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/v1/members/me").authenticated()
                         .requestMatchers("/api/v1/members/check-nickname").permitAll()
                         .requestMatchers("/api/v1/alerts/**").permitAll()
+                        .requestMatchers("/api/v1/districts/**").permitAll()
                         .anyRequest().authenticated()
                 )
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)

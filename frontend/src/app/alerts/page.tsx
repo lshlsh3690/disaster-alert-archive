@@ -1,44 +1,65 @@
 "use client";
 
-import { useSearchAlerts } from "@/lib/queries/useAlerts";
+import { useSearchAlerts, useSigungu } from "@/lib/queries/useAlerts";
 import { Alert } from "@/types/alerts";
 import { LEVEL_OPTIONS, levelTextToCode } from "@/ui/level";
 import { zodResolver } from "@hookform/resolvers/zod";
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
+import { useRouter, useSearchParams } from "next/navigation";
+import { DISASTER_TYPES } from "@/ui/disasterType";
+import { METROS } from "@/ui/metros";
 
 const ZSearch = z.object({
-  region: z.string().optional(),
-  districtCode: z.string().optional(),
-  startDate: z.string().optional(), // YYYY-MM-DD
+  sido: z.string().optional(),
+  sigungu: z.string().optional(),
+  startDate: z.string().optional(),
   endDate: z.string().optional(),
   type: z.string().optional(),
-  levelText: z.string().optional(), // "안전안내" ...
+  levelText: z.string().optional(),
   keyword: z.string().optional(),
+  source: z.enum(["ALL", "OFFICIAL", "USER"]).optional(),
 });
 type SearchForm = z.infer<typeof ZSearch>;
 
 export default function DisasterListPage() {
-  const [page, setPage] = useState<number>(0);
-  const [size, setSize] = useState<number>(10);
-  const [formState, setFormState] = useState<SearchForm>({});
+  return (
+    <Suspense fallback={<main className="p-6">불러오는 중...</main>}>
+      <DisasterListPageInner />
+    </Suspense>
+  );
+}
 
-  const { register, handleSubmit, reset } = useForm<SearchForm>({
+function DisasterListPageInner() {
+  const [page, setPage] = useState<number>(0);
+  const size = 10;
+  const [formState, setFormState] = useState<SearchForm>({});
+  const router = useRouter();
+  const searchParams = useSearchParams();
+
+  const { register, handleSubmit, reset, watch, setValue } = useForm<SearchForm>({
     resolver: zodResolver(ZSearch),
     defaultValues: {},
   });
 
+  const watchedSido = watch("sido");
+  const { data: sigunguList } = useSigungu(watchedSido || undefined);
+
+  useEffect(() => {
+    setValue("sigungu", "");
+  }, [watchedSido, setValue]);
+
   const buildParams = (f: SearchForm) => {
     const levelCode = levelTextToCode(f.levelText);
+    const region = f.sido && f.sigungu ? `${f.sido} ${f.sigungu}` : f.sido || undefined;
     return {
-      region: f.region || undefined,
-      districtCode: f.districtCode || undefined,
+      region,
       startDate: f.startDate || undefined,
       endDate: f.endDate || undefined,
       type: f.type || undefined,
-      level: levelCode, // 백엔드 enum 코드로 전송
+      level: levelCode,
       keyword: f.keyword || undefined,
       page,
       size,
@@ -51,12 +72,38 @@ export default function DisasterListPage() {
 
   const onSubmit = (v: SearchForm) => {
     setPage(0);
-    setFormState(v);
+    const qs = new URLSearchParams();
+    if (v.sido) qs.set("sido", v.sido);
+    if (v.sigungu) qs.set("sigungu", v.sigungu);
+    if (v.startDate) qs.set("startDate", v.startDate);
+    if (v.endDate) qs.set("endDate", v.endDate);
+    if (v.type) qs.set("type", v.type);
+    if (v.levelText) qs.set("levelText", v.levelText);
+    if (v.keyword) qs.set("keyword", v.keyword);
+    if (v.source) qs.set("source", v.source);
+    router.push(`/alerts?${qs.toString()}`);
   };
+
+  useEffect(() => {
+    const sido = searchParams.get("sido") || undefined;
+    const sigungu = searchParams.get("sigungu") || undefined;
+    const startDate = searchParams.get("startDate") || undefined;
+    const endDate = searchParams.get("endDate") || undefined;
+    const type = searchParams.get("type") || undefined;
+    const levelText = searchParams.get("levelText") || undefined;
+    const keyword = searchParams.get("keyword") || undefined;
+    const source = (searchParams.get("source") as "ALL" | "OFFICIAL" | "USER" | null) || undefined;
+
+    setPage(0);
+    setFormState({ sido, sigungu, startDate, endDate, type, levelText, keyword, source });
+    reset({ sido, sigungu, startDate, endDate, type, levelText, keyword, source });
+  }, [searchParams]);
+
   const onReset = () => {
     reset({});
     setFormState({});
     setPage(0);
+    router.push("/alerts");
   };
 
   return (
@@ -66,17 +113,36 @@ export default function DisasterListPage() {
         과거 수신된 모든 재난 문자 목록입니다. 지역/날짜/키워드로 검색할 수 있어요.
       </p>
 
-      {/* 검색 필터 바 */}
       <form
         onSubmit={handleSubmit(onSubmit)}
         className="bg-white rounded-xl shadow p-4 grid grid-cols-2 md:grid-cols-4 gap-3"
       >
-        <input {...register("region")} placeholder="지역명 (예: 서울특별시)" className="input" />
-        <input {...register("districtCode")} placeholder="법정동 코드" className="input" />
+        <select {...register("sido")} className="input">
+          <option value="">시/도(전체)</option>
+          {METROS.map((m) => (
+            <option key={m} value={m}>
+              {m}
+            </option>
+          ))}
+        </select>
+        <select {...register("sigungu")} className="input" disabled={!watchedSido}>
+          <option value="">시/군/구(전체)</option>
+          {sigunguList?.map((s) => (
+            <option key={s} value={s}>
+              {s}
+            </option>
+          ))}
+        </select>
         <input {...register("startDate")} type="date" className="input" />
         <input {...register("endDate")} type="date" className="input" />
-        <input {...register("type")} placeholder="유형(예: 호우)" className="input" />
-
+        <select {...register("type")} className="input">
+          <option value="">유형(전체)</option>
+          {DISASTER_TYPES.map((t) => (
+            <option key={t} value={t}>
+              {t}
+            </option>
+          ))}
+        </select>
         <select {...register("levelText")} className="input">
           <option value="">레벨(전체)</option>
           {LEVEL_OPTIONS.map((o) => (
@@ -85,9 +151,7 @@ export default function DisasterListPage() {
             </option>
           ))}
         </select>
-
         <input {...register("keyword")} placeholder="키워드(예: 경보)" className="input col-span-2" />
-
         <div className="col-span-2 md:col-span-4 flex justify-end gap-2">
           <button type="button" onClick={onReset} className="px-3 py-2 rounded bg-gray-100">
             초기화
@@ -102,7 +166,6 @@ export default function DisasterListPage() {
         </div>
       </form>
 
-      {/* 목록 */}
       <div className="bg-white rounded-xl shadow p-4">
         {isLoading ? (
           <div className="text-sm text-gray-500">불러오는 중...</div>
@@ -125,8 +188,6 @@ export default function DisasterListPage() {
                 );
               })}
             </ul>
-
-            {/* 페이지네이션 */}
             <div className="mt-4 flex items-center justify-between">
               <button
                 className="px-3 py-1 rounded bg-gray-100 disabled:opacity-50"

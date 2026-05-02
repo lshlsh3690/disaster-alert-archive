@@ -44,3 +44,8 @@ export async function fetchLatestAlertsBySido(params: AlertSearchRequest): Promi
   const data = z.array(ZRegionStat).parse(res.data);
   return data;
 }
+
+export async function fetchSigungu(sido: string): Promise<string[]> {
+  const res = await instance.get("/api/v1/districts/sigungu", { params: { sido } });
+  return z.array(z.string()).parse(res.data);
+}

@@ -2,7 +2,7 @@ import axios, { AxiosError, InternalAxiosRequestConfig } from "axios";
 import { reissue } from "./authApi";
 
 const instance = axios.create({
-  baseURL: process.env.BASE_API_URL || "http://localhost:8080", // 환경 변수에서 API URL 가져오기
+  baseURL: process.env.NEXT_PUBLIC_API_URL || "",
   withCredentials: true, // 쿠키 기반 인증 시 필요
 });
 
@@ -12,11 +12,10 @@ let waitQueue: Array<() => void> = [];
 
 // 유틸: 재발급/로그인 요청 판별
 const isReissueRequest = (config?: InternalAxiosRequestConfig) =>
-  !!config?.url && config.url.includes('/api/v1/auth/reissue');
+  !!config?.url && config.url.includes("/api/v1/auth/reissue");
 
 const isAuthLoginRequest = (config?: InternalAxiosRequestConfig) =>
-  !!config?.url && config.url.includes('/api/v1/auth/login');
-
+  !!config?.url && config.url.includes("/api/v1/auth/login");
 
 // 응답 에러 처리 (예: 401 시 refresh 등)
 instance.interceptors.response.use(
@@ -70,7 +69,7 @@ instance.interceptors.response.use(
     }
 
     return Promise.reject(error);
-  }
+  },
 );
 
 export default instance;
