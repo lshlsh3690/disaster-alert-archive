@@ -48,7 +48,7 @@ jobs:
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
             cd ~/apps/disaster
-            echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
-            docker compose -f docker-compose.prod.yml --env-file .env.prod pull backend
-            docker compose -f docker-compose.prod.yml --env-file .env.prod up -d --force-recreate --no-deps backend
+            docker login -u ${{ secrets.DOCKERHUB_USERNAME }} -p ${{ secrets.DOCKERHUB_TOKEN }}
+            docker compose -f docker-compose.prod.yml pull backend
+            docker compose -f docker-compose.prod.yml up -d --force-recreate --no-deps backend
             docker image prune -f || true
