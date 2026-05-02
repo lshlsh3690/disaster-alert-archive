@@ -54,6 +54,11 @@ export async function fetchLatestAlertsBySido(
   return data;
 }
 
+export async function fetchSigungu(sido: string): Promise<string[]> {
+  const res = await instance.get("/api/v1/districts/sigungu", { params: { sido } });
+  return z.array(z.string()).parse(res.data);
+}
+
 export async function fetchDashboardSummary(): Promise<DashboardSummary> {
   const res = await instance.get("/api/v1/alerts/dashboard/summary");
   const data = ZDashboardSummary.parse(res.data);

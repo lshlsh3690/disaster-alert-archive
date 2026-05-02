@@ -1,8 +1,7 @@
 // hooks/useAlerts.ts
 import { useQuery, keepPreviousData } from "@tanstack/react-query";
-import { fetchLatestAlerts, searchAlerts, fetchAlert, fetchStats, type AlertSearchRequest, fetchLatestAlertsBySido, searchCombinedAlerts, fetchDashboardSummary } from "@/api/alertApi";
-import { fetchUserAlert } from "@/api/userAlertApi";
-import { fetchUserAlerts } from "@/api/userAlertApi";
+import { fetchLatestAlerts, searchAlerts, fetchAlert, fetchStats, type AlertSearchRequest, fetchLatestAlertsBySido, searchCombinedAlerts, fetchDashboardSummary, fetchSigungu } from "@/api/alertApi";
+import { fetchUserAlert, fetchUserAlerts } from "@/api/userAlertApi";
 
 export function useLatestAlerts(limit = 5) {
   return useQuery({
@@ -58,6 +57,15 @@ export function useSidoStats(params: AlertSearchRequest) {
     queryKey: ["alert-stats-sido", params],
     queryFn: () => fetchLatestAlertsBySido(params),
     placeholderData: keepPreviousData,
+  });
+}
+
+export function useSigungu(sido: string | undefined) {
+  return useQuery({
+    queryKey: ["sigungu", sido],
+    queryFn: () => fetchSigungu(sido!),
+    enabled: !!sido,
+    staleTime: Infinity,
   });
 }
 

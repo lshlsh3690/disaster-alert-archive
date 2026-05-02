@@ -3,7 +3,6 @@ import { reissue } from "./authApi";
 
 const baseURL = process.env.NEXT_PUBLIC_API_URL || "";
 
-
 const instance = axios.create({
   baseURL: baseURL || undefined,
   withCredentials: true,
@@ -79,7 +78,7 @@ instance.interceptors.response.use(
     }
 
     return Promise.reject(error);
-  }
+  },
 );
 
 export default instance;

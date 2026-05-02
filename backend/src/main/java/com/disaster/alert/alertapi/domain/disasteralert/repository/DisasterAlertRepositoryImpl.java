@@ -95,8 +95,6 @@ public class DisasterAlertRepositoryImpl implements DisasterAlertRepositoryCusto
         return queryFactory
                 .select(disasterAlert.id.countDistinct())
                 .from(disasterAlert)
-                .join(disasterAlert.disasterAlertRegions, disasterAlertRegion)
-                .join(disasterAlertRegion.legalDistrict, legalDistrict)
                 .where(byAlertCondition(c))
                 .fetchOne();
     }
