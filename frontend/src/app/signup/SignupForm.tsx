@@ -88,6 +88,13 @@ export default function SignupForm() {
       >
         {isSignupPending ? "회원가입 중..." : "회원가입"}
       </Button>
+      <button
+        type="button"
+        onClick={() => router.back()}
+        className="w-full bg-gray-100 text-gray-700 py-2 rounded hover:bg-gray-200 transition"
+      >
+        취소
+      </button>
     </form>
   );
 }

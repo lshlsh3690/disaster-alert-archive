@@ -2,6 +2,7 @@ package com.disaster.alert.alertapi.domain.disasteralert.repository;
 
 import com.disaster.alert.alertapi.domain.disasteralert.dto.AlertSearchRequest;
 import com.disaster.alert.alertapi.domain.disasteralert.dto.DisasterAlertStatResponse;
+import com.disaster.alert.alertapi.domain.disasteralert.dto.CombinedAlertResponse;
 import com.disaster.alert.alertapi.domain.disasteralert.model.DisasterAlert;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -20,4 +21,6 @@ public interface DisasterAlertRepositoryCustom {
     List<DisasterAlertStatResponse.LevelStat> countByLevel(AlertSearchRequest request);
 
     List<DisasterAlertStatResponse.RegionStat> getStatsSido(AlertSearchRequest request);
+
+    Page<CombinedAlertResponse> searchCombined(AlertSearchRequest request, String source, Pageable pageable);
 }

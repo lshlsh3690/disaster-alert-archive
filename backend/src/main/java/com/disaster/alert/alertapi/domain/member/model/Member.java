@@ -1,5 +1,4 @@
 package com.disaster.alert.alertapi.domain.member.model;
-
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.Where;
@@ -7,7 +6,9 @@ import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
+
 import java.time.LocalDateTime;
+ 
 
 @Entity
 @Table(name = "member")
@@ -20,14 +21,13 @@ import java.time.LocalDateTime;
 // querydsl에서 @Where은 적용되지 않음
 @Where(clause = "is_deleted = false")
 public class Member {
-
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "member_id")
     private Long id;
 
     @Column(nullable = false, unique = true)
-    private String email;  // 로그인 ID
+    private String email;  // 로그인 I
 
     @Column(nullable = false)
     private String password;  // 암호화된 비밀번호

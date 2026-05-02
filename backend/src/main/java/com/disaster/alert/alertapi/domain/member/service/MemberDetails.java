@@ -1,7 +1,7 @@
 package com.disaster.alert.alertapi.domain.member.service;
 
 import com.disaster.alert.alertapi.domain.member.model.Member;
-import lombok.Getter;
+import com.disaster.alert.alertapi.domain.member.model.MemberRole;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 
@@ -14,6 +14,10 @@ public record MemberDetails(Member member) implements UserDetails {
     }
     public String getNickname() {
         return member.getNickname();
+    }
+
+    public MemberRole getRole() {
+        return member.getRole();
     }
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {

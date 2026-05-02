@@ -1,7 +1,5 @@
 package com.disaster.alert.alertapi.global.security.jwt;
 
-import com.disaster.alert.alertapi.domain.common.exception.CustomException;
-import com.disaster.alert.alertapi.domain.common.exception.ErrorCode;
 import com.disaster.alert.alertapi.domain.member.service.CustomUserDetailsService;
 import com.disaster.alert.alertapi.global.redis.RedisService;
 import io.jsonwebtoken.Claims;
@@ -13,15 +11,12 @@ import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
-import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
-import java.util.stream.Collectors;
 
 @Component
 @RequiredArgsConstructor
@@ -31,17 +26,16 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private final CustomUserDetailsService userDetailsService;
     private final RedisService redisService;
 
+
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) throws ServletException {
-        String p = request.getRequestURI();
-        return p.endsWith("login")
-                || p.startsWith("/api/v1/auth/reissue")
-                || p.startsWith("/api/v1/auth/signup")
-                || p.startsWith("/api/v1/auth/email/verify")
-                || p.endsWith("check-nickname") || p.endsWith("logout")
-                || p.startsWith("/api/v1/alerts");
+        if ("OPTIONS".equalsIgnoreCase(request.getMethod())) return true; // CORS preflight 요청은 필터링하지 않음
+        String uri = request.getRequestURI();
+        if (uri.startsWith("/api/v1/auth/oauth/")) return true; // OAuth 관련 경로는 필터링하지 않음
+        return false;
     }
 
+    // 모든 요청에 대해 필터는 지나가되, 토큰이 없으면 바로 다음 체인으로 넘깁니다.
     @Override
     protected void doFilterInternal(HttpServletRequest request,
                                     HttpServletResponse response,
@@ -51,7 +45,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
         String token = resolveToken(request);
 
-        //토큰이 없으면 그냥 다음 필터로 넘김 (로그인/회원가입/공개 API가 동작해야 함)
+        // 토큰이 없으면 다음 필터로
         if (token == null || token.isBlank()) {
             filterChain.doFilter(request, response);
             return;
@@ -64,6 +58,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         }
 
         if (!jwtTokenProvider.validateToken(token)) {
+            log.warn("유효하지 않은 토큰입니다.");
             unauthorized(response, "Invalid or expired access token");
             return;
         }
@@ -102,4 +97,6 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         response.setContentType("application/json");
         response.getWriter().write("{\"message\":\"" + msg + "\"}");
     }
+
+
 }

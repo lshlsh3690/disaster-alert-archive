@@ -6,7 +6,6 @@ import com.disaster.alert.alertapi.domain.disasteralert.model.DisasterAlert;
 import com.disaster.alert.alertapi.domain.disasteralert.model.DisasterLevel;
 import com.disaster.alert.alertapi.domain.disasteralert.repository.DisasterAlertRepository;
 import com.disaster.alert.alertapi.domain.legaldistrict.model.LegalDistrict;
-import com.disaster.alert.alertapi.domain.legaldistrict.repository.LegalDistrictRepository;
 import com.disaster.alert.alertapi.global.service.LegalDistrictCache;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.persistence.EntityManager;
@@ -23,6 +22,9 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.stream.Collectors;
 
 @Service
@@ -30,7 +32,6 @@ import java.util.stream.Collectors;
 @Slf4j
 public class DisasterAlertService {
     private final DisasterAlertRepository disasterAlertRepository;
-    private final LegalDistrictRepository legalDistrictRepository;
 
     private final DisasterOpenApiClient disasterOpenApiClient;
     private final ObjectMapper objectMapper;
@@ -42,6 +43,10 @@ public class DisasterAlertService {
 
     @Transactional
     public void saveData(String raw) {
+        if (raw == null || raw.isBlank()) {
+            log.warn("saveData: 원시 응답이 null/blank 입니다. 저장을 건너뜁니다.");
+            return;
+        }
         try {
             DisasterApiResponse response = objectMapper.readValue(raw, DisasterApiResponse.class);
 
@@ -73,7 +78,19 @@ public class DisasterAlertService {
                 return;
             }
 
-            disasterAlertRepository.saveAll(newAlerts);
+            // 변경 - 충돌 시 무시
+            try {
+                disasterAlertRepository.saveAll(newAlerts);
+            } catch (Exception e) {
+                // 중복 키 충돌 시 한 건씩 저장 시도
+                for (DisasterAlert alert : newAlerts) {
+                    try {
+                        disasterAlertRepository.save(alert);
+                    } catch (Exception ex) {
+                        log.warn("중복 SN 건너뜀: {}", alert.getSn());
+                    }
+                }
+            }
             log.info("재난문자 {}건 저장 완료", newAlerts.size());
         } catch (Exception e) {
             log.error("재난문자 저장 중 오류 발생", e);
@@ -210,6 +227,10 @@ public class DisasterAlertService {
             int numOfRows = 1000;
             int firstPage = 1;
             String raw = disasterOpenApiClient.fetchData(firstPage, numOfRows);
+            if (raw == null || raw.isBlank()) {
+                log.warn("initAllDisasterData: 첫 페이지 응답이 없습니다. 초기화를 중단합니다.");
+                return;
+            }
             DisasterApiResponse response = objectMapper.readValue(raw, DisasterApiResponse.class);
 
             if (checkAPIFailure(response)) return;
@@ -226,12 +247,29 @@ public class DisasterAlertService {
             // 3. 저장 시작 (1000개 단위 페이지 순차 저장)
             int totalPages = (int) Math.ceil((double) totalCount / numOfRows);
 
+            ExecutorService executor = Executors.newFixedThreadPool(10);
+            List<CompletableFuture<Void>> futures = new ArrayList<>();
+
             for (int page = 1; page <= totalPages; page++) {
-                raw = disasterOpenApiClient.fetchData(page, numOfRows);
-                this.saveData(raw);
-                log.info("page {} 저장 완료", page);
+                final int currentPage = page;
+                CompletableFuture<Void> future = CompletableFuture.runAsync(() -> {
+                    try {
+                        String pageRaw = disasterOpenApiClient.fetchData(currentPage, numOfRows);
+                        if (pageRaw == null || pageRaw.isBlank()) {
+                            log.warn("page {} 응답 없음, 건너뜀", currentPage);
+                            return;
+                        }
+                        this.saveData(pageRaw);
+                        log.info("page {} 저장 완료", currentPage);
+                    } catch (Exception e) {
+                        log.error("page {} 저장 오류: {}", currentPage, e.getMessage());
+                    }
+                }, executor);
+                futures.add(future);
             }
 
+            CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).join();
+            executor.shutdown();
             log.info("총 {}건 재난문자 초기화 완료", totalCount);
         } catch (Exception e) {
             log.error("DisasterAlertService.initAllDisasterData() 오류 발생", e);
@@ -244,12 +282,23 @@ public class DisasterAlertService {
         return result.map(DisasterAlertResponseDto::from);
     }
 
+    public Page<CombinedAlertResponse> searchCombined(AlertSearchRequest req, String source, Pageable pageable) {
+        return disasterAlertRepository.searchCombined(req, source, pageable);
+    }
+
     public DisasterAlertStatResponse getStats(AlertSearchRequest request) {
         long total = disasterAlertRepository.countAlerts(request);
         List<DisasterAlertStatResponse.RegionStat> regionStats = disasterAlertRepository.countByRegion(request);
         List<DisasterAlertStatResponse.LevelStat> levelStats = disasterAlertRepository.countByLevel(request);
         List<DisasterAlertStatResponse.TypeStat> typeStats = disasterAlertRepository.countByType(request);
         return new DisasterAlertStatResponse(total, regionStats, levelStats, typeStats);
+    }
+
+    public DashboardSummaryResponse getDashboardSummary(long todayUserCount, long totalUserCount) {
+        long todayOfficial = disasterAlertRepository.countToday();
+        long totalOfficial = disasterAlertRepository.count();
+        long combined = totalOfficial + totalUserCount;
+        return new DashboardSummaryResponse(todayOfficial, todayUserCount, totalUserCount, combined);
     }
 
     /**

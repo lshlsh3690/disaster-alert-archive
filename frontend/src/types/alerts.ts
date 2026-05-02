@@ -18,11 +18,24 @@ export const ZAlert = z.object({
 
 export type Alert = z.infer<typeof ZAlert>;
 
+export const ZCombinedAlert = ZAlert.extend({
+  source: z.enum(["OFFICIAL", "USER"]).optional(),
+});
+export type CombinedAlert = z.infer<typeof ZCombinedAlert>;
+
 export const ZPageMeta = z.object({
   content: z.array(ZAlert),
   totalElements: z.number(),
   totalPages: z.number(),
   number: z.number(), // current page (0-based)
+  size: z.number(),
+});
+
+export const ZPageMetaCombined = z.object({
+  content: z.array(ZCombinedAlert),
+  totalElements: z.number(),
+  totalPages: z.number(),
+  number: z.number(),
   size: z.number(),
 });
 
@@ -48,3 +61,11 @@ export const ZLatestAlert = z.object({
   disasterType: z.string().nullable().optional(),
 });
 export type LatestAlert = z.infer<typeof ZLatestAlert>;
+
+export const ZDashboardSummary = z.object({
+  todayOfficialCount: z.number(),
+  todayUserCount: z.number(),
+  totalUserCount: z.number(),
+  totalCombinedCount: z.number(),
+});
+export type DashboardSummary = z.infer<typeof ZDashboardSummary>;

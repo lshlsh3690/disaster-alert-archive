@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import OAuthButton from "@/components/OAuthButton";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import useLogin from "@/lib/mutations/useLogin";
@@ -49,6 +50,13 @@ export default function LoginPage() {
           <button type="submit" className="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700 transition">
             로그인
           </button>
+          <button
+            type="button"
+            onClick={() => router.back()}
+            className="w-full bg-gray-100 text-gray-700 py-2 rounded hover:bg-gray-200 transition"
+          >
+            취소
+          </button>
         </form>
         {/*체크 박스를 사용해서 로그인 저장하기 */}
         <div className="flex items-center">
@@ -64,6 +72,12 @@ export default function LoginPage() {
             회원가입
           </Link>
         </p>
+      </div>
+      <div className="w-full max-w-md mt-4 bg-white rounded-xl shadow p-6 space-y-3">
+        <p className="text-sm text-center text-gray-500">간편 로그인</p>
+        <OAuthButton provider="google" />
+        <OAuthButton provider="kakao" />
+        <OAuthButton provider="naver" />
       </div>
     </main>
   );

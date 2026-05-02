@@ -1,0 +1,54 @@
+name: backend-deploy
+on:
+  push:
+    branches: [ "develop" ]
+    paths:
+      - "backend/**"
+      - ".github/workflows/backend-deploy.yml"
+      - "docker-compose.prod.yml"
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  IMAGE_NAME: lshlsh36903690/disaster-backend  # GHCR → Docker Hub으로 변경
+  IMAGE_TAG: latest
+
+jobs:
+  backend-build-and-push:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build image
+        run: |
+          docker build -t ${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }} -f backend/dockerfile backend
+
+      - name: Push image
+        run: docker push ${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}
+
+  backend-deploy-on-ec2:
+    runs-on: ubuntu-latest
+    needs: backend-build-and-push
+    steps:
+      - name: Deploy to EC2 via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ubuntu
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            cd ~/apps/disaster
+            echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+            docker compose -f docker-compose.prod.yml --env-file .env.prod pull backend
+            docker compose -f docker-compose.prod.yml --env-file .env.prod up -d --force-recreate --no-deps backend
+            docker image prune -f || true

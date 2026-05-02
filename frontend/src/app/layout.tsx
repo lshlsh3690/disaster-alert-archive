@@ -33,7 +33,7 @@ export default function RootLayout({
           <Header />
           {children}
           <footer className="bg-gray-100 p-4 text-center text-sm">
-            © 2024 재난 안전문자 플랫폼 | 문의: help@disaster-sms.com
+            © 2025 재난 안전문자 플랫폼 | 문의: lshlsh3690@gmail.com
           </footer>
         </ReactQueryProvider>
       </body>

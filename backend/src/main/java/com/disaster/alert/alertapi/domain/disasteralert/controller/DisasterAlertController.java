@@ -1,19 +1,18 @@
 package com.disaster.alert.alertapi.domain.disasteralert.controller;
 
 import com.disaster.alert.alertapi.domain.disasteralert.dto.*;
-import com.disaster.alert.alertapi.domain.disasteralert.model.DisasterLevel;
 import com.disaster.alert.alertapi.domain.disasteralert.service.DisasterAlertService;
+import com.disaster.alert.alertapi.domain.useralert.service.UserDisasterAlertService;
+import com.disaster.alert.alertapi.domain.disasteralert.dto.CombinedAlertResponse;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.time.LocalDate;
 import java.util.List;
 
 @RestController
@@ -23,6 +22,7 @@ import java.util.List;
 public class DisasterAlertController {
 
     private final DisasterAlertService disasterAlertService;
+    private final UserDisasterAlertService userDisasterAlertService;
 
     /**
      * 재난 경고 조회 API
@@ -31,12 +31,19 @@ public class DisasterAlertController {
      * @return 재난 안전문자 목록
      */
     @GetMapping("/search")
-    public ResponseEntity<Page<DisasterAlertResponseDto>> searchAlerts(
-            AlertSearchRequest alertSearchRequest, Pageable pageable
+    public ResponseEntity<Page<DisasterAlertResponseDto>> searchAlerts(AlertSearchRequest alertSearchRequest, Pageable pageable
     ) {
         log.info("Searching alerts with condition: {}", alertSearchRequest);
         Page<DisasterAlertResponseDto> result = disasterAlertService.searchAlerts(alertSearchRequest, pageable);
         return ResponseEntity.ok(result);
+    }
+    @GetMapping("/search/combined")
+    public ResponseEntity<Page<CombinedAlertResponse>> searchCombined(
+            AlertSearchRequest alertSearchRequest,
+            @RequestParam(defaultValue = "ALL") String source, // ALL | OFFICIAL | USER
+            Pageable pageable
+    ) {
+        return ResponseEntity.ok(disasterAlertService.searchCombined(alertSearchRequest, source, pageable));
     }
 
     /**
@@ -75,5 +82,12 @@ public class DisasterAlertController {
             @RequestParam(defaultValue = "5") @Min(1) @Max(50) int limit
     ) {
        return ResponseEntity.ok(disasterAlertService.getLatestAlert(limit));
+    }
+
+    @GetMapping("/dashboard/summary")
+    public ResponseEntity<DashboardSummaryResponse> getDashboardSummary() {
+        long totalUserCount = userDisasterAlertService.countAllActive();
+        long todayUserCount = userDisasterAlertService.countTodayActive();
+        return ResponseEntity.ok(disasterAlertService.getDashboardSummary(todayUserCount, totalUserCount));
     }
 }

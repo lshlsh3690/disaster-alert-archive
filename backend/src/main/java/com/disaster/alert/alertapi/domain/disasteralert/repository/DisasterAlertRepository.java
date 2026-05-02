@@ -34,4 +34,7 @@ public interface DisasterAlertRepository extends JpaRepository<DisasterAlert, Lo
               order by d.createdAt desc
             """)
     List<LatestAlertResponse> latestAlerts(Pageable pageable);
+
+    @Query("select count(d) from DisasterAlert d where d.createdAt >= CURRENT_DATE")
+    long countToday();
 }

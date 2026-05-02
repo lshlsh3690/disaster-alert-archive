@@ -15,6 +15,12 @@ public enum ErrorCode {
     INVALID_REFRESH_TOKEN(401, "A105", "Refresh Token이 유효하지 않습니다."),
     REFRESH_TOKEN_NOT_FOUND(404, "A106", "Refresh Token을 찾을 수 없습니다."),
     UNAUTHORIZED(401, "A107", "인증되지 않은 사용자입니다."),
+    FORBIDDEN(403, "A108", "권한이 없습니다."),
+
+    USER_ALERT_NOT_FOUND(404, "A108", "사용자 재난 알림을 찾을 수 없습니다."),
+
+    DISASTER_ALERT_NOT_FOUND(404, "D404", "공식 재난문자를 찾을 수 없습니다."),
+    COMMENT_NOT_FOUND(404, "CM404", "댓글을 찾을 수 없습니다."),
 
 
     DUPLICATE_EMAIL(409, "M401", "이미 사용 중인 이메일입니다."),
@@ -24,7 +30,8 @@ public enum ErrorCode {
 
 
     INTERNAL_SERVER_ERROR(500, "C500", "서버 내부 오류입니다."),
-    RANDOM_CODE_GENERATION_FAILED(500, "C501", "랜덤 코드 생성에 실패했습니다.")
+    RANDOM_CODE_GENERATION_FAILED(500, "C501", "랜덤 코드 생성에 실패했습니다."),
+
     ;
 
     private final int httpStatus;

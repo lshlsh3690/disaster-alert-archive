@@ -3,7 +3,6 @@
 
 # Docker
 .dockerignore
-docker-compose.override.yml
 
 # Build logs
 *.log
@@ -36,9 +35,6 @@ out/
 **/.env.*       
 
 
-!frontend/.env.docker
-!frontend/.env.local
-
 
 # Node/Next.js
 node_modules/
@@ -52,3 +48,9 @@ yarn-error.log*
 
 # Typescript generated
 next-env.d.ts
+
+#prompts
+frontend/.templates
+backend/.templates
+**/*.prompt
+**/PROMPTS.md

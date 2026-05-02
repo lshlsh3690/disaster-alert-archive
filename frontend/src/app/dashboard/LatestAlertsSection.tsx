@@ -4,7 +4,7 @@
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import instance from "@/api/axios";
-import { fetchLatestAlerts } from "@/api/alertpi";
+import { fetchLatestAlerts } from "@/api/alertApi";
 import { LatestAlert } from "@/types/alerts";
 
 

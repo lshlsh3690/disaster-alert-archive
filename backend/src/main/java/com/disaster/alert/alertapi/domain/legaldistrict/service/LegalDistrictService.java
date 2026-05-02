@@ -29,7 +29,7 @@ public class LegalDistrictService {
         try (InputStream inputStream = getClass().getClassLoader()
                 .getResourceAsStream("data/legal_district_init_file.csv");
              BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream))) {
-
+            
             String line;
 
             // 첫 번째 줄은 헤더이므로 건너뜁니다.

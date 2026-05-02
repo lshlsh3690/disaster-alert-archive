@@ -20,6 +20,10 @@ public class DisasterFetchScheduler {
         log.info("재난문자 수집 시작");
 
         String raw = openApiClient.fetchData();
+        if (raw == null || raw.isBlank()) {
+            log.warn("외부 API 응답이 없거나 비어 있어 저장을 건너뜁니다.");
+            return;
+        }
         alertService.saveData(raw);
     }
 }

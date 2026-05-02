@@ -1,11 +1,12 @@
 "use client";
 
-import { useSearchAlerts, useSigungu } from "@/lib/queries/useAlerts";
+import ReportButton from "@/components/alerts/ReportButton";
+import { useSearchCombinedAlerts, useSigungu } from "@/lib/queries/useAlerts";
 import { Alert } from "@/types/alerts";
 import { LEVEL_OPTIONS, levelTextToCode } from "@/ui/level";
 import { zodResolver } from "@hookform/resolvers/zod";
 import Link from "next/link";
-import { Suspense, useEffect, useMemo, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -51,7 +52,7 @@ function DisasterListPageInner() {
     setValue("sigungu", "");
   }, [watchedSido, setValue]);
 
-  const buildParams = (f: SearchForm) => {
+  const buildParams = useCallback((f: SearchForm) => {
     const levelCode = levelTextToCode(f.levelText);
     const region = f.sido && f.sigungu ? `${f.sido} ${f.sigungu}` : f.sido || undefined;
     return {
@@ -61,14 +62,37 @@ function DisasterListPageInner() {
       type: f.type || undefined,
       level: levelCode,
       keyword: f.keyword || undefined,
+      source: f.source || "ALL",
       page,
       size,
       sort: "createdAt,desc",
     };
-  };
-  const params = useMemo(() => buildParams(formState), [formState, page]);
+  }, [page, size]);
+  const params = useMemo(() => buildParams(formState), [buildParams, formState]);
 
-  const { data, isLoading, isFetching } = useSearchAlerts(params);
+  const { data, isLoading, isFetching } = useSearchCombinedAlerts(params);
+
+  useEffect(() => {
+    const sido = searchParams.get("sido") || undefined;
+    const sigungu = searchParams.get("sigungu") || undefined;
+    const startDate = searchParams.get("startDate") || undefined;
+    const endDate = searchParams.get("endDate") || undefined;
+    const type = searchParams.get("type") || undefined;
+    const levelText = searchParams.get("levelText") || undefined;
+    const keyword = searchParams.get("keyword") || undefined;
+    const source = (searchParams.get("source") as "ALL" | "OFFICIAL" | "USER" | null) || undefined;
+
+    setPage(0);
+    setFormState({ sido, sigungu, startDate, endDate, type, levelText, keyword, source });
+    reset({ sido, sigungu, startDate, endDate, type, levelText, keyword, source });
+
+    if (typeof window !== "undefined" && window.location.hash === "#list") {
+      setTimeout(() => {
+        const el = document.getElementById("list");
+        if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+      }, 0);
+    }
+  }, [searchParams, reset]);
 
   const onSubmit = (v: SearchForm) => {
     setPage(0);
@@ -84,21 +108,6 @@ function DisasterListPageInner() {
     router.push(`/alerts?${qs.toString()}`);
   };
 
-  useEffect(() => {
-    const sido = searchParams.get("sido") || undefined;
-    const sigungu = searchParams.get("sigungu") || undefined;
-    const startDate = searchParams.get("startDate") || undefined;
-    const endDate = searchParams.get("endDate") || undefined;
-    const type = searchParams.get("type") || undefined;
-    const levelText = searchParams.get("levelText") || undefined;
-    const keyword = searchParams.get("keyword") || undefined;
-    const source = (searchParams.get("source") as "ALL" | "OFFICIAL" | "USER" | null) || undefined;
-
-    setPage(0);
-    setFormState({ sido, sigungu, startDate, endDate, type, levelText, keyword, source });
-    reset({ sido, sigungu, startDate, endDate, type, levelText, keyword, source });
-  }, [searchParams]);
-
   const onReset = () => {
     reset({});
     setFormState({});
@@ -108,10 +117,15 @@ function DisasterListPageInner() {
 
   return (
     <main className="p-6 space-y-6">
-      <h1 className="text-xl font-semibold">🗂 재난 문자 아카이브</h1>
-      <p className="text-sm text-gray-500">
-        과거 수신된 모든 재난 문자 목록입니다. 지역/날짜/키워드로 검색할 수 있어요.
-      </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-xl font-semibold">🗂 재난 문자 아카이브</h1>
+          <p className="text-sm text-gray-500">
+            과거 수신된 모든 재난 문자 목록입니다. 지역/날짜/키워드로 검색할 수 있어요.
+          </p>
+        </div>
+        <ReportButton />
+      </div>
 
       <form
         onSubmit={handleSubmit(onSubmit)}
@@ -151,6 +165,11 @@ function DisasterListPageInner() {
             </option>
           ))}
         </select>
+        <select {...register("source")} className="input">
+          <option value="ALL">출처(전체)</option>
+          <option value="OFFICIAL">공공 알림만</option>
+          <option value="USER">사용자 제보만</option>
+        </select>
         <input {...register("keyword")} placeholder="키워드(예: 경보)" className="input col-span-2" />
         <div className="col-span-2 md:col-span-4 flex justify-end gap-2">
           <button type="button" onClick={onReset} className="px-3 py-2 rounded bg-gray-100">
@@ -166,17 +185,19 @@ function DisasterListPageInner() {
         </div>
       </form>
 
-      <div className="bg-white rounded-xl shadow p-4">
+      {/* 목록 */}
+      <div id="list" className="bg-white rounded-xl shadow p-4">
         {isLoading ? (
           <div className="text-sm text-gray-500">불러오는 중...</div>
         ) : (
           <>
             <ul className="space-y-2">
-              {data?.content.map((a: Alert) => {
+              {(data?.content ?? []).map((a: Alert & { source?: "OFFICIAL" | "USER" }) => {
                 const regionLabel = a.regionNames && a.regionNames.length > 0 ? a.regionNames.join(", ") : "-";
+                const href = a.source === "USER" ? `/alerts/${a.id}?source=USER` : `/alerts/${a.id}?source=OFFICIAL`;
                 return (
                   <li key={a.id} className="border-b last:border-0 pb-2">
-                    <Link href={`/alerts/${a.id}`} className="hover:underline">
+                    <Link href={href} className="hover:underline">
                       <span className="text-gray-800">
                         [{regionLabel}] {new Date(a.createdAt).toLocaleString()} - {a.message}
                       </span>

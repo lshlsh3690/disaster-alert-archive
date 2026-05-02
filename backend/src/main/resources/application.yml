@@ -7,6 +7,8 @@ spring:
     username: ${POSTGRES_USER}
     password: ${POSTGRES_PASSWORD}
     driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: 10
 
   jpa:
     hibernate:
@@ -14,8 +16,13 @@ spring:
     show-sql: false
     properties:
       hibernate:
-        format_sql: true
-
+        jdbc:
+          batch_size: 500
+        order_inserts: true
+        order_updates: true
+        generate_statistics: true  # 배치 적용 여부 로그로 확인
+        id:
+          new_generator_mappings: true  # 추가
   data:
     redis:
       host: ${REDIS_HOST}
@@ -32,6 +39,13 @@ spring:
           starttls:
             enable: true
 
+  flyway:
+    enabled: true
+    baseline-on-migrate: true   # 기존 데이터가 있는 DB에 처음 붙을 때 충돌 방지
+    baseline-version: 0         # 기준 버전 (0으로 두면 V1부터 신규 실행)
+    locations: classpath:db/migration
+    encoding: UTF-8
+
 logging:
   level:
     #    org.springframework.beans.factory: debug
@@ -41,6 +55,9 @@ logging:
 
 server:
   port: 8080
+
+cookie:
+  secure: false
 
 disaster-alert:
   api:
@@ -53,4 +70,24 @@ jwt:
   header: Authorization
   prefix: Bearer
 
+oauth:
+  success-redirect: ${OAUTH_SUCCESS_REDIRECT:https://www.disaster-alert-archive.co.kr/dashboard}
+  google:
+    clientId: ${GOOGLE_OAUTH_CLIENT_ID}
+    clientSecret: ${GOOGLE_OAUTH_CLIENT_SECRET}
+    redirectUri: ${GOOGLE_OAUTH_REDIRECT_URI:http://localhost:8080/api/v1/auth/oauth/google/callback}
+  kakao:
+    clientId: ${KAKAO_OAUTH_CLIENT_ID}
+    clientSecret: ${KAKAO_OAUTH_CLIENT_SECRET}
+    redirectUri: ${KAKAO_OAUTH_REDIRECT_URI:http://localhost:8080/api/v1/auth/oauth/kakao/callback}
+  naver:
+    clientId: ${NAVER_OAUTH_CLIENT_ID}
+    clientSecret: ${NAVER_OAUTH_CLIENT_SECRET}
+    redirectUri: ${NAVER_OAUTH_REDIRECT_URI:http://localhost:8080/api/v1/auth/oauth/naver/callback}
 
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+  api-docs:
+    path: /v3/api-docs

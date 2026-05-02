@@ -1,9 +1,11 @@
 import axios, { AxiosError, InternalAxiosRequestConfig } from "axios";
 import { reissue } from "./authApi";
 
+const baseURL = process.env.NEXT_PUBLIC_API_URL || "";
+
 const instance = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_API_URL || "",
-  withCredentials: true, // 쿠키 기반 인증 시 필요
+  baseURL: baseURL || undefined,
+  withCredentials: true,
 });
 
 // 전역 플래그 & 대기열
@@ -21,7 +23,9 @@ const isAuthLoginRequest = (config?: InternalAxiosRequestConfig) =>
 instance.interceptors.response.use(
   (res) => res,
   async (error: AxiosError) => {
-    const original = error.config as InternalAxiosRequestConfig & { _retry?: boolean };
+    const original = error.config as InternalAxiosRequestConfig & {
+      _retry?: boolean;
+    };
 
     // 1) 재발급 요청 자체는 재시도 금지 (여기서 루프 끊음)
     if (isReissueRequest(original)) {
@@ -37,8 +41,13 @@ instance.interceptors.response.use(
       return Promise.reject(error);
     }
 
-    // 3) 401만 재발급 시도
+    // 3) 401만 재발급 시도 (단, 인증이 필요한 요청에 한함)
     if (error.response?.status === 401) {
+      const authRequired = original?.headers?.["X-Auth-Required"] === "true";
+      if (!authRequired) {
+        // 공개 API 요청이면 재발급 시도하지 않고 그대로 실패 반환
+        return Promise.reject(error);
+      }
       if (isRefreshing) {
         // 이미 재발급 중이면 대기 → 완료 후 원요청 1회 재시도
         await new Promise<void>((resolve) => waitQueue.push(resolve));
