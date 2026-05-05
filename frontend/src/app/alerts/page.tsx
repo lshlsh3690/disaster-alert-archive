@@ -121,7 +121,7 @@ function DisasterListPageInner() {
         <div>
           <h1 className="text-xl font-semibold">🗂 재난 문자 아카이브</h1>
           <p className="text-sm text-gray-500">
-            과거 수신된 모든 재난 문자 목록입니다. 지역/날짜/키워드로 검색할 수 있어요. 테스트1
+            과거 수신된 모든 재난 문자 목록입니다. 지역/날짜/키워드로 검색할 수 있어요.
           </p>
         </div>
         <ReportButton />
