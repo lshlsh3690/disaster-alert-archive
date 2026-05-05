@@ -1,7 +1,11 @@
 [build]
   base = "frontend"
-  command = "npm run build"
+  command = "npm install && npm run build"
   publish = ".next"
 
 [[plugins]]
   package = "@netlify/plugin-nextjs"
+
+[build.environment]
+  npm_config_platform = "linux"
+  npm_config_arch = "x64"
