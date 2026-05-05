@@ -3,6 +3,9 @@ import type { NextConfig } from "next";
 const API_BASE = process.env.BASE_API_URL ?? "https://api.disaster-alert-archive.co.kr";
 
 const nextConfig: NextConfig = {
+  experimental: {
+    turbo: undefined,
+  },
   async rewrites() {
     return [
       {
