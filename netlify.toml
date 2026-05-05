@@ -9,3 +9,6 @@
 [build.environment]
   npm_config_platform = "linux"
   npm_config_arch = "x64"
+
+  [build.ignore]
+  command = "git diff --quiet HEAD~ HEAD -- frontend/"
