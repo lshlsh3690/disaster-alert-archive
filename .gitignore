@@ -54,3 +54,17 @@ frontend/.templates
 backend/.templates
 **/*.prompt
 **/PROMPTS.md
+
+
+# 기존 .gitignore에 추가
+public/sw.js
+public/sw.js.map
+public/workbox-*.js
+public/workbox-*.js.map
+
+# PWA generated files
+frontend/public/sw.js
+frontend/public/sw.js.map
+frontend/public/swe-worker-*.js
+frontend/public/workbox-*.js
+frontend/public/workbox-*.js.map

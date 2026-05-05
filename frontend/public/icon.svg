@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <!-- Background -->
+  <rect width="512" height="512" rx="96" fill="#1E3A8A"/>
+
+  <!-- Subtle inner ring -->
+  <rect x="18" y="18" width="476" height="476" rx="82" fill="none" stroke="#3B6FD4" stroke-width="3"/>
+
+  <!-- Bell handle -->
+  <rect x="236" y="92" width="40" height="64" rx="20" fill="white"/>
+
+  <!-- Bell body -->
+  <path d="M 241 148 C 172 150, 132 205, 132 308 L 380 308 C 380 205, 340 150, 271 148 Z" fill="white"/>
+
+  <!-- Bell rim -->
+  <rect x="112" y="300" width="288" height="34" rx="17" fill="white"/>
+
+  <!-- Clapper stem -->
+  <rect x="250" y="333" width="12" height="22" rx="6" fill="white"/>
+
+  <!-- Clapper ball -->
+  <circle cx="256" cy="368" r="24" fill="white"/>
+
+  <!-- Alert badge shadow -->
+  <circle cx="352" cy="156" r="52" fill="#7F1D1D" opacity="0.35"/>
+
+  <!-- Alert badge -->
+  <circle cx="348" cy="150" r="52" fill="#EF4444"/>
+
+  <!-- Exclamation stem -->
+  <rect x="340" y="114" width="16" height="42" rx="8" fill="white"/>
+
+  <!-- Exclamation dot -->
+  <circle cx="348" cy="168" r="9" fill="white"/>
+
+  <!-- Signal arcs -->
+  <path d="M 78 90 Q 68 110, 78 130" fill="none" stroke="white" stroke-width="8" stroke-linecap="round" opacity="0.35"/>
+  <path d="M 56 72 Q 36 110, 56 148" fill="none" stroke="white" stroke-width="8" stroke-linecap="round" opacity="0.2"/>
+</svg>
