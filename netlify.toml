@@ -2,7 +2,6 @@
   base = "frontend"
   command = "npm install && npm run build"
   publish = ".next"
-  ignore = "git diff --quiet HEAD~1 HEAD -- frontend/"
 
 [build.environment]
   npm_config_platform = "linux"
