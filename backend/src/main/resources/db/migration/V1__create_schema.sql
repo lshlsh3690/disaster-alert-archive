@@ -149,7 +149,7 @@ CREATE TABLE IF NOT EXISTS community_post (
 --     필드명 camelCase → Spring PhysicalNamingStrategy snake_case 변환 반영
 -- =============================================================
 CREATE TABLE IF NOT EXISTS missing_child (
-                                             msspsnidntfccd   BIGINT       PRIMARY KEY,  -- msspsnIdntfccd
+                                             msspsn_idntfccd   BIGINT       PRIMARY KEY,  -- msspsnIdntfccd
                                              name             VARCHAR(50),
     age              INTEGER,
     gender           VARCHAR(10),
