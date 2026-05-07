@@ -3,8 +3,10 @@ package com.disaster.alert.alertapi.domain.disasteralert.service;
 import com.disaster.alert.alertapi.api.DisasterOpenApiClient;
 import com.disaster.alert.alertapi.domain.disasteralert.dto.*;
 import com.disaster.alert.alertapi.domain.disasteralert.model.DisasterAlert;
+import com.disaster.alert.alertapi.domain.disasteralert.model.DisasterAlertTranslation;
 import com.disaster.alert.alertapi.domain.disasteralert.model.DisasterLevel;
 import com.disaster.alert.alertapi.domain.disasteralert.repository.DisasterAlertRepository;
+import com.disaster.alert.alertapi.domain.disasteralert.repository.DisasterAlertTranslationRepository;
 import com.disaster.alert.alertapi.domain.legaldistrict.model.LegalDistrict;
 import com.disaster.alert.alertapi.global.service.LegalDistrictCache;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -32,6 +34,7 @@ import java.util.stream.Collectors;
 @Slf4j
 public class DisasterAlertService {
     private final DisasterAlertRepository disasterAlertRepository;
+    private final DisasterAlertTranslationRepository translationRepository;
 
     private final DisasterOpenApiClient disasterOpenApiClient;
     private final ObjectMapper objectMapper;
@@ -42,20 +45,20 @@ public class DisasterAlertService {
     private EntityManager entityManager;
 
     @Transactional
-    public void saveData(String raw) {
+    public List<Long> saveData(String raw) {
         if (raw == null || raw.isBlank()) {
             log.warn("saveData: 원시 응답이 null/blank 입니다. 저장을 건너뜁니다.");
-            return;
+            return List.of();
         }
         try {
             DisasterApiResponse response = objectMapper.readValue(raw, DisasterApiResponse.class);
 
-            if (checkAPIFailure(response)) return;
+            if (checkAPIFailure(response)) return List.of();
 
             List<DisasterAlertDto> dtos = response.getBody();
             if (dtos == null || dtos.isEmpty()) {
                 log.info("재난문자 데이터가 없습니다.");
-                return;
+                return List.of();
             }
 
             // 지역 이름을 정리하여 공백 제거 및 "전체" 제거
@@ -75,25 +78,30 @@ public class DisasterAlertService {
 
             if (newAlerts.isEmpty()) {
                 log.info("새로운 재난문자가 없습니다.");
-                return;
+                return List.of();
             }
 
             // 변경 - 충돌 시 무시
+            List<Long> savedIds = new ArrayList<>();
             try {
                 disasterAlertRepository.saveAll(newAlerts);
+                savedIds = newAlerts.stream().map(DisasterAlert::getId).toList();
             } catch (Exception e) {
                 // 중복 키 충돌 시 한 건씩 저장 시도
                 for (DisasterAlert alert : newAlerts) {
                     try {
                         disasterAlertRepository.save(alert);
+                        savedIds.add(alert.getId());
                     } catch (Exception ex) {
                         log.warn("중복 SN 건너뜀: {}", alert.getSn());
                     }
                 }
             }
-            log.info("재난문자 {}건 저장 완료", newAlerts.size());
+            log.info("재난문자 {}건 저장 완료", savedIds.size());
+            return savedIds;
         } catch (Exception e) {
             log.error("재난문자 저장 중 오류 발생", e);
+            return List.of();
         }
     }
 
@@ -307,13 +315,31 @@ public class DisasterAlertService {
      * @param id 재난문자 ID
      * @return 재난문자 상세 정보 DTO
      */
-    public DisasterAlertDetailDto getAlertDetail(Long id) {
+    public DisasterAlertDetailDto getAlertDetail(Long id, String lang) {
         DisasterAlert alert = disasterAlertRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("재난문자를 찾을 수 없습니다: id=" + id));
 
         List<String> regionNames = disasterAlertRepository.legalDistrictNamesByAlertId(id);
 
-        return new DisasterAlertDetailDto(alert, regionNames);
+        DisasterAlertDetailDto dto = new DisasterAlertDetailDto(alert, regionNames);
+
+        if ("en".equalsIgnoreCase(lang)) {
+            translationRepository.findByIdAlertIdAndIdLanguageCode(id, "EN")
+                    .ifPresent(t -> {
+                        dto.setTranslatedMessage(t.getTranslatedMessage());
+                        dto.setTranslatedDisasterType(t.getTranslatedDisasterType());
+                        if (t.getTranslatedRegionNames() != null && !t.getTranslatedRegionNames().isBlank()) {
+                            dto.setTranslatedRegionNames(
+                                    Arrays.stream(t.getTranslatedRegionNames().split(","))
+                                            .map(String::trim)
+                                            .toList()
+                            );
+                        }
+                        dto.setLanguage("en");
+                    });
+        }
+
+        return dto;
     }
 
     /**
