@@ -34,8 +34,8 @@ export async function searchCombinedAlerts(params: AlertSearchRequest & { source
   return data;
 }
 
-export async function fetchAlert(id: number): Promise<Alert> {
-  const res = await instance.get(`/api/v1/alerts/${id}`, { headers: { "X-Auth-Required": "false" } });
+export async function fetchAlert(id: number, lang = "ko"): Promise<Alert> {
+  const res = await instance.get(`/api/v1/alerts/${id}`, { params: { lang }, headers: { "X-Auth-Required": "false" } });
   const data = ZAlert.parse(res.data);
   return data;
 }

@@ -9,11 +9,15 @@ export const ZAlert = z.object({
   id: z.number(),
   sn: z.number().optional(),
   message: z.string(),
-  createdAt: z.string(),             
+  createdAt: z.string(),
   emergencyLevelText: z.string().nullable().optional(),
   disasterType: z.string().nullable().optional(),
   originalRegion: z.string().nullable().optional(),
-  regionNames: z.array(z.string()).default([]), 
+  regionNames: z.array(z.string()).default([]),
+  translatedMessage: z.string().nullable().optional(),
+  translatedDisasterType: z.string().nullable().optional(),
+  translatedRegionNames: z.array(z.string()).nullable().optional(),
+  language: z.string().nullable().optional(),
 });
 
 export type Alert = z.infer<typeof ZAlert>;
