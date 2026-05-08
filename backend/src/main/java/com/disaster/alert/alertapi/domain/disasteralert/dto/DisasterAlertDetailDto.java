@@ -18,6 +18,10 @@ public class DisasterAlertDetailDto {
     private LocalDateTime modifiedDate;
     private String originalRegion;
     private List<String> legalDistrictNames;
+    private String translatedMessage;
+    private String translatedDisasterType;
+    private List<String> translatedRegionNames;
+    private String language;
 
     public DisasterAlertDetailDto(DisasterAlert alert, List<String> legalDistrictNames) {
         this.id = alert.getId();

@@ -27,10 +27,10 @@ export function useSearchCombinedAlerts(params: AlertSearchRequest & { source?: 
   });
 }
 
-export function useAlert(id: number) {
+export function useAlert(id: number, lang = "ko") {
   return useQuery({
-    queryKey: ["alert", id],
-    queryFn: () => fetchAlert(id),
+    queryKey: ["alert", id, lang],
+    queryFn: () => fetchAlert(id, lang),
     enabled: !!id,
   });
 }

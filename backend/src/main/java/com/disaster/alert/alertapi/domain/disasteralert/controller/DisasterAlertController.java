@@ -72,8 +72,11 @@ public class DisasterAlertController {
      * @return 재난 안전문자 상세 정보
      */
     @GetMapping("/{id}")
-    public ResponseEntity<DisasterAlertDetailDto> getDisasterAlert(@PathVariable Long id) {
-        DisasterAlertDetailDto dto = disasterAlertService.getAlertDetail(id);
+    public ResponseEntity<DisasterAlertDetailDto> getDisasterAlert(
+            @PathVariable Long id,
+            @RequestParam(defaultValue = "ko") String lang
+    ) {
+        DisasterAlertDetailDto dto = disasterAlertService.getAlertDetail(id, lang);
         return ResponseEntity.ok(dto);
     }
 

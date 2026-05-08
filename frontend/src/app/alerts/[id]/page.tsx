@@ -14,7 +14,8 @@ export default function AlertDetailPage() {
   const id = Number(params.id);
   const source = (sp.get("source") || "OFFICIAL").toUpperCase();
   const isUser = source === "USER";
-  const { data: offData, isLoading: offLoading } = useAlert(isUser ? 0 : id);
+  const [lang, setLang] = useState<"ko" | "en">("ko");
+  const { data: offData, isLoading: offLoading } = useAlert(isUser ? 0 : id, lang);
   const { data: userData, isLoading: userLoading } = useUserAlert(isUser ? id : 0);
   const data = isUser ? userData : offData;
   const isLoading = isUser ? userLoading : offLoading;
@@ -50,19 +51,45 @@ export default function AlertDetailPage() {
   if (isLoading) return <main className="p-6">불러오는 중...</main>;
   if (!data) return <main className="p-6">데이터가 없습니다.</main>;
 
-  const regionText = Array.isArray((data)?.regionNames) && (data)?.regionNames.length > 0
-    ? (data)?.regionNames.join(", ")
-    : (isUser ? "-" : (offData?.originalRegion ?? "-"));
+  const translatedRegions = lang === "en" && offData?.translatedRegionNames?.length
+    ? offData.translatedRegionNames
+    : null;
+  const regionText = translatedRegions
+    ? translatedRegions.join(", ")
+    : Array.isArray(data?.regionNames) && data.regionNames.length > 0
+      ? data.regionNames.join(", ")
+      : (isUser ? "-" : (offData?.originalRegion ?? "-"));
 
   return (
     <main className="p-6 space-y-4">
       <h1 className="text-xl font-semibold">📨 재난 문자 상세</h1>
       <div className="bg-white rounded-xl shadow p-4 space-y-2">
         <div className="text-sm text-gray-500">{new Date(data.createdAt).toLocaleString()}</div>
-        <div className="text-lg">{data.message}</div>
-        <div className="text-sm text-gray-600">유형: {data.disasterType ?? "-"}</div>
-        <div className="text-sm text-gray-600">레벨: {data.emergencyLevelText ?? "-"}</div>
-        <div className="text-sm text-gray-600">지역: {regionText}</div>
+        {!isUser && (
+          <div className="flex gap-2">
+            <button
+              className={`px-3 py-1 text-sm rounded border ${lang === "ko" ? "bg-gray-800 text-white border-gray-800" : "text-gray-600 border-gray-300"}`}
+              onClick={() => setLang("ko")}
+            >한국어</button>
+            <button
+              className={`px-3 py-1 text-sm rounded border ${lang === "en" ? "bg-gray-800 text-white border-gray-800" : "text-gray-600 border-gray-300"}`}
+              onClick={() => setLang("en")}
+            >English</button>
+          </div>
+        )}
+        <div className="text-lg">
+          {lang === "en" && offData?.translatedMessage
+            ? offData.translatedMessage
+            : data.message}
+        </div>
+        {lang === "en" && !offData?.translatedMessage && !isUser && (
+          <div className="text-sm text-gray-400">번역 준비 중입니다.</div>
+        )}
+        <div className="text-sm text-gray-600">
+          {lang === "en" ? "Type" : "유형"}: {(lang === "en" && offData?.translatedDisasterType) ? offData.translatedDisasterType : (data.disasterType ?? "-")}
+        </div>
+        <div className="text-sm text-gray-600">{lang === "en" ? "Level" : "레벨"}: {data.emergencyLevelText ?? "-"}</div>
+        <div className="text-sm text-gray-600">{lang === "en" ? "Region" : "지역"}: {regionText}</div>
         {!(isUser) && <div className="text-xs text-gray-400">SN: {offData?.sn ?? "-"}</div>}
         {canEdit && (
           <div className="pt-2 flex gap-2">

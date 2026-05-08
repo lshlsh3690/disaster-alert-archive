@@ -2,10 +2,13 @@ package com.disaster.alert.alertapi.scheduler;
 
 import com.disaster.alert.alertapi.api.DisasterOpenApiClient;
 import com.disaster.alert.alertapi.domain.disasteralert.service.DisasterAlertService;
+import com.disaster.alert.alertapi.global.translation.TranslationService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
+
+import java.util.List;
 
 @Slf4j
 @Component
@@ -14,6 +17,8 @@ public class DisasterFetchScheduler {
 
     private final DisasterOpenApiClient openApiClient;
     private final DisasterAlertService alertService;
+    private final TranslationService translationService;
+
     // 매 10분마다 실행
     @Scheduled(cron = "0 0/10 * * * *")
     public void fetchAndSaveDisasterAlerts() {
@@ -24,6 +29,8 @@ public class DisasterFetchScheduler {
             log.warn("외부 API 응답이 없거나 비어 있어 저장을 건너뜁니다.");
             return;
         }
-        alertService.saveData(raw);
+
+        List<Long> newAlertIds = alertService.saveData(raw);
+        newAlertIds.forEach(translationService::translateAndSaveAsync);
     }
 }
