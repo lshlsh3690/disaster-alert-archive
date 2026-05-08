@@ -23,8 +23,15 @@ public class OAuthController {
 
     @GetMapping("/{provider}/callback")
     public ResponseEntity<Void> callback(@PathVariable("provider") String provider,
-                                         @RequestParam("code") String code,
-                                         @RequestParam(value = "state", required = false) String state) {
+                                         @RequestParam(value = "code", required = false) String code,
+                                         @RequestParam(value = "state", required = false) String state,
+                                         @RequestParam(value = "error", required = false) String error) {
+        if (error != null || code == null) {
+            String loginRedirect = oAuthService.getSuccessRedirectOrDefault(state)
+                    .replaceAll("/[^/]+$", "/login");
+            return ResponseEntity.status(302).header("Location", loginRedirect).build();
+        }
+
         var result = oAuthService.handleCallback(provider, code, state);
 
         String successRedirect = result.isNew()
