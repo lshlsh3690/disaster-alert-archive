@@ -5,6 +5,7 @@ type User = {
   memberId: number | null;
   nickname: string | null;
   email: string | null;
+  role: "ADMIN" | "USER" | null;
 };
 
 type AuthStore = {
@@ -22,6 +23,6 @@ export const useAuthStore = create<AuthStore>()(
     }),
     {
       name: "disaster-alert-auth",
-    }
-  )
+    },
+  ),
 );

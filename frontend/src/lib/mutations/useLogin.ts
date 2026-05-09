@@ -31,7 +31,7 @@ export default function useLogin(options: {
     onSuccess: async (response) => {
       const { memberId, nickname, email } = response.data;
 
-      useAuthStore.getState().setUser({ memberId, nickname, email });
+      useAuthStore.getState().setUser({ memberId, nickname, email, role: null });
       options.onSuccessCallback?.();
     },
     onError: (error: AxiosError) => {

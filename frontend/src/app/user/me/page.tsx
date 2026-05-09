@@ -19,19 +19,20 @@ export default function MePage() {
     queryKey: ["myInfo"],
     queryFn: getMyInfo,
     retry: false,
-    refetchOnWindowFocus: false, // 페이지가 포커스될 때마다 재조회하지 않도록 설정
+    refetchOnWindowFocus: false,
   });
 
-  // Update state when data is successfully fetched
   if (
     isSuccess &&
     data &&
-    (myInfo.email !== data.email || myInfo.nickname !== data.nickname || myInfo.role !== data.role)
+    (myInfo.email !== data.data.email ||    // ← data → data.data
+     myInfo.nickname !== data.data.nickname ||
+     myInfo.role !== data.data.role)
   ) {
     setMyInfo({
-      email: data.email,
-      nickname: data.nickname,
-      role: data.role,
+      email: data.data.email,       // ← data → data.data
+      nickname: data.data.nickname,
+      role: data.data.role,
     });
   }
 
@@ -43,7 +44,6 @@ export default function MePage() {
           <p>이메일: {myInfo.email}</p>
           <p>닉네임: {myInfo.nickname}</p>
           <p>역할: {myInfo.role}</p>
-          {/* 필요한 다른 정보도 추가 */}
         </div>
       )}
       <h1 className="text-xl font-bold mb-4">👤 내 정보</h1>
