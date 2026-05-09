@@ -16,29 +16,32 @@ interface UseSignupMutationProps {
 }
 
 interface SignupApiResponse {
-  memberId: number;
-  message: string;
+  id: number;
+  email: string;
+  nickname: string;
+  role: string;
 }
 
 export default function useSignup(options: UseSignupMutationProps) {
   const dataSchema = z.object({
-    memberId: z.number(),
-    message: z.string(),
+    id: z.number(),
+    email: z.string(),
+    nickname: z.string(),
+    role: z.string(),
   });
 
-
   return useMutation<SuccessResponse<SignupApiResponse>, AxiosError, SignupFormData>({
-    mutationFn: async(data)  => {
-      useSignupStore.getState().validateSignupStateForForm(options.setError);
-      return await makeMutationFn<SignupFormData, SignupApiResponse>(
-        signupApi,
-        dataSchema
-      )(data);
+    mutationFn: async (data) => {
+      const isValid = useSignupStore.getState().validateSignupStateForForm(options.setError);
+      if (!isValid) throw new Error("VALIDATION_FAILED");
+      return await makeMutationFn<SignupFormData, SignupApiResponse>(signupApi, dataSchema)(data);
     },
     onSuccess: () => {
       options.onSuccessCallback?.();
     },
     onError: (error: AxiosError) => {
+      if (error.message === "VALIDATION_FAILED") return; // ← 추가 (폼에 이미 에러 표시됨)
+
       const errorResponse = parseErrorResponse(error.response?.data);
       if (!errorResponse) {
         options.onErrorCallback("알 수 없는 오류가 발생했습니다.");

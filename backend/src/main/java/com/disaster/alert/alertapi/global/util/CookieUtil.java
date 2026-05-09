@@ -16,14 +16,14 @@ public class CookieUtil{
 
     ) {
         ResponseCookie.ResponseCookieBuilder builder = ResponseCookie.from(name, value)
-            .httpOnly(true)
+                .httpOnly(true)
             .secure(secure)
-            .path("/")
+                .path("/")
             .sameSite(secure ? "None" : "Lax")
             .maxAge(maxAge);
 
         if (domain != null && !domain.isBlank()) {
-            builder.domain(domain);  // .disaster-alert-archive.co.kr
+            builder.domain(domain);
         }
 
         return builder.build();
