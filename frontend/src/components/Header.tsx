@@ -1,3 +1,4 @@
+// frontend/src/components/Header.tsx
 "use client";
 
 import Link from "next/link";
@@ -5,15 +6,18 @@ import { usePathname } from "next/navigation";
 import { useAuthStore } from "@/store/authStore";
 import { useEffect, useRef, useState } from "react";
 import { logoutApi } from "@/api/authApi";
-import { getMyInfo } from "@/api/memberApi";
 import { useRouter } from "next/navigation";
+import { useInitAuth } from "@/hooks/useInitAuth";
 
 export default function Header() {
   const router = useRouter();
   const pathname = usePathname();
+
+  // OAuth/쿠키 기반 로그인 후 Zustand 동기화 (핵심)
+  useInitAuth();
+
   const isLoggedIn = useAuthStore((state) => state.user !== null);
   const logout = useAuthStore((state) => state.logout);
-  const setUser = useAuthStore((state) => state.setUser);
   const [open, setOpen] = useState<boolean>(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const nickname = useAuthStore((state) => state.user?.nickname);
@@ -28,7 +32,6 @@ export default function Header() {
   const handleLogout = () => {
     logoutApi()
       .then(() => {
-        console.log("로그아웃 성공");
         logout();
         setOpen(false);
         router.push("/");
@@ -47,25 +50,6 @@ export default function Header() {
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
-
-  // OAuth 로그인 후 새로고침 시 쿠키 기반으로 사용자 정보를 동기화
-  useEffect(() => {
-    if (isLoggedIn) return;
-    (async () => {
-      try {
-        const me: any = await getMyInfo();
-        if (!me) return;
-        setUser({
-          memberId: me.memberId ?? me.id ?? 0,
-          nickname: me.nickname ?? "",
-          email: me.email ?? "",
-          role: me.role ?? null,
-        });
-      } catch (_) {
-        // noop
-      }
-    })();
-  }, [isLoggedIn, setUser]);
 
   return (
     <header className="bg-white shadow px-6 py-3 flex items-center justify-between">
@@ -86,33 +70,23 @@ export default function Header() {
         {isLoggedIn ? (
           <div className="relative" ref={dropdownRef}>
             <button
-              onClick={() => setOpen(!open)}
-              className="flex items-center gap-2 bg-gray-100 px-3 py-1 rounded hover:bg-gray-200"
+              onClick={() => setOpen((prev) => !prev)}
+              className="text-sm font-medium text-blue-600 hover:underline"
             >
-              <span className="text-sm font-medium text-gray-800">{nickname}</span>
-              {/* 아이콘 대신 이미지도 가능 */}
-              <svg
-                className="w-4 h-4 text-gray-600"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth={2}
-                viewBox="0 0 24 24"
-              >
-                <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-              </svg>
+              {nickname ?? "사용자"} ▾
             </button>
-
             {open && (
-              <div className="absolute right-0 mt-2 w-40 bg-white border rounded shadow z-10">
-                <Link href="/user/me" className="block px-4 py-2 hover:bg-gray-100 text-sm">
-                  내 정보
-                </Link>
-                <Link href="/user/settings" className="block px-4 py-2 hover:bg-gray-100 text-sm">
+              <div className="absolute right-0 mt-2 w-36 bg-white border rounded shadow text-sm z-50">
+                <Link
+                  href="/user/settings"
+                  className="block px-4 py-2 hover:bg-gray-50"
+                  onClick={() => setOpen(false)}
+                >
                   설정
                 </Link>
                 <button
                   onClick={handleLogout}
-                  className="w-full text-left px-4 py-2 hover:bg-red-100 text-sm text-red-600"
+                  className="w-full text-left px-4 py-2 hover:bg-gray-50 text-red-500"
                 >
                   로그아웃
                 </button>
@@ -120,7 +94,7 @@ export default function Header() {
             )}
           </div>
         ) : (
-          <Link href="/login" className="bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700 text-sm">
+          <Link href="/login" className="text-blue-600 hover:underline font-medium">
             로그인
           </Link>
         )}

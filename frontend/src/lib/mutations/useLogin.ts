@@ -1,9 +1,10 @@
+// frontend/src/lib/mutations/useLogin.ts
 import { loginApi } from "@/api/authApi";
 import { parseErrorResponse } from "@/types/errorResponse";
 import { useAuthStore } from "@/store/authStore";
 import { useMutation } from "@tanstack/react-query";
 import { AxiosError } from "axios";
-import {SuccessResponse } from "@/types/SuccessResponse";
+import { SuccessResponse } from "@/types/SuccessResponse";
 import { getMyInfo } from "@/api/memberApi";
 
 interface LoginFormData {
@@ -29,16 +30,8 @@ export default function useLogin(options: {
     },
     onSuccess: async (response) => {
       const { memberId, nickname, email } = response.data;
-      // 로그인 직후 서버에서 role을 한번만 가져와 스토어에 저장
-      let role: "USER" | "ADMIN" | null = null;
-      try {
-        const me = await getMyInfo();
-        role = (me?.role as any) ?? null;
-      } catch (_) {
-        role = null;
-      }
-      useAuthStore.getState().setUser({ memberId, nickname, email, role });
 
+      useAuthStore.getState().setUser({ memberId, nickname, email });
       options.onSuccessCallback?.();
     },
     onError: (error: AxiosError) => {
