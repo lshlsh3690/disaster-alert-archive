@@ -16,6 +16,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import jakarta.validation.Valid;
+import org.springframework.beans.factory.annotation.Value;
+
 
 import java.time.Duration;
 
@@ -30,13 +32,16 @@ public class AuthController {
     @org.springframework.beans.factory.annotation.Value("${cookie.secure:true}")
     private boolean isSecureCookie; // 운영 true, 로컬 false
 
+    @Value("${cookie.domain:}")
+    private String cookieDomain;
+
     @PostMapping("/login")
     public ResponseEntity<ApiResponse<LoginResponse>> login(@Valid @RequestBody LoginRequest request,
                                                             HttpServletResponse response) {
         LoginResponse loginResponse = authService.login(request);
 
-        var accessCookie = CookieUtil.buildCookie("accessToken", loginResponse.getAccessToken(), Duration.ofHours(1), isSecureCookie);
-        var refreshCookie = CookieUtil.buildCookie("refreshToken", loginResponse.getRefreshToken(), Duration.ofDays(7), isSecureCookie);
+        var accessCookie = CookieUtil.buildCookie("accessToken", loginResponse.getAccessToken(), Duration.ofHours(1), isSecureCookie, cookieDomain);
+        var refreshCookie = CookieUtil.buildCookie("refreshToken", loginResponse.getRefreshToken(), Duration.ofDays(7), isSecureCookie,cookieDomain);
 
         response.addHeader("Set-Cookie", accessCookie.toString());
         response.addHeader("Set-Cookie", refreshCookie.toString());
@@ -62,8 +67,8 @@ public class AuthController {
         }
         ReissueResponse reissue = authService.reissue(refreshToken);
 
-        var accessCookie = CookieUtil.buildCookie("accessToken", reissue.accessToken(), Duration.ofHours(1), isSecureCookie);
-        var refreshCookie = CookieUtil.buildCookie("refreshToken", reissue.refreshToken(), Duration.ofDays(7), isSecureCookie);
+        var accessCookie = CookieUtil.buildCookie("accessToken", reissue.accessToken(), Duration.ofHours(1), isSecureCookie,cookieDomain);
+        var refreshCookie = CookieUtil.buildCookie("refreshToken", reissue.refreshToken(), Duration.ofDays(7), isSecureCookie,cookieDomain);
 
         response.addHeader("Set-Cookie", accessCookie.toString());
         response.addHeader("Set-Cookie", refreshCookie.toString());
@@ -76,8 +81,8 @@ public class AuthController {
                                        HttpServletResponse response) {
         authService.logout(refreshToken);
         var expired = Duration.ZERO;
-        response.addHeader("Set-Cookie", CookieUtil.buildCookie("accessToken",  "", expired, isSecureCookie).toString());
-        response.addHeader("Set-Cookie", CookieUtil.buildCookie("refreshToken", "", expired, isSecureCookie).toString());
+        response.addHeader("Set-Cookie", CookieUtil.buildCookie("accessToken",  "", expired, isSecureCookie,cookieDomain).toString());
+        response.addHeader("Set-Cookie", CookieUtil.buildCookie("refreshToken", "", expired, isSecureCookie,cookieDomain).toString());
         return ResponseEntity.ok(ApiResponse.empty());
     }
 
