@@ -36,6 +36,9 @@ public class OAuthService {
 
     @Value("${cookie.secure:true}")
     private boolean isSecureCookie;
+    
+    @Value("${cookie.domain:}")
+    private String cookieDomain;
 
     private Map<String, OAuthProvider> providerMap() {
         return providers.stream().collect(Collectors.toMap(OAuthProvider::getProviderKey, p -> p));
@@ -61,8 +64,8 @@ public class OAuthService {
         String refreshToken = jwtTokenProvider.generateRefreshToken(member.getEmail());
         redisService.saveRefreshToken(member.getEmail(), refreshToken, jwtTokenProvider.getRefreshTokenExpiration() * 1000L);
 
-        ResponseCookie accessCookie = CookieUtil.buildCookie("accessToken", accessToken, Duration.ofHours(1), isSecureCookie);
-        ResponseCookie refreshCookie = CookieUtil.buildCookie("refreshToken", refreshToken, Duration.ofDays(7), isSecureCookie);
+        ResponseCookie accessCookie = CookieUtil.buildCookie("accessToken", accessToken, Duration.ofHours(1), isSecureCookie, cookieDomain);
+        ResponseCookie refreshCookie = CookieUtil.buildCookie("refreshToken", refreshToken, Duration.ofDays(7), isSecureCookie, cookieDomain);
 
         return new OAuthLoginResult(accessCookie, refreshCookie, member, ensured.created);
     }

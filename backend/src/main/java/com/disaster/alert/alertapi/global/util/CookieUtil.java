@@ -11,14 +11,21 @@ public class CookieUtil{
             String name,
             String value,
             Duration maxAge,
-            boolean secure
+            boolean secure,
+            String domain     
+
     ) {
-        return ResponseCookie.from(name, value)
-                .httpOnly(true)
-                .secure(secure)           // 운영: true
-                .path("/")
-                .sameSite(secure ? "None" : "Lax") // HTTPS면 None; 개발 HTTP면 Lax
-                .maxAge(maxAge)
-                .build();
+        ResponseCookie.ResponseCookieBuilder builder = ResponseCookie.from(name, value)
+            .httpOnly(true)
+            .secure(secure)
+            .path("/")
+            .sameSite(secure ? "None" : "Lax")
+            .maxAge(maxAge);
+
+        if (domain != null && !domain.isBlank()) {
+            builder.domain(domain);  // .disaster-alert-archive.co.kr
+        }
+
+        return builder.build();
     }
 }

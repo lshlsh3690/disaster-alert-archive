@@ -5,7 +5,6 @@ type User = {
   memberId: number | null;
   nickname: string | null;
   email: string | null;
-  role?: "USER" | "ADMIN" | null;
 };
 
 type AuthStore = {

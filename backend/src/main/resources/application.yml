@@ -58,6 +58,8 @@ server:
 
 cookie:
   secure: false
+  domain: ${COOKIE_DOMAIN:}  # 로컬은 비워둠, 운영은 env로 주입
+
 
 disaster-alert:
   api:
