@@ -47,6 +47,7 @@ export function useInitAuth() {
           memberId: member.memberId ?? member.id ?? 0,
           nickname: member.nickname ?? "",
           email: member.email ?? "",
+          role: member.role ?? null,
         });
       } catch (error: unknown) {
         // 401 = 로그인 안 된 상태 → 정상, 무시
