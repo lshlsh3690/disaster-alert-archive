@@ -11,7 +11,6 @@ import java.io.Serializable;
 @NoArgsConstructor
 @AllArgsConstructor
 @EqualsAndHashCode
-@Setter
 public class MemberFavoriteRegionId implements Serializable {
 
     @Column(name = "member_id")
