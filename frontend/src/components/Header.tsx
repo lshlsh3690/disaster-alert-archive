@@ -13,7 +13,7 @@ export default function Header() {
   const router = useRouter();
   const pathname = usePathname();
 
-  // OAuth/쿠키 기반 로그인 후 Zustand 동기화 (핵심)
+  // OAuth/쿠키 기반 로그인 후 Zustand 동기화
   useInitAuth();
 
   const isLoggedIn = useAuthStore((state) => state.user !== null);
@@ -25,7 +25,6 @@ export default function Header() {
   const menu = [
     { name: "대시보드", href: "/dashboard" },
     { name: "재난 문자", href: "/alerts" },
-    // { name: "통계", href: "/stats" },
     { name: "커뮤니티", href: "/community" },
   ];
 
@@ -77,17 +76,10 @@ export default function Header() {
             </button>
             {open && (
               <div className="absolute right-0 mt-2 w-36 bg-white border rounded shadow text-sm z-50">
-                <Link
-                  href="/user/settings"
-                  className="block px-4 py-2 hover:bg-gray-50"
-                  onClick={() => setOpen(false)}
-                >
+                <Link href="/user/settings" className="block px-4 py-2 hover:bg-gray-50" onClick={() => setOpen(false)}>
                   설정
                 </Link>
-                <button
-                  onClick={handleLogout}
-                  className="w-full text-left px-4 py-2 hover:bg-gray-50 text-red-500"
-                >
+                <button onClick={handleLogout} className="w-full text-left px-4 py-2 hover:bg-gray-50 text-red-500">
                   로그아웃
                 </button>
               </div>
