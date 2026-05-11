@@ -28,6 +28,12 @@ public enum ErrorCode {
 
     MEMBER_NOT_FOUND(404, "M404", "회원을 찾을 수 없습니다."),
 
+    LEGAL_DISTRICT_NOT_FOUND(404, "LD404", "존재하지 않는 지역 코드입니다."),
+
+    FAVORITE_REGION_ALREADY_EXISTS(409, "MR409", "이미 등록된 관심 지역입니다."),
+    FAVORITE_REGION_LIMIT_EXCEEDED(400, "MR400", "관심 지역은 최대 5개까지 등록할 수 있습니다."),
+    FAVORITE_REGION_NOT_FOUND(404, "MR404", "등록되지 않은 관심 지역입니다."),
+
 
     INTERNAL_SERVER_ERROR(500, "C500", "서버 내부 오류입니다."),
     RANDOM_CODE_GENERATION_FAILED(500, "C501", "랜덤 코드 생성에 실패했습니다."),
