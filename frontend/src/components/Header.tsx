@@ -4,30 +4,43 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAuthStore } from "@/store/authStore";
+import { useLanguageStore } from "@/store/languageStore";
 import { useEffect, useRef, useState } from "react";
 import { logoutApi } from "@/api/authApi";
 import { useRouter } from "next/navigation";
 import { useInitAuth } from "@/hooks/useInitAuth";
+import { LANGUAGES, LangCode } from "@/constants/language";
+import { useI18n } from "@/hooks/useI18n";
 
 export default function Header() {
   const router = useRouter();
   const pathname = usePathname();
 
-  // OAuth/쿠키 기반 로그인 후 Zustand 동기화 (핵심)
   useInitAuth();
 
   const isLoggedIn = useAuthStore((state) => state.user !== null);
   const logout = useAuthStore((state) => state.logout);
-  const [open, setOpen] = useState<boolean>(false);
-  const dropdownRef = useRef<HTMLDivElement>(null);
   const nickname = useAuthStore((state) => state.user?.nickname);
 
+  const language = useLanguageStore((state) => state.language);
+  const setLanguage = useLanguageStore((state) => state.setLanguage);
+
+  const [open, setOpen] = useState<boolean>(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  const t = useI18n();
+
+
   const menu = [
-    { name: "대시보드", href: "/dashboard" },
-    { name: "재난 문자", href: "/alerts" },
-    // { name: "통계", href: "/stats" },
-    { name: "커뮤니티", href: "/community" },
+    { name: t.nav.dashboard, href: "/dashboard" },
+    { name: t.nav.alerts, href: "/alerts" },
+    { name: t.nav.community, href: "/community" },
   ];
+
+  const handleLangChange = (lang: LangCode) => {
+    setLanguage(lang);
+    // 로그인 상태면 추후 DB 저장 API 호출 추가
+  };
 
   const handleLogout = () => {
     logoutApi()
@@ -54,7 +67,7 @@ export default function Header() {
   return (
     <header className="bg-white shadow px-6 py-3 flex items-center justify-between">
       <Link href="/" className="text-xl font-bold text-blue-500">
-        재난 문자 아카이브
+        {t.appName}
       </Link>
       <nav className="flex items-center gap-4 text-sm text-gray-700">
         {menu.map(({ name, href }) => (
@@ -67,13 +80,25 @@ export default function Header() {
           </Link>
         ))}
 
+        {/* 언어 선택 드롭다운 */}
+        <select
+          value={language}
+          onChange={(e) => handleLangChange(e.target.value as LangCode)}
+          className="text-sm border border-gray-300 rounded px-2 py-1 text-gray-700 bg-white cursor-pointer hover:border-blue-400 focus:outline-none focus:border-blue-500"
+        >
+          {LANGUAGES.map(({ code, label }) => (
+            <option key={code} value={code}>
+              {label}
+            </option>
+          ))}
+        </select>
+
         {isLoggedIn ? (
           <div className="relative" ref={dropdownRef}>
-            <button
-              onClick={() => setOpen((prev) => !prev)}
+            <button onClick={() => setOpen((prev) => !prev)}
               className="text-sm font-medium text-blue-600 hover:underline"
             >
-              {nickname ?? "사용자"} ▾
+              {nickname ?? t.nav.user} ▾
             </button>
             {open && (
               <div className="absolute right-0 mt-2 w-36 bg-white border rounded shadow text-sm z-50">
@@ -82,21 +107,23 @@ export default function Header() {
                   className="block px-4 py-2 hover:bg-gray-50"
                   onClick={() => setOpen(false)}
                 >
-                  설정
+                  {t.nav.settings}
                 </Link>
                 <button
                   onClick={handleLogout}
                   className="w-full text-left px-4 py-2 hover:bg-gray-50 text-red-500"
                 >
-                  로그아웃
+                  {t.nav.logout}
                 </button>
               </div>
             )}
           </div>
         ) : (
-          <Link href="/login" className="text-blue-600 hover:underline font-medium">
-            로그인
-          </Link>
+          <Link href="/login" className="text-blue-600 hover:underline font-medium">{t.nav.login}</Link>
+
+          // <Link href="/login" className="text-blue-600 hover:underline font-medium">
+          //   로그인
+          // </Link>
         )}
       </nav>
     </header>

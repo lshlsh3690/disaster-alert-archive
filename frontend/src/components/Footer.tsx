@@ -1,9 +1,12 @@
-import React from "react";
+// frontend/src/components/Footer.tsx
+"use client";
+import { useI18n } from "@/hooks/useI18n";
 
 export default function Footer() {
+  const t = useI18n();
   return (
-    <footer className="w-full bg-transparent text-center text-xs text-gray-400 py-6 mt-8">
-      © 2024 재난 안전문자 플랫폼 | 문의: help@disaster-sms.com
+    <footer className="bg-gray-100 p-4 text-center text-sm">
+      {t.footer}
     </footer>
   );
-} 
+}

@@ -12,6 +12,7 @@ import { z } from "zod";
 import { useRouter, useSearchParams } from "next/navigation";
 import { DISASTER_TYPES } from "@/ui/disasterType";
 import { METROS } from "@/ui/metros";
+import { useI18n } from "@/hooks/useI18n";
 
 const ZSearch = z.object({
   sido: z.string().optional(),
@@ -39,6 +40,8 @@ function DisasterListPageInner() {
   const [formState, setFormState] = useState<SearchForm>({});
   const router = useRouter();
   const searchParams = useSearchParams();
+  const t = useI18n();
+
 
   const { register, handleSubmit, reset, watch, setValue } = useForm<SearchForm>({
     resolver: zodResolver(ZSearch),
@@ -119,9 +122,9 @@ function DisasterListPageInner() {
     <main className="p-6 space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-semibold">🗂 재난 문자 아카이브</h1>
+          <h1 className="text-xl font-semibold">{t.alertList.title}</h1>
           <p className="text-sm text-gray-500">
-            과거 수신된 모든 재난 문자 목록입니다. 지역/날짜/키워드로 검색할 수 있어요.
+            {t.alertList.description}
           </p>
         </div>
         <ReportButton />
@@ -132,55 +135,55 @@ function DisasterListPageInner() {
         className="bg-white rounded-xl shadow p-4 grid grid-cols-2 md:grid-cols-4 gap-3"
       >
         <select {...register("sido")} className="input">
-          <option value="">시/도(전체)</option>
+          <option value="">{t.alertList.filter.sido}</option>
           {METROS.map((m) => (
-            <option key={m} value={m}>
-              {m}
-            </option>
+            <option key={m} value={m}>{t.metros[m]}</option>
           ))}
         </select>
         <select {...register("sigungu")} className="input" disabled={!watchedSido}>
-          <option value="">시/군/구(전체)</option>
+          <option value="">{t.alertList.filter.sigungu}</option>
           {sigunguList?.map((s) => (
             <option key={s} value={s}>
               {s}
             </option>
           ))}
         </select>
-        <input {...register("startDate")} type="date" className="input" />
-        <input {...register("endDate")} type="date" className="input" />
+        <div className="flex flex-col gap-1">
+          <label className="text-xs text-gray-500">{t.alertList.filter.startDate}</label>
+          <input {...register("startDate")} type="date" className="input" />
+        </div>
+        <div className="flex flex-col gap-1">
+          <label className="text-xs text-gray-500">{t.alertList.filter.endDate}</label>
+          <input {...register("endDate")} type="date" className="input" />
+        </div>
         <select {...register("type")} className="input">
-          <option value="">유형(전체)</option>
-          {DISASTER_TYPES.map((t) => (
-            <option key={t} value={t}>
-              {t}
-            </option>
+          <option value="">{t.alertList.filter.type}</option>
+          {DISASTER_TYPES.map((type) => (
+            <option key={type} value={type}>{t.disasterTypes[type]}</option>
           ))}
         </select>
         <select {...register("levelText")} className="input">
-          <option value="">레벨(전체)</option>
+          <option value="">{t.alertList.filter.level}</option>
           {LEVEL_OPTIONS.map((o) => (
-            <option key={o.code} value={o.text}>
-              {o.text}
-            </option>
+            <option key={o.code} value={o.text}>{t.levels[o.text]}</option>
           ))}
         </select>
         <select {...register("source")} className="input">
-          <option value="ALL">출처(전체)</option>
-          <option value="OFFICIAL">공공 알림만</option>
-          <option value="USER">사용자 제보만</option>
+          <option value="ALL">{t.alertList.filter.sourceAll}</option>
+          <option value="OFFICIAL">{t.alertList.filter.sourceOfficial}</option>
+          <option value="USER">{t.alertList.filter.sourceUser}</option>
         </select>
-        <input {...register("keyword")} placeholder="키워드(예: 경보)" className="input col-span-2" />
+        <input {...register("keyword")} placeholder={t.alertList.filter.keyword} className="input col-span-2" />
         <div className="col-span-2 md:col-span-4 flex justify-end gap-2">
           <button type="button" onClick={onReset} className="px-3 py-2 rounded bg-gray-100">
-            초기화
+            {t.alertList.reset}
           </button>
           <button
             type="submit"
             className="px-3 py-2 rounded bg-blue-600 text-white disabled:opacity-60"
             disabled={isFetching}
           >
-            {isFetching ? "검색 중..." : "검색"}
+            {isFetching ? t.alertList.searching : t.alertList.search}
           </button>
         </div>
       </form>
@@ -188,7 +191,7 @@ function DisasterListPageInner() {
       {/* 목록 */}
       <div id="list" className="bg-white rounded-xl shadow p-4">
         {isLoading ? (
-          <div className="text-sm text-gray-500">불러오는 중...</div>
+          <div className="text-sm text-gray-500">{t.loading}</div>
         ) : (
           <>
             <ul className="space-y-2">
@@ -215,7 +218,7 @@ function DisasterListPageInner() {
                 onClick={() => setPage((p) => Math.max(0, p - 1))}
                 disabled={page === 0}
               >
-                이전
+                {t.alertList.prev}
               </button>
               <div className="text-sm text-gray-500">{data ? `${data.number + 1} / ${data.totalPages}` : "-"}</div>
               <button
@@ -223,7 +226,7 @@ function DisasterListPageInner() {
                 onClick={() => setPage((p) => (data ? Math.min(data.totalPages - 1, p + 1) : p))}
                 disabled={!data || data.number + 1 >= data.totalPages}
               >
-                다음
+                {t.alertList.next}
               </button>
             </div>
           </>
