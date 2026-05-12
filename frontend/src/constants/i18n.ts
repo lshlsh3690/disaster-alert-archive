@@ -100,7 +100,19 @@ export const i18n = {
             "테러": "테러", "금융": "금융", "에너지": "에너지", "폭발": "폭발", "AI": "AI",
         },
         levels: { "안전안내": "안전안내", "긴급재난": "긴급재난", "위급재난": "위급재난" },
-
+        dashboard: {
+            todayAlerts: "오늘 재난문자",
+            todayUserReports: "오늘 사용자 제보",
+            totalUserReports: "누적 사용자 제보 수",
+            latestAlerts: "📩 최신 재난 문자",
+            alertMap: "🗺️ 지역별 재난 문자 지도",
+            latestComments: "💬 최신 댓글",
+            viewAll: "전체 보기 →",
+            noComments: "최근 댓글이 없습니다.",
+            anonymous: "익명",
+            langLabel: "언어",
+            count: "건"
+        },
     },
 
     en: {
@@ -193,7 +205,19 @@ export const i18n = {
         },
 
         levels: { "안전안내": "Safety Notice", "긴급재난": "Emergency Disaster", "위급재난": "Critical Disaster" },
-
+        dashboard: {
+            todayAlerts: "Today's Alerts",
+            todayUserReports: "Today's Reports",
+            totalUserReports: "Total User Reports",
+            latestAlerts: "📩 Latest Alerts",
+            alertMap: "🗺️ Regional Alert Map",
+            latestComments: "💬 Latest Comments",
+            viewAll: "View All →",
+            noComments: "No recent comments.",
+            anonymous: "Anonymous",
+            langLabel: "Language",
+            count: ""
+        },
     },
 
     ja: {
@@ -286,7 +310,19 @@ export const i18n = {
         },
 
         levels: { "안전안내": "安全案内", "긴급재난": "緊急災害", "위급재난": "危急災害" },
-
+        dashboard: {
+            todayAlerts: "本日の災害速報",
+            todayUserReports: "本日のユーザー報告",
+            totalUserReports: "累積ユーザー報告数",
+            latestAlerts: "📩 最新の災害速報",
+            alertMap: "🗺️ 地域別災害速報マップ",
+            latestComments: "💬 最新コメント",
+            viewAll: "全て見る →",
+            noComments: "最近のコメントはありません。",
+            anonymous: "匿名",
+            langLabel: "言語",
+            count: "件"
+        },
     },
 
     zh: {
@@ -379,7 +415,19 @@ export const i18n = {
         },
 
         levels: { "안전안내": "安全通知", "긴급재난": "紧急灾害", "위급재난": "危急灾害" },
-
+        dashboard: {
+            todayAlerts: "今日预警",
+            todayUserReports: "今日用户报告",
+            totalUserReports: "累计用户报告数",
+            latestAlerts: "📩 最新预警",
+            alertMap: "🗺️ 地区预警地图",
+            latestComments: "💬 最新评论",
+            viewAll: "查看全部 →",
+            noComments: "暂无最新评论。",
+            anonymous: "匿名",
+            langLabel: "语言",
+            count: "件"
+        },
     },
 } as const;
 
