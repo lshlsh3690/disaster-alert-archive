@@ -148,20 +148,24 @@ function DisasterListPageInner() {
             </option>
           ))}
         </select>
-        <input {...register("startDate")} type="date" className="input" />
-        <input {...register("endDate")} type="date" className="input" />
+        <div className="flex flex-col gap-1">
+          <label className="text-xs text-gray-500">{t.alertList.filter.startDate}</label>
+          <input {...register("startDate")} type="date" className="input" />
+        </div>
+        <div className="flex flex-col gap-1">
+          <label className="text-xs text-gray-500">{t.alertList.filter.endDate}</label>
+          <input {...register("endDate")} type="date" className="input" />
+        </div>
         <select {...register("type")} className="input">
           <option value="">{t.alertList.filter.type}</option>
           {DISASTER_TYPES.map((type) => (
-            <option key={type} value={type}>{type}</option>
+            <option key={type} value={type}>{t.disasterTypes[type]}</option>
           ))}
         </select>
         <select {...register("levelText")} className="input">
           <option value="">{t.alertList.filter.level}</option>
           {LEVEL_OPTIONS.map((o) => (
-            <option key={o.code} value={o.text}>
-              {o.text}
-            </option>
+            <option key={o.code} value={o.text}>{t.levels[o.text]}</option>
           ))}
         </select>
         <select {...register("source")} className="input">
