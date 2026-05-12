@@ -79,19 +79,19 @@ export default function Header() {
             {name}
           </Link>
         ))}
-
         {/* 언어 선택 드롭다운 */}
-        <select
-          value={language}
-          onChange={(e) => handleLangChange(e.target.value as LangCode)}
-          className="text-sm border border-gray-300 rounded px-2 py-1 text-gray-700 bg-white cursor-pointer hover:border-blue-400 focus:outline-none focus:border-blue-500"
-        >
-          {LANGUAGES.map(({ code, label }) => (
-            <option key={code} value={code}>
-              {label}
-            </option>
-          ))}
-        </select>
+        <div className="flex items-center gap-1">
+          <span className="text-sm text-gray-500">{t.dashboard.langLabel}:</span>
+          <select
+            value={language}
+            onChange={(e) => handleLangChange(e.target.value as LangCode)}
+            className="text-sm border border-gray-300 rounded px-2 py-1 text-gray-700 bg-white cursor-pointer hover:border-blue-400 focus:outline-none focus:border-blue-500"
+          >
+            {LANGUAGES.map(({ code, label }) => (
+              <option key={code} value={code}>{label}</option>
+            ))}
+          </select>
+        </div>
 
         {isLoggedIn ? (
           <div className="relative" ref={dropdownRef}>
