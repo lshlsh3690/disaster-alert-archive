@@ -2,6 +2,7 @@ package com.disaster.alert.alertapi.domain.member.service;
 
 import com.disaster.alert.alertapi.domain.common.exception.CustomException;
 import com.disaster.alert.alertapi.domain.common.exception.ErrorCode;
+import com.disaster.alert.alertapi.domain.legaldistrict.model.LegalDistrict;
 import com.disaster.alert.alertapi.domain.legaldistrict.repository.LegalDistrictRepository;
 import com.disaster.alert.alertapi.domain.member.dto.MemberFavoriteRegionDtos;
 import com.disaster.alert.alertapi.domain.member.model.MemberFavoriteRegion;
@@ -31,10 +32,9 @@ public class MemberFavoriteRegionService {
     }
 
     @Transactional
-    public void addFavoriteRegion(Long memberId, MemberRole role, String legalDistrictCode) {
-        if (!legalDistrictRepository.existsByCode(legalDistrictCode)) {
-            throw new CustomException(ErrorCode.LEGAL_DISTRICT_NOT_FOUND);
-        }
+    public MemberFavoriteRegionDtos.Response addFavoriteRegion(Long memberId, MemberRole role, String legalDistrictCode) {
+        LegalDistrict legalDistrict = legalDistrictRepository.findByCode(legalDistrictCode)
+                .orElseThrow(() -> new CustomException(ErrorCode.LEGAL_DISTRICT_NOT_FOUND));
         if (memberFavoriteRegionRepository.existsByIdMemberIdAndIdLegalDistrictCode(memberId, legalDistrictCode)) {
             throw new CustomException(ErrorCode.FAVORITE_REGION_ALREADY_EXISTS);
         }
@@ -42,7 +42,8 @@ public class MemberFavoriteRegionService {
         if (limit != Integer.MAX_VALUE && memberFavoriteRegionRepository.countByIdMemberId(memberId) >= limit) {
             throw new CustomException(ErrorCode.FAVORITE_REGION_LIMIT_EXCEEDED);
         }
-        memberFavoriteRegionRepository.save(MemberFavoriteRegion.of(memberId, legalDistrictCode));
+        MemberFavoriteRegion saved = memberFavoriteRegionRepository.save(MemberFavoriteRegion.of(memberId, legalDistrictCode));
+        return new MemberFavoriteRegionDtos.Response(legalDistrictCode, legalDistrict.getName(), saved.getCreatedAt());
     }
 
     private int getLimitByRole(MemberRole role) {
