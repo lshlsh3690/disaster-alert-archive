@@ -3,7 +3,6 @@ package com.disaster.alert.alertapi.domain.disasteralert.controller;
 import com.disaster.alert.alertapi.domain.disasteralert.dto.*;
 import com.disaster.alert.alertapi.domain.disasteralert.service.DisasterAlertService;
 import com.disaster.alert.alertapi.domain.useralert.service.UserDisasterAlertService;
-import com.disaster.alert.alertapi.domain.disasteralert.dto.CombinedAlertResponse;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import lombok.RequiredArgsConstructor;
@@ -25,32 +24,40 @@ public class DisasterAlertController {
     private final UserDisasterAlertService userDisasterAlertService;
 
     /**
-     * 재난 경고 조회 API
-     * @param alertSearchRequest 검색 조건
-     * @param pageable     페이지 정보
-     * @return 재난 안전문자 목록
+     * 재난문자 검색 (페이지네이션).
+     *
+     * @param lang 응답 언어 — "ko"(기본)/"en"/"ja"/"zh".
+     *             "ko" 또는 미지정 시 번역 필드는 모두 null.
+     *             다른 값은 해당 언어로 번역 (캐시 없으면 DeepL 호출).
      */
     @GetMapping("/search")
-    public ResponseEntity<Page<DisasterAlertResponseDto>> searchAlerts(AlertSearchRequest alertSearchRequest, Pageable pageable
+    public ResponseEntity<Page<DisasterAlertResponseDto>> searchAlerts(
+            AlertSearchRequest alertSearchRequest,
+            Pageable pageable,
+            @RequestParam(defaultValue = "ko") String lang
     ) {
-        log.info("Searching alerts with condition: {}", alertSearchRequest);
-        Page<DisasterAlertResponseDto> result = disasterAlertService.searchAlerts(alertSearchRequest, pageable);
+        log.info("Searching alerts with condition: {}, lang: {}", alertSearchRequest, lang);
+        Page<DisasterAlertResponseDto> result = disasterAlertService.searchAlerts(alertSearchRequest, pageable, lang);
         return ResponseEntity.ok(result);
     }
+
+    /**
+     * 공식 + 사용자 제보 통합 검색.
+     *
+     * <p>USER 제보는 번역 시스템이 없으므로 OFFICIAL 항목만 번역됨.
+     */
     @GetMapping("/search/combined")
     public ResponseEntity<Page<CombinedAlertResponse>> searchCombined(
             AlertSearchRequest alertSearchRequest,
             @RequestParam(defaultValue = "ALL") String source, // ALL | OFFICIAL | USER
-            Pageable pageable
+            Pageable pageable,
+            @RequestParam(defaultValue = "ko") String lang
     ) {
-        return ResponseEntity.ok(disasterAlertService.searchCombined(alertSearchRequest, source, pageable));
+        return ResponseEntity.ok(disasterAlertService.searchCombined(alertSearchRequest, source, pageable, lang));
     }
 
     /**
-     * 재난 안전문자 통계 조회 API
-     *
-     * @param alertSearchRequest 검색 조건
-     * @return 재난 안전문자 통계 정보
+     * 재난문자 통계 조회 (숫자/카운트만 반환하므로 lang 파라미터 없음).
      */
     @GetMapping("/stats")
     public ResponseEntity<DisasterAlertStatResponse> getStats(AlertSearchRequest alertSearchRequest) {
@@ -66,10 +73,9 @@ public class DisasterAlertController {
     }
 
     /**
-     * 재난 안전문자 상세 조회 API
+     * 재난문자 상세 조회.
      *
-     * @param id 재난 경고 ID
-     * @return 재난 안전문자 상세 정보
+     * @param lang 응답 언어. 캐시 없으면 lazy 번역 (DeepL 호출).
      */
     @GetMapping("/{id}")
     public ResponseEntity<DisasterAlertDetailDto> getDisasterAlert(
@@ -80,13 +86,20 @@ public class DisasterAlertController {
         return ResponseEntity.ok(dto);
     }
 
+    /**
+     * 최신 재난문자 N건 (대시보드/홈 화면).
+     */
     @GetMapping("/latest")
     public ResponseEntity<List<LatestAlertResponse>> getLatestAlert(
-            @RequestParam(defaultValue = "5") @Min(1) @Max(50) int limit
+            @RequestParam(defaultValue = "5") @Min(1) @Max(50) int limit,
+            @RequestParam(defaultValue = "ko") String lang
     ) {
-       return ResponseEntity.ok(disasterAlertService.getLatestAlert(limit));
+        return ResponseEntity.ok(disasterAlertService.getLatestAlert(limit, lang));
     }
 
+    /**
+     * 대시보드 요약 통계 (카운트만 반환하므로 lang 파라미터 없음).
+     */
     @GetMapping("/dashboard/summary")
     public ResponseEntity<DashboardSummaryResponse> getDashboardSummary() {
         long totalUserCount = userDisasterAlertService.countAllActive();
