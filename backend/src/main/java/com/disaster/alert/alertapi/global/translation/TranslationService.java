@@ -27,7 +27,7 @@ import java.util.stream.Collectors;
  * </ul>
  *
  * <p><b>지역명(region_names)은 여기서 번역하지 않는다.</b>
- * PR 1에서 도입한 {@code legal_district_translation} 테이블에서 조회한다.
+ * {@code legal_district_translation} 테이블에서 조회한다.
  * (같은 법정동이 여러 재난문자에 반복 등장하므로 DB 캐시가 훨씬 효율적)
  *
  * <p><b>동작 모드</b>

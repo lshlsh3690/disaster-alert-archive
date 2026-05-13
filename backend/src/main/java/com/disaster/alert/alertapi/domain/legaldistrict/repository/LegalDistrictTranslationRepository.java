@@ -42,10 +42,11 @@ public interface LegalDistrictTranslationRepository
             List<String> codes, String languageCode);
 
     /**
-     * 존재 여부 확인 — lazy 번역 시 "이미 저장돼 있나?" 판단용.
+     * 존재 여부 확인 — 특정 법정동의 특정 언어 번역이 이미 저장돼 있는지 판단.
      *
-     * <p>PR 2 에서 lazy 번역 로직 구현 시 사용 예정.
-     * (이번 PR 에서는 영어 시드 데이터만 사용하므로 호출되지 않음.)
+     * <p>현재 구현에서는 {@link #findByIdCodeInAndIdLanguageCode} 로 일괄 조회 후
+     * Map 에서 누락 여부를 확인하는 방식을 사용한다.
+     * 단건 존재 여부 확인이 필요한 경우 이 메서드를 사용할 수 있다.
      */
     boolean existsByIdCodeAndIdLanguageCode(String code, String languageCode);
 }
