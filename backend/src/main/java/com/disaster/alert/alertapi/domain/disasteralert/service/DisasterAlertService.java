@@ -373,9 +373,12 @@ public class DisasterAlertService {
                         dto.setTranslatedDisasterType(t.getTranslatedDisasterType());
                     });
 
-            // 2) 지역명 번역 (legal_district_translation 조회, 없으면 한국어 fallback)
+            // 2) 지역명 번역 (legal_district_translation 조회)
+            //    요청 언어 → 영어 → 한국어 순서로 fallback.
+            //    JA/ZH 시드가 없는 현재, 사용자는 한국어 대신 영어 지역명을 보게 된다.
             List<String> codes = disasterAlertRepository.legalDistrictCodesByAlertId(id);
-            Map<String, String> codeToTranslated = legalDistrictTranslationService.getTranslatedNames(codes, language.getDbCode());
+            Map<String, String> codeToTranslated =
+                    legalDistrictTranslationService.getTranslatedNamesWithEnglishFallback(codes, language.getDbCode());
 
             // 코드 순서대로 번역명을 매핑 (regionNames 와 codes 는 같은 순서로 정렬됨)
             List<String> translatedRegionNames = new ArrayList<>();
@@ -444,12 +447,12 @@ public class DisasterAlertService {
                         .stream()
                         .collect(Collectors.toMap(t -> t.getId().getAlertId(), t -> t));
 
-        // 3) 법정동 코드 일괄 수집 + 번역 조회
+        // 3) 법정동 코드 일괄 수집 + 번역 조회 (요청 언어 → 영어 → 한국어 순서로 fallback)
         Set<String> allCodes = alerts.stream()
                 .flatMap(a -> Optional.ofNullable(a.getDisasterAlertRegions()).orElse(List.of()).stream())
                 .map(r -> r.getLegalDistrict().getCode())
                 .collect(Collectors.toSet());
-        Map<String, String> codeToTranslated = legalDistrictTranslationService.getTranslatedNames(
+        Map<String, String> codeToTranslated = legalDistrictTranslationService.getTranslatedNamesWithEnglishFallback(
                 new ArrayList<>(allCodes), language.getDbCode());
 
         // 4) DTO 에 적용
@@ -512,7 +515,8 @@ public class DisasterAlertService {
         Set<String> allCodes = alertIdToCodes.values().stream()
                 .flatMap(List::stream)
                 .collect(Collectors.toSet());
-        Map<String, String> codeToTranslated = legalDistrictTranslationService.getTranslatedNames(
+        // 요청 언어 → 영어 → 한국어 순서로 fallback
+        Map<String, String> codeToTranslated = legalDistrictTranslationService.getTranslatedNamesWithEnglishFallback(
                 new ArrayList<>(allCodes), language.getDbCode());
 
         // 4) DTO 적용
@@ -568,7 +572,8 @@ public class DisasterAlertService {
             alertIdToFirstCode.putIfAbsent(alertId, code);
         }
         Set<String> allCodes = new HashSet<>(alertIdToFirstCode.values());
-        Map<String, String> codeToTranslated = legalDistrictTranslationService.getTranslatedNames(
+        // 요청 언어 → 영어 → 한국어 순서로 fallback
+        Map<String, String> codeToTranslated = legalDistrictTranslationService.getTranslatedNamesWithEnglishFallback(
                 new ArrayList<>(allCodes), language.getDbCode());
 
         // 4) DTO 적용
