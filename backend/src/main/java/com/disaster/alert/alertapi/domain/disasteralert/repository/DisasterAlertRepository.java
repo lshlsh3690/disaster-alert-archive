@@ -18,6 +18,26 @@ public interface DisasterAlertRepository extends JpaRepository<DisasterAlert, Lo
     @Query("SELECT d.legalDistrict.name FROM DisasterAlertRegion d WHERE d.disasterAlert.id = :id")
     List<String> legalDistrictNamesByAlertId(Long id);
 
+    /**
+     * 한 재난문자에 연결된 모든 법정동 코드를 순서대로 조회.
+     * 다국어 응답에서 {@code legal_district_translation} 조회용 키로 사용.
+     */
+    @Query("SELECT d.legalDistrict.code FROM DisasterAlertRegion d WHERE d.disasterAlert.id = :id")
+    List<String> legalDistrictCodesByAlertId(Long id);
+
+    /**
+     * 여러 재난문자의 (alertId, legalDistrictCode) 쌍을 한 번에 조회.
+     * 목록 응답에서 지역명 번역을 일괄 적용하기 위한 N+1 방지용 쿼리.
+     *
+     * <p>반환: Object[] {alertId, code} — 호출 측에서 Map 으로 변환해 사용.
+     */
+    @Query("""
+              SELECT d.disasterAlert.id, d.legalDistrict.code
+              FROM DisasterAlertRegion d
+              WHERE d.disasterAlert.id IN :ids
+            """)
+    List<Object[]> findAlertIdAndCodePairs(@Param("ids") List<Long> ids);
+
 
     @Query("""
               select new com.disaster.alert.alertapi.domain.disasteralert.dto.LatestAlertResponse(
