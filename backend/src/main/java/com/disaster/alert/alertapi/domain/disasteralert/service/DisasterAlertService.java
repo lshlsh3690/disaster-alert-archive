@@ -3,12 +3,14 @@ package com.disaster.alert.alertapi.domain.disasteralert.service;
 import com.disaster.alert.alertapi.api.DisasterOpenApiClient;
 import com.disaster.alert.alertapi.domain.disasteralert.dto.*;
 import com.disaster.alert.alertapi.domain.disasteralert.model.DisasterAlert;
-import com.disaster.alert.alertapi.domain.disasteralert.model.DisasterAlertTranslation;
 import com.disaster.alert.alertapi.domain.disasteralert.model.DisasterLevel;
 import com.disaster.alert.alertapi.domain.disasteralert.repository.DisasterAlertRepository;
 import com.disaster.alert.alertapi.domain.disasteralert.repository.DisasterAlertTranslationRepository;
 import com.disaster.alert.alertapi.domain.legaldistrict.model.LegalDistrict;
+import com.disaster.alert.alertapi.domain.legaldistrict.service.LegalDistrictTranslationService;
 import com.disaster.alert.alertapi.global.service.LegalDistrictCache;
+import com.disaster.alert.alertapi.global.translation.SupportedLanguage;
+import com.disaster.alert.alertapi.global.translation.TranslationService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.EntityNotFoundException;
@@ -16,6 +18,7 @@ import jakarta.persistence.PersistenceContext;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -40,6 +43,10 @@ public class DisasterAlertService {
     private final ObjectMapper objectMapper;
 
     private final LegalDistrictCache legalDistrictCache;
+
+    // ─── 다국어 응답용 의존성 ──────────────────────────────
+    private final TranslationService translationService;                          // lazy 번역 (message/disasterType)
+    private final LegalDistrictTranslationService legalDistrictTranslationService; // 법정동 번역 조회
 
     @PersistenceContext
     private EntityManager entityManager;
@@ -284,14 +291,45 @@ public class DisasterAlertService {
         }
     }
 
-    public Page<DisasterAlertResponseDto> searchAlerts(AlertSearchRequest alertSearchCondition, Pageable pageable) {
-        Page<DisasterAlert> result = disasterAlertRepository.searchAlerts(alertSearchCondition, pageable);
+    // ============================================================================
+    //  검색 / 조회 — 다국어 지원
+    // ============================================================================
 
-        return result.map(DisasterAlertResponseDto::from);
+    /**
+     * 재난문자 검색 (페이지네이션).
+     *
+     * @param lang 응답 언어 ("ko"/null = 한국어, "en"/"ja"/"zh" = 번역본)
+     */
+    public Page<DisasterAlertResponseDto> searchAlerts(AlertSearchRequest cond, Pageable pageable, String lang) {
+        Page<DisasterAlert> result = disasterAlertRepository.searchAlerts(cond, pageable);
+
+        // 1) 기본 한국어 DTO 변환
+        List<DisasterAlert> alerts = result.getContent();
+        List<DisasterAlertResponseDto> dtos = alerts.stream()
+                .map(DisasterAlertResponseDto::from)
+                .toList();
+
+        // 2) 다국어 응답 후처리
+        SupportedLanguage.fromRequestParam(lang).ifPresent(language ->
+                applyTranslationsToList(alerts, dtos, language)
+        );
+
+        return new PageImpl<>(dtos, pageable, result.getTotalElements());
     }
 
-    public Page<CombinedAlertResponse> searchCombined(AlertSearchRequest req, String source, Pageable pageable) {
-        return disasterAlertRepository.searchCombined(req, source, pageable);
+    /**
+     * 공식 + 사용자 제보 통합 검색 (페이지네이션).
+     *
+     * <p>USER 제보는 번역 시스템이 없으므로 OFFICIAL 항목만 번역 적용.
+     */
+    public Page<CombinedAlertResponse> searchCombined(AlertSearchRequest req, String source, Pageable pageable, String lang) {
+        Page<CombinedAlertResponse> page = disasterAlertRepository.searchCombined(req, source, pageable);
+
+        SupportedLanguage.fromRequestParam(lang).ifPresent(language ->
+                applyTranslationsToCombined(page.getContent(), language)
+        );
+
+        return page;
     }
 
     public DisasterAlertStatResponse getStats(AlertSearchRequest request) {
@@ -312,43 +350,65 @@ public class DisasterAlertService {
     /**
      * 재난문자 상세 정보를 조회합니다.
      *
-     * @param id 재난문자 ID
-     * @return 재난문자 상세 정보 DTO
+     * <p>다국어 동작:
+     * <ul>
+     *   <li>한국어 요청 ("ko"/null): 번역 필드 모두 null</li>
+     *   <li>지원 언어 요청 ("en"/"ja"/"zh"): 캐시 없으면 DeepL 호출 → 저장 후 응답</li>
+     * </ul>
      */
+    @Transactional
     public DisasterAlertDetailDto getAlertDetail(Long id, String lang) {
         DisasterAlert alert = disasterAlertRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("재난문자를 찾을 수 없습니다: id=" + id));
 
         List<String> regionNames = disasterAlertRepository.legalDistrictNamesByAlertId(id);
-
         DisasterAlertDetailDto dto = new DisasterAlertDetailDto(alert, regionNames);
 
-        if ("en".equalsIgnoreCase(lang)) {
-            translationRepository.findByIdAlertIdAndIdLanguageCode(id, "EN")
+        SupportedLanguage.fromRequestParam(lang).ifPresent(language -> {
+            // 1) 메시지/유형 번역 (없으면 lazy DeepL 호출)
+            translationService.ensureTranslated(id, language);
+            translationRepository.findByIdAlertIdAndIdLanguageCode(id, language.getDbCode())
                     .ifPresent(t -> {
                         dto.setTranslatedMessage(t.getTranslatedMessage());
                         dto.setTranslatedDisasterType(t.getTranslatedDisasterType());
-                        if (t.getTranslatedRegionNames() != null && !t.getTranslatedRegionNames().isBlank()) {
-                            dto.setTranslatedRegionNames(
-                                    Arrays.stream(t.getTranslatedRegionNames().split(","))
-                                            .map(String::trim)
-                                            .toList()
-                            );
-                        }
-                        dto.setLanguage("en");
                     });
-        }
+
+            // 2) 지역명 번역 (legal_district_translation 조회)
+            //    요청 언어 → 영어 → 한국어 순서로 fallback.
+            //    JA/ZH 시드가 없는 현재, 사용자는 한국어 대신 영어 지역명을 보게 된다.
+            List<String> codes = disasterAlertRepository.legalDistrictCodesByAlertId(id);
+            Map<String, String> codeToTranslated =
+                    legalDistrictTranslationService.getTranslatedNamesWithEnglishFallback(codes, language.getDbCode());
+
+            // 코드 순서대로 번역명을 매핑 (regionNames 와 codes 는 같은 순서로 정렬됨)
+            List<String> translatedRegionNames = new ArrayList<>();
+            for (int i = 0; i < codes.size(); i++) {
+                String code = codes.get(i);
+                String original = i < regionNames.size() ? regionNames.get(i) : null;
+                translatedRegionNames.add(codeToTranslated.getOrDefault(code, original));
+            }
+            dto.setTranslatedRegionNames(translatedRegionNames);
+
+            dto.setLanguage(language.getCode());
+        });
 
         return dto;
     }
 
     /**
-     * 최신 재난문자를 조회합니다.
+     * 최신 재난문자 N건을 조회합니다.
      *
-     * @return 최신 재난문자 DTO
+     * @param lang 응답 언어 ("ko"/null = 한국어, "en"/"ja"/"zh" = 번역본)
      */
-    public List<LatestAlertResponse> getLatestAlert(int limit) {
-        return disasterAlertRepository.latestAlerts(PageRequest.of(0, limit));
+    @Transactional
+    public List<LatestAlertResponse> getLatestAlert(int limit, String lang) {
+        List<LatestAlertResponse> alerts = disasterAlertRepository.latestAlerts(PageRequest.of(0, limit));
+
+        SupportedLanguage.fromRequestParam(lang).ifPresent(language ->
+                applyTranslationsToLatest(alerts, language)
+        );
+
+        return alerts;
     }
 
     @Transactional(readOnly = true)
@@ -356,5 +416,184 @@ public class DisasterAlertService {
         List<DisasterAlertStatResponse.RegionStat> regionStats = disasterAlertRepository.getStatsSido(request);
         log.info("지역별 재난문자 통계: {}", regionStats);
         return regionStats;
+    }
+
+    // ============================================================================
+    //  다국어 응답 — 내부 헬퍼
+    // ============================================================================
+
+    /**
+     * 검색 결과 페이지에 번역을 일괄 적용 (entity 기반).
+     *
+     * <p>흐름:
+     * <ol>
+     *   <li>누락된 (alertId, lang) 조합을 DeepL 로 일괄 번역 (lazy)</li>
+     *   <li>번역 결과를 Map 으로 조회</li>
+     *   <li>법정동 코드들을 legal_district_translation 에서 일괄 조회</li>
+     *   <li>각 DTO 에 번역 필드 채우기</li>
+     * </ol>
+     */
+    private void applyTranslationsToList(List<DisasterAlert> alerts, List<DisasterAlertResponseDto> dtos, SupportedLanguage language) {
+        if (alerts.isEmpty()) return;
+
+        List<Long> alertIds = alerts.stream().map(DisasterAlert::getId).toList();
+
+        // 1) 누락된 항목 lazy 번역
+        translationService.ensureTranslatedBatch(alertIds, language);
+
+        // 2) 번역 Map 조회
+        Map<Long, com.disaster.alert.alertapi.domain.disasteralert.model.DisasterAlertTranslation> translationMap =
+                translationRepository.findByIdAlertIdInAndIdLanguageCode(alertIds, language.getDbCode())
+                        .stream()
+                        .collect(Collectors.toMap(t -> t.getId().getAlertId(), t -> t));
+
+        // 3) 법정동 코드 일괄 수집 + 번역 조회 (요청 언어 → 영어 → 한국어 순서로 fallback)
+        Set<String> allCodes = alerts.stream()
+                .flatMap(a -> Optional.ofNullable(a.getDisasterAlertRegions()).orElse(List.of()).stream())
+                .map(r -> r.getLegalDistrict().getCode())
+                .collect(Collectors.toSet());
+        Map<String, String> codeToTranslated = legalDistrictTranslationService.getTranslatedNamesWithEnglishFallback(
+                new ArrayList<>(allCodes), language.getDbCode());
+
+        // 4) DTO 에 적용
+        for (int i = 0; i < alerts.size(); i++) {
+            DisasterAlert alert = alerts.get(i);
+            DisasterAlertResponseDto dto = dtos.get(i);
+
+            // 메시지/유형
+            var t = translationMap.get(alert.getId());
+            if (t != null) {
+                dto.setTranslatedMessage(t.getTranslatedMessage());
+                dto.setTranslatedDisasterType(t.getTranslatedDisasterType());
+            }
+
+            // 지역명
+            List<String> translatedRegionNames = Optional.ofNullable(alert.getDisasterAlertRegions()).orElse(List.of())
+                    .stream()
+                    .map(r -> {
+                        String code = r.getLegalDistrict().getCode();
+                        String original = r.getLegalDistrict().getName();
+                        return codeToTranslated.getOrDefault(code, original);
+                    })
+                    .toList();
+            dto.setTranslatedRegionNames(translatedRegionNames);
+
+            dto.setLanguage(language.getCode());
+        }
+    }
+
+    /**
+     * 통합 검색 결과에 번역을 일괄 적용.
+     * OFFICIAL 항목만 번역, USER 항목은 한국어 그대로.
+     */
+    private void applyTranslationsToCombined(List<CombinedAlertResponse> items, SupportedLanguage language) {
+        // OFFICIAL ID 추출
+        List<Long> officialIds = items.stream()
+                .filter(i -> i.getSource() == CombinedAlertResponse.Source.OFFICIAL)
+                .map(CombinedAlertResponse::getId)
+                .toList();
+
+        if (officialIds.isEmpty()) return;
+
+        // 1) lazy 번역
+        translationService.ensureTranslatedBatch(officialIds, language);
+
+        // 2) 번역 Map
+        Map<Long, com.disaster.alert.alertapi.domain.disasteralert.model.DisasterAlertTranslation> translationMap =
+                translationRepository.findByIdAlertIdInAndIdLanguageCode(officialIds, language.getDbCode())
+                        .stream()
+                        .collect(Collectors.toMap(t -> t.getId().getAlertId(), t -> t));
+
+        // 3) 지역명 번역 — 일괄 (alertId, code) 쌍 조회
+        Map<Long, List<String>> alertIdToCodes = new HashMap<>();
+        for (Object[] row : disasterAlertRepository.findAlertIdAndCodePairs(officialIds)) {
+            Long alertId = (Long) row[0];
+            String code = (String) row[1];
+            alertIdToCodes.computeIfAbsent(alertId, k -> new ArrayList<>()).add(code);
+        }
+
+        Set<String> allCodes = alertIdToCodes.values().stream()
+                .flatMap(List::stream)
+                .collect(Collectors.toSet());
+        // 요청 언어 → 영어 → 한국어 순서로 fallback
+        Map<String, String> codeToTranslated = legalDistrictTranslationService.getTranslatedNamesWithEnglishFallback(
+                new ArrayList<>(allCodes), language.getDbCode());
+
+        // 4) DTO 적용
+        for (CombinedAlertResponse item : items) {
+            if (item.getSource() != CombinedAlertResponse.Source.OFFICIAL) continue;
+
+            var t = translationMap.get(item.getId());
+            if (t != null) {
+                item.setTranslatedMessage(t.getTranslatedMessage());
+                item.setTranslatedDisasterType(t.getTranslatedDisasterType());
+            }
+
+            List<String> codes = alertIdToCodes.getOrDefault(item.getId(), List.of());
+            List<String> originalNames = Optional.ofNullable(item.getRegionNames()).orElse(List.of());
+            List<String> translatedRegionNames = new ArrayList<>();
+            for (int i = 0; i < codes.size(); i++) {
+                String code = codes.get(i);
+                String original = i < originalNames.size() ? originalNames.get(i) : null;
+                translatedRegionNames.add(codeToTranslated.getOrDefault(code, original));
+            }
+            item.setTranslatedRegionNames(translatedRegionNames);
+
+            item.setLanguage(language.getCode());
+        }
+    }
+
+    /**
+     * 최신 재난문자 목록에 번역을 일괄 적용.
+     *
+     * <p>topRegion 은 첫 번째 법정동 코드를 사용해 번역 (legal_district_translation).
+     * 번역이 없으면 원본 한국어 유지.
+     */
+    private void applyTranslationsToLatest(List<LatestAlertResponse> alerts, SupportedLanguage language) {
+        if (alerts.isEmpty()) return;
+
+        List<Long> alertIds = alerts.stream().map(LatestAlertResponse::getId).toList();
+
+        // 1) lazy 번역
+        translationService.ensureTranslatedBatch(alertIds, language);
+
+        // 2) 번역 Map
+        Map<Long, com.disaster.alert.alertapi.domain.disasteralert.model.DisasterAlertTranslation> translationMap =
+                translationRepository.findByIdAlertIdInAndIdLanguageCode(alertIds, language.getDbCode())
+                        .stream()
+                        .collect(Collectors.toMap(t -> t.getId().getAlertId(), t -> t));
+
+        // 3) 지역명 번역 — (alertId → 첫 코드) 매핑
+        Map<Long, String> alertIdToFirstCode = new HashMap<>();
+        for (Object[] row : disasterAlertRepository.findAlertIdAndCodePairs(alertIds)) {
+            Long alertId = (Long) row[0];
+            String code = (String) row[1];
+            // 가장 먼저 매칭된 코드만 사용 (대표 지역)
+            alertIdToFirstCode.putIfAbsent(alertId, code);
+        }
+        Set<String> allCodes = new HashSet<>(alertIdToFirstCode.values());
+        // 요청 언어 → 영어 → 한국어 순서로 fallback
+        Map<String, String> codeToTranslated = legalDistrictTranslationService.getTranslatedNamesWithEnglishFallback(
+                new ArrayList<>(allCodes), language.getDbCode());
+
+        // 4) DTO 적용
+        for (LatestAlertResponse alert : alerts) {
+            var t = translationMap.get(alert.getId());
+            if (t != null) {
+                alert.setTranslatedMessage(t.getTranslatedMessage());
+                alert.setTranslatedDisasterType(t.getTranslatedDisasterType());
+            }
+
+            String firstCode = alertIdToFirstCode.get(alert.getId());
+            if (firstCode != null) {
+                alert.setTranslatedTopRegion(
+                        codeToTranslated.getOrDefault(firstCode, alert.getTopRegion())
+                );
+            } else {
+                alert.setTranslatedTopRegion(alert.getTopRegion());
+            }
+
+            alert.setLanguage(language.getCode());
+        }
     }
 }
