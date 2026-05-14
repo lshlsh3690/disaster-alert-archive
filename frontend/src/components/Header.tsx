@@ -30,7 +30,6 @@ export default function Header() {
 
   const t = useI18n();
 
-
   const menu = [
     { name: t.nav.dashboard, href: "/dashboard" },
     { name: t.nav.alerts, href: "/alerts" },
@@ -88,14 +87,17 @@ export default function Header() {
             className="text-sm border border-gray-300 rounded px-2 py-1 text-gray-700 bg-white cursor-pointer hover:border-blue-400 focus:outline-none focus:border-blue-500"
           >
             {LANGUAGES.map(({ code, label }) => (
-              <option key={code} value={code}>{label}</option>
+              <option key={code} value={code}>
+                {label}
+              </option>
             ))}
           </select>
         </div>
 
         {isLoggedIn ? (
           <div className="relative" ref={dropdownRef}>
-            <button onClick={() => setOpen((prev) => !prev)}
+            <button
+              onClick={() => setOpen((prev) => !prev)}
               className="text-sm font-medium text-blue-600 hover:underline"
             >
               {nickname ?? t.nav.user} ▾
@@ -103,23 +105,25 @@ export default function Header() {
             {open && (
               <div className="absolute right-0 mt-2 w-36 bg-white border rounded shadow text-sm z-50">
                 <Link
-                  href="/user/settings"
+                  href="/user/settings/regions"
                   className="block px-4 py-2 hover:bg-gray-50"
                   onClick={() => setOpen(false)}
                 >
+                  {t.nav.favoriteRegions}
+                </Link>
+                <Link href="/user/settings" className="block px-4 py-2 hover:bg-gray-50" onClick={() => setOpen(false)}>
                   {t.nav.settings}
                 </Link>
-                <button
-                  onClick={handleLogout}
-                  className="w-full text-left px-4 py-2 hover:bg-gray-50 text-red-500"
-                >
+                <button onClick={handleLogout} className="w-full text-left px-4 py-2 hover:bg-gray-50 text-red-500">
                   {t.nav.logout}
                 </button>
               </div>
             )}
           </div>
         ) : (
-          <Link href="/login" className="text-blue-600 hover:underline font-medium">{t.nav.login}</Link>
+          <Link href="/login" className="text-blue-600 hover:underline font-medium">
+            {t.nav.login}
+          </Link>
 
           // <Link href="/login" className="text-blue-600 hover:underline font-medium">
           //   로그인
