@@ -25,5 +25,5 @@ package com.disaster.alert.alertapi.domain.legaldistrict.dto;
  * ]
  * </pre>
  */
-public record SigunguResponse(String name, String translatedName) {
+public record SigunguResponse(String name, String translatedName, String code) {
 }

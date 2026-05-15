@@ -108,11 +108,30 @@ public class LegalDistrictService {
 
         // 2) 한국어 또는 미지원 lang → 번역 시도 안 함 (DB 추가 쿼리 없음)
         Optional<SupportedLanguage> langOpt = SupportedLanguage.fromRequestParam(lang);
+        // if (langOpt.isEmpty()) {
+        //     return sigunguNames.stream()
+        //             .map(name -> new SigunguResponse(name, null))
+        //             .toList();
+        // }
         if (langOpt.isEmpty()) {
-            return sigunguNames.stream()
-                    .map(name -> new SigunguResponse(name, null))
-                    .toList();
-        }
+    List<String> fullNames = sigunguNames.stream()
+            .map(s -> sido + " " + s)
+            .toList();
+    Map<String, String> nameToCodeKo = legalDistrictRepository
+            .findByNameInOrderByCodeAsc(fullNames)
+            .stream()
+            .collect(Collectors.toMap(
+                    LegalDistrict::getName,
+                    LegalDistrict::getCode,
+                    (existing, replacement) -> existing
+            ));
+    return sigunguNames.stream()
+            .map(name -> {
+                String code = nameToCodeKo.get(sido + " " + name);
+                return new SigunguResponse(name, null, code);
+            })
+            .toList();
+}
         SupportedLanguage language = langOpt.get();
 
         // 3) 시군구 풀네임("서울특별시 강남구") → LegalDistrict.code 매핑
@@ -150,14 +169,14 @@ public class LegalDistrictService {
 
         // 7) 최종 매핑: 시군구 번역에서 시도 prefix 제거
         return sigunguNames.stream()
-                .map(name -> {
-                    String fullName = sido + " " + name;
-                    String code = nameToCode.get(fullName);
-                    String fullTranslated = code != null ? codeToTranslated.get(code) : null;
-                    String sigunguOnly = stripSidoPrefix(fullTranslated, sidoTranslated);
-                    return new SigunguResponse(name, sigunguOnly);
-                })
-                .toList();
+        .map(name -> {
+            String fullName = sido + " " + name;
+            String code = nameToCode.get(fullName);
+            String fullTranslated = code != null ? codeToTranslated.get(code) : null;
+            String sigunguOnly = stripSidoPrefix(fullTranslated, sidoTranslated);
+            return new SigunguResponse(name, sigunguOnly, code); // ← code 추가
+        })
+        .toList();
     }
 
     /**
