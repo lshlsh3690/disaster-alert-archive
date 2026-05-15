@@ -60,10 +60,10 @@ export function useSidoStats(params: AlertSearchRequest) {
   });
 }
 
-export function useSigungu(sido: string | undefined) {
+export function useSigungu(sido: string | undefined, lang = "ko") {
   return useQuery({
-    queryKey: ["sigungu", sido],
-    queryFn: () => fetchSigungu(sido!),
+    queryKey: ["sigungu", sido, lang],
+    queryFn: () => fetchSigungu(sido!, lang),
     enabled: !!sido,
     staleTime: Infinity,
   });

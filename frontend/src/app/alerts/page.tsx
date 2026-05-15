@@ -13,6 +13,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { DISASTER_TYPES } from "@/ui/disasterType";
 import { METROS } from "@/ui/metros";
 import { useI18n } from "@/hooks/useI18n";
+import { useLanguageStore } from "@/store/languageStore";
 
 const ZSearch = z.object({
   sido: z.string().optional(),
@@ -41,6 +42,8 @@ function DisasterListPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const t = useI18n();
+  const language = useLanguageStore((s) => s.language);
+
 
 
   const { register, handleSubmit, reset, watch, setValue } = useForm<SearchForm>({
@@ -142,9 +145,10 @@ function DisasterListPageInner() {
         </select>
         <select {...register("sigungu")} className="input" disabled={!watchedSido}>
           <option value="">{t.alertList.filter.sigungu}</option>
+          {/* 드롭다운 - value는 한국어 이름(검색용), 표시는 번역된 이름 */}
           {sigunguList?.map((s) => (
-            <option key={s} value={s}>
-              {s}
+            <option key={s.code} value={s.name}>
+              {s.translatedName}
             </option>
           ))}
         </select>

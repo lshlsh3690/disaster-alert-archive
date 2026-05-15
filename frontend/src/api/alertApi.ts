@@ -54,11 +54,24 @@ export async function fetchLatestAlertsBySido(
   return data;
 }
 
-export async function fetchSigungu(sido: string): Promise<string[]> {
-  const res = await instance.get("/api/v1/districts/sigungu", { params: { sido } });
-  return z.array(z.string()).parse(res.data);
-}
+export type Sigungu = {
+  name: string;          // 한국어 원문 (검색 API 전달용)
+  translatedName: string; // 번역된 이름 (화면 표시용)
+  code: string;          // 법정동 코드 (관심지역 등록용)
+};
 
+export async function fetchSigungu(sido: string, lang = "ko"): Promise<Sigungu[]> {
+  const res = await instance.get("/api/v1/districts/sigungu", {
+    params: { sido, lang },
+  });
+  return z.array(
+    z.object({
+      name: z.string(),
+      translatedName: z.string(),
+      code: z.string(),
+    })
+  ).parse(res.data);
+}
 export async function fetchDashboardSummary(): Promise<DashboardSummary> {
   const res = await instance.get("/api/v1/alerts/dashboard/summary");
   const data = ZDashboardSummary.parse(res.data);
