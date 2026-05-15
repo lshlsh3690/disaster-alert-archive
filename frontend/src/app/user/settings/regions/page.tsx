@@ -157,7 +157,7 @@ export default function FavoriteRegionsPage() {
                 </option>
                 {sigunguList.map((s) => (
                   <option key={s.code} value={s.code}>
-                    {s.translatedName}
+                    {s.translatedName ?? s.name}
                   </option>
                 ))}
               </select>
