@@ -1,5 +1,7 @@
 services:
   frontend:
+    profiles:
+      - docker
     build:
       context: ./frontend
       dockerfile: Dockerfile
@@ -12,6 +14,8 @@ services:
       - disaster-net
 
   backend:
+    profiles:
+      - docker
     build:
       context: ./backend
       dockerfile: Dockerfile
