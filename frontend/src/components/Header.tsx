@@ -26,6 +26,7 @@ export default function Header() {
   const setLanguage = useLanguageStore((state) => state.setLanguage);
 
   const [open, setOpen] = useState<boolean>(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState<boolean>(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   const t = useI18n();
@@ -64,72 +65,129 @@ export default function Header() {
   }, []);
 
   return (
-    <header className="bg-white shadow px-6 py-3 flex items-center justify-between">
-      <Link href="/" className="text-xl font-bold text-blue-500">
-        {t.appName}
-      </Link>
-      <nav className="flex items-center gap-4 text-sm text-gray-700">
-        {menu.map(({ name, href }) => (
-          <Link
-            key={href}
-            href={href}
-            className={`hover:text-blue-600 ${pathname.startsWith(href) ? "font-bold text-blue-600" : ""}`}
-          >
-            {name}
-          </Link>
-        ))}
-        {/* 언어 선택 드롭다운 */}
-        <div className="flex items-center gap-1">
-          <span className="text-sm text-gray-500">{t.dashboard.langLabel}:</span>
-          <select
-            value={language}
-            onChange={(e) => handleLangChange(e.target.value as LangCode)}
-            className="text-sm border border-gray-300 rounded px-2 py-1 text-gray-700 bg-white cursor-pointer hover:border-blue-400 focus:outline-none focus:border-blue-500"
-          >
-            {LANGUAGES.map(({ code, label }) => (
-              <option key={code} value={code}>
-                {label}
-              </option>
-            ))}
-          </select>
-        </div>
+    <header className="bg-white shadow px-4 sm:px-6 py-3">
+      <div className="flex items-center justify-between">
+        <Link href="/" className="text-xl font-bold text-blue-500">
+          {t.appName}
+        </Link>
 
-        {isLoggedIn ? (
-          <div className="relative" ref={dropdownRef}>
-            <button
-              onClick={() => setOpen((prev) => !prev)}
-              className="text-sm font-medium text-blue-600 hover:underline"
+        {/* 데스크톱 네비게이션 */}
+        <nav className="hidden md:flex items-center gap-4 text-sm text-gray-700">
+          {menu.map(({ name, href }) => (
+            <Link
+              key={href}
+              href={href}
+              className={`hover:text-blue-600 ${pathname.startsWith(href) ? "font-bold text-blue-600" : ""}`}
             >
-              {nickname ?? t.nav.user} ▾
-            </button>
-            {open && (
-              <div className="absolute right-0 mt-2 w-36 bg-white border rounded shadow text-sm z-50">
-                <Link
-                  href="/user/settings/regions"
-                  className="block px-4 py-2 hover:bg-gray-50"
-                  onClick={() => setOpen(false)}
-                >
-                  {t.nav.favoriteRegions}
-                </Link>
-                <Link href="/user/settings" className="block px-4 py-2 hover:bg-gray-50" onClick={() => setOpen(false)}>
-                  {t.nav.settings}
-                </Link>
-                <button onClick={handleLogout} className="w-full text-left px-4 py-2 hover:bg-gray-50 text-red-500">
-                  {t.nav.logout}
-                </button>
-              </div>
-            )}
+              {name}
+            </Link>
+          ))}
+          <div className="flex items-center gap-1">
+            <span className="text-sm text-gray-500">{t.dashboard.langLabel}:</span>
+            <select
+              value={language}
+              onChange={(e) => handleLangChange(e.target.value as LangCode)}
+              className="text-sm border border-gray-300 rounded px-2 py-1 text-gray-700 bg-white cursor-pointer hover:border-blue-400 focus:outline-none focus:border-blue-500"
+            >
+              {LANGUAGES.map(({ code, label }) => (
+                <option key={code} value={code}>{label}</option>
+              ))}
+            </select>
           </div>
-        ) : (
-          <Link href="/login" className="text-blue-600 hover:underline font-medium">
-            {t.nav.login}
-          </Link>
+          {isLoggedIn ? (
+            <div className="relative" ref={dropdownRef}>
+              <button
+                onClick={() => setOpen((prev) => !prev)}
+                className="text-sm font-medium text-blue-600 hover:underline"
+              >
+                {nickname ?? t.nav.user} ▾
+              </button>
+              {open && (
+                <div className="absolute right-0 mt-2 w-36 bg-white border rounded shadow text-sm z-50">
+                  <Link href="/user/settings/regions" className="block px-4 py-2 hover:bg-gray-50" onClick={() => setOpen(false)}>
+                    {t.nav.favoriteRegions}
+                  </Link>
+                  <Link href="/user/settings" className="block px-4 py-2 hover:bg-gray-50" onClick={() => setOpen(false)}>
+                    {t.nav.settings}
+                  </Link>
+                  <button onClick={handleLogout} className="w-full text-left px-4 py-2 hover:bg-gray-50 text-red-500">
+                    {t.nav.logout}
+                  </button>
+                </div>
+              )}
+            </div>
+          ) : (
+            <Link href="/login" className="text-blue-600 hover:underline font-medium">
+              {t.nav.login}
+            </Link>
+          )}
+        </nav>
 
-          // <Link href="/login" className="text-blue-600 hover:underline font-medium">
-          //   로그인
-          // </Link>
-        )}
-      </nav>
+        {/* 모바일 햄버거 버튼 */}
+        <button
+          className="md:hidden p-2 rounded text-gray-600 hover:bg-gray-100"
+          onClick={() => setMobileMenuOpen((prev) => !prev)}
+          aria-label="메뉴 열기"
+        >
+          {mobileMenuOpen ? (
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          ) : (
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+            </svg>
+          )}
+        </button>
+      </div>
+
+      {/* 모바일 드롭다운 메뉴 */}
+      {mobileMenuOpen && (
+        <nav className="md:hidden mt-3 pb-2 border-t pt-3 space-y-1 text-sm text-gray-700">
+          {menu.map(({ name, href }) => (
+            <Link
+              key={href}
+              href={href}
+              className={`block px-2 py-2 rounded hover:bg-gray-50 hover:text-blue-600 ${pathname.startsWith(href) ? "font-bold text-blue-600" : ""}`}
+              onClick={() => setMobileMenuOpen(false)}
+            >
+              {name}
+            </Link>
+          ))}
+          <div className="flex items-center gap-2 px-2 py-2">
+            <span className="text-gray-500">{t.dashboard.langLabel}:</span>
+            <select
+              value={language}
+              onChange={(e) => handleLangChange(e.target.value as LangCode)}
+              className="text-sm border border-gray-300 rounded px-2 py-1 text-gray-700 bg-white"
+            >
+              {LANGUAGES.map(({ code, label }) => (
+                <option key={code} value={code}>{label}</option>
+              ))}
+            </select>
+          </div>
+          {isLoggedIn ? (
+            <>
+              <Link href="/user/settings/regions" className="block px-2 py-2 rounded hover:bg-gray-50" onClick={() => setMobileMenuOpen(false)}>
+                {t.nav.favoriteRegions}
+              </Link>
+              <Link href="/user/settings" className="block px-2 py-2 rounded hover:bg-gray-50" onClick={() => setMobileMenuOpen(false)}>
+                {t.nav.settings}
+              </Link>
+              <button
+                onClick={() => { handleLogout(); setMobileMenuOpen(false); }}
+                className="block w-full text-left px-2 py-2 rounded hover:bg-gray-50 text-red-500"
+              >
+                {t.nav.logout}
+              </button>
+            </>
+          ) : (
+            <Link href="/login" className="block px-2 py-2 rounded hover:bg-gray-50 text-blue-600 font-medium" onClick={() => setMobileMenuOpen(false)}>
+              {t.nav.login}
+            </Link>
+          )}
+        </nav>
+      )}
     </header>
   );
 }

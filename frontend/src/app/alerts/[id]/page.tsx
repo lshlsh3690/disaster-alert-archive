@@ -61,7 +61,7 @@ export default function AlertDetailPage() {
       : (isUser ? "-" : (offData?.originalRegion ?? "-"));
 
   return (
-    <main className="p-6 space-y-4">
+    <main className="p-3 sm:p-6 space-y-4">
       <h1 className="text-xl font-semibold">📨 재난 문자 상세</h1>
       <div className="bg-white rounded-xl shadow p-4 space-y-2">
         <div className="text-sm text-gray-500">{new Date(data.createdAt).toLocaleString()}</div>
@@ -115,7 +115,7 @@ export default function AlertDetailPage() {
       <section className="bg-white rounded-xl shadow p-4 space-y-3">
         <h2 className="text-lg font-semibold">댓글</h2>
         {authUser ? (
-          <div className="flex gap-2">
+          <div className="flex flex-col sm:flex-row gap-2">
             <input
               value={commentText}
               onChange={(e) => setCommentText(e.target.value)}
@@ -123,7 +123,7 @@ export default function AlertDetailPage() {
               className="flex-1 border rounded px-3 py-2"
             />
             <button
-              className="px-4 py-2 bg-blue-600 text-white rounded"
+              className="px-4 py-2 bg-blue-600 text-white rounded sm:w-auto w-full"
               onClick={async () => {
                 const text = commentText.trim();
                 if (!text) return;
