@@ -122,8 +122,8 @@ function DisasterListPageInner() {
   };
 
   return (
-    <main className="p-6 space-y-6">
-      <div className="flex items-center justify-between">
+    <main className="p-3 sm:p-6 space-y-4 sm:space-y-6">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-xl font-semibold">{t.alertList.title}</h1>
           <p className="text-sm text-gray-500">
@@ -135,7 +135,7 @@ function DisasterListPageInner() {
 
       <form
         onSubmit={handleSubmit(onSubmit)}
-        className="bg-white rounded-xl shadow p-4 grid grid-cols-2 md:grid-cols-4 gap-3"
+        className="bg-white rounded-xl shadow p-4 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3"
       >
         <select {...register("sido")} className="input">
           <option value="">{t.alertList.filter.sido}</option>
@@ -177,8 +177,8 @@ function DisasterListPageInner() {
           <option value="OFFICIAL">{t.alertList.filter.sourceOfficial}</option>
           <option value="USER">{t.alertList.filter.sourceUser}</option>
         </select>
-        <input {...register("keyword")} placeholder={t.alertList.filter.keyword} className="input col-span-2" />
-        <div className="col-span-2 md:col-span-4 flex justify-end gap-2">
+        <input {...register("keyword")} placeholder={t.alertList.filter.keyword} className="input col-span-full sm:col-span-2" />
+        <div className="col-span-full sm:col-span-2 md:col-span-4 flex justify-end gap-2">
           <button type="button" onClick={onReset} className="px-3 py-2 rounded bg-gray-100">
             {t.alertList.reset}
           </button>

@@ -14,9 +14,9 @@ export default function DashboardPage() {
 
 
   return (
-    <main className="p-6 space-y-10">
+    <main className="p-3 sm:p-6 space-y-6 sm:space-y-10">
       {/* 상단 요약 카드 */}
-      <section className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+      <section className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4">
         <SummaryCard
           title={t.dashboard.todayAlerts}
           value={`${data?.todayOfficialCount ?? 0}${t.dashboard.count}`}
@@ -69,7 +69,7 @@ function SummaryCard({ title, value }: { title: string; value: string }) {
   return (
     <div className="bg-white p-4 rounded-xl shadow text-center">
       <div className="text-gray-500 text-sm mb-1">{title}</div>
-      <div className="text-2xl font-bold text-gray-900">{value}</div>
+      <div className="text-xl sm:text-2xl font-bold text-gray-900">{value}</div>
     </div>
   );
 }

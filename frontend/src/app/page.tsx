@@ -7,24 +7,24 @@ export default function Home() {
   const t = useI18n();
 
   return (
-    <main className="min-h-screen bg-gray-50 px-6 py-12">
-      <section className="text-center py-16">
-        <h1 className="text-4xl font-bold mb-4 text-gray-900">{t.home.title}</h1>
-        <p className="text-gray-600 text-center mt-2 mb-6">
+    <main className="min-h-screen bg-gray-50 px-4 sm:px-6 py-8 sm:py-12">
+      <section className="text-center py-8 sm:py-16">
+        <h1 className="text-2xl sm:text-4xl font-bold mb-4 text-gray-900">{t.home.title}</h1>
+        <p className="text-gray-600 text-center mt-2 mb-6 text-sm sm:text-base">
           {t.home.subtitle.split("\n").map((line, i) => (
             <span key={i}>{line}{i === 0 && <br />}</span>
           ))}
         </p>
       </section>
 
-      <section className="mt-16 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+      <section className="mt-8 sm:mt-16 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
         {Object.values(t.home.features).map(({ title, desc }) => (
           <FeatureCard key={title} title={title} desc={desc} />
         ))}
       </section>
 
-      <section className="mt-20 text-center">
-        <h2 className="text-2xl font-semibold mb-4">{t.home.ctaTitle}</h2>
+      <section className="mt-10 sm:mt-20 text-center">
+        <h2 className="text-xl sm:text-2xl font-semibold mb-4">{t.home.ctaTitle}</h2>
         <Link href="/dashboard">
           <button className="bg-blue-500 hover:bg-blue-600 text-white px-5 py-3 rounded-lg">
             {t.home.ctaButton}

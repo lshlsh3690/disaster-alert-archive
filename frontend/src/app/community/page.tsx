@@ -36,7 +36,7 @@ export default function CommunityPage() {
   };
 
   return (
-    <main className="p-6 space-y-6">
+    <main className="p-3 sm:p-6 space-y-4 sm:space-y-6">
       <h1 className="text-2xl font-bold">💬 커뮤니티</h1>
       <div className="flex gap-2">
         <button className={`px-3 py-1 rounded ${tab === "NOTICE" ? "bg-blue-600 text-white" : "bg-gray-100"}`} onClick={() => setTab("NOTICE")}>공지사항</button>
