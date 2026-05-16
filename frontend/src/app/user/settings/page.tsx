@@ -1,8 +1,10 @@
+// frontend/src/app/user/settings/page.tsx
 "use client";
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuthStore } from "@/store/authStore";
+import NotificationSettings from "@/components/notification/NotificationSettings";
 
 export default function AccountSettingsPage() {
   const router = useRouter();
@@ -24,15 +26,18 @@ export default function AccountSettingsPage() {
       {/* 프로필 정보 */}
       <section className="bg-white rounded-xl shadow p-6 space-y-4">
         <h2 className="text-lg font-semibold text-gray-800">프로필 정보</h2>
-
         <InfoRow label="이메일" value={user.email ?? "-"} />
         <InfoRow label="닉네임" value={user.nickname ?? "-"} />
+      </section>
+
+      {/* ✅ 알림 설정 추가 */}
+      <section className="bg-white rounded-xl shadow">
+        <NotificationSettings />
       </section>
 
       {/* 계정 관리 */}
       <section className="bg-white rounded-xl shadow p-6 space-y-3">
         <h2 className="text-lg font-semibold text-gray-800">계정 관리</h2>
-
         <button
           className="w-full text-left px-4 py-3 border border-gray-200 rounded-lg hover:bg-gray-50 transition"
           onClick={() => alert("비밀번호 변경 기능은 준비 중입니다.")}
@@ -40,7 +45,6 @@ export default function AccountSettingsPage() {
           <div className="font-medium text-gray-800">비밀번호 변경</div>
           <div className="text-xs text-gray-500 mt-1">계정 비밀번호를 변경합니다.</div>
         </button>
-
         <button
           className="w-full text-left px-4 py-3 border border-red-200 rounded-lg hover:bg-red-50 transition"
           onClick={() => alert("회원 탈퇴 기능은 준비 중입니다.")}
