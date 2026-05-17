@@ -29,7 +29,10 @@ export const useNotificationPermission = () => {
       // Service Worker 등록 + 활성화 대기
       let swRegistration: ServiceWorkerRegistration | undefined;
       if ("serviceWorker" in navigator) {
-        swRegistration = await navigator.serviceWorker.register("/firebase-messaging-sw.js", { scope: "/" });
+        swRegistration = await navigator.serviceWorker.register(
+          "/firebase-messaging-sw.js",
+          { scope: "/firebase-cloud-messaging-push-scope" },
+        );
 
         // 활성화될 때까지 대기
         await navigator.serviceWorker.ready;
