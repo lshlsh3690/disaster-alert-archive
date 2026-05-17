@@ -24,14 +24,16 @@ export const useNotificationPermission = () => {
   const getFcmToken = useCallback(async (): Promise<string | null> => {
     try {
       const messaging = getFirebaseMessaging();
+      console.log("messaging:", messaging);
       if (!messaging) return null;
 
+      console.log("getToken 호출 시작...");
       const token = await getToken(messaging, {
         vapidKey: VAPID_KEY,
       });
+      console.log("getToken 결과:", token); // ← null인지 확인
 
       if (token) {
-        console.log("🔥 FCM Token:", token);
         setFcmToken(token);
         await registerFcmToken(token);
         return token;
