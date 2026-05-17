@@ -68,3 +68,5 @@ frontend/public/sw.js.map
 frontend/public/swe-worker-*.js
 frontend/public/workbox-*.js
 frontend/public/workbox-*.js.map
+
+backend/src/main/resources/firebase-service-account.json
