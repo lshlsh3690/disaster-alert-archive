@@ -50,9 +50,9 @@ public class AlertNotificationService {
             String title = "[재난문자] " + alert.getDisasterType();
             String body = alert.getMessage();
 
-            // 3. 해당 지역들을 관심지역으로 등록한 사용자 조회 ✅ 수정
+            // 3. 해당 지역들을 관심지역으로 등록한 사용자 조회
             List<Long> memberIds = favoriteRegionRepository
-                    .findByIdLegalDistrictCodeIn(regionCodes)  // 기존 메서드 활용!
+                    .findByIdLegalDistrictCodeIn(regionCodes)  // 기존 메서드 활용
                     .stream()
                     .map(r -> r.getId().getMemberId())
                     .distinct()

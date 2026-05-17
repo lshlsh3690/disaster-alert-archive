@@ -26,10 +26,34 @@ export const useNotificationPermission = () => {
       const messaging = getFirebaseMessaging();
       if (!messaging) return null;
 
-      const token = await getToken(messaging, { vapidKey: VAPID_KEY });
+      // Service Worker 등록 + 활성화 대기
+      let swRegistration: ServiceWorkerRegistration | undefined;
+      if ("serviceWorker" in navigator) {
+        swRegistration = await navigator.serviceWorker.register("/firebase-messaging-sw.js", { scope: "/" });
+
+        // 활성화될 때까지 대기
+        await navigator.serviceWorker.ready;
+
+        // installing 상태면 activate 대기
+        if (swRegistration.installing) {
+          await new Promise<void>((resolve) => {
+            swRegistration!.installing!.addEventListener("statechange", (e) => {
+              if ((e.target as ServiceWorker).state === "activated") {
+                resolve();
+              }
+            });
+          });
+        }
+      }
+
+      const token = await getToken(messaging, {
+        vapidKey: VAPID_KEY,
+        serviceWorkerRegistration: swRegistration,
+      });
+
       if (token) {
+        console.log("🔥 FCM Token:", token);
         setFcmToken(token);
-        // BE에 토큰 전송
         await registerFcmToken(token);
         return token;
       }
