@@ -1,7 +1,6 @@
 // frontend/public/firebase-messaging-sw.js
-importScripts("https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js");
-importScripts("https://www.gstatic.com/firebasejs/10.12.0/firebase-messaging-compat.js");
-
+importScripts("https://www.gstatic.com/firebasejs/12.13.0/firebase-app-compat.js");
+importScripts("https://www.gstatic.com/firebasejs/12.13.0/firebase-messaging-compat.js");
 firebase.initializeApp({
   apiKey: "AIzaSyApBI5Nt1HoxcodorezhYPCR1_wprPDwWY",
   authDomain: "disaster-alert-archive-c02ea.firebaseapp.com",
