@@ -36,7 +36,7 @@ public class DisasterFetchScheduler {
 
         newAlertIds.forEach(alertId -> {
             // 번역 비동기 처리
-//            translationService.translateAndSaveAsync(alertId);
+            translationService.translateAndSaveAsync(alertId);
             // FCM 알림 트리거
             alertNotificationService.triggerNotification(alertId);
         });
