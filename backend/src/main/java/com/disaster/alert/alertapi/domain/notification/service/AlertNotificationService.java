@@ -1,5 +1,8 @@
 package com.disaster.alert.alertapi.domain.notification.service;
 
+import com.disaster.alert.alertapi.domain.disasteralert.model.DisasterAlert;
+import com.disaster.alert.alertapi.domain.disasteralert.repository.DisasterAlertRepository;
+import com.disaster.alert.alertapi.domain.member.repository.MemberFavoriteRegionRepository;
 import com.disaster.alert.alertapi.domain.notification.model.NotificationType;
 import com.disaster.alert.alertapi.domain.notification.model.UserNotificationLog;
 import com.disaster.alert.alertapi.domain.notification.repository.FcmTokenRepository;
@@ -7,6 +10,7 @@ import com.disaster.alert.alertapi.domain.notification.repository.NotificationPr
 import com.disaster.alert.alertapi.domain.notification.repository.UserNotificationLogRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -17,83 +21,100 @@ import java.util.List;
 @RequiredArgsConstructor
 public class AlertNotificationService {
 
+    private final MemberFavoriteRegionRepository favoriteRegionRepository;
     private final NotificationPreferenceRepository preferenceRepository;
     private final FcmTokenRepository fcmTokenRepository;
     private final UserNotificationLogRepository notificationLogRepository;
     private final FcmSendService fcmSendService;
+    private final DisasterAlertRepository disasterAlertRepository;
 
-    // 재난문자 수신 시 관심지역 매칭 사용자에게 FCM 발송
+    @Async
     @Transactional
-    public void sendAlertToMatchedUsers(Long alertId, String regionCode,
-                                        String title, String body) {
-        // 1. 해당 지역을 관심지역으로 등록한 사용자 ID 목록 조회
-        List<Long> memberIds = findMembersByRegionCode(regionCode);
-        if (memberIds.isEmpty()) return;
+    public void triggerNotification(Long alertId) {
+        try {
+            // 1. 재난문자 조회
+            DisasterAlert alert = disasterAlertRepository.findById(alertId)
+                    .orElse(null);
+            if (alert == null) return;
 
-        log.info("알림 발송 대상: {}명, alertId: {}", memberIds.size(), alertId);
+            // 2. 재난문자의 지역코드 목록 추출
+            List<String> regionCodes = alert.getDisasterAlertRegions()
+                    .stream()
+                    .map(r -> r.getId().getDistrictCode())
+                    .filter(code -> code != null && !code.isBlank())
+                    .distinct()
+                    .toList();
 
-        for (Long memberId : memberIds) {
-            try {
-                // 2. 중복 발송 방지 체크
-                if (notificationLogRepository.existsByMemberIdAndAlertId(memberId, alertId)) {
-                    log.debug("중복 알림 스킵 - memberId: {}, alertId: {}", memberId, alertId);
-                    continue;
-                }
+            if (regionCodes.isEmpty()) return;
 
-                // 3. 알림 타입 조회 (없으면 기본값 PUSH)
-                String notificationType = preferenceRepository
-                        .findByMemberId(memberId)
-                        .map(p -> p.getNotificationType().name())
-                        .orElse(NotificationType.PUSH.name());
+            String title = "[재난문자] " + alert.getDisasterType();
+            String body = alert.getMessage();
 
-                // 4. NONE이면 발송 안 함
-                if (NotificationType.NONE.name().equals(notificationType)) {
-                    log.debug("알림 비활성화 사용자 스킵 - memberId: {}", memberId);
-                    continue;
-                }
+            // 3. 해당 지역들을 관심지역으로 등록한 사용자 조회 ✅ 수정
+            List<Long> memberIds = favoriteRegionRepository
+                    .findByIdLegalDistrictCodeIn(regionCodes)  // 기존 메서드 활용!
+                    .stream()
+                    .map(r -> r.getId().getMemberId())
+                    .distinct()
+                    .toList();
 
-                // 5. FCM 토큰 목록 조회
-                List<String> tokens = fcmTokenRepository
-                        .findAllByMemberId(memberId)
-                        .stream()
-                        .map(t -> t.getToken())
-                        .toList();
+            if (memberIds.isEmpty()) return;
 
-                if (tokens.isEmpty()) continue;
+            log.info("알림 발송 대상: {}명, alertId: {}", memberIds.size(), alertId);
 
-                // 6. FCM 발송
-                boolean sent = false;
-                if (tokens.size() == 1) {
-                    sent = fcmSendService.sendToToken(
-                            tokens.get(0), title, body,
-                            notificationType, String.valueOf(alertId));
-                } else {
-                    var response = fcmSendService.sendToTokens(
-                            tokens, title, body,
-                            notificationType, String.valueOf(alertId));
-                    sent = response != null && response.getSuccessCount() > 0;
-                }
-
-                // 7. 발송 이력 저장
-                notificationLogRepository.save(
-                        UserNotificationLog.builder()
-                                .memberId(memberId)
-                                .alertId(alertId)
-                                .status(sent ? "SENT" : "FAILED")
-                                .notificationType(notificationType)
-                                .build()
-                );
-
-            } catch (Exception e) {
-                log.error("알림 발송 실패 - memberId: {}, error: {}", memberId, e.getMessage());
+            for (Long memberId : memberIds) {
+                sendToMember(memberId, alertId, title, body);
             }
+
+        } catch (Exception e) {
+            log.error("알림 트리거 실패 - alertId: {}, error: {}", alertId, e.getMessage());
         }
     }
 
-    // 관심지역 코드로 사용자 ID 조회
-    private List<Long> findMembersByRegionCode(String regionCode) {
-        // user_alert_regions 테이블에서 조회
-        // 기존 쿼리 활용
-        return List.of(); // 아래에서 Repository 주입 후 구현
+    private void sendToMember(Long memberId, Long alertId, String title, String body) {
+        try {
+            // 중복 발송 방지
+            if (notificationLogRepository.existsByMemberIdAndAlertId(memberId, alertId)) {
+                return;
+            }
+
+            // 알림 타입 조회
+            String notificationType = preferenceRepository
+                    .findByMemberId(memberId)
+                    .map(p -> p.getNotificationType().name())
+                    .orElse(NotificationType.PUSH.name());
+
+            // NONE이면 발송 안 함
+            if (NotificationType.NONE.name().equals(notificationType)) return;
+
+            // FCM 토큰 조회
+            List<String> tokens = fcmTokenRepository
+                    .findAllByMemberId(memberId)
+                    .stream()
+                    .map(t -> t.getToken())
+                    .toList();
+
+            if (tokens.isEmpty()) return;
+
+            // FCM 발송
+            boolean sent = tokens.size() == 1
+                    ? fcmSendService.sendToToken(tokens.get(0), title, body,
+                    notificationType, String.valueOf(alertId))
+                    : fcmSendService.sendToTokens(tokens, title, body,
+                    notificationType, String.valueOf(alertId)) != null;
+
+            // 발송 이력 저장
+            notificationLogRepository.save(
+                    UserNotificationLog.builder()
+                            .memberId(memberId)
+                            .alertId(alertId)
+                            .status(sent ? "SENT" : "FAILED")
+                            .notificationType(notificationType)
+                            .build()
+            );
+
+        } catch (Exception e) {
+            log.error("개별 알림 발송 실패 - memberId: {}, error: {}", memberId, e.getMessage());
+        }
     }
 }

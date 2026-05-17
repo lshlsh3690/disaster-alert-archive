@@ -2,6 +2,7 @@ package com.disaster.alert.alertapi.scheduler;
 
 import com.disaster.alert.alertapi.api.DisasterOpenApiClient;
 import com.disaster.alert.alertapi.domain.disasteralert.service.DisasterAlertService;
+import com.disaster.alert.alertapi.domain.notification.service.AlertNotificationService;
 import com.disaster.alert.alertapi.global.translation.TranslationService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -18,6 +19,7 @@ public class DisasterFetchScheduler {
     private final DisasterOpenApiClient openApiClient;
     private final DisasterAlertService alertService;
     private final TranslationService translationService;
+    private final AlertNotificationService alertNotificationService;
 
     // 매 10분마다 실행
     @Scheduled(cron = "0 0/10 * * * *")
@@ -31,6 +33,12 @@ public class DisasterFetchScheduler {
         }
 
         List<Long> newAlertIds = alertService.saveData(raw);
-        newAlertIds.forEach(translationService::translateAndSaveAsync);
+
+        newAlertIds.forEach(alertId -> {
+            // 번역 비동기 처리
+            translationService.translateAndSaveAsync(alertId);
+            // FCM 알림 트리거
+            alertNotificationService.triggerNotification(alertId);
+        });
     }
 }
