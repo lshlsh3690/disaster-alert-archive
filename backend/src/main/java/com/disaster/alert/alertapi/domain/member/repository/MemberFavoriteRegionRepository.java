@@ -18,4 +18,6 @@ public interface MemberFavoriteRegionRepository
     void deleteByIdMemberIdAndIdLegalDistrictCode(Long memberId, String legalDistrictCode);
 
     List<MemberFavoriteRegion> findByIdLegalDistrictCodeIn(List<String> legalDistrictCodes);
+
+    List<MemberFavoriteRegion> findByIdLegalDistrictCode(String legalDistrictCode);
 }
