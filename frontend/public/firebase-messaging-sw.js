@@ -4,12 +4,12 @@ importScripts("https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js
 importScripts("https://www.gstatic.com/firebasejs/10.12.0/firebase-messaging-compat.js");
 
 firebase.initializeApp({
-  apiKey: "AIzaSyApBI5Nt1HoxcodorezhYPCR1_wprPDwWY",
-  authDomain: "disaster-alert-archive-c02ea.firebaseapp.com",
-  projectId: "disaster-alert-archive-c02ea",
-  storageBucket: "disaster-alert-archive-c02ea.firebasestorage.app",
-  messagingSenderId: "212414658608",
-  appId: "1:212414658608:web:c6a06ffecf9ffaea1955f5",
+  apiKey: "AIzaSyCsWLhVWPRFZFHmI27xz09qFGp5Lwl8Y9Y",
+  authDomain: "disaster-alert-archive.firebaseapp.com",
+  projectId: "disaster-alert-archive",
+  storageBucket: "disaster-alert-archive.firebasestorage.app",
+  messagingSenderId: "920878537636",
+  appId: "1:920878537636:web:e5825c24678cc9d215ff31",
 });
 
 const messaging = firebase.messaging();
