@@ -11,17 +11,7 @@ export const useNotificationPermission = () => {
   const [fcmToken, setFcmToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
-  // 초기 권한 상태 확인
-  useEffect(() => {
-    if (typeof window === "undefined" || !("Notification" in window)) {
-      setPermission("unsupported");
-      return;
-    }
-    setPermission(Notification.permission as NotificationPermissionStatus);
-  }, []);
-
   // FCM 토큰 발급
-  // useNotificationPermission.ts
   const getFcmToken = useCallback(async (): Promise<string | null> => {
 
     // SW 등록 후 활성화까지 대기
@@ -34,6 +24,19 @@ export const useNotificationPermission = () => {
     // 재시도 로직 (SW 활성화 + Firebase 간헐적 401 모두 대응)
     return await retryGetToken(3);
   }, []);
+
+  // 초기 권한 상태 확인 + 이미 granted면 토큰 재등록
+  useEffect(() => {
+    if (typeof window === "undefined" || !("Notification" in window)) {
+      setPermission("unsupported");
+      return;
+    }
+    const current = Notification.permission as NotificationPermissionStatus;
+    setPermission(current);
+    if (current === "granted") {
+      getFcmToken();
+    }
+  }, [getFcmToken]);
 
   async function retryGetToken(retries: number): Promise<string | null> {
     try {
