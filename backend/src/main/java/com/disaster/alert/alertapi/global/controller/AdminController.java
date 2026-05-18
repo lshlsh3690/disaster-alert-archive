@@ -14,7 +14,6 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/api/v1/admin")
-@Profile("!prod") // 운영 환경에서는 비활성화
 public class AdminController {
 
     private final DisasterFetchScheduler disasterFetchScheduler;
