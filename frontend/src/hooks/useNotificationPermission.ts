@@ -21,29 +21,51 @@ export const useNotificationPermission = () => {
   }, []);
 
   // FCM 토큰 발급
+  // useNotificationPermission.ts
   const getFcmToken = useCallback(async (): Promise<string | null> => {
+
+    // SW 등록 후 활성화까지 대기
+    if ("serviceWorker" in navigator) {
+      await navigator.serviceWorker.register("/firebase-messaging-sw.js", {
+        scope: "/firebase-cloud-messaging-push-scope",
+      });
+    }
+
+    // 재시도 로직 (SW 활성화 + Firebase 간헐적 401 모두 대응)
+    return await retryGetToken(3);
+  }, []);
+
+  async function retryGetToken(retries: number): Promise<string | null> {
     try {
       const messaging = getFirebaseMessaging();
-      console.log("messaging:", messaging);
       if (!messaging) return null;
 
-      console.log("getToken 호출 시작...");
+      const swRegistration = await navigator.serviceWorker.getRegistration(
+        "/firebase-cloud-messaging-push-scope"
+      );
+
       const token = await getToken(messaging, {
-        vapidKey: VAPID_KEY,
+        vapidKey: process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY,
+        serviceWorkerRegistration: swRegistration,
       });
-      console.log("getToken 결과:", token); // ← null인지 확인
 
       if (token) {
-        setFcmToken(token);
+        console.log("🔥 FCM Token:", token);
         await registerFcmToken(token);
         return token;
       }
       return null;
     } catch (error) {
-      console.error("FCM 토큰 발급 실패:", error);
-      return null;
+      console.warn(`FCM 재시도 남은 횟수: ${retries}`, error);
+      if (retries === 0) {
+        console.error("FCM 토큰 발급 최종 실패");
+        return null;
+      }
+      // 재시도 전 대기 (점진적 증가)
+      await new Promise(resolve => setTimeout(resolve, 1500));
+      return retryGetToken(retries - 1);
     }
-  }, []);
+  }
 
   // 알림 권한 요청
   const requestPermission = useCallback(async (): Promise<boolean> => {
