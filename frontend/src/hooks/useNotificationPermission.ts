@@ -97,6 +97,9 @@ export const useNotificationPermission = () => {
 
 // BE fcm_token API 호출
 async function registerFcmToken(token: string) {
+  const isTWA = document.referrer.includes("android-app://");
+  const deviceType = isTWA ? "ANDROID" : "WEB";
+
   try {
     await fetch("/api/v1/fcm-token", {
       method: "POST",
@@ -104,7 +107,7 @@ async function registerFcmToken(token: string) {
       credentials: "include",
       body: JSON.stringify({
         token,
-        deviceType: "WEB",
+        deviceType
       }),
     });
   } catch (error) {
