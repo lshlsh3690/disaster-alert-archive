@@ -5,7 +5,7 @@ const BASE = "/api/v1/notification-logs";
 
 export type NotificationLogItem = {
   id: number;
-  disasterAlertId: number;
+  alertId: number;
   message: string | null;
   disasterType: string | null;
   originalRegion: string | null;

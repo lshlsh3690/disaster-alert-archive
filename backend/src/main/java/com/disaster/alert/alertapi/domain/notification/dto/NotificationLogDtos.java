@@ -1,7 +1,7 @@
 package com.disaster.alert.alertapi.domain.notification.dto;
 
 import com.disaster.alert.alertapi.domain.disasteralert.model.DisasterAlert;
-import com.disaster.alert.alertapi.domain.notification.model.NotificationLog;
+import com.disaster.alert.alertapi.domain.notification.model.UserNotificationLog;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -10,7 +10,7 @@ public class NotificationLogDtos {
 
     public record ListItem(
             Long id,
-            Long disasterAlertId,
+            Long alertId,
             String message,
             String disasterType,
             String originalRegion,
@@ -18,11 +18,11 @@ public class NotificationLogDtos {
             boolean isRead,
             LocalDateTime sentAt
     ) {
-        public static ListItem from(NotificationLog log) {
+        public static ListItem from(UserNotificationLog log) {
             DisasterAlert alert = log.getDisasterAlert();
             return new ListItem(
                     log.getId(),
-                    log.getDisasterAlertId(),
+                    log.getAlertId(),
                     alert != null ? alert.getMessage() : null,
                     alert != null ? alert.getDisasterType() : null,
                     alert != null ? alert.getOriginalRegion() : null,
@@ -30,7 +30,7 @@ public class NotificationLogDtos {
                             ? alert.getEmergencyLevel().getDescription()
                             : null,
                     log.isRead(),
-                    log.getSentAt()
+                    log.getCreatedAt()
             );
         }
     }

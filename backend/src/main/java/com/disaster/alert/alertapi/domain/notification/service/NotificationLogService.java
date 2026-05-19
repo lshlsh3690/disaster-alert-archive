@@ -1,8 +1,8 @@
 package com.disaster.alert.alertapi.domain.notification.service;
 
 import com.disaster.alert.alertapi.domain.notification.dto.NotificationLogDtos;
-import com.disaster.alert.alertapi.domain.notification.model.NotificationLog;
-import com.disaster.alert.alertapi.domain.notification.repository.NotificationLogRepository;
+import com.disaster.alert.alertapi.domain.notification.model.UserNotificationLog;
+import com.disaster.alert.alertapi.domain.notification.repository.UserNotificationLogRepository;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -17,12 +17,13 @@ import java.util.List;
 @Transactional(readOnly = true)
 public class NotificationLogService {
 
-    private final NotificationLogRepository notificationLogRepository;
+    private final UserNotificationLogRepository userNotificationLogRepository;
 
     public NotificationLogDtos.PageResponse getMyNotifications(Long memberId, Pageable pageable) {
-        Page<NotificationLog> page = notificationLogRepository
-                .findByMemberIdWithAlertOrderBySentAtDesc(memberId, pageable);
-        long unreadCount = notificationLogRepository.countByMemberIdAndIsReadFalse(memberId);
+        Page<UserNotificationLog> page = userNotificationLogRepository
+                .findByMemberIdWithAlertOrderByCreatedAtDesc(memberId, pageable);
+
+        long unreadCount = userNotificationLogRepository.countByMemberIdAndIsReadFalse(memberId);
 
         List<NotificationLogDtos.ListItem> content = page.getContent().stream()
                 .map(NotificationLogDtos.ListItem::from)
@@ -40,7 +41,8 @@ public class NotificationLogService {
 
     @Transactional
     public void markAsRead(Long id, Long memberId) {
-        NotificationLog log = notificationLogRepository.findByIdAndMemberId(id, memberId)
+        UserNotificationLog log = userNotificationLogRepository
+                .findByIdAndMemberId(id, memberId)
                 .orElseThrow(() -> new EntityNotFoundException("알림을 찾을 수 없습니다."));
         log.markAsRead();
     }
