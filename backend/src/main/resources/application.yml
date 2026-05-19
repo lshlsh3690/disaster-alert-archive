@@ -42,6 +42,7 @@ spring:
     enabled: true
     baseline-on-migrate: true   # 기존 데이터가 있는 DB에 처음 붙을 때 충돌 방지
     baseline-version: 0         # 기준 버전 (0으로 두면 V1부터 신규 실행)
+    out-of-order: true          # 순서가 어긋난 미적용 마이그레이션 허용
     locations: classpath:db/migration
     encoding: UTF-8
 
