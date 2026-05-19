@@ -3,11 +3,12 @@
 import Link from "next/link";
 import OAuthButton from "@/components/OAuthButton";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import useLogin from "@/lib/mutations/useLogin";
 import EmailInput from "@/components/form/EmailInput";
 import { useForm } from "react-hook-form";
 import PasswordInput from "@/components/form/PasswordInput";
+import { useAuthStore } from "@/store/authStore";
 
 interface LoginFormData {
   email: string;
@@ -17,7 +18,12 @@ interface LoginFormData {
 
 export default function LoginPage() {
   const router = useRouter();
+  const user = useAuthStore((s) => s.user);
   const [error, setError] = useState("");
+
+  useEffect(() => {
+    if (user) router.replace("/");
+  }, [user, router]);
 
   const formMethods = useForm<LoginFormData>({
     mode: "onChange",
