@@ -19,8 +19,8 @@ messaging.onBackgroundMessage(async (payload) => {
 
   if (notificationType === "NONE") return;
 
-  const title = payload.notification?.title ?? "재난문자 알림";
-  const body = payload.notification?.body ?? "";
+  const title = payload.data?.title || payload.notification?.title || "재난문자 알림";
+  const body = payload.data?.body || payload.notification?.body || "";
   const alertId = payload.data?.alertId;
 
   const options = {
