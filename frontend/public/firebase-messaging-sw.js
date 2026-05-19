@@ -14,7 +14,7 @@ firebase.initializeApp({
 
 const messaging = firebase.messaging();
 
-messaging.onBackgroundMessage((payload) => {
+messaging.onBackgroundMessage(async (payload) => {
   const notificationType = payload.data?.notificationType ?? "PUSH";
 
   if (notificationType === "NONE") return;
@@ -41,7 +41,7 @@ messaging.onBackgroundMessage((payload) => {
     }),
   };
 
-  self.registration.showNotification(title, options);
+  await self.registration.showNotification(title, options);
 });
 
 self.addEventListener("notificationclick", (event) => {
