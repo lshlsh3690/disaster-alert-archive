@@ -49,7 +49,7 @@ export default function FavoriteRegionsPage() {
 
   const handleAdd = () => {
     if (!selectedSigunguCode) {
-      setErrorMsg("시/도와 시/군/구를 모두 선택해주세요.");
+      setErrorMsg("지역을 선택해주세요.");
       return;
     }
     if (regions.length >= MAX_REGIONS) {
@@ -153,11 +153,13 @@ export default function FavoriteRegionsPage() {
                     ? "먼저 시/도를 선택하세요"
                     : sigunguLoading
                       ? "불러오는 중..."
-                      : "시/군/구를 선택하세요"}
+                      : "시/군/구 또는 전체를 선택하세요"}
                 </option>
                 {sigunguList.map((s) => (
-                  <option key={s.code} value={s.code}>
-                    {s.translatedName ?? s.name}
+                  <option key={s.code ?? s.name} value={s.code ?? ""}>
+                    {s.name === "전체"
+                      ? `${selectedSido} 전체`
+                      : s.translatedName ?? s.name}
                   </option>
                 ))}
               </select>
@@ -177,7 +179,7 @@ export default function FavoriteRegionsPage() {
           </div>
 
           <div className="p-3 bg-blue-50 text-sm text-blue-700 rounded-lg">
-            💡 시/군/구 단위로 등록되며, 해당 지역에 발령되는 재난문자 알림을 받게 됩니다.
+            💡 시/도 전체 또는 시/군/구 단위로 등록할 수 있습니다. 시/군/구 목록에서 &quot;{selectedSido || "시/도"} 전체&quot;를 선택하면 해당 시/도 전체 알림을 받게 됩니다.
           </div>
         </section>
       </div>

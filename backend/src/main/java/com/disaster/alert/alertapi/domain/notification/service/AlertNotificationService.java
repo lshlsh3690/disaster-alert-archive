@@ -14,7 +14,9 @@ import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Stream;
 
 @Slf4j
 @Service
@@ -51,8 +53,18 @@ public class AlertNotificationService {
             String body = alert.getMessage();
 
             // 3. 해당 지역들을 관심지역으로 등록한 사용자 조회
+            // 시도 전체 등록 사용자를 위해 시도 레벨 코드도 포함 (예: "2900300000" → "2900000000")
+            List<String> sidoCodes = regionCodes.stream()
+                    .filter(code -> code.length() == 10)
+                    .map(code -> code.substring(0, 2) + "00000000")
+                    .distinct()
+                    .toList();
+            List<String> allCodesToSearch = Stream.concat(regionCodes.stream(), sidoCodes.stream())
+                    .distinct()
+                    .toList();
+
             List<Long> memberIds = favoriteRegionRepository
-                    .findByIdLegalDistrictCodeIn(regionCodes)  // 기존 메서드 활용
+                    .findByIdLegalDistrictCodeIn(allCodesToSearch)
                     .stream()
                     .map(r -> r.getId().getMemberId())
                     .distinct()

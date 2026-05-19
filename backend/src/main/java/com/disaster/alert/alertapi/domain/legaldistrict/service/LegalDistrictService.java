@@ -125,12 +125,17 @@ public class LegalDistrictService {
                     LegalDistrict::getCode,
                     (existing, replacement) -> existing
             ));
-    return sigunguNames.stream()
-            .map(name -> {
-                String code = nameToCodeKo.get(sido + " " + name);
-                return new SigunguResponse(name, null, code);
-            })
-            .toList();
+    String sidoCodeKo = legalDistrictRepository.findByName(sido)
+            .map(LegalDistrict::getCode)
+            .orElse(null);
+    List<SigunguResponse> resultKo = new ArrayList<>();
+    if (sidoCodeKo != null) {
+        resultKo.add(new SigunguResponse("전체", null, sidoCodeKo));
+    }
+    sigunguNames.stream()
+            .map(name -> new SigunguResponse(name, null, nameToCodeKo.get(sido + " " + name)))
+            .forEach(resultKo::add);
+    return resultKo;
 }
         SupportedLanguage language = langOpt.get();
 
@@ -167,16 +172,21 @@ public class LegalDistrictService {
 
         String sidoTranslated = sidoCode != null ? codeToTranslated.get(sidoCode) : null;
 
-        // 7) 최종 매핑: 시군구 번역에서 시도 prefix 제거
-        return sigunguNames.stream()
-        .map(name -> {
-            String fullName = sido + " " + name;
-            String code = nameToCode.get(fullName);
-            String fullTranslated = code != null ? codeToTranslated.get(code) : null;
-            String sigunguOnly = stripSidoPrefix(fullTranslated, sidoTranslated);
-            return new SigunguResponse(name, sigunguOnly, code); // ← code 추가
-        })
-        .toList();
+        // 7) 최종 매핑: 시도 전체 항목을 맨 앞에, 이후 시군구 목록
+        List<SigunguResponse> result = new ArrayList<>();
+        if (sidoCode != null) {
+            result.add(new SigunguResponse("전체", null, sidoCode));
+        }
+        sigunguNames.stream()
+            .map(name -> {
+                String fullName = sido + " " + name;
+                String code = nameToCode.get(fullName);
+                String fullTranslated = code != null ? codeToTranslated.get(code) : null;
+                String sigunguOnly = stripSidoPrefix(fullTranslated, sidoTranslated);
+                return new SigunguResponse(name, sigunguOnly, code);
+            })
+            .forEach(result::add);
+        return result;
     }
 
     /**
