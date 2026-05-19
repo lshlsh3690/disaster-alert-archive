@@ -131,17 +131,15 @@ export default function NotificationsPage() {
                       {formatDate(item.sentAt)}
                     </time>
                   </div>
-                  {item.disasterAlertId && (
-                    <div className="mt-2">
-                      <Link
-                        href={`/alerts/${item.disasterAlertId}`}
-                        onClick={(e) => e.stopPropagation()}
-                        className="text-xs text-blue-500 hover:underline"
-                      >
-                        상세 보기 →
-                      </Link>
-                    </div>
-                  )}
+                  <div className="mt-2">
+                    <Link
+                      href={`/alerts/${item.alertId}`}
+                      onClick={(e) => e.stopPropagation()}
+                      className="text-xs text-blue-500 hover:underline"
+                    >
+                      상세 보기 →
+                    </Link>
+                  </div>
                 </button>
               </li>
             ))}

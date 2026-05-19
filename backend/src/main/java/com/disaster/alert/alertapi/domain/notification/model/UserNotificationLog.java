@@ -1,5 +1,6 @@
 package com.disaster.alert.alertapi.domain.notification.model;
 
+import com.disaster.alert.alertapi.domain.disasteralert.model.DisasterAlert;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Builder;
@@ -27,11 +28,18 @@ public class UserNotificationLog {
     @Column(name = "alert_id", nullable = false)
     private Long alertId;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "alert_id", insertable = false, updatable = false)
+    private DisasterAlert disasterAlert;
+
     @Column(name = "status", nullable = false)
     private String status; // SENT / FAILED
 
     @Column(name = "notification_type", nullable = false)
     private String notificationType;
+
+    @Column(name = "is_read", nullable = false)
+    private boolean isRead = false;
 
     @CreatedDate
     @Column(nullable = false, updatable = false)
@@ -44,5 +52,10 @@ public class UserNotificationLog {
         this.alertId = alertId;
         this.status = status;
         this.notificationType = notificationType;
+        this.isRead = false;
+    }
+
+    public void markAsRead() {
+        this.isRead = true;
     }
 }
