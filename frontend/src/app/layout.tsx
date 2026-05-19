@@ -4,6 +4,7 @@ import "./globals.css";
 import Header from "@components/Header";
 import ReactQueryProvider from "@/lib/reactQueryProvider";
 import Footer from "@/components/Footer";
+import NotificationPermissionBanner from "@/components/notification/NotificationPermissionBanner";
 
 
 const geistSans = Geist({
@@ -260,6 +261,7 @@ export default function RootLayout({
           <Header />
           {children}
           <Footer />
+          <NotificationPermissionBanner />
         </ReactQueryProvider>
       </body>
     </html>
