@@ -4,11 +4,16 @@ import com.disaster.alert.alertapi.domain.notification.model.NotificationLog;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 import java.util.List;
 import java.util.Optional;
 
 public interface NotificationLogRepository extends JpaRepository<NotificationLog, Long> {
+
+    @Query("SELECT nl FROM NotificationLog nl JOIN FETCH nl.disasterAlert WHERE nl.memberId = :memberId ORDER BY nl.sentAt DESC")
+    Page<NotificationLog> findByMemberIdWithAlertOrderBySentAtDesc(@Param("memberId") Long memberId, Pageable pageable);
 
     // 알림함 전체 조회 (최신순)
     List<NotificationLog> findByMemberIdOrderBySentAtDesc(Long memberId);

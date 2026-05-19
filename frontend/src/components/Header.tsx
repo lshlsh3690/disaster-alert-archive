@@ -105,7 +105,10 @@ export default function Header() {
                 {nickname ?? t.nav.user} ▾
               </button>
               {open && (
-                <div className="absolute right-0 mt-2 w-36 bg-white border rounded shadow text-sm z-50">
+                <div className="absolute right-0 mt-2 w-40 bg-white border rounded shadow text-sm z-50">
+                  <Link href="/notifications" className="block px-4 py-2 hover:bg-gray-50" onClick={() => setOpen(false)}>
+                    알림 이력
+                  </Link>
                   <Link href="/user/settings/regions" className="block px-4 py-2 hover:bg-gray-50" onClick={() => setOpen(false)}>
                     {t.nav.favoriteRegions}
                   </Link>
@@ -170,6 +173,9 @@ export default function Header() {
           </div>
           {isLoggedIn ? (
             <>
+              <Link href="/notifications" className="block px-2 py-2 rounded hover:bg-gray-50" onClick={() => setMobileMenuOpen(false)}>
+                알림 이력
+              </Link>
               <Link href="/user/settings/regions" className="block px-2 py-2 rounded hover:bg-gray-50" onClick={() => setMobileMenuOpen(false)}>
                 {t.nav.favoriteRegions}
               </Link>
