@@ -11,8 +11,10 @@ import { useRouter } from "next/navigation";
 import { useInitAuth } from "@/hooks/useInitAuth";
 import { LANGUAGES, LangCode } from "@/constants/language";
 import { useI18n } from "@/hooks/useI18n";
+import { useForegroundMessage } from "@/hooks/useForegroundMessage";
 
 export default function Header() {
+  useForegroundMessage();
   const router = useRouter();
   const pathname = usePathname();
 
