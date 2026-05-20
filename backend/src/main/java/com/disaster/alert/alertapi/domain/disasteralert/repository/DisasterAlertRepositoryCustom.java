@@ -22,5 +22,7 @@ public interface DisasterAlertRepositoryCustom {
 
     List<DisasterAlertStatResponse.RegionStat> getStatsSido(AlertSearchRequest request);
 
+    List<DisasterAlertStatResponse.RegionStat> getStatsSigungu(AlertSearchRequest request);
+
     Page<CombinedAlertResponse> searchCombined(AlertSearchRequest request, String source, Pageable pageable);
 }

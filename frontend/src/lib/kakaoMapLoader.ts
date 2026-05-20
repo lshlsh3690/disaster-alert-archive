@@ -24,7 +24,7 @@ export function loadKakaoMapSdk(appKey?: string): Promise<typeof window.kakao> {
     s.id = scriptId;
     s.async = true;
     s.defer = true;
-    s.src = `https://dapi.kakao.com/v2/maps/sdk.js?appkey=${key}&autoload=false`;
+    s.src = `https://dapi.kakao.com/v2/maps/sdk.js?appkey=${key}&autoload=false&libraries=services`;
     s.onload = () => {
       if (!window.kakao) return reject(new Error("kakao not found"));
       window.kakao.maps.load(() => resolve(window.kakao));

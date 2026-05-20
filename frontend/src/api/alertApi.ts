@@ -54,6 +54,13 @@ export async function fetchLatestAlertsBySido(
   return data;
 }
 
+export async function fetchSigunguStats(
+  params: AlertSearchRequest
+): Promise<Array<{ region: string; count: number }>> {
+  const res = await instance.get("/api/v1/alerts/stats/sigungu", { params });
+  return z.array(ZRegionStat).parse(res.data);
+}
+
 export type Sigungu = {
   name: string;          // 한국어 원문 (검색 API 전달용)
   translatedName: string | null; // 번역된 이름 (화면 표시용)
