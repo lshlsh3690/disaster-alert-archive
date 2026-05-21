@@ -12,6 +12,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
 import java.util.List;
@@ -42,6 +43,13 @@ public class WeatherCollectService {
 
     private static final DateTimeFormatter BASE_DATE_FMT = DateTimeFormatter.ofPattern("yyyyMMdd");
 
+    /**
+     * 한국 표준시 (KST, UTC+9).
+     * 기상청 API 가 KST 시각만 받고, 우리 서비스의 모든 시간 표현도 KST 기준.
+     * JVM 기본 타임존이 UTC 인 운영 환경에서도 일관된 동작을 보장하기 위해 명시.
+     */
+    private static final ZoneId KST = ZoneId.of("Asia/Seoul");
+
     private final KmaNowcastApiClient apiClient;
     private final WeatherStationMappingRepository mappingRepository;
     private final WeatherObservationRepository observationRepository;
@@ -64,9 +72,11 @@ public class WeatherCollectService {
                     .add(m);
         }
 
-        // 2. 기준 시각 — 직전 정각
-        LocalDateTime now = LocalDateTime.now();
-        LocalDateTime observedAt = now.withMinute(0).withSecond(0).withNano(0);
+        // 2. 기준 시각 — 직전 정각 (KST 기준).
+        //    LocalDateTime.now() 만 쓰면 JVM 기본 타임존을 따르는데, 운영 환경은 보통 UTC 라
+        //    한국 시각보다 9시간 어긋남. 항상 KST 로 호출하도록 ZoneId 명시.
+        LocalDateTime observedAt = LocalDateTime.now(KST)
+                .withMinute(0).withSecond(0).withNano(0);
         String baseDate = observedAt.format(BASE_DATE_FMT);
         String baseTime = String.format("%02d00", observedAt.getHour());
 
