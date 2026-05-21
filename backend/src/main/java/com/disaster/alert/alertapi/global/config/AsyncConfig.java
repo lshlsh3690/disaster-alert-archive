@@ -24,4 +24,19 @@ public class AsyncConfig {
         executor.initialize();
         return executor;
     }
+
+    /**
+     * 날씨 백필 비동기 실행 전용 풀.
+     * 백필러는 단일 long-running 작업이므로 동시 실행을 컨트롤러 측에서 막고 풀 크기는 1.
+     */
+    @Bean(name = "backfillExecutor")
+    public Executor backfillExecutor() {
+        ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
+        executor.setCorePoolSize(1);
+        executor.setMaxPoolSize(1);
+        executor.setQueueCapacity(0);
+        executor.setThreadNamePrefix("weather-backfill-");
+        executor.initialize();
+        return executor;
+    }
 }

@@ -2,6 +2,7 @@ package com.disaster.alert.alertapi.domain.weather.repository;
 
 import com.disaster.alert.alertapi.domain.weather.model.WeatherStationMapping;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
 
 import java.util.List;
 
@@ -31,4 +32,12 @@ public interface WeatherStationMappingRepository
      * 기상청 단기예보 API 1회 호출 결과를 여러 시군구로 분배할 때 사용.
      */
     List<WeatherStationMapping> findByKmaNxAndKmaNy(Integer kmaNx, Integer kmaNy);
+
+    /**
+     * 매핑에 사용 중인 ASOS 지점 번호 전체 (중복 제거, 정렬).
+     * 백필러 시작 시 "어떤 지점들을 호출해야 하는가" 결정.
+     */
+    @Query("SELECT DISTINCT m.asosStationId FROM WeatherStationMapping m " +
+           "WHERE m.asosStationId IS NOT NULL ORDER BY m.asosStationId")
+    List<String> findDistinctAsosStationIds();
 }
