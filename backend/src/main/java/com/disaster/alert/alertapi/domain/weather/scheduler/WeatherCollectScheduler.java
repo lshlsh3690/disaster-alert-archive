@@ -27,10 +27,14 @@ public class WeatherCollectScheduler {
     private final WeatherCollectService weatherCollectService;
 
     /**
-     * 매시 45분 자동 수집.
+     * 매시 45분 자동 수집 (한국 표준시 기준).
      * cron: 초 분 시 일 월 요일 → "0 45 * * * *"
+     *
+     * <p><b>zone = "Asia/Seoul"</b> 명시 이유:
+     * JVM 기본 타임존이 UTC 인 운영 환경에서도 한국 시각 기준으로 동작하도록.
+     * 명시하지 않으면 UTC 매시 45분 = KST 매시 45분 - 9시간 으로 어긋남.
      */
-    @Scheduled(cron = "0 45 * * * *")
+    @Scheduled(cron = "0 45 * * * *", zone = "Asia/Seoul")
     public void runHourly() {
         log.info("WeatherCollectScheduler 시작");
         try {
