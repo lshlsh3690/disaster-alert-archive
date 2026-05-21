@@ -418,6 +418,10 @@ public class DisasterAlertService {
         return regionStats;
     }
 
+    public List<DisasterAlertStatResponse.RegionStat> countBySigungu(AlertSearchRequest request) {
+        return disasterAlertRepository.getStatsSigungu(request);
+    }
+
     // ============================================================================
     //  다국어 응답 — 내부 헬퍼
     // ============================================================================

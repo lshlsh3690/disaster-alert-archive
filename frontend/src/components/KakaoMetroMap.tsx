@@ -1,4 +1,3 @@
-// src/components/map/KakaoMetroMap.tsx
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -18,15 +17,24 @@ function todayRange() {
   return { startDate: s, endDate: s };
 }
 
-//한국 경계 박스(대략): SW(제주 남서) ~ NE(강원 북동)
 const KOREA_SW = { lat: 32.5, lng: 124.5 };
 const KOREA_NE = { lat: 38.8, lng: 132.0 };
+
+const SIDO_ZOOM: Record<string, number> = {
+  "서울특별시": 8, "부산광역시": 8, "대구광역시": 8, "인천광역시": 8,
+  "광주광역시": 8, "대전광역시": 8, "울산광역시": 8, "세종특별자치시": 8,
+  "경기도": 9, "강원특별자치도": 9, "충청북도": 9, "충청남도": 9,
+  "전북특별자치도": 9, "전라남도": 9, "경상북도": 9, "경상남도": 9,
+  "제주특별자치도": 8,
+};
 
 interface KakaoMapProps {
   todayOnly?: boolean;
   zoomable?: boolean;
   zoomLevel_MAX?: number;
   zoomLevel_MIN?: number;
+  selectedSido?: string;
+  sigunguStats?: Array<{ name: string; count: number }>;
 }
 
 export default function KakaoMetroMap({
@@ -34,8 +42,12 @@ export default function KakaoMetroMap({
   zoomable = true,
   zoomLevel_MAX = 12,
   zoomLevel_MIN = 3,
+  selectedSido,
+  sigunguStats,
 }: KakaoMapProps) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const mapRef = useRef<any>(null);
+  const overlaysRef = useRef<OverlayRef[]>([]);
   const router = useRouter();
   const [{ ready, kakao }, setReady] = useState<{ ready: boolean; kakao: any | null }>({ ready: false, kakao: null });
 
@@ -43,53 +55,45 @@ export default function KakaoMetroMap({
   const { data, isLoading, isError } = useSidoStats(dateParams);
   const metroCounts = useMemo(() => groupToMetros(data ?? []), [data]);
 
+  // 지도 초기화
   useEffect(() => {
-    let overlays: OverlayRef[] = [];
-    let map: any;
-
     loadKakaoMapSdk()
       .then((kk) => {
         setReady({ ready: true, kakao: kk });
         if (!containerRef.current) return;
 
         const INITIAL_LEVEL = Math.min(Math.max(zoomLevel_MIN, zoomLevel_MAX), 12);
+        const center = new kk.maps.LatLng(36.3, 127.8);
+        const map = new kk.maps.Map(containerRef.current, { center, level: INITIAL_LEVEL });
+        mapRef.current = map;
 
-        const center = new kk.maps.LatLng(36.3, 127.8); // 대한민국 중심 좌표
-        map = new kk.maps.Map(containerRef.current, {
-          center,
-          level: INITIAL_LEVEL,
-        });
-
-        // 2) 대한민국 경계(bounds) 설정 + 그 범위로 맞춤
         const bounds = new kk.maps.LatLngBounds(
           new kk.maps.LatLng(KOREA_SW.lat, KOREA_SW.lng),
           new kk.maps.LatLng(KOREA_NE.lat, KOREA_NE.lng)
         );
         map.setBounds(bounds);
-
         map.setZoomable(!!zoomable);
 
-        // 3) 줌 제한
         if (zoomable) {
           map.setMinLevel?.(zoomLevel_MIN);
           map.setMaxLevel?.(zoomLevel_MAX);
+          const zoomControl = new kk.maps.ZoomControl();
+          map.addControl(zoomControl, kk.maps.ControlPosition.RIGHT);
         } else {
           map.setMinLevel?.(INITIAL_LEVEL);
           map.setMaxLevel?.(INITIAL_LEVEL);
         }
 
-        // 4) 범위 밖으로 드래그/줌 시 강제 복귀
         const clampCenter = () => {
           const c = map.getCenter();
           const sw = bounds.getSouthWest();
           const ne = bounds.getNorthEast();
-          const clampedLat = Math.min(Math.max(c.getLat(), sw.getLat()), ne.getLat());
-          const clampedLng = Math.min(Math.max(c.getLng(), sw.getLng()), ne.getLng());
-          if (clampedLat !== c.getLat() || clampedLng !== c.getLng()) {
-            map.setCenter(new kk.maps.LatLng(clampedLat, clampedLng));
+          const lat = Math.min(Math.max(c.getLat(), sw.getLat()), ne.getLat());
+          const lng = Math.min(Math.max(c.getLng(), sw.getLng()), ne.getLng());
+          if (lat !== c.getLat() || lng !== c.getLng()) {
+            map.setCenter(new kk.maps.LatLng(lat, lng));
           }
         };
-
         const clampLevel = () => {
           const lv = map.getLevel();
           const hi = zoomable ? zoomLevel_MAX : INITIAL_LEVEL;
@@ -99,79 +103,117 @@ export default function KakaoMetroMap({
         };
 
         kk.maps.event.addListener(map, "dragend", clampCenter);
+        if (zoomable) kk.maps.event.addListener(map, "zoom_changed", clampLevel);
+        kk.maps.event.addListener(map, "idle", () => { clampLevel(); clampCenter(); });
+      })
+      .catch(() => setReady({ ready: false, kakao: null }));
 
-        if (zoomable) {
-          kk.maps.event.addListener(map, "zoom_changed", clampLevel);
-          // 컨트롤(줌)
-          const zoomControl = new kk.maps.ZoomControl();
-          map.addControl(zoomControl, kk.maps.ControlPosition.RIGHT);
-        }
+    return () => {
+      overlaysRef.current.forEach((ov) => ov.setMap(null));
+      overlaysRef.current = [];
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [zoomable, zoomLevel_MAX, zoomLevel_MIN]);
 
-        // idle: 이동·확대/축소 후 유휴 상태 → 최종 보정
-        kk.maps.event.addListener(map, "idle", () => {
-          clampLevel();
-          clampCenter();
-        });
+  // 오버레이 갱신 (시도/시군구 모드 전환)
+  useEffect(() => {
+    if (!ready || !kakao || !mapRef.current) return;
+    const map = mapRef.current;
+    let cancelled = false;
 
-        // 오버레이 생성 함수
-        const createOverlay = (name: Metro, count: number) => {
-          const pos = METRO_COORDS[name];
-          if (!pos) return;
+    overlaysRef.current.forEach((ov) => ov.setMap(null));
+    overlaysRef.current = [];
+
+    if (selectedSido && sigunguStats && sigunguStats.length > 0) {
+      // 시군구 모드: 선택된 시/도로 줌인
+      const sidoCoords = METRO_COORDS[selectedSido as Metro];
+      if (sidoCoords) {
+        map.setZoomable(true);
+        map.setMinLevel?.(3);
+        map.setMaxLevel?.(12);
+        map.setCenter(new kakao.maps.LatLng(sidoCoords.lat, sidoCoords.lng));
+        map.setLevel(SIDO_ZOOM[selectedSido] ?? 9);
+      }
+
+      const geocoder = new kakao.maps.services.Geocoder();
+      sigunguStats.forEach(({ name, count }) => {
+        geocoder.addressSearch(`${selectedSido} ${name}`, (result: any, status: any) => {
+          if (cancelled || status !== kakao.maps.services.Status.OK) return;
 
           const div = document.createElement("div");
           div.style.cssText =
-            "transform: translate(-50%, -50%); background: rgba(255,255,255,0.6); border: 1px solid #e5e7eb; border-radius: 12px; padding: 4px 8px; box-shadow: 0 1px 2px rgba(0,0,0,0.06); display:flex; flex-direction:column; align-items:center; gap:2px; cursor:pointer; transition: background 0.2s;";
-          div.addEventListener("mouseenter", () => {
-            div.style.background = "white";
-          });
-          div.addEventListener("mouseleave", () => {
-            div.style.background = "rgba(255,255,255,0.6)";
-          });
+            "transform:translate(-50%,-50%);background:rgba(255,255,255,0.85);border:1px solid #e5e7eb;border-radius:12px;padding:3px 7px;box-shadow:0 1px 3px rgba(0,0,0,0.1);display:flex;flex-direction:column;align-items:center;gap:1px;cursor:pointer;";
+          div.addEventListener("mouseenter", () => { div.style.background = "white"; });
+          div.addEventListener("mouseleave", () => { div.style.background = "rgba(255,255,255,0.85)"; });
           div.innerHTML = `
-              <div style="font-size:10px;color:#6b7280;">${name}</div>
-              <div style="font-size:14px;font-weight:700;">${count.toLocaleString("ko-KR")}</div>
-            `;
+            <div style="font-size:9px;color:#6b7280;">${name}</div>
+            <div style="font-size:12px;font-weight:700;color:#111827;">${count.toLocaleString("ko-KR")}</div>
+          `;
           div.addEventListener("click", () => {
-            router.push(`/alerts?region=${encodeURIComponent(name)}#list`);
+            router.push(`/alerts?sido=${encodeURIComponent(selectedSido)}&sigungu=${encodeURIComponent(name)}#list`);
           });
 
-          const overlay = new kk.maps.CustomOverlay({
-            position: new kk.maps.LatLng(pos.lat, pos.lng),
+          const overlay = new kakao.maps.CustomOverlay({
+            position: new kakao.maps.LatLng(parseFloat(result[0].y), parseFloat(result[0].x)),
             content: div,
             yAnchor: 0.5,
             xAnchor: 0.5,
             clickable: true,
             map,
           });
-          overlays.push(overlay);
-        };
 
-        // 초기 렌더
-        Object.entries(metroCounts).forEach(([name, count]) => createOverlay(name as Metro, count as number));
-      })
-      .catch(() => setReady({ ready: false, kakao: null }));
+          if (cancelled) {
+            overlay.setMap(null);
+          } else {
+            overlaysRef.current.push(overlay);
+          }
+        });
+      });
+    } else {
+      // 시도 모드: 전국 뷰로 복귀
+      const bounds = new kakao.maps.LatLngBounds(
+        new kakao.maps.LatLng(KOREA_SW.lat, KOREA_SW.lng),
+        new kakao.maps.LatLng(KOREA_NE.lat, KOREA_NE.lng)
+      );
+      map.setBounds(bounds);
+      map.setZoomable(!!zoomable);
+      if (!zoomable) {
+        const lv = map.getLevel();
+        map.setMinLevel?.(lv);
+        map.setMaxLevel?.(lv);
+      }
 
-    // 데이터 변경 시 오버레이 갱신
-    if (ready && kakao && containerRef.current) {
-      // 기존 오버레이 제거 후 다시 그림
-      // (위 load 이후 데이터가 바뀌었을 때 재실행되도록 의존성 조합 고려)
+      Object.entries(metroCounts).forEach(([name, count]) => {
+        const pos = METRO_COORDS[name as Metro];
+        if (!pos) return;
+
+        const div = document.createElement("div");
+        div.style.cssText =
+          "transform:translate(-50%,-50%);background:rgba(255,255,255,0.6);border:1px solid #e5e7eb;border-radius:12px;padding:4px 8px;box-shadow:0 1px 2px rgba(0,0,0,0.06);display:flex;flex-direction:column;align-items:center;gap:2px;cursor:pointer;transition:background 0.2s;";
+        div.addEventListener("mouseenter", () => { div.style.background = "white"; });
+        div.addEventListener("mouseleave", () => { div.style.background = "rgba(255,255,255,0.6)"; });
+        div.innerHTML = `
+          <div style="font-size:10px;color:#6b7280;">${name}</div>
+          <div style="font-size:14px;font-weight:700;">${(count as number).toLocaleString("ko-KR")}</div>
+        `;
+        div.addEventListener("click", () => {
+          router.push(`/alerts?region=${encodeURIComponent(name)}#list`);
+        });
+
+        const overlay = new kakao.maps.CustomOverlay({
+          position: new kakao.maps.LatLng(pos.lat, pos.lng),
+          content: div,
+          yAnchor: 0.5,
+          xAnchor: 0.5,
+          clickable: true,
+          map,
+        });
+        overlaysRef.current.push(overlay);
+      });
     }
 
-    return () => {
-      // 정리
-      overlays.forEach((ov) => ov.setMap(null));
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ready, kakao, zoomable, zoomLevel_MAX, zoomLevel_MIN]); // 최초 SDK 로드용
-
-  // metroCounts 변화에 반응해 오버레이 갱신
-  useEffect(() => {
-    if (!ready || !kakao || !containerRef.current) return;
-    // 가장 간단한 방법: 맵 인스턴스를 찾아 재생성보단, 아래처럼 리렌더 시 container를 비우고 다시 초기화해도 OK
-    // 여기서는 간결성을 위해 SDK 초기화 이펙트를 dependency 최소화하고,
-    // 최초 렌더 이후 건수 텍스트만 업데이트 하려면 오버레이 배열 관리를 더 세밀하게 해야 함.
-    // 대시보드 성격상 빈번 변경이 아니므로 최초 로드 시점 데이터로 충분한 경우가 많음.
-  }, [metroCounts, ready, kakao]);
+    return () => { cancelled = true; };
+  }, [ready, kakao, selectedSido, sigunguStats, metroCounts, zoomable, router]);
 
   return (
     <div className="bg-white rounded-xl shadow w-full h-[300px] relative overflow-hidden">
@@ -185,7 +227,7 @@ export default function KakaoMetroMap({
       )}
       <div ref={containerRef} className="w-full h-full" />
       <div className="absolute bottom-2 right-3 text-xs text-gray-400 bg-white/70 rounded px-2 py-1">
-        데이터: 광역시 합산(숫자만 표시)
+        {selectedSido ? `${selectedSido} 시/군/구별` : "시도별 합산"}
       </div>
     </div>
   );

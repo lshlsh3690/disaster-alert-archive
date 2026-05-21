@@ -72,6 +72,13 @@ public class DisasterAlertController {
         return ResponseEntity.ok(disasterAlertService.countBySido(request));
     }
 
+    @GetMapping("/stats/sigungu")
+    public ResponseEntity<List<DisasterAlertStatResponse.RegionStat>> countBySigungu(
+            AlertSearchRequest request
+    ) {
+        return ResponseEntity.ok(disasterAlertService.countBySigungu(request));
+    }
+
     /**
      * 재난문자 상세 조회.
      *
