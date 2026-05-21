@@ -2,6 +2,9 @@ package com.disaster.alert.alertapi.domain.weather.repository;
 
 import com.disaster.alert.alertapi.domain.weather.model.WeatherObservation;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -37,4 +40,51 @@ public interface WeatherObservationRepository
      */
     boolean existsByLegalDistrictCodeAndObservedAt(
             String legalDistrictCode, LocalDateTime observedAt);
+
+    /**
+     * UPSERT — INSERT 시도 후 (legal_district_code, observed_at) 충돌 시 UPDATE.
+     *
+     * <p>cron 수집에서 사용. 같은 시각을 재시도하거나 수동 트리거가 중복 호출돼도 안전.
+     * 또한 향후 백필/예보 등 다른 소스가 같은 시점을 채워둔 자리에 더 신뢰성 높은 데이터가
+     * 들어올 때 자연스럽게 덮어쓰기.
+     *
+     * <p>PostgreSQL 의 {@code ON CONFLICT ... DO UPDATE} (UPSERT) 사용.
+     * {@code EXCLUDED} 는 INSERT 하려던 새 값을 의미.
+     *
+     * <p><b>created_at</b> 은 NEW row 일 땐 NOW() 기본값으로 채워지고,
+     * UPDATE 시엔 유지하기 위해 SET 절에서 제외.
+     */
+    @Modifying
+    @Query(value = """
+            INSERT INTO weather_observation (
+                legal_district_code, observed_at,
+                temperature, precipitation, wind_speed, wind_direction,
+                humidity, pressure, source
+            ) VALUES (
+                :legalDistrictCode, :observedAt,
+                :temperature, :precipitation, :windSpeed, :windDirection,
+                :humidity, :pressure, :source
+            )
+            ON CONFLICT (legal_district_code, observed_at)
+            DO UPDATE SET
+                temperature    = EXCLUDED.temperature,
+                precipitation  = EXCLUDED.precipitation,
+                wind_speed     = EXCLUDED.wind_speed,
+                wind_direction = EXCLUDED.wind_direction,
+                humidity       = EXCLUDED.humidity,
+                pressure       = EXCLUDED.pressure,
+                source         = EXCLUDED.source
+            """,
+            nativeQuery = true)
+    void upsert(
+            @Param("legalDistrictCode") String legalDistrictCode,
+            @Param("observedAt") LocalDateTime observedAt,
+            @Param("temperature") Double temperature,
+            @Param("precipitation") Double precipitation,
+            @Param("windSpeed") Double windSpeed,
+            @Param("windDirection") Integer windDirection,
+            @Param("humidity") Double humidity,
+            @Param("pressure") Double pressure,
+            @Param("source") String source
+    );
 }

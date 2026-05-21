@@ -65,6 +65,13 @@ disaster-alert:
   api:
     service-key: ${DISASTER_ALERT_SERVICE_KEY}
 
+# 기상청 초단기실황 API (공공데이터포털 게이트웨이)
+# - 매시 정각 관측값을 매시 40분에 발표 → 스케줄러가 매시 45분에 호출
+kma:
+  api:
+    base-url: https://apis.data.go.kr/1360000
+    service-key: ${KMA_ASOS_API_KEY}
+
 jwt:
   secret: ${JWT_SECRET}
   access-token-expiration: 3600 # in seconds
