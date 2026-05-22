@@ -175,7 +175,41 @@ public class DisasterAlertRepositoryImpl implements DisasterAlertRepositoryCusto
                 )
                 .groupBy(sido)
                 .orderBy(disasterAlert.id.countDistinct().desc(), sido.asc())
-                .fetch();    }
+                .fetch();
+    }
+
+    @Override
+    public List<DisasterAlertStatResponse.RegionStat> getStatsSigungu(AlertSearchRequest request) {
+        StringTemplate norm =
+                Expressions.stringTemplate(
+                        "function('btrim', function('regexp_replace', {0}, '\\\\s+', ' ', 'g'))",
+                        legalDistrict.name
+                );
+
+        // 시/도 + 시/군/구 = 첫 두 토큰 (두 번째 토큰이 없으면 첫 토큰만)
+        StringTemplate sigungu = Expressions.stringTemplate(
+                "CASE WHEN function('split_part', {0}, ' ', 2) = '' " +
+                "THEN function('split_part', {0}, ' ', 1) " +
+                "ELSE function('split_part', {0}, ' ', 1) || ' ' || function('split_part', {0}, ' ', 2) END",
+                norm
+        );
+
+        return queryFactory
+                .select(Projections.constructor(DisasterAlertStatResponse.RegionStat.class,
+                        sigungu,
+                        disasterAlert.id.countDistinct()
+                ))
+                .from(disasterAlert)
+                .join(disasterAlert.disasterAlertRegions, disasterAlertRegion)
+                .join(disasterAlertRegion.legalDistrict, legalDistrict)
+                .where(
+                        byAlertCondition(request),
+                        regionFilterOnJoin(request)
+                )
+                .groupBy(sigungu)
+                .orderBy(disasterAlert.id.countDistinct().desc(), sigungu.asc())
+                .fetch();
+    }
 
     private BooleanBuilder byAlertCondition(AlertSearchRequest condition) {
         BooleanBuilder b = new BooleanBuilder();
