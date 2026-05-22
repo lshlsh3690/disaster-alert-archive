@@ -21,11 +21,11 @@ const KOREA_SW = { lat: 32.5, lng: 124.5 };
 const KOREA_NE = { lat: 38.8, lng: 132.0 };
 
 const SIDO_ZOOM: Record<string, number> = {
-  "서울특별시": 8, "부산광역시": 8, "대구광역시": 8, "인천광역시": 8,
-  "광주광역시": 8, "대전광역시": 8, "울산광역시": 8, "세종특별자치시": 8,
-  "경기도": 9, "강원특별자치도": 9, "충청북도": 9, "충청남도": 9,
-  "전북특별자치도": 9, "전라남도": 9, "경상북도": 9, "경상남도": 9,
-  "제주특별자치도": 8,
+  "서울특별시": 9, "부산광역시": 9, "대구광역시": 9, "인천광역시": 9,
+  "광주광역시": 9, "대전광역시": 9, "울산광역시": 9, "세종특별자치시": 9,
+  "경기도": 11, "강원특별자치도": 11, "충청북도": 11, "충청남도": 11,
+  "전북특별자치도": 11, "전라남도": 11, "경상북도": 11, "경상남도": 11,
+  "제주특별자치도": 11,
 };
 
 interface KakaoMapProps {
@@ -35,6 +35,10 @@ interface KakaoMapProps {
   zoomLevel_MIN?: number;
   selectedSido?: string;
   sigunguStats?: Array<{ name: string; count: number }>;
+  showModeLabel?: boolean;
+  showOverlays?: boolean;
+  mapHeight?: string;
+  nationalLevel?: number;
 }
 
 export default function KakaoMetroMap({
@@ -44,6 +48,10 @@ export default function KakaoMetroMap({
   zoomLevel_MIN = 3,
   selectedSido,
   sigunguStats,
+  showModeLabel = true,
+  showOverlays = true,
+  mapHeight = "300px",
+  nationalLevel,
 }: KakaoMapProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<any>(null);
@@ -72,6 +80,7 @@ export default function KakaoMetroMap({
           new kk.maps.LatLng(KOREA_NE.lat, KOREA_NE.lng)
         );
         map.setBounds(bounds);
+        if (nationalLevel !== undefined) map.setLevel(nationalLevel);
         map.setZoomable(!!zoomable);
 
         if (zoomable) {
@@ -80,8 +89,9 @@ export default function KakaoMetroMap({
           const zoomControl = new kk.maps.ZoomControl();
           map.addControl(zoomControl, kk.maps.ControlPosition.RIGHT);
         } else {
-          map.setMinLevel?.(INITIAL_LEVEL);
-          map.setMaxLevel?.(INITIAL_LEVEL);
+          const lv = map.getLevel();
+          map.setMinLevel?.(lv);
+          map.setMaxLevel?.(lv);
         }
 
         const clampCenter = () => {
@@ -104,7 +114,7 @@ export default function KakaoMetroMap({
 
         kk.maps.event.addListener(map, "dragend", clampCenter);
         if (zoomable) kk.maps.event.addListener(map, "zoom_changed", clampLevel);
-        kk.maps.event.addListener(map, "idle", () => { clampLevel(); clampCenter(); });
+        kk.maps.event.addListener(map, "idle", () => { if (zoomable) clampLevel(); clampCenter(); });
       })
       .catch(() => setReady({ ready: false, kakao: null }));
 
@@ -113,7 +123,7 @@ export default function KakaoMetroMap({
       overlaysRef.current = [];
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [zoomable, zoomLevel_MAX, zoomLevel_MIN]);
+  }, [zoomable, zoomLevel_MAX, zoomLevel_MIN, nationalLevel]);
 
   // 오버레이 갱신 (시도/시군구 모드 전환)
   useEffect(() => {
@@ -123,6 +133,38 @@ export default function KakaoMetroMap({
 
     overlaysRef.current.forEach((ov) => ov.setMap(null));
     overlaysRef.current = [];
+
+    if (!showOverlays) {
+      // 지도 위치/줌만 업데이트하고 오버레이는 표시하지 않음
+      if (selectedSido) {
+        const sidoCoords = METRO_COORDS[selectedSido as Metro];
+        if (sidoCoords) {
+          map.setMinLevel?.(1);
+          map.setMaxLevel?.(14);
+          map.setCenter(new kakao.maps.LatLng(sidoCoords.lat, sidoCoords.lng));
+          map.setLevel(SIDO_ZOOM[selectedSido] ?? 9);
+          if (!zoomable) {
+            const lv = map.getLevel();
+            map.setMinLevel?.(lv);
+            map.setMaxLevel?.(lv);
+          }
+        }
+      } else {
+        const bounds = new kakao.maps.LatLngBounds(
+          new kakao.maps.LatLng(KOREA_SW.lat, KOREA_SW.lng),
+          new kakao.maps.LatLng(KOREA_NE.lat, KOREA_NE.lng)
+        );
+        map.setMinLevel?.(1);
+        map.setMaxLevel?.(14);
+        map.setBounds(bounds);
+        if (!zoomable) {
+          const lv = map.getLevel();
+          map.setMinLevel?.(lv);
+          map.setMaxLevel?.(lv);
+        }
+      }
+      return () => { cancelled = true; };
+    }
 
     if (selectedSido && sigunguStats && sigunguStats.length > 0) {
       // 시군구 모드: 선택된 시/도로 줌인
@@ -175,7 +217,11 @@ export default function KakaoMetroMap({
         new kakao.maps.LatLng(KOREA_SW.lat, KOREA_SW.lng),
         new kakao.maps.LatLng(KOREA_NE.lat, KOREA_NE.lng)
       );
+      // 이전 시도 선택 시 걸린 줌 제약을 해제한 뒤 setBounds로 전국 뷰 계산
+      map.setMinLevel?.(1);
+      map.setMaxLevel?.(14);
       map.setBounds(bounds);
+      if (nationalLevel !== undefined) map.setLevel(nationalLevel);
       map.setZoomable(!!zoomable);
       if (!zoomable) {
         const lv = map.getLevel();
@@ -197,7 +243,7 @@ export default function KakaoMetroMap({
           <div style="font-size:14px;font-weight:700;">${(count as number).toLocaleString("ko-KR")}</div>
         `;
         div.addEventListener("click", () => {
-          router.push(`/alerts?region=${encodeURIComponent(name)}#list`);
+          router.push(`/alerts?sido=${encodeURIComponent(name)}#list`);
         });
 
         const overlay = new kakao.maps.CustomOverlay({
@@ -213,10 +259,10 @@ export default function KakaoMetroMap({
     }
 
     return () => { cancelled = true; };
-  }, [ready, kakao, selectedSido, sigunguStats, metroCounts, zoomable, router]);
+  }, [ready, kakao, selectedSido, sigunguStats, metroCounts, zoomable, showOverlays, router]);
 
   return (
-    <div className="bg-white rounded-xl shadow w-full h-[300px] relative overflow-hidden">
+    <div className="bg-white rounded-xl shadow w-full relative overflow-hidden" style={{ height: mapHeight }}>
       {(isLoading || !ready) && (
         <div className="absolute inset-0 flex items-center justify-center text-sm text-gray-500">
           지도를 불러오는 중…
@@ -226,9 +272,11 @@ export default function KakaoMetroMap({
         <div className="absolute inset-0 flex items-center justify-center text-sm text-red-500">지도 로딩 실패</div>
       )}
       <div ref={containerRef} className="w-full h-full" />
-      <div className="absolute bottom-2 right-3 text-xs text-gray-400 bg-white/70 rounded px-2 py-1">
-        {selectedSido ? `${selectedSido} 시/군/구별` : "시도별 합산"}
-      </div>
+      {showModeLabel && (
+        <div className="absolute bottom-2 right-3 text-xs text-gray-400 bg-white/70 rounded px-2 py-1">
+          {selectedSido ? `${selectedSido} 시/군/구별` : "시도별 합산"}
+        </div>
+      )}
     </div>
   );
 }

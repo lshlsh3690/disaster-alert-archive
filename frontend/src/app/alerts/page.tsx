@@ -14,7 +14,6 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { DISASTER_TYPES } from "@/ui/disasterType";
 import { METROS } from "@/ui/metros";
 import { useI18n } from "@/hooks/useI18n";
-import { useLanguageStore } from "@/store/languageStore";
 
 type WeatherData = {
   temp: number;
@@ -80,7 +79,6 @@ function DisasterListPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const t = useI18n();
-  const language = useLanguageStore((s) => s.language);
 
 
 
@@ -230,9 +228,9 @@ function DisasterListPageInner() {
         <ReportButton />
       </div>
 
-      <div className="flex flex-col xl:flex-row gap-4 sm:gap-6 items-start">
+      <div className="grid grid-cols-1 xl:grid-cols-[1fr_420px] gap-4 sm:gap-6">
         {/* 왼쪽: 검색 폼 + 목록 */}
-        <div className="flex-1 min-w-0 space-y-4 sm:space-y-6">
+        <div className="flex flex-col min-w-0 gap-4 sm:gap-6">
           <form
             onSubmit={handleSubmit(onSubmit)}
             className="bg-white rounded-xl shadow p-4 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3"
@@ -293,19 +291,19 @@ function DisasterListPageInner() {
           </form>
 
           {/* 목록 */}
-          <div id="list" className="bg-white rounded-xl shadow p-4">
+          <div id="list" className="bg-white rounded-xl shadow p-4 flex flex-col flex-1">
             {isLoading ? (
               <div className="text-sm text-gray-500">{t.loading}</div>
             ) : (
-              <>
+              <div className="flex flex-col flex-1">
                 <ul className="space-y-2">
                   {(data?.content ?? []).map((a: Alert & { source?: "OFFICIAL" | "USER" }) => {
                     const regionLabel = a.regionNames && a.regionNames.length > 0 ? a.regionNames.join(", ") : "-";
                     const href = a.source === "USER" ? `/alerts/${a.id}?source=USER` : `/alerts/${a.id}?source=OFFICIAL`;
                     return (
                       <li key={a.id} className="border-b last:border-0 pb-2">
-                        <Link href={href} className="hover:underline">
-                          <span className="text-gray-800">
+                        <Link href={href} className="hover:underline block">
+                          <span className="text-gray-800 block truncate">
                             [{regionLabel}] {new Date(a.createdAt).toLocaleString()} - {a.message}
                           </span>
                         </Link>
@@ -316,7 +314,7 @@ function DisasterListPageInner() {
                     );
                   })}
                 </ul>
-                <div className="mt-4 flex items-center justify-between">
+                <div className="mt-auto pt-2 border-t flex items-center justify-between">
                   <button
                     className="px-3 py-1 rounded bg-gray-100 disabled:opacity-50"
                     onClick={() => setPage((p) => Math.max(0, p - 1))}
@@ -333,20 +331,22 @@ function DisasterListPageInner() {
                     {t.alertList.next}
                   </button>
                 </div>
-              </>
+              </div>
             )}
           </div>
         </div>
 
         {/* 오른쪽: 카카오 히트맵 */}
-        <div className="w-full xl:w-[420px] shrink-0">
-          <div className="bg-white rounded-xl shadow p-4 space-y-3">
+        <div className="w-full xl:w-[420px] shrink-0 flex flex-col">
+          <div className="bg-white rounded-xl shadow p-4 space-y-3 flex-1">
             <h2 className="text-sm font-semibold text-gray-700">시도별 재난 현황</h2>
             <KakaoMetroMap
               todayOnly={false}
               zoomable={false}
               selectedSido={formState.sido}
               sigunguStats={sigunguAllStats}
+              showModeLabel={false}
+              showOverlays={false}
             />
 
             {/* 재난 통계 요약 */}
@@ -443,6 +443,29 @@ function DisasterListPageInner() {
                   ))}
                 </ul>
               )}
+            </div>
+
+            {/* 재난 경보 단계별 건수 */}
+            <div className="pt-2 border-t">
+              <h3 className="text-sm font-semibold text-gray-700 mb-2">
+                재난 경보 단계{formState.sido ? ` · ${formState.sido}` : " · 전국"}
+              </h3>
+              <div className="grid grid-cols-3 gap-2">
+                {[
+                  { text: "안전안내", color: "bg-blue-50 text-blue-700 border-blue-200" },
+                  { text: "긴급재난", color: "bg-orange-50 text-orange-700 border-orange-200" },
+                  { text: "위급재난", color: "bg-red-50 text-red-700 border-red-200" },
+                ].map(({ text, color }) => {
+                  const count = (filteredStats ?? alertStats)?.levelStats
+                    ?.find((l) => l.level === text)?.count ?? 0;
+                  return (
+                    <div key={text} className={`flex flex-col items-center rounded border py-1.5 gap-0.5 ${color}`}>
+                      <span className="text-xs font-medium">{text}</span>
+                      <span className="text-sm font-bold">{count.toLocaleString("ko-KR")}건</span>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
 
             {/* 시/군/구 TOP N 랭킹 */}

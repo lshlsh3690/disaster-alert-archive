@@ -40,7 +40,9 @@ export default function DashboardPage() {
       {/* 지역별 재난 문자 지도 */}
       <section>
         <SectionHeader title={t.dashboard.alertMap} href="/alerts/map" />
-        <KakaoMetroMap todayOnly zoomable={false} />
+        <div className="px-[25%]">
+          <KakaoMetroMap todayOnly zoomable={false} mapHeight="500px" nationalLevel={12} />
+        </div>
       </section>
 
       {/* 커뮤니티 인기 글 */}
