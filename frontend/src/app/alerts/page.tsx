@@ -1,7 +1,7 @@
 "use client";
 
 import ReportButton from "@/components/alerts/ReportButton";
-import KakaoMetroMap from "@/components/KakaoMetroMap";
+import KakaoPolygonMap from "@/components/KakaoPolygonMap";
 import { useSearchCombinedAlerts, useSigungu, useSidoStats, useAlertStats, useSigunguStats } from "@/lib/queries/useAlerts";
 import { Alert } from "@/types/alerts";
 import { LEVEL_OPTIONS, levelTextToCode } from "@/ui/level";
@@ -15,42 +15,6 @@ import { DISASTER_TYPES } from "@/ui/disasterType";
 import { METROS } from "@/ui/metros";
 import { useI18n } from "@/hooks/useI18n";
 
-type WeatherData = {
-  temp: number;
-  humidity: number;
-  rainfall: number;
-  windDir: string;
-  windSpeed: number;
-  dust: number;
-  dustLevel: "좋음" | "보통" | "나쁨" | "매우나쁨";
-};
-
-const DUMMY_WEATHER: Record<string, WeatherData> = {
-  "서울특별시":   { temp: 23, humidity: 62, rainfall: 0.0, windDir: "남서", windSpeed: 3.2, dust: 48, dustLevel: "보통" },
-  "부산광역시":   { temp: 26, humidity: 75, rainfall: 1.2, windDir: "남",   windSpeed: 4.5, dust: 28, dustLevel: "좋음" },
-  "대구광역시":   { temp: 27, humidity: 58, rainfall: 0.0, windDir: "북동", windSpeed: 2.1, dust: 62, dustLevel: "보통" },
-  "인천광역시":   { temp: 22, humidity: 68, rainfall: 0.3, windDir: "서",   windSpeed: 5.0, dust: 41, dustLevel: "보통" },
-  "광주광역시":   { temp: 25, humidity: 71, rainfall: 0.0, windDir: "남서", windSpeed: 2.8, dust: 35, dustLevel: "좋음" },
-  "대전광역시":   { temp: 24, humidity: 63, rainfall: 0.0, windDir: "북",   windSpeed: 2.3, dust: 55, dustLevel: "보통" },
-  "울산광역시":   { temp: 26, humidity: 70, rainfall: 0.5, windDir: "동",   windSpeed: 3.7, dust: 30, dustLevel: "좋음" },
-  "세종특별자치시": { temp: 23, humidity: 60, rainfall: 0.0, windDir: "북서", windSpeed: 2.6, dust: 50, dustLevel: "보통" },
-  "경기도":       { temp: 22, humidity: 66, rainfall: 0.1, windDir: "남",   windSpeed: 3.0, dust: 53, dustLevel: "보통" },
-  "강원특별자치도": { temp: 18, humidity: 55, rainfall: 0.0, windDir: "북동", windSpeed: 4.2, dust: 20, dustLevel: "좋음" },
-  "충청북도":     { temp: 23, humidity: 61, rainfall: 0.0, windDir: "북서", windSpeed: 2.0, dust: 47, dustLevel: "보통" },
-  "충청남도":     { temp: 22, humidity: 67, rainfall: 0.2, windDir: "서",   windSpeed: 3.4, dust: 44, dustLevel: "보통" },
-  "전북특별자치도": { temp: 24, humidity: 69, rainfall: 0.0, windDir: "남서", windSpeed: 2.5, dust: 38, dustLevel: "좋음" },
-  "전라남도":     { temp: 25, humidity: 74, rainfall: 0.8, windDir: "남",   windSpeed: 3.9, dust: 25, dustLevel: "좋음" },
-  "경상북도":     { temp: 25, humidity: 57, rainfall: 0.0, windDir: "북동", windSpeed: 2.2, dust: 60, dustLevel: "보통" },
-  "경상남도":     { temp: 26, humidity: 72, rainfall: 0.4, windDir: "동남", windSpeed: 3.1, dust: 33, dustLevel: "좋음" },
-  "제주특별자치도": { temp: 27, humidity: 80, rainfall: 3.5, windDir: "남",   windSpeed: 6.8, dust: 18, dustLevel: "좋음" },
-};
-
-const DUST_COLOR: Record<WeatherData["dustLevel"], string> = {
-  "좋음":   "text-blue-500",
-  "보통":   "text-green-600",
-  "나쁨":   "text-orange-500",
-  "매우나쁨": "text-red-600",
-};
 
 const ZSearch = z.object({
   sido: z.string().optional(),
@@ -120,11 +84,6 @@ function DisasterListPageInner() {
     formState.sido ? { region: formState.sido } : {}
   );
 
-  const maxRegion = useMemo(() => {
-    if (!sidoStats || sidoStats.length === 0) return null;
-    return sidoStats.reduce((a, b) => (a.count > b.count ? a : b));
-  }, [sidoStats]);
-
   const topType = useMemo(() => {
     if (!alertStats?.typeStats) return null;
     return alertStats.typeStats
@@ -147,31 +106,34 @@ function DisasterListPageInner() {
     }));
   }, [filteredStats, alertStats]);
 
-  const sigunguRanking = useMemo(() => {
-    if (!formState.sido || !sidoStats) return [];
-    const prefix = formState.sido + " ";
-    return sidoStats
-      .filter((s) => s.region.startsWith(prefix))
-      .sort((a, b) => b.count - a.count)
-      .slice(0, 5)
-      .map((s) => ({ name: s.region.slice(prefix.length), count: s.count }));
-  }, [sidoStats, formState.sido]);
+  const mapParams = useMemo(() => {
+    const levelCode = levelTextToCode(formState.levelText);
+    return {
+      startDate: formState.startDate || undefined,
+      endDate: formState.endDate || undefined,
+      type: formState.type || undefined,
+      level: levelCode,
+      keyword: formState.keyword || undefined,
+      source: formState.source || undefined,
+    };
+  }, [formState]);
 
-  const { data: sigunguRawData } = useSigunguStats(
-    formState.sido ? { region: formState.sido } : {},
+  const { data: sigunguStats } = useSigunguStats(
+    { ...mapParams, region: formState.sido },
     !!formState.sido
   );
 
-  const sigunguAllStats = useMemo(() => {
-    if (!formState.sido || !sigunguRawData) return [];
-    const prefix = formState.sido + " ";
-    return sigunguRawData
-      .filter((s) => s.count > 0)
-      .map((s) => ({
-        name: s.region.startsWith(prefix) ? s.region.slice(prefix.length) : s.region,
-        count: s.count,
-      }));
-  }, [sigunguRawData, formState.sido]);
+  const maxRegion = useMemo(() => {
+    if (formState.sido) {
+      if (!sigunguStats || sigunguStats.length === 0) return null;
+      const max = sigunguStats.reduce((a, b) => (a.count > b.count ? a : b));
+      const prefix = formState.sido + " ";
+      const name = max.region.startsWith(prefix) ? max.region.slice(prefix.length) : max.region;
+      return { region: name, count: max.count };
+    }
+    if (!sidoStats || sidoStats.length === 0) return null;
+    return sidoStats.reduce((a, b) => (a.count > b.count ? a : b));
+  }, [formState.sido, sigunguStats, sidoStats]);
 
   useEffect(() => {
     const sido = searchParams.get("sido") || undefined;
@@ -185,7 +147,16 @@ function DisasterListPageInner() {
 
     setPage(0);
     setFormState({ sido, sigungu, startDate, endDate, type, levelText, keyword, source });
-    reset({ sido, sigungu, startDate, endDate, type, levelText, keyword, source });
+    reset({
+      sido: sido ?? "",
+      sigungu: sigungu ?? "",
+      startDate: startDate ?? "",
+      endDate: endDate ?? "",
+      type: type ?? "",
+      levelText: levelText ?? "",
+      keyword: keyword ?? "",
+      source: source ?? "ALL",
+    });
 
     if (typeof window !== "undefined" && window.location.hash === "#list") {
       setTimeout(() => {
@@ -216,6 +187,19 @@ function DisasterListPageInner() {
     router.push("/alerts");
   };
 
+  const onMapSidoSelect = useCallback((sido: string | null) => {
+    setPage(0);
+    const qs = new URLSearchParams(searchParams.toString());
+    if (sido) {
+      qs.set("sido", sido);
+      qs.delete("sigungu");
+    } else {
+      qs.delete("sido");
+      qs.delete("sigungu");
+    }
+    router.push(`/alerts?${qs.toString()}`);
+  }, [searchParams, router]);
+
   return (
     <main className="p-3 sm:p-6 space-y-4 sm:space-y-6">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
@@ -228,7 +212,7 @@ function DisasterListPageInner() {
         <ReportButton />
       </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-[1fr_420px] gap-4 sm:gap-6">
+      <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_340px] gap-4 sm:gap-6">
         {/* 왼쪽: 검색 폼 + 목록 */}
         <div className="flex flex-col min-w-0 gap-4 sm:gap-6">
           <form
@@ -336,21 +320,13 @@ function DisasterListPageInner() {
           </div>
         </div>
 
-        {/* 오른쪽: 카카오 히트맵 */}
-        <div className="w-full xl:w-[420px] shrink-0 flex flex-col">
-          <div className="bg-white rounded-xl shadow p-4 space-y-3 flex-1">
-            <h2 className="text-sm font-semibold text-gray-700">시도별 재난 현황</h2>
-            <KakaoMetroMap
-              todayOnly={false}
-              zoomable={false}
-              selectedSido={formState.sido}
-              sigunguStats={sigunguAllStats}
-              showModeLabel={false}
-              showOverlays={false}
-            />
+        {/* 오른쪽: 폴리곤 지도 + 통계 */}
+        <div className="w-full min-w-0 flex flex-col gap-4">
+          <KakaoPolygonMap params={mapParams} mapHeight="520px" showSidebar={false} externalSido={formState.sido || undefined} onSidoSelect={onMapSidoSelect} />
 
-            {/* 재난 통계 요약 */}
-            <div className="pt-2 border-t space-y-2">
+          {/* 재난 통계 요약 */}
+          <div className="bg-white rounded-xl shadow p-4 space-y-3">
+            <div className="space-y-2">
               <div className="flex items-center justify-between text-sm">
                 <span className="text-gray-500">총 발생 건수</span>
                 <span className="font-semibold">
@@ -369,53 +345,6 @@ function DisasterListPageInner() {
                   {topType ? `${topType.type} (${topType.count.toLocaleString("ko-KR")}건)` : "-"}
                 </span>
               </div>
-            </div>
-
-            {/* 날씨 정보 */}
-            <div className="pt-2 border-t">
-              <h3 className="text-sm font-semibold text-gray-700 mb-2">
-                날씨 정보{formState.sido ? ` · ${formState.sido}` : ""}
-              </h3>
-              {(() => {
-                const w = formState.sido ? DUMMY_WEATHER[formState.sido] : null;
-                if (!w) {
-                  return (
-                    <p className="text-xs text-gray-400 text-center py-3">
-                      시/도를 선택하면 해당 지역 날씨가 표시됩니다
-                    </p>
-                  );
-                }
-                return (
-                  <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
-                    <div className="flex justify-between">
-                      <span className="text-gray-500">온도</span>
-                      <span className="font-medium">{w.temp}°C</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-500">습도</span>
-                      <span className="font-medium">{w.humidity}%</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-500">강수량</span>
-                      <span className="font-medium">{w.rainfall}mm</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-500">풍향</span>
-                      <span className="font-medium">{w.windDir}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-500">풍속</span>
-                      <span className="font-medium">{w.windSpeed}m/s</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-500">미세먼지</span>
-                      <span className={`font-medium ${DUST_COLOR[w.dustLevel]}`}>
-                        {w.dust}㎍/㎥ ({w.dustLevel})
-                      </span>
-                    </div>
-                  </div>
-                );
-              })()}
             </div>
 
             {/* 재난 유형 분포 */}
@@ -452,12 +381,12 @@ function DisasterListPageInner() {
               </h3>
               <div className="grid grid-cols-3 gap-2">
                 {[
-                  { text: "안전안내", color: "bg-blue-50 text-blue-700 border-blue-200" },
-                  { text: "긴급재난", color: "bg-orange-50 text-orange-700 border-orange-200" },
-                  { text: "위급재난", color: "bg-red-50 text-red-700 border-red-200" },
-                ].map(({ text, color }) => {
+                  { code: "LEVEL_1", text: "안전안내", color: "bg-blue-50 text-blue-700 border-blue-200" },
+                  { code: "LEVEL_2", text: "긴급재난", color: "bg-orange-50 text-orange-700 border-orange-200" },
+                  { code: "LEVEL_3", text: "위급재난", color: "bg-red-50 text-red-700 border-red-200" },
+                ].map(({ code, text, color }) => {
                   const count = (filteredStats ?? alertStats)?.levelStats
-                    ?.find((l) => l.level === text)?.count ?? 0;
+                    ?.find((l) => l.level === code)?.count ?? 0;
                   return (
                     <div key={text} className={`flex flex-col items-center rounded border py-1.5 gap-0.5 ${color}`}>
                       <span className="text-xs font-medium">{text}</span>
@@ -467,24 +396,6 @@ function DisasterListPageInner() {
                 })}
               </div>
             </div>
-
-            {/* 시/군/구 TOP N 랭킹 */}
-            {sigunguRanking.length > 0 && (
-              <div className="pt-2 border-t">
-                <h3 className="text-sm font-semibold text-gray-700 mb-2">
-                  시/군/구 TOP {sigunguRanking.length} · {formState.sido}
-                </h3>
-                <ol className="space-y-1">
-                  {sigunguRanking.map(({ name, count }, i) => (
-                    <li key={name} className="flex items-center gap-2 text-sm">
-                      <span className="w-4 text-xs text-gray-400 font-medium shrink-0">{i + 1}</span>
-                      <span className="flex-1 text-gray-700 truncate">{name}</span>
-                      <span className="text-gray-500 text-xs shrink-0">{count.toLocaleString("ko-KR")}건</span>
-                    </li>
-                  ))}
-                </ol>
-              </div>
-            )}
           </div>
         </div>
       </div>
