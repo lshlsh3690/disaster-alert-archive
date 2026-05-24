@@ -6,6 +6,7 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
@@ -16,6 +17,7 @@ import java.io.IOException;
  * <p>일반 사용자 JWT와 별개로 외부 클라이언트가 발급받은 OpenAPI 서비스키를 검증한다.
  * 토큰 관리 API는 JWT 인증을 사용해야 하므로 이 필터에서 제외한다.
  */
+@Slf4j
 @RequiredArgsConstructor
 public class OpenApiTokenAuthenticationFilter extends OncePerRequestFilter {
     /** OpenAPI 경로 루트. 하위 경로를 모두 처리한다. */
@@ -49,15 +51,29 @@ public class OpenApiTokenAuthenticationFilter extends OncePerRequestFilter {
         return !isOpenApiPath || isTokenManagementPath;
     }
 
-    /** 요청에서 서비스키를 추출해 검증하고, 실패 시 401 응답을 반환한다. */
+    /**
+     * 서비스키를 검증하고 마지막 사용 시각 갱신을 시도한다.
+     *
+     * <ul>
+     *   <li>검증 실패 → 401 반환</li>
+     *   <li>검증 성공 + 갱신 실패 → 200 (통계 실패가 인증을 막지 않음)</li>
+     *   <li>검증 성공 + 갱신 성공 → 200</li>
+     * </ul>
+     */
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
             throws ServletException, IOException {
         String token = resolveToken(request);
 
-        if (!openApiTokenService.validateAndMarkUsed(token)) {
+        if (!openApiTokenService.validate(token)) {
             unauthorized(response);
             return;
+        }
+
+        try {
+            openApiTokenService.markUsed(token);
+        } catch (Exception e) {
+            log.warn("lastUsedAt 갱신 실패 - 인증은 통과 처리: {}", e.getMessage());
         }
 
         filterChain.doFilter(request, response);

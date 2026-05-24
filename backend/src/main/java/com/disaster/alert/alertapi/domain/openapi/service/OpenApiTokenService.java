@@ -91,23 +91,37 @@ public class OpenApiTokenService {
     }
 
     /**
-     * 외부 API 요청에 포함된 서비스키를 검증하고 마지막 사용 시각을 갱신한다.
+     * 외부 API 요청에 포함된 서비스키의 유효성만 확인한다.
      *
      * <p>필터에서 호출되며, 원본 토큰을 해시한 뒤 저장된 해시와 비교한다.
+     * lastUsedAt 갱신은 별도 트랜잭션인 markUsed()에서 처리한다.
      */
-    @Transactional
-    public boolean validateAndMarkUsed(String rawToken) {
+    @Transactional(readOnly = true)
+    public boolean validate(String rawToken) {
         if (rawToken == null || rawToken.isBlank()) {
             return false;
         }
 
         return openApiTokenRepository.findByTokenHash(hash(rawToken))
                 .filter(token -> token.isActive(LocalDateTime.now()))
-                .map(token -> {
-                    token.markUsed();
-                    return true;
-                })
-                .orElse(false);
+                .isPresent();
+    }
+
+    /**
+     * 마지막 사용 시각을 갱신한다.
+     *
+     * <p>통계 목적의 갱신이므로 실패가 인증 결과에 영향을 주면 안 된다.
+     * 필터에서 이 메서드의 예외를 catch해 인증과 분리한다.
+     */
+    @Transactional
+    public void markUsed(String rawToken) {
+        if (rawToken == null || rawToken.isBlank()) {
+            return;
+        }
+
+        openApiTokenRepository.findByTokenHash(hash(rawToken))
+                .filter(token -> token.isActive(LocalDateTime.now()))
+                .ifPresent(OpenApiToken::markUsed);
     }
 
     /** URL-safe Base64 문자열을 사용해 외부 전달 가능한 서비스키 원문을 생성한다. */
