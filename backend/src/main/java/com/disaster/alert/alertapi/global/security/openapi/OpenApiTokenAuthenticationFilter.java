@@ -6,7 +6,6 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
-import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
@@ -17,7 +16,6 @@ import java.io.IOException;
  * <p>일반 사용자 JWT와 별개로 외부 클라이언트가 발급받은 OpenAPI 서비스키를 검증한다.
  * 토큰 관리 API는 JWT 인증을 사용해야 하므로 이 필터에서 제외한다.
  */
-@Component
 @RequiredArgsConstructor
 public class OpenApiTokenAuthenticationFilter extends OncePerRequestFilter {
     /** OpenAPI 전체 경로 prefix. */

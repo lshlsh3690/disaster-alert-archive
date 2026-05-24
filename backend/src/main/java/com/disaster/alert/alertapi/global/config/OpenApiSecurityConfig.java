@@ -1,5 +1,6 @@
 package com.disaster.alert.alertapi.global.config;
 
+import com.disaster.alert.alertapi.domain.openapi.service.OpenApiTokenService;
 import com.disaster.alert.alertapi.global.security.jwt.JwtAuthenticationFilter;
 import com.disaster.alert.alertapi.global.security.openapi.OpenApiTokenAuthenticationFilter;
 import jakarta.servlet.http.HttpServletResponse;
@@ -26,11 +27,22 @@ public class OpenApiSecurityConfig {
     /** 서비스키 관리 API에서 로그인 사용자를 인증하기 위한 기존 JWT 필터. */
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
 
-    /** OpenAPI 데이터 조회 API에서 서비스키를 검증하는 필터. */
-    private final OpenApiTokenAuthenticationFilter openApiTokenAuthenticationFilter;
+    /** OpenAPI 서비스키 검증 및 마지막 사용 시각 갱신을 담당하는 서비스. */
+    private final OpenApiTokenService openApiTokenService;
 
     /** 기존 SecurityConfig와 동일한 CORS 정책을 재사용한다. */
     private final CorsConfigurationSource corsConfigurationSource;
+
+    /**
+     * OpenAPI 서비스키 인증 필터 빈.
+     *
+     * <p>@Component 없이 @Bean으로만 등록해 Spring Boot의 서블릿 자동 등록을 방지한다.
+     * 이 필터는 openApiDataFilterChain 보안 체인 안에서만 동작한다.
+     */
+    @Bean
+    public OpenApiTokenAuthenticationFilter openApiTokenAuthenticationFilter() {
+        return new OpenApiTokenAuthenticationFilter(openApiTokenService);
+    }
 
     /**
      * 서비스키 관리 API 보안 체인.
@@ -80,7 +92,7 @@ public class OpenApiSecurityConfig {
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .anyRequest().permitAll()
                 )
-                .addFilterBefore(openApiTokenAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
+                .addFilterBefore(openApiTokenAuthenticationFilter(), UsernamePasswordAuthenticationFilter.class)
                 .build();
     }
 }
