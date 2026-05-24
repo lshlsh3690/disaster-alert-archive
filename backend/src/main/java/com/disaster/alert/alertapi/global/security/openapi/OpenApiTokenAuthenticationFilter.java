@@ -18,8 +18,8 @@ import java.io.IOException;
  */
 @RequiredArgsConstructor
 public class OpenApiTokenAuthenticationFilter extends OncePerRequestFilter {
-    /** OpenAPI 전체 경로 prefix. */
-    private static final String OPEN_API_PREFIX = "/api/v1/open-api/";
+    /** OpenAPI 경로 루트. 하위 경로를 모두 처리한다. */
+    private static final String OPEN_API_ROOT = "/api/v1/open-api";
 
     /** 서비스키 발급/조회/폐기 경로. 이 경로는 JWT 인증 체인이 담당한다. */
     private static final String TOKEN_MANAGEMENT_PREFIX = "/api/v1/open-api/tokens";
@@ -44,7 +44,9 @@ public class OpenApiTokenAuthenticationFilter extends OncePerRequestFilter {
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
         String uri = request.getRequestURI();
-        return !uri.startsWith(OPEN_API_PREFIX) || uri.startsWith(TOKEN_MANAGEMENT_PREFIX);
+        boolean isOpenApiPath = uri.equals(OPEN_API_ROOT) || uri.startsWith(OPEN_API_ROOT + "/");
+        boolean isTokenManagementPath = uri.startsWith(TOKEN_MANAGEMENT_PREFIX);
+        return !isOpenApiPath || isTokenManagementPath;
     }
 
     /** 요청에서 서비스키를 추출해 검증하고, 실패 시 401 응답을 반환한다. */
