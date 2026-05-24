@@ -1,9 +1,10 @@
 package com.disaster.alert.alertapi.domain.openapi.repository;
 
 import com.disaster.alert.alertapi.domain.openapi.model.OpenApiToken;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 
-import java.util.List;
 import java.util.Optional;
 
 /**
@@ -15,6 +16,6 @@ public interface OpenApiTokenRepository extends JpaRepository<OpenApiToken, Long
     /** 요청 서비스키의 SHA-256 해시로 발급 이력을 조회한다. */
     Optional<OpenApiToken> findByTokenHash(String tokenHash);
 
-    /** 회원이 발급받은 서비스키 목록을 최신 발급순으로 조회한다. */
-    List<OpenApiToken> findAllByMemberIdOrderByCreatedAtDesc(Long memberId);
+    /** 회원이 발급받은 서비스키 목록을 최신 발급순으로 페이징 조회한다. */
+    Page<OpenApiToken> findAllByMemberIdOrderByCreatedAtDesc(Long memberId, Pageable pageable);
 }

@@ -11,13 +11,16 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
+
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.SecureRandom;
 import java.time.LocalDateTime;
 import java.util.Base64;
 import java.util.HexFormat;
-import java.util.List;
 
 /**
  * OpenAPI 서비스키 발급과 검증을 담당하는 서비스.
@@ -68,13 +71,15 @@ public class OpenApiTokenService {
         return OpenApiTokenDtos.CreateResponse.of(openApiTokenRepository.save(openApiToken), rawToken);
     }
 
-    /** 회원이 발급받은 서비스키 목록을 최신순으로 조회한다. */
+    /** 한 페이지에 표시할 최대 서비스키 수. */
+    private static final int TOKEN_LIST_PAGE_SIZE = 20;
+
+    /** 회원이 발급받은 서비스키 목록을 최신순으로 페이징 조회한다. */
     @Transactional(readOnly = true)
-    public List<OpenApiTokenDtos.Response> findMine(Long memberId) {
-        return openApiTokenRepository.findAllByMemberIdOrderByCreatedAtDesc(memberId)
-                .stream()
-                .map(OpenApiTokenDtos.Response::from)
-                .toList();
+    public Page<OpenApiTokenDtos.Response> findMine(Long memberId, int page) {
+        PageRequest pageable = PageRequest.of(page, TOKEN_LIST_PAGE_SIZE, Sort.by(Sort.Direction.DESC, "createdAt"));
+        return openApiTokenRepository.findAllByMemberIdOrderByCreatedAtDesc(memberId, pageable)
+                .map(OpenApiTokenDtos.Response::from);
     }
 
     /** 회원 소유의 서비스키를 폐기한다. 다른 회원의 키는 폐기할 수 없다. */

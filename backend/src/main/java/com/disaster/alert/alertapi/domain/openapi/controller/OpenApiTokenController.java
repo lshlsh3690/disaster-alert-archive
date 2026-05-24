@@ -9,15 +9,15 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.data.domain.Page;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
-
-import java.util.List;
 
 /**
  * OpenAPI 서비스키 관리 컨트롤러.
@@ -50,10 +50,11 @@ public class OpenApiTokenController {
     /** 로그인한 회원이 발급받은 OpenAPI 서비스키 목록을 조회한다. 원본 토큰은 반환하지 않는다. */
     @PreAuthorize("isAuthenticated()")
     @GetMapping
-    public ResponseEntity<ApiResponse<List<OpenApiTokenDtos.Response>>> findMine(
-            @AuthenticationPrincipal MemberDetails memberDetails
+    public ResponseEntity<ApiResponse<Page<OpenApiTokenDtos.Response>>> findMine(
+            @AuthenticationPrincipal MemberDetails memberDetails,
+            @RequestParam(defaultValue = "0") int page
     ) {
-        return ResponseEntity.ok(ApiResponse.success(openApiTokenService.findMine(memberDetails.getId())));
+        return ResponseEntity.ok(ApiResponse.success(openApiTokenService.findMine(memberDetails.getId(), page)));
     }
 
     /** 로그인한 회원이 소유한 OpenAPI 서비스키를 폐기한다. 폐기된 키는 이후 데이터 조회에 사용할 수 없다. */
