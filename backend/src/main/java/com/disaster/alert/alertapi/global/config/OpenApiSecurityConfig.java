@@ -53,7 +53,7 @@ public class OpenApiSecurityConfig {
     @Order(1)
     public SecurityFilterChain openApiTokenManagementFilterChain(HttpSecurity http) throws Exception {
         return http
-                .securityMatcher("/api/v1/open-api/tokens/**")
+                .securityMatcher("/api/v1/open-api/tokens", "/api/v1/open-api/tokens/**")
                 .csrf(csrf -> csrf.disable())
                 .cors(cors -> cors.configurationSource(corsConfigurationSource))
                 .authorizeHttpRequests(auth -> auth
