@@ -18,9 +18,6 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.stream.Collectors;
 
-@RestController
-@RequiredArgsConstructor
-@RequestMapping("/api/v1/open-api/alerts")
 /**
  * OpenAPI 재난문자 조회 컨트롤러.
  *
@@ -28,6 +25,9 @@ import java.util.stream.Collectors;
  * 검색 조건은 기존 AlertSearchRequest를 재사용해 내부 검색 정책과 외부 API 검색 계약이 어긋나지 않게 했다.
  * 응답 포맷은 JSON과 CSV를 모두 지원하므로 공통 OpenAPI response writer로 응답 생성을 위임한다.
  */
+@RestController
+@RequiredArgsConstructor
+@RequestMapping("/api/v1/open-api/alerts")
 public class OpenApiAlertController {
     /** OpenAPI 재난문자 조회 유스케이스를 담당하는 서비스. */
     private final OpenApiAlertService openApiAlertService;

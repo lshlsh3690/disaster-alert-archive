@@ -19,9 +19,6 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
 
-@RestController
-@RequiredArgsConstructor
-@RequestMapping("/api/v1/open-api/tokens")
 /**
  * OpenAPI 서비스키 관리 컨트롤러.
  *
@@ -29,6 +26,9 @@ import java.util.List;
  * 이 API는 서비스키 자체가 아니라 로그인한 회원의 JWT 인증으로 접근해야 하므로
  * 실제 데이터 조회 API와 보안 체인을 분리했다.
  */
+@RestController
+@RequiredArgsConstructor
+@RequestMapping("/api/v1/open-api/tokens")
 public class OpenApiTokenController {
     /** 서비스키 발급, 조회, 폐기 유스케이스를 처리하는 서비스. */
     private final OpenApiTokenService openApiTokenService;

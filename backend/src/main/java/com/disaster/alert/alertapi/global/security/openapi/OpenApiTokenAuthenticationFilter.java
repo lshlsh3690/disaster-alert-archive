@@ -11,14 +11,14 @@ import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
 
-@Component
-@RequiredArgsConstructor
 /**
  * OpenAPI 데이터 조회 요청의 서비스키를 검증하는 필터.
  *
  * <p>일반 사용자 JWT와 별개로 외부 클라이언트가 발급받은 OpenAPI 서비스키를 검증한다.
  * 토큰 관리 API는 JWT 인증을 사용해야 하므로 이 필터에서 제외한다.
  */
+@Component
+@RequiredArgsConstructor
 public class OpenApiTokenAuthenticationFilter extends OncePerRequestFilter {
     /** OpenAPI 전체 경로 prefix. */
     private static final String OPEN_API_PREFIX = "/api/v1/open-api/";

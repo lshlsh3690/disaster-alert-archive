@@ -13,8 +13,6 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.web.cors.CorsConfigurationSource;
 
-@Configuration
-@RequiredArgsConstructor
 /**
  * OpenAPI 전용 Spring Security 설정.
  *
@@ -22,6 +20,8 @@ import org.springframework.web.cors.CorsConfigurationSource;
  * 서비스키 관리 API는 로그인 JWT가 필요하고, 실제 데이터 조회 API는 OpenAPI 서비스키가 필요하다.
  * 따라서 기존 일반 서비스 보안 체인과 분리해 각 경로의 인증 책임을 명확히 했다.
  */
+@Configuration
+@RequiredArgsConstructor
 public class OpenApiSecurityConfig {
     /** 서비스키 관리 API에서 로그인 사용자를 인증하기 위한 기존 JWT 필터. */
     private final JwtAuthenticationFilter jwtAuthenticationFilter;

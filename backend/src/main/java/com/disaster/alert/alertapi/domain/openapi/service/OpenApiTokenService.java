@@ -19,14 +19,14 @@ import java.util.Base64;
 import java.util.HexFormat;
 import java.util.List;
 
-@Service
-@RequiredArgsConstructor
 /**
  * OpenAPI 서비스키 발급과 검증을 담당하는 서비스.
  *
  * <p>서비스키 원문은 발급 응답에서만 노출하고, 저장소에는 SHA-256 해시만 저장한다.
  * 만료와 폐기는 DB 필드로 관리해 운영자가 발급 이력과 상태를 추적할 수 있게 했다.
  */
+@Service
+@RequiredArgsConstructor
 public class OpenApiTokenService {
     /** OpenAPI 서비스키임을 구분하기 위한 접두사. */
     private static final String TOKEN_PREFIX = "daa_";

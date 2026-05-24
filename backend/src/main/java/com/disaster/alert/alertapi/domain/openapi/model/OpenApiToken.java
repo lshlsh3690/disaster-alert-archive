@@ -21,6 +21,12 @@ import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
 import java.time.LocalDateTime;
 
+/**
+ * OpenAPI 서비스키 엔티티.
+ *
+ * <p>회원별로 발급된 외부 API 접근 키의 상태를 저장한다.
+ * 보안상 원본 토큰은 저장하지 않고 SHA-256 해시만 저장하며, 만료와 폐기를 통해 운영 중 키를 통제한다.
+ */
 @Entity
 @Table(name = "open_api_token")
 @Getter
@@ -28,12 +34,6 @@ import java.time.LocalDateTime;
 @AllArgsConstructor
 @Builder
 @EntityListeners(AuditingEntityListener.class)
-/**
- * OpenAPI 서비스키 엔티티.
- *
- * <p>회원별로 발급된 외부 API 접근 키의 상태를 저장한다.
- * 보안상 원본 토큰은 저장하지 않고 SHA-256 해시만 저장하며, 만료와 폐기를 통해 운영 중 키를 통제한다.
- */
 public class OpenApiToken {
     /** OpenAPI 서비스키 식별자. */
     @Id
