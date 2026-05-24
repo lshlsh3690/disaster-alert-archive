@@ -37,7 +37,9 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-data-redis'
     implementation 'org.springframework.boot:spring-boot-starter-mail'
 //    implementation 'org.springframework.boot:spring-boot-starter-oauth2-client'
-    runtimeOnly 'org.postgresql:postgresql'
+    // PostgreSQL 드라이버 — V18 Java 마이그레이션에서 CopyManager 를 컴파일 타임에 사용하므로
+    // runtimeOnly 가 아닌 implementation 으로 선언한다. 빌드 산출물 크기 변화 미미.
+    implementation 'org.postgresql:postgresql'
 
     implementation 'org.springframework.boot:spring-boot-starter-security'
     testImplementation 'org.springframework.security:spring-security-test'
