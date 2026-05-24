@@ -1,0 +1,10 @@
+[{
+  "relation": ["delegate_permission/common.handle_all_urls"],
+  "target": {
+    "namespace": "android_app",
+    "package_name": "kr.co.disasteralertarchive",
+    "sha256_cert_fingerprints": [
+      "47:A4:39:D1:80:61:2E:20:56:27:B9:BE:4B:22:34:9E:A2:89:D9:64:50:48:6E:E1:50:F9:C2:6B:B2:D8:25:73"
+    ]
+  }
+}]
