@@ -23,6 +23,8 @@ jobs:
       packages: write
     steps:
       - uses: actions/checkout@v4
+        with:
+          lfs: true
 
       - name: Firebase 서비스 계정 키 생성
         run: |
