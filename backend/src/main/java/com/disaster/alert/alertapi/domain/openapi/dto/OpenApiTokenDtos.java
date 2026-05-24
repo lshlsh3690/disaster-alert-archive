@@ -73,7 +73,9 @@ public class OpenApiTokenDtos {
             /** 서비스키 발급 시각. */
             LocalDateTime createdAt,
             /** 현재 시각 기준 사용 가능 여부. */
-            boolean active
+            boolean active,
+            /** 이 서비스키로 인증에 성공한 누적 호출 횟수. */
+            long callCount
     ) {
         /** 엔티티를 목록 응답 DTO로 변환한다. */
         public static Response from(OpenApiToken token) {
@@ -85,7 +87,8 @@ public class OpenApiTokenDtos {
                     token.getLastUsedAt(),
                     token.getRevokedAt(),
                     token.getCreatedAt(),
-                    token.isActive(LocalDateTime.now())
+                    token.isActive(LocalDateTime.now()),
+                    token.getCallCount()
             );
         }
     }

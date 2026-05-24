@@ -65,6 +65,11 @@ public class OpenApiToken {
     /** 마지막으로 OpenAPI 요청에 성공적으로 사용된 시각. */
     private LocalDateTime lastUsedAt;
 
+    /** 이 서비스키로 인증에 성공한 누적 호출 횟수. */
+    @Column(nullable = false)
+    @Builder.Default
+    private long callCount = 0;
+
     /** 서비스키가 폐기된 시각. null이면 폐기되지 않은 상태이다. */
     private LocalDateTime revokedAt;
 
@@ -98,8 +103,9 @@ public class OpenApiToken {
         this.revokedAt = LocalDateTime.now();
     }
 
-    /** 인증에 성공한 시각을 기록한다. */
+    /** 인증에 성공한 시각을 기록하고 호출 횟수를 증가시킨다. */
     public void markUsed() {
         this.lastUsedAt = LocalDateTime.now();
+        this.callCount++;
     }
 }

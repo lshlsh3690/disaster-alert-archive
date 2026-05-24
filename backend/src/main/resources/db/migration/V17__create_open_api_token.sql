@@ -8,6 +8,7 @@ CREATE TABLE IF NOT EXISTS open_api_token (
     last_used_at TIMESTAMP,
     revoked_at TIMESTAMP,
     created_at TIMESTAMP,
+    call_count BIGINT NOT NULL DEFAULT 0,
     CONSTRAINT fk_open_api_token_member FOREIGN KEY (member_id) REFERENCES member (member_id)
 );
 
