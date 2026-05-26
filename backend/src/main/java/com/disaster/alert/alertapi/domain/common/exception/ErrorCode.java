@@ -30,6 +30,9 @@ public enum ErrorCode {
 
     LEGAL_DISTRICT_NOT_FOUND(404, "LD404", "존재하지 않는 지역 코드입니다."),
 
+    OPEN_API_TOKEN_NOT_FOUND(404, "OA404", "OpenAPI Token을 찾을 수 없습니다."),
+    INVALID_OPEN_API_TOKEN(401, "OA401", "OpenAPI Token이 유효하지 않습니다."),
+
     FAVORITE_REGION_ALREADY_EXISTS(409, "MR409", "이미 등록된 관심 지역입니다."),
     FAVORITE_REGION_LIMIT_EXCEEDED(400, "MR400", "관심 지역은 최대 5개까지 등록할 수 있습니다."),
     FAVORITE_REGION_NOT_FOUND(404, "MR404", "등록되지 않은 관심 지역입니다."),
