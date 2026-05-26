@@ -349,11 +349,26 @@ export default function KakaoPolygonMap({ params = {}, mapHeight = "500px", show
     const map   = mapRef.current;
     clearAll();
 
-    sidoDataRef.current.forEach((feature) => {
+    // 도(道)를 먼저, 광역시·특별시를 나중에 그려야 비지(광주·대구·대전·세종)가 위에 올라와 hover 이벤트를 받음
+    const sorted = [...sidoDataRef.current].sort((a, b) => {
+      const isCity = (f: SidoFeature) => /광역시|특별시|특별자치시/.test(f.properties.CTP_KOR_NM);
+      return Number(isCity(a)) - Number(isCity(b));
+    });
+    sorted.forEach((feature) => {
       const cd    = feature.properties.CTPRVN_CD;
       const polys: any[] = [];
       toLatLngPaths(kakao, feature.geometry).forEach((path) => {
         const p = new kakao.maps.Polygon({ map, path, ...SIDO_NORMAL });
+        kakao.maps.event.addListener(p, "mouseover", () => {
+          if (selectedSidoRef.current) return;
+          highlightSido(cd);
+          showHoverLabel(kakao, map, feature);
+        });
+        kakao.maps.event.addListener(p, "mouseout", () => {
+          if (selectedSidoRef.current) return;
+          highlightSido(null);
+          clearHoverOverlay();
+        });
         kakao.maps.event.addListener(p, "click", () => {
           setSelectedSido(feature);
           onSidoSelect?.(feature.properties.CTP_KOR_NM);
@@ -412,6 +427,19 @@ export default function KakaoPolygonMap({ params = {}, mapHeight = "500px", show
       const hStyle = { ...DANGER_POLY[danger], ...DANGER_POLY_HOVER[danger] };
       infoList.push({ name, danger, count });
 
+      // 시군구 이름 정적 레이블
+      const [cLat, cLng] = largestRingCenter(feature.geometry);
+      const labelDiv = document.createElement("div");
+      labelDiv.style.cssText =
+        "font-size:11px;font-weight:600;color:#1f2937;pointer-events:none;white-space:nowrap;" +
+        "text-shadow:0 0 3px white,0 0 3px white,0 0 3px white;";
+      labelDiv.textContent = name;
+      const labelOverlay = new kakao.maps.CustomOverlay({
+        map, position: new kakao.maps.LatLng(cLat, cLng),
+        content: labelDiv, yAnchor: 0.5, xAnchor: 0.5,
+      });
+      sigunguPolys.current.push(labelOverlay);
+
       toLatLngPaths(kakao, feature.geometry).forEach((path) => {
         const p = new kakao.maps.Polygon({ map, path, ...style });
         kakao.maps.event.addListener(p, "mouseover", () => {
@@ -428,8 +456,11 @@ export default function KakaoPolygonMap({ params = {}, mapHeight = "500px", show
     });
 
     setSigunguInfo(infoList);
-    map.setBounds(calcBounds(kakao, sido.geometry), 30, 30, 30, 30);
+    // setBounds는 먼 섬(백령도, 울릉도 등)까지 포함해 중심이 벗어나므로
+    // 가장 큰 폴리곤(본토) 중심으로 setCenter 사용
+    const [lat, lng] = largestRingCenter(sido.geometry);
     const zoomLevel = SIDO_ZOOM[sido.properties.CTP_KOR_NM] ?? 10;
+    map.setCenter(new kakao.maps.LatLng(lat, lng));
     map.setLevel(zoomLevel);
     setStatus(`${sido.properties.CTP_KOR_NM} — ${list.length}개 시군구`);
   }
