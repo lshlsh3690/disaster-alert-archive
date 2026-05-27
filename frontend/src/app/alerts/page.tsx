@@ -78,23 +78,36 @@ function DisasterListPageInner() {
 
   const { data, isLoading, isFetching } = useSearchCombinedAlerts(params);
 
-  const { data: sidoStats } = useSidoStats({});
-  const { data: alertStats } = useAlertStats({});
-  const { data: filteredStats } = useAlertStats(
-    formState.sido ? { region: formState.sido } : {}
-  );
+  const filteredStatsParams = useMemo(() => {
+    const levelCode = levelTextToCode(formState.levelText);
+    const region =
+      formState.sido && formState.sigungu
+        ? `${formState.sido} ${formState.sigungu}`
+        : formState.sido || undefined;
+    return {
+      region,
+      startDate: formState.startDate || undefined,
+      endDate: formState.endDate || undefined,
+      type: formState.type || undefined,
+      level: levelCode,
+      keyword: formState.keyword || undefined,
+      source: formState.source || undefined,
+    };
+  }, [formState]);
+
+  const { data: sidoStats } = useSidoStats(filteredStatsParams);
+  const { data: filteredStats } = useAlertStats(filteredStatsParams);
 
   const topType = useMemo(() => {
-    if (!alertStats?.typeStats) return null;
-    return alertStats.typeStats
+    if (!filteredStats?.typeStats) return null;
+    return filteredStats.typeStats
       .filter((t) => t.type)
       .sort((a, b) => b.count - a.count)[0] ?? null;
-  }, [alertStats]);
+  }, [filteredStats]);
 
   const typeDistribution = useMemo(() => {
-    const stats = filteredStats ?? alertStats;
-    if (!stats?.typeStats) return [];
-    const sorted = stats.typeStats
+    if (!filteredStats?.typeStats) return [];
+    const sorted = filteredStats.typeStats
       .filter((t) => t.type)
       .sort((a, b) => b.count - a.count)
       .slice(0, 5);
@@ -104,7 +117,7 @@ function DisasterListPageInner() {
       count: t.count,
       pct: total > 0 ? Math.round((t.count / total) * 100) : 0,
     }));
-  }, [filteredStats, alertStats]);
+  }, [filteredStats]);
 
   const mapParams = useMemo(() => {
     const levelCode = levelTextToCode(formState.levelText);
@@ -330,7 +343,7 @@ function DisasterListPageInner() {
               <div className="flex items-center justify-between text-sm">
                 <span className="text-gray-500">총 발생 건수</span>
                 <span className="font-semibold">
-                  {alertStats ? alertStats.totalCount.toLocaleString("ko-KR") + "건" : "-"}
+                  {filteredStats ? filteredStats.totalCount.toLocaleString("ko-KR") + "건" : "-"}
                 </span>
               </div>
               <div className="flex items-center justify-between text-sm">
@@ -385,7 +398,7 @@ function DisasterListPageInner() {
                   { code: "LEVEL_2", text: "긴급재난", color: "bg-orange-50 text-orange-700 border-orange-200" },
                   { code: "LEVEL_3", text: "위급재난", color: "bg-red-50 text-red-700 border-red-200" },
                 ].map(({ code, text, color }) => {
-                  const count = (filteredStats ?? alertStats)?.levelStats
+                  const count = filteredStats?.levelStats
                     ?.find((l) => l.level === code)?.count ?? 0;
                   return (
                     <div key={text} className={`flex flex-col items-center rounded border py-1.5 gap-0.5 ${color}`}>
