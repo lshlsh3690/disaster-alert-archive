@@ -100,6 +100,23 @@ deepl:
   api-url: https://api-free.deepl.com/v2/translate
   enabled: true
 
+# Spring AI — OpenAI Embedding
+# 컨테이너 추가 없음. 기존 backend Spring Boot 프로세스 안에서 라이브러리로 동작.
+spring.ai:
+  openai:
+    api-key: ${OPENAI_API_KEY:dummy}
+    embedding:
+      options:
+        model: text-embedding-3-small
+        dimensions: 512
+
+# 이벤트 클러스터링 (임베딩 기반)
+# 임계값: cosine 유사도 >= threshold 면 기존 이벤트에 머지
+clustering:
+  enabled: ${CLUSTERING_ENABLED:false}
+  similarity-threshold: 0.85
+  candidate-time-window-hours: 168
+
 springdoc:
   swagger-ui:
     path: /swagger-ui.html
