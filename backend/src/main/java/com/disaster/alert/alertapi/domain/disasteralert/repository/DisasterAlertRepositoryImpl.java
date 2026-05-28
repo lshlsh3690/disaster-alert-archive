@@ -9,9 +9,11 @@ import com.disaster.alert.alertapi.domain.useralert.model.QUserDisasterAlert;
 import com.disaster.alert.alertapi.domain.useralert.model.QUserDisasterAlertRegion;
 import com.disaster.alert.alertapi.domain.useralert.model.UserDisasterAlert;
 import com.querydsl.core.BooleanBuilder;
+import com.querydsl.core.Tuple;
 import com.querydsl.core.types.Projections;
 import com.querydsl.core.types.dsl.BooleanExpression;
 import com.querydsl.core.types.dsl.Expressions;
+import com.querydsl.core.types.dsl.NumberExpression;
 import com.querydsl.core.types.dsl.StringTemplate;
 import com.querydsl.jpa.JPAExpressions;
 import com.querydsl.jpa.impl.JPAQueryFactory;
@@ -209,6 +211,75 @@ public class DisasterAlertRepositoryImpl implements DisasterAlertRepositoryCusto
                 .groupBy(sigungu)
                 .orderBy(disasterAlert.id.countDistinct().desc(), sigungu.asc())
                 .fetch();
+    }
+
+    @Override
+    public List<DisasterAlertStatResponse.DailyStat> getStatsByDate(AlertSearchRequest request) {
+        NumberExpression<Integer> year  = disasterAlert.createdAt.year();
+        NumberExpression<Integer> month = disasterAlert.createdAt.month();
+        NumberExpression<Integer> day   = disasterAlert.createdAt.dayOfMonth();
+
+        List<Tuple> rows = queryFactory
+                .select(year, month, day, disasterAlert.id.countDistinct())
+                .from(disasterAlert)
+                .where(byAlertCondition(request))
+                .groupBy(year, month, day)
+                .orderBy(year.asc(), month.asc(), day.asc())
+                .fetch();
+
+        return rows.stream()
+                .filter(t -> t.get(0, Integer.class) != null)
+                .map(t -> new DisasterAlertStatResponse.DailyStat(
+                        String.format("%04d-%02d-%02d",
+                                t.get(0, Integer.class),
+                                t.get(1, Integer.class),
+                                t.get(2, Integer.class)),
+                        t.get(3, Long.class)
+                ))
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    public List<DisasterAlertStatResponse.HourlyStat> getStatsByHour(AlertSearchRequest request) {
+        // PostgreSQL: EXTRACT(DOW FROM ...) returns 0=Sun, 1=Mon, ..., 6=Sat
+        NumberExpression<Integer> dow  = Expressions.numberTemplate(Integer.class, "EXTRACT(DOW FROM {0})", disasterAlert.createdAt);
+        NumberExpression<Integer> hour = disasterAlert.createdAt.hour();
+        List<Tuple> rows = queryFactory
+                .select(dow, hour, disasterAlert.id.countDistinct())
+                .from(disasterAlert)
+                .where(byAlertCondition(request))
+                .groupBy(dow, hour)
+                .orderBy(dow.asc(), hour.asc())
+                .fetch();
+        return rows.stream()
+                .filter(t -> t.get(0, Integer.class) != null)
+                .map(t -> new DisasterAlertStatResponse.HourlyStat(
+                        t.get(0, Integer.class),
+                        t.get(1, Integer.class),
+                        t.get(2, Long.class)
+                ))
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    public List<DisasterAlertStatResponse.MonthlyTypeStat> getStatsByMonthType(AlertSearchRequest request) {
+        NumberExpression<Integer> year  = disasterAlert.createdAt.year();
+        NumberExpression<Integer> month = disasterAlert.createdAt.month();
+        List<Tuple> rows = queryFactory
+                .select(year, month, disasterAlert.disasterType, disasterAlert.id.countDistinct())
+                .from(disasterAlert)
+                .where(byAlertCondition(request).and(disasterAlert.disasterType.isNotNull()))
+                .groupBy(year, month, disasterAlert.disasterType)
+                .orderBy(year.asc(), month.asc())
+                .fetch();
+        return rows.stream()
+                .filter(t -> t.get(0, Integer.class) != null)
+                .map(t -> new DisasterAlertStatResponse.MonthlyTypeStat(
+                        String.format("%04d-%02d", t.get(0, Integer.class), t.get(1, Integer.class)),
+                        t.get(2, String.class),
+                        t.get(3, Long.class)
+                ))
+                .collect(Collectors.toList());
     }
 
     private BooleanBuilder byAlertCondition(AlertSearchRequest condition) {

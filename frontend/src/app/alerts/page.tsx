@@ -222,7 +222,15 @@ function DisasterListPageInner() {
             {t.alertList.description}
           </p>
         </div>
-        <ReportButton />
+        <div className="flex items-center gap-2">
+          <Link
+            href={`/stats${searchParams.toString() ? `?${searchParams.toString()}` : ""}`}
+            className="px-3 py-2 text-sm font-semibold rounded-lg border border-gray-200 bg-white text-gray-700 hover:border-blue-400 hover:text-blue-600 transition-colors"
+          >
+            📊 통계 보기
+          </Link>
+          <ReportButton />
+        </div>
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_340px] gap-4 sm:gap-6">

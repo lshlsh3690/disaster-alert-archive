@@ -10,6 +10,7 @@ export const i18n = {
     nav: {
       dashboard: "대시보드",
       alerts: "재난 문자",
+      stats: "통계",
       community: "커뮤니티",
       login: "로그인",
       logout: "로그아웃",
@@ -160,6 +161,7 @@ export const i18n = {
     nav: {
       dashboard: "Dashboard",
       alerts: "Alerts",
+      stats: "Statistics",
       community: "Community",
       login: "Login",
       logout: "Logout",
@@ -305,6 +307,7 @@ export const i18n = {
     nav: {
       dashboard: "ダッシュボード",
       alerts: "災害速報",
+      stats: "統計",
       community: "コミュニティ",
       login: "ログイン",
       logout: "ログアウト",
@@ -450,6 +453,7 @@ export const i18n = {
     nav: {
       dashboard: "仪表板",
       alerts: "灾害预警",
+      stats: "统计",
       community: "社区",
       login: "登录",
       logout: "退出",

@@ -37,5 +37,31 @@ public class DisasterAlertStatResponse {
         private String type;
         private long count;
     }
+
+    @Getter
+    @AllArgsConstructor
+    @ToString
+    public static class DailyStat {
+        private String date;  // "YYYY-MM-DD"
+        private long count;
+    }
+
+    @Getter
+    @AllArgsConstructor
+    @ToString
+    public static class HourlyStat {
+        private int dayOfWeek;  // 1=Sun, 2=Mon, ..., 7=Sat (MySQL DAYOFWEEK)
+        private int hour;
+        private long count;
+    }
+
+    @Getter
+    @AllArgsConstructor
+    @ToString
+    public static class MonthlyTypeStat {
+        private String month;  // "YYYY-MM"
+        private String type;
+        private long count;
+    }
 }
 

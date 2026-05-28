@@ -79,6 +79,27 @@ public class DisasterAlertController {
         return ResponseEntity.ok(disasterAlertService.countBySigungu(request));
     }
 
+    @GetMapping("/stats/daily")
+    public ResponseEntity<List<DisasterAlertStatResponse.DailyStat>> countByDate(
+            AlertSearchRequest request
+    ) {
+        return ResponseEntity.ok(disasterAlertService.countByDate(request));
+    }
+
+    @GetMapping("/stats/hourly")
+    public ResponseEntity<List<DisasterAlertStatResponse.HourlyStat>> countByHour(
+            AlertSearchRequest request
+    ) {
+        return ResponseEntity.ok(disasterAlertService.countByHour(request));
+    }
+
+    @GetMapping("/stats/monthly-type")
+    public ResponseEntity<List<DisasterAlertStatResponse.MonthlyTypeStat>> countByMonthType(
+            AlertSearchRequest request
+    ) {
+        return ResponseEntity.ok(disasterAlertService.countByMonthType(request));
+    }
+
     /**
      * 재난문자 상세 조회.
      *
