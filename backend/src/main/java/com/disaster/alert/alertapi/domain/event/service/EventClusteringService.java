@@ -52,6 +52,9 @@ public class EventClusteringService {
     @Value("${clustering.similarity-threshold:0.85}")
     private double similarityThreshold;
 
+    @Value("${clustering.cross-region-similarity-threshold:0.93}")
+    private double crossRegionSimilarityThreshold;
+
     @Value("${clustering.candidate-time-window-hours:168}")
     private int candidateWindowHours;
 
@@ -104,31 +107,55 @@ public class EventClusteringService {
         }
 
         LocalDateTime since = alert.getCreatedAt().minusHours(candidateWindowHours);
-        List<Object[]> candidates = disasterEventRepository.findTopCandidate(embeddingText, regionCodes, since);
+        List<Object[]> candidates = disasterEventRepository.findTopCandidates(embeddingText, regionCodes, since);
 
-        // 4. 임계값 판정
-        double mergeMaxDistance = 1.0 - similarityThreshold;
-        if (!candidates.isEmpty()) {
-            Object[] row = candidates.get(0);
+        // 4. top-3 후보 로깅 (임계값 튜닝 / 디버깅용)
+        logCandidates(alert.getId(), candidates);
+
+        // 5. 임계값 판정 — 지역 겹침 여부에 따라 다른 임계값 적용
+        for (Object[] row : candidates) {
             Long eventId = ((Number) row[0]).longValue();
             double dist = ((Number) row[1]).doubleValue();
+            boolean regionOverlap = (Boolean) row[2];
+
+            double threshold = regionOverlap ? similarityThreshold : crossRegionSimilarityThreshold;
+            double mergeMaxDistance = 1.0 - threshold;
+
             if (dist <= mergeMaxDistance) {
-                mergeIntoExisting(eventId, alert, dist);
+                mergeIntoExisting(eventId, alert, dist, regionOverlap);
                 return;
             }
-            log.info("clusterNewAlert: alertId={} 최근접 event={} dist={} > {} — 신규 이벤트",
-                    alert.getId(), eventId, dist, mergeMaxDistance);
         }
 
         createNewEvent(alert, regionCodes[0], extractFirstRegionName(alert));
     }
 
-    private void mergeIntoExisting(Long eventId, DisasterAlert alert, double distance) {
+    /**
+     * top-3 후보 정보 로깅. 어떤 후보가 임계값을 못 넘었는지 알아야 임계값 튜닝 가능.
+     */
+    private void logCandidates(Long alertId, List<Object[]> candidates) {
+        if (candidates.isEmpty()) {
+            log.info("clusterNewAlert: alertId={} 후보 0건 (윈도우 안에 이벤트 없음)", alertId);
+            return;
+        }
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < candidates.size(); i++) {
+            Object[] c = candidates.get(i);
+            sb.append(String.format(Locale.ROOT, "[#%d event=%d dist=%.4f overlap=%s] ",
+                    i + 1,
+                    ((Number) c[0]).longValue(),
+                    ((Number) c[1]).doubleValue(),
+                    c[2]));
+        }
+        log.info("clusterNewAlert: alertId={} top-{} 후보: {}", alertId, candidates.size(), sb.toString().trim());
+    }
+
+    private void mergeIntoExisting(Long eventId, DisasterAlert alert, double distance, boolean regionOverlap) {
         int nextSeq = eventAlertMappingRepository.countByEventId(eventId) + 1;
         eventAlertMappingRepository.save(EventAlertMapping.of(eventId, alert.getId(), nextSeq));
         disasterEventRepository.incrementOnMerge(eventId, alert.getCreatedAt());
-        log.info("clusterNewAlert: alertId={} → event={} (dist={}, seq={})",
-                alert.getId(), eventId, distance, nextSeq);
+        log.info("clusterNewAlert: alertId={} → event={} 머지 (dist={}, overlap={}, seq={})",
+                alert.getId(), eventId, distance, regionOverlap, nextSeq);
     }
 
     private void createNewEvent(DisasterAlert alert, String regionCode, String regionName) {

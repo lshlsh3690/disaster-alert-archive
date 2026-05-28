@@ -12,38 +12,42 @@ import java.util.List;
 public interface DisasterEventRepository extends JpaRepository<DisasterEvent, Long> {
 
     /**
-     * 클러스터링 후보 검색.
+     * 클러스터링 후보 검색 — top-3 까지.
      *
      * <p>조건:
      * <ol>
      *   <li>이벤트 last_alert_at 이 sinceTime 이후 (7일 윈도우)</li>
-     *   <li>이벤트에 속한 알림 중 하나라도 새 알림의 시군구와 겹침 (지역 교집합)</li>
-     *   <li>코사인 거리 (embedding &lt;=&gt; new_emb) 최소값 기준 정렬, 상위 1개</li>
+     *   <li>코사인 거리 (embedding &lt;=&gt; new_emb) 최소값 기준 정렬, 상위 3개</li>
      * </ol>
      *
-     * <p>반환: {eventId, minDistance} 한 행. distance 0.0=동일, 1.0=직교. 임계값 비교는 호출 측.
+     * <p><b>지역 교집합은 필터가 아닌 표시</b>: WHERE 에서 제거하고 SELECT 의 BOOL_OR 로
+     * region_overlap 플래그로 받음. 호출 측에서 overlap=true 면 일반 임계값(0.85), false 면
+     * 더 까다로운 임계값(0.93) 적용. 늑대 대전→광주 같이 지역이 다르지만 본문 의미가 매우
+     * 유사한 케이스를 잡되, 강원/경북 산불 같은 false positive 는 차단.
+     *
+     * <p>반환: {eventId, minDistance, regionOverlap} 튜플 0~3 행. distance 0.0=동일, 1.0=직교.
+     * top-2/3 는 디버깅·임계값 튜닝용 로깅에 활용.
      *
      * <p>new_emb 는 pgvector text 표현 ("[0.1, 0.2, ...]") 으로 넘겨받아 ::vector 캐스팅.
-     * 정수 배열 IN 절은 PostgreSQL ANY(:regionCodes) 로 처리.
      */
     @Query(value = """
             SELECT e.id AS event_id,
-                   MIN(da.embedding <=> CAST(:newEmbedding AS vector)) AS min_distance
+                   MIN(da.embedding <=> CAST(:newEmbedding AS vector)) AS min_distance,
+                   BOOL_OR(EXISTS (
+                       SELECT 1 FROM disaster_alert_region dar
+                       WHERE dar.disaster_alert_id = da.disaster_alert_id
+                         AND dar.legal_district_code = ANY(CAST(:regionCodes AS varchar[]))
+                   )) AS region_overlap
             FROM disaster_events e
             JOIN event_alert_mapping m ON m.event_id = e.id
             JOIN disaster_alert da ON da.disaster_alert_id = m.alert_id
             WHERE e.last_alert_at > :sinceTime
               AND da.embedding IS NOT NULL
-              AND EXISTS (
-                  SELECT 1 FROM disaster_alert_region dar
-                  WHERE dar.disaster_alert_id = da.disaster_alert_id
-                    AND dar.legal_district_code = ANY(CAST(:regionCodes AS varchar[]))
-              )
             GROUP BY e.id
             ORDER BY min_distance ASC
-            LIMIT 1
+            LIMIT 3
             """, nativeQuery = true)
-    List<Object[]> findTopCandidate(
+    List<Object[]> findTopCandidates(
             @Param("newEmbedding") String newEmbedding,
             @Param("regionCodes") String[] regionCodes,
             @Param("sinceTime") LocalDateTime sinceTime

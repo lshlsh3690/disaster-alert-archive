@@ -111,10 +111,14 @@ spring.ai:
         dimensions: 512
 
 # 이벤트 클러스터링 (임베딩 기반)
-# 임계값: cosine 유사도 >= threshold 면 기존 이벤트에 머지
+# 두 단계 threshold:
+#   - 지역 겹침 시 similarity-threshold (느슨, 0.85)
+#   - 지역 안 겹침 시 cross-region-similarity-threshold (까다로움, 0.93)
+# 늑대 대전→광주 같은 지역 다른 같은 사건은 0.93+ 면 묶이고, 강원/경북 산불 같은 다른 사건은 분리
 clustering:
   enabled: ${CLUSTERING_ENABLED:false}
   similarity-threshold: 0.85
+  cross-region-similarity-threshold: 0.93
   candidate-time-window-hours: 168
 
 springdoc:
