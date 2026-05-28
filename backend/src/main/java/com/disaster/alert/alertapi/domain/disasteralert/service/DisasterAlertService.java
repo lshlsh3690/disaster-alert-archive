@@ -422,6 +422,18 @@ public class DisasterAlertService {
         return disasterAlertRepository.getStatsSigungu(request);
     }
 
+    public List<DisasterAlertStatResponse.DailyStat> countByDate(AlertSearchRequest request) {
+        return disasterAlertRepository.getStatsByDate(request);
+    }
+
+    public List<DisasterAlertStatResponse.HourlyStat> countByHour(AlertSearchRequest request) {
+        return disasterAlertRepository.getStatsByHour(request);
+    }
+
+    public List<DisasterAlertStatResponse.MonthlyTypeStat> countByMonthType(AlertSearchRequest request) {
+        return disasterAlertRepository.getStatsByMonthType(request);
+    }
+
     // ============================================================================
     //  다국어 응답 — 내부 헬퍼
     // ============================================================================

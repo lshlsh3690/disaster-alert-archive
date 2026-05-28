@@ -1,4 +1,4 @@
-import { Alert, LatestAlert, Stats, ZAlert, ZLatestAlert, ZPageMeta, ZPageMetaCombined, ZRegionStat, ZStats, ZDashboardSummary, type DashboardSummary } from "@/types/alerts";
+import { Alert, LatestAlert, Stats, ZAlert, ZLatestAlert, ZPageMeta, ZPageMetaCombined, ZRegionStat, ZStats, ZDashboardSummary, ZDailyStat, ZHourlyStat, ZMonthlyTypeStat, type DashboardSummary, type DailyStat, type HourlyStat, type MonthlyTypeStat } from "@/types/alerts";
 import instance from "./axios";
 import { z } from "zod";
 
@@ -61,6 +61,11 @@ export async function fetchSigunguStats(
   return z.array(ZRegionStat).parse(res.data);
 }
 
+export async function fetchDailyStats(params: AlertSearchRequest): Promise<DailyStat[]> {
+  const res = await instance.get("/api/v1/alerts/stats/daily", { params });
+  return z.array(ZDailyStat).parse(res.data);
+}
+
 export type Sigungu = {
   name: string;          // 한국어 원문 (검색 API 전달용)
   translatedName: string | null; // 번역된 이름 (화면 표시용)
@@ -78,6 +83,16 @@ export async function fetchSigungu(sido: string, lang = "ko"): Promise<Sigungu[]
       code: z.string(),
     })
   ).parse(res.data);
+}
+
+export async function fetchHourlyStats(params: AlertSearchRequest): Promise<HourlyStat[]> {
+  const res = await instance.get("/api/v1/alerts/stats/hourly", { params });
+  return z.array(ZHourlyStat).parse(res.data);
+}
+
+export async function fetchMonthlyTypeStats(params: AlertSearchRequest): Promise<MonthlyTypeStat[]> {
+  const res = await instance.get("/api/v1/alerts/stats/monthly-type", { params });
+  return z.array(ZMonthlyTypeStat).parse(res.data);
 }
 
 export async function fetchDashboardSummary(): Promise<DashboardSummary> {

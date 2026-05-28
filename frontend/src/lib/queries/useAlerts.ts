@@ -1,6 +1,6 @@
 // hooks/useAlerts.ts
 import { useQuery, keepPreviousData } from "@tanstack/react-query";
-import { fetchLatestAlerts, searchAlerts, fetchAlert, fetchStats, type AlertSearchRequest, fetchLatestAlertsBySido, fetchSigunguStats, searchCombinedAlerts, fetchDashboardSummary, fetchSigungu } from "@/api/alertApi";
+import { fetchLatestAlerts, searchAlerts, fetchAlert, fetchStats, type AlertSearchRequest, fetchLatestAlertsBySido, fetchSigunguStats, searchCombinedAlerts, fetchDashboardSummary, fetchSigungu, fetchDailyStats, fetchHourlyStats, fetchMonthlyTypeStats } from "@/api/alertApi";
 import { fetchUserAlert, fetchUserAlerts } from "@/api/userAlertApi";
 
 export function useLatestAlerts(limit = 5) {
@@ -83,6 +83,33 @@ export function useUserAlerts(params: { page?: number; size?: number; mine?: boo
     queryKey: ["user-alerts", params],
     queryFn: () => fetchUserAlerts(params),
     placeholderData: keepPreviousData,
+  });
+}
+
+export function useDailyStats(params: AlertSearchRequest) {
+  return useQuery({
+    queryKey: ["alert-stats-daily", params],
+    queryFn: () => fetchDailyStats(params),
+    placeholderData: keepPreviousData,
+    staleTime: 60_000,
+  });
+}
+
+export function useHourlyStats(params: AlertSearchRequest) {
+  return useQuery({
+    queryKey: ["alert-stats-hourly", params],
+    queryFn: () => fetchHourlyStats(params),
+    placeholderData: keepPreviousData,
+    staleTime: 60_000,
+  });
+}
+
+export function useMonthlyTypeStats(params: AlertSearchRequest) {
+  return useQuery({
+    queryKey: ["alert-stats-monthly-type", params],
+    queryFn: () => fetchMonthlyTypeStats(params),
+    placeholderData: keepPreviousData,
+    staleTime: 60_000,
   });
 }
 
