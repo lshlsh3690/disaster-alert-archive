@@ -163,6 +163,7 @@ public class EventClusteringService {
                 alert.getDisasterType(),
                 regionCode,
                 regionName,
+                alert.getMessage(),
                 alert.getCreatedAt()
         );
         DisasterEvent saved = disasterEventRepository.save(event);

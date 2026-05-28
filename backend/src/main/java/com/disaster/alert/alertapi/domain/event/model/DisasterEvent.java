@@ -64,23 +64,53 @@ public class DisasterEvent {
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
+    /** 제목 생성 시 disaster_type 이 정보 부족하다고 간주하는 값 목록. */
+    private static final java.util.Set<String> UNINFORMATIVE_TYPES =
+            java.util.Set.of("기타", "UNKNOWN", "etc", "ETC");
+
+    /** 본문 fallback 사용 시 잘라낼 최대 길이. */
+    private static final int MESSAGE_PREVIEW_LEN = 30;
+
     /**
      * 첫 알림 기준 신규 이벤트 생성용 팩토리.
-     * 제목은 {@code "{지역명} {유형} ({yyyy-MM-dd})"} 형태로 자동 생성.
+     *
+     * <p>제목 자동 생성 규칙:
+     * <ul>
+     *   <li>disaster_type 이 의미 있을 때: {@code "{지역명} {유형} ({yyyy-MM-dd})"}</li>
+     *   <li>disaster_type 이 "기타"/null 등 정보 부족 시: {@code "{지역명} {본문앞30자} ({yyyy-MM-dd})"}</li>
+     * </ul>
+     *
+     * <p>본문 fallback 으로 "교통사고 도시철도 1호선 운행지연" 같은 사건 특성이 제목에 드러남.
+     * 나중에 LLM 요약 PR 에서 자연어 제목으로 업그레이드 가능.
      */
     public static DisasterEvent createFromFirstAlert(
             String disasterType,
             String regionCode,
             String regionName,
+            String message,
             LocalDateTime alertAt
     ) {
-        String safeType = disasterType == null ? "UNKNOWN" : disasterType;
         String safeRegion = regionName == null ? "지역미상" : regionName;
-        String title = String.format("%s %s (%s)", safeRegion, safeType, alertAt.format(TITLE_DATE));
+        boolean typeInformative = disasterType != null
+                && !disasterType.isBlank()
+                && !UNINFORMATIVE_TYPES.contains(disasterType);
+
+        String titleMiddle;
+        if (typeInformative) {
+            titleMiddle = disasterType;
+        } else if (message != null && !message.isBlank()) {
+            String trimmed = message.strip();
+            titleMiddle = trimmed.length() > MESSAGE_PREVIEW_LEN
+                    ? trimmed.substring(0, MESSAGE_PREVIEW_LEN) + "..."
+                    : trimmed;
+        } else {
+            titleMiddle = "기타";
+        }
+        String title = String.format("%s %s (%s)", safeRegion, titleMiddle, alertAt.format(TITLE_DATE));
 
         return DisasterEvent.builder()
                 .eventTitle(title)
-                .primaryDisasterType(safeType)
+                .primaryDisasterType(disasterType == null ? "UNKNOWN" : disasterType)
                 .primaryRegionCode(regionCode)
                 .primaryRegionName(safeRegion)
                 .firstAlertAt(alertAt)
