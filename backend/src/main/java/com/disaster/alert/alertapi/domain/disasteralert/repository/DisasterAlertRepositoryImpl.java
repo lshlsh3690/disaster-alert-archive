@@ -241,9 +241,9 @@ public class DisasterAlertRepositoryImpl implements DisasterAlertRepositoryCusto
 
     @Override
     public List<DisasterAlertStatResponse.HourlyStat> getStatsByHour(AlertSearchRequest request) {
-        // PostgreSQL: EXTRACT(DOW FROM ...) returns 0=Sun, 1=Mon, ..., 6=Sat
-        NumberExpression<Integer> dow  = Expressions.numberTemplate(Integer.class, "EXTRACT(DOW FROM {0})", disasterAlert.createdAt);
-        NumberExpression<Integer> hour = disasterAlert.createdAt.hour();
+        // PostgreSQL: date_part('dow', ...) returns 0=Sun, 1=Mon, ..., 6=Sat
+        NumberExpression<Integer> dow  = Expressions.numberTemplate(Integer.class, "function('date_part', 'dow', {0})", disasterAlert.createdAt);
+        NumberExpression<Integer> hour = Expressions.numberTemplate(Integer.class, "function('date_part', 'hour', {0})", disasterAlert.createdAt);
         List<Tuple> rows = queryFactory
                 .select(dow, hour, disasterAlert.id.countDistinct())
                 .from(disasterAlert)

@@ -315,6 +315,7 @@ function LevelsCard({ data }: { data: LevelStat[] }) {
 // ─── 차트: 히트맵 ────────────────────────────────────────────────────────────
 
 function Heatmap({ data }: { data: HourlyStat[] }) {
+  const [tooltip, setTooltip] = useState<{ di: number; hi: number; v: number; x: number; y: number } | null>(null);
   const matrix = Array.from({ length: 7 }, () => Array(24).fill(0) as number[]);
   data.forEach(({ dayOfWeek, hour, count }) => {
     const idx = DOW_TO_IDX[dayOfWeek];
@@ -322,7 +323,7 @@ function Heatmap({ data }: { data: HourlyStat[] }) {
   });
   const max = Math.max(...matrix.flat()) || 1;
   return (
-    <div className="flex flex-col gap-2 flex-1">
+    <div className="flex flex-col gap-2 flex-1 relative">
       <div style={{ display: "grid", gridTemplateColumns: "20px repeat(24, 1fr)", gap: 2 }}>
         <div />
         {Array.from({ length: 24 }).map((_, h) => (
@@ -332,11 +333,29 @@ function Heatmap({ data }: { data: HourlyStat[] }) {
           <Fragment key={di}>
             <div style={{ fontSize: 10, color: "#6b7280", display: "flex", alignItems: "center", justifyContent: "flex-end", paddingRight: 4 }}>{WEEKDAYS[di]}</div>
             {row.map((v, hi) => (
-              <div key={hi} style={{ aspectRatio: "1/1", background: v === 0 ? "#f3f4f6" : `rgba(37,99,235,${0.15 + (v / max) * 0.75})`, borderRadius: 2 }} title={`${WEEKDAYS[di]} ${hi}시: ${v}건`} />
+              <div
+                key={hi}
+                style={{ aspectRatio: "1/1", background: v === 0 ? "#f3f4f6" : `rgba(37,99,235,${0.15 + (v / max) * 0.75})`, borderRadius: 2, cursor: "pointer" }}
+                onMouseEnter={e => {
+                  const rect = (e.target as HTMLElement).getBoundingClientRect();
+                  const parent = (e.target as HTMLElement).closest(".relative")!.getBoundingClientRect();
+                  setTooltip({ di, hi, v, x: rect.left - parent.left + rect.width / 2, y: rect.top - parent.top });
+                }}
+                onMouseLeave={() => setTooltip(null)}
+              />
             ))}
           </Fragment>
         ))}
       </div>
+      {tooltip && (
+        <div
+          className="absolute z-10 bg-gray-800 text-white text-xs rounded px-2 py-1.5 shadow-lg pointer-events-none whitespace-nowrap -translate-x-1/2 -translate-y-full"
+          style={{ left: tooltip.x, top: tooltip.y - 6 }}
+        >
+          <div className="font-semibold">{WEEKDAYS[tooltip.di]} {tooltip.hi}시</div>
+          <div className="text-gray-300">{tooltip.v.toLocaleString("ko-KR")}건</div>
+        </div>
+      )}
       <div className="flex items-center gap-1.5 text-xs text-gray-400 mt-1 flex-wrap">
         <span>적음</span>
         {[0.15, 0.3, 0.5, 0.7, 0.9].map(o => (
