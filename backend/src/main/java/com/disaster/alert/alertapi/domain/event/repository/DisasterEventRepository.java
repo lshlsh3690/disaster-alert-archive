@@ -48,37 +48,37 @@ public interface DisasterEventRepository extends JpaRepository<DisasterEvent, Lo
     Page<DisasterEvent> findInactive(@Param("now") LocalDateTime now, Pageable pageable);
 
     /**
-     * 클러스터링 후보 검색 — top-3 까지.
+     * 클러스터링 후보 검색 — 같은 지역(시군구 교집합) 이벤트 중 top-3.
      *
-     * <p>조건:
+     * <p>조건 (AND):
      * <ol>
      *   <li>이벤트 last_alert_at 이 sinceTime 이후 (7일 윈도우)</li>
+     *   <li>이벤트의 알림 중 하나라도 새 알림과 시군구 교집합 (<b>지역 hard 필터</b>)</li>
      *   <li>코사인 거리 (embedding &lt;=&gt; new_emb) 최소값 기준 정렬, 상위 3개</li>
      * </ol>
      *
-     * <p><b>지역 교집합은 필터가 아닌 표시</b>: WHERE 에서 제거하고 SELECT 의 BOOL_OR 로
-     * region_overlap 플래그로 받음. 호출 측에서 overlap=true 면 일반 임계값(0.85), false 면
-     * 더 까다로운 임계값(0.93) 적용. 늑대 대전→광주 같이 지역이 다르지만 본문 의미가 매우
-     * 유사한 케이스를 잡되, 강원/경북 산불 같은 false positive 는 차단.
+     * <p><b>지역 hard 필터인 이유</b>: 폭염·호우·물놀이 안전수칙 같은 템플릿형 메시지는 본문이
+     * 거의 동일해 다른 시군구끼리도 임베딩 유사도가 매우 높다. 지역을 soft 신호로 두면(cross-region
+     * 자동병합) 전북+전남+충남이 한 폭염 이벤트로 뭉치는 다지역 blob 이 생긴다(실데이터 검증).
+     * 따라서 지역 교집합을 필수 조건으로 둔다. 지역이 다른 같은 사건(늑대 대전→광주류)은 드물고
+     * 관리자 수동 병합으로 처리.
      *
-     * <p>반환: {eventId, minDistance, regionOverlap} 튜플 0~3 행. distance 0.0=동일, 1.0=직교.
-     * top-2/3 는 디버깅·임계값 튜닝용 로깅에 활용.
-     *
-     * <p>new_emb 는 pgvector text 표현 ("[0.1, 0.2, ...]") 으로 넘겨받아 ::vector 캐스팅.
+     * <p>반환: {eventId, minDistance} 튜플 0~3 행. distance 0.0=동일, 1.0=직교.
+     * top-2/3 는 디버깅·임계값 튜닝 로깅용.
      */
     @Query(value = """
             SELECT e.id AS event_id,
-                   MIN(da.embedding <=> CAST(:newEmbedding AS vector)) AS min_distance,
-                   BOOL_OR(EXISTS (
-                       SELECT 1 FROM disaster_alert_region dar
-                       WHERE dar.disaster_alert_id = da.disaster_alert_id
-                         AND dar.legal_district_code = ANY(CAST(:regionCodes AS varchar[]))
-                   )) AS region_overlap
+                   MIN(da.embedding <=> CAST(:newEmbedding AS vector)) AS min_distance
             FROM disaster_events e
             JOIN event_alert_mapping m ON m.event_id = e.id
             JOIN disaster_alert da ON da.disaster_alert_id = m.alert_id
             WHERE e.last_alert_at > :sinceTime
               AND da.embedding IS NOT NULL
+              AND EXISTS (
+                  SELECT 1 FROM disaster_alert_region dar
+                  WHERE dar.disaster_alert_id = da.disaster_alert_id
+                    AND dar.legal_district_code = ANY(CAST(:regionCodes AS varchar[]))
+              )
             GROUP BY e.id
             ORDER BY min_distance ASC
             LIMIT 3
