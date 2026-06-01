@@ -50,12 +50,16 @@ public class EventClusteringBackfillTool implements ApplicationRunner {
     @Override
     public void run(ApplicationArguments args) {
         Integer limit = parseLimit(args);
+        boolean recluster = parseRecluster(args);
 
-        List<Long> alertIds = limit == null
-                ? fetchAllAlertIdsOrdered()
-                : fetchAlertIdsOrdered(limit);
+        List<Long> alertIds = fetchAlertIds(limit, recluster);
 
-        log.info("EventClusteringBackfillTool 시작: 대상 {}건 (limit={})", alertIds.size(), limit);
+        log.info("EventClusteringBackfillTool 시작: 대상 {}건 (limit={}, recluster={})",
+                alertIds.size(), limit, recluster);
+        if (recluster) {
+            log.info("  recluster 모드: 저장된 임베딩 재사용(OpenAI 호출 X). " +
+                    "이벤트 테이블을 먼저 비웠는지 확인하세요 (TRUNCATE event_alert_mapping, disaster_events).");
+        }
 
         int processed = 0;
         int errors = 0;
@@ -91,26 +95,24 @@ public class EventClusteringBackfillTool implements ApplicationRunner {
         }
     }
 
-    /**
-     * created_at ASC 정렬 ID 목록.
-     * disaster_alert.embedding 이 이미 NOT NULL 인 row 는 스킵 (재실행 안전).
-     */
-    private List<Long> fetchAllAlertIdsOrdered() {
-        return jdbcTemplate.queryForList(
-                "SELECT disaster_alert_id FROM disaster_alert " +
-                "WHERE embedding IS NULL " +
-                "ORDER BY created_at ASC",
-                Long.class
-        );
+    /** {@code --backfill.recluster=true} 면 저장된 임베딩으로 재클러스터링(임계값 튜닝용). */
+    private boolean parseRecluster(ApplicationArguments args) {
+        List<String> values = args.getOptionValues("backfill.recluster");
+        return values != null && !values.isEmpty() && Boolean.parseBoolean(values.get(0));
     }
 
-    private List<Long> fetchAlertIdsOrdered(int limit) {
-        return jdbcTemplate.queryForList(
-                "SELECT disaster_alert_id FROM disaster_alert " +
-                "WHERE embedding IS NULL " +
-                "ORDER BY created_at ASC LIMIT ?",
-                Long.class,
-                limit
-        );
+    /**
+     * created_at ASC 정렬 대상 ID 목록.
+     *
+     * <p>recluster=false (기본): {@code embedding IS NULL} 만 — 임베딩 미생성 알림만 처리(재실행 안전).
+     * <p>recluster=true: {@code embedding IS NOT NULL} 전체 — 이미 임베딩된 알림을 다시 클러스터링
+     * (튜닝 시 이벤트 비우고 저장 벡터로 재구성).
+     */
+    private List<Long> fetchAlertIds(Integer limit, boolean recluster) {
+        String where = recluster ? "embedding IS NOT NULL" : "embedding IS NULL";
+        String sql = "SELECT disaster_alert_id FROM disaster_alert WHERE " + where
+                + " ORDER BY created_at ASC"
+                + (limit == null ? "" : " LIMIT " + limit);
+        return jdbcTemplate.queryForList(sql, Long.class);
     }
 }

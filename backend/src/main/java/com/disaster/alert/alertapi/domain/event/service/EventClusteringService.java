@@ -90,12 +90,14 @@ public class EventClusteringService {
     }
 
     private void doCluster(DisasterAlert alert) {
-        // 1. 임베딩 생성
-        float[] embedding = embeddingModel.embed(alert.getMessage());
-        String embeddingText = toVectorText(embedding);
-
-        // 2. disaster_alert.embedding UPDATE
-        alertEmbeddingRepository.updateEmbedding(alert.getId(), embeddingText);
+        // 1. 임베딩 확보 — 이미 저장돼 있으면 재사용(OpenAI 재호출 X), 없으면 생성 후 저장.
+        //    덕분에 재클러스터링(임계값 튜닝)이 공짜+빠름: 비싼 임베딩은 1회만.
+        String embeddingText = alertEmbeddingRepository.findEmbeddingText(alert.getId());
+        if (embeddingText == null) {
+            float[] embedding = embeddingModel.embed(alert.getMessage());
+            embeddingText = toVectorText(embedding);
+            alertEmbeddingRepository.updateEmbedding(alert.getId(), embeddingText);
+        }
 
         // 3. 후보 이벤트 검색
         String[] regionCodes = extractRegionCodes(alert);

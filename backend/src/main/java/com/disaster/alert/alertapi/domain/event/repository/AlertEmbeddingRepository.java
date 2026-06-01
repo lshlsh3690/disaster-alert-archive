@@ -35,4 +35,18 @@ public class AlertEmbeddingRepository {
                 embedding, alertId
         );
     }
+
+    /**
+     * 저장된 임베딩을 pgvector text 표현("[0.1,0.2,...]")으로 조회. 없으면 null.
+     *
+     * <p>재클러스터링(임계값 튜닝) 시 OpenAI 재호출 없이 저장된 벡터를 그대로 후보 검색에 쓰기 위함.
+     */
+    public String findEmbeddingText(Long alertId) {
+        var result = jdbcTemplate.query(
+                "SELECT embedding::text FROM disaster_alert WHERE disaster_alert_id = ?",
+                (rs, rowNum) -> rs.getString(1),
+                alertId
+        );
+        return result.isEmpty() ? null : result.get(0);
+    }
 }
