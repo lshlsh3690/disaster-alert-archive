@@ -55,6 +55,10 @@ public class EventClusteringService {
     @Value("${clustering.candidate-time-window-hours:168}")
     private int candidateWindowHours;
 
+    /** 한 알림이 이 수를 초과하는 시군구에 발송되면 광역 브로드캐스트로 보고 단독 이벤트 처리. */
+    @Value("${clustering.max-region-span:10}")
+    private int maxRegionSpan;
+
     /**
      * 신규 알림에 대해 임베딩 생성 + 클러스터링 수행.
      *
@@ -119,7 +123,17 @@ public class EventClusteringService {
         if (regionCodes.length == 0) {
             // 지역 정보 없으면 후보 검색 불가 → 항상 신규 이벤트
             log.info("clusterNewAlert: alertId={} 지역 코드 없음 — 신규 이벤트 생성", alert.getId());
-            createNewEvent(alert, null, null);
+            createNewEvent(alert, null, null, false);
+            return;
+        }
+
+        // 광역 브로드캐스트(다수 시군구 발송)는 단독 이벤트로 — blob 다리 차단.
+        // 후보 검색도 머지도 안 하고, is_broadcast=true 로 만들어 다른 알림 후보에서도 제외.
+        int sigunguSpan = distinctSigunguCount(regionCodes);
+        if (sigunguSpan > maxRegionSpan) {
+            log.info("clusterNewAlert: alertId={} 광역({}시군구>{}) — 단독 broadcast 이벤트",
+                    alert.getId(), sigunguSpan, maxRegionSpan);
+            createNewEvent(alert, regionCodes[0], extractFirstRegionName(alert), true);
             return;
         }
 
@@ -141,7 +155,7 @@ public class EventClusteringService {
             }
         }
 
-        createNewEvent(alert, regionCodes[0], extractFirstRegionName(alert));
+        createNewEvent(alert, regionCodes[0], extractFirstRegionName(alert), false);
     }
 
     /**
@@ -171,18 +185,28 @@ public class EventClusteringService {
                 alert.getId(), eventId, distance, nextSeq);
     }
 
-    private void createNewEvent(DisasterAlert alert, String regionCode, String regionName) {
+    private void createNewEvent(DisasterAlert alert, String regionCode, String regionName, boolean broadcast) {
         DisasterEvent event = DisasterEvent.createFromFirstAlert(
                 alert.getDisasterType(),
                 regionCode,
                 regionName,
                 alert.getMessage(),
-                alert.getCreatedAt()
+                alert.getCreatedAt(),
+                broadcast
         );
         DisasterEvent saved = disasterEventRepository.save(event);
         eventAlertMappingRepository.save(EventAlertMapping.of(saved.getId(), alert.getId(), 1));
-        log.info("clusterNewAlert: alertId={} → 신규 event={} (title='{}')",
-                alert.getId(), saved.getId(), saved.getEventTitle());
+        log.info("clusterNewAlert: alertId={} → 신규 event={} (broadcast={}, title='{}')",
+                alert.getId(), saved.getId(), broadcast, saved.getEventTitle());
+    }
+
+    /** 시군구(코드 앞 5자) 기준 distinct 개수 — 광역 알림 판정용. */
+    private int distinctSigunguCount(String[] regionCodes) {
+        java.util.Set<String> sigungu = new java.util.HashSet<>();
+        for (String code : regionCodes) {
+            sigungu.add(code.length() >= 5 ? code.substring(0, 5) : code);
+        }
+        return sigungu.size();
     }
 
     private String[] extractRegionCodes(DisasterAlert alert) {

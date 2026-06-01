@@ -73,6 +73,7 @@ public interface DisasterEventRepository extends JpaRepository<DisasterEvent, Lo
             JOIN event_alert_mapping m ON m.event_id = e.id
             JOIN disaster_alert da ON da.disaster_alert_id = m.alert_id
             WHERE e.last_alert_at > :sinceTime
+              AND e.is_broadcast = false
               AND da.embedding IS NOT NULL
               AND EXISTS (
                   SELECT 1 FROM disaster_alert_region dar

@@ -67,6 +67,13 @@ public class DisasterEvent {
     @Column(name = "cooldown_hours", nullable = false)
     private int cooldownHours;
 
+    /**
+     * 광역 브로드캐스트 이벤트 여부. 한 알림이 다수 시군구에 발송된 광역 경보로 만들어진 이벤트.
+     * true 면 다른 알림의 머지 후보에서 제외해 transitive blob 을 방지.
+     */
+    @Column(name = "is_broadcast", nullable = false)
+    private boolean broadcast;
+
     @CreatedDate
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
@@ -95,7 +102,8 @@ public class DisasterEvent {
             String regionCode,
             String regionName,
             String message,
-            LocalDateTime alertAt
+            LocalDateTime alertAt,
+            boolean broadcast
     ) {
         String safeRegion = regionName == null ? "지역미상" : regionName;
         boolean typeInformative = disasterType != null
@@ -124,6 +132,7 @@ public class DisasterEvent {
                 .lastAlertAt(alertAt)
                 .alertCount(1)
                 .cooldownHours(DisasterCooldown.hoursFor(disasterType))
+                .broadcast(broadcast)
                 .build();
     }
 

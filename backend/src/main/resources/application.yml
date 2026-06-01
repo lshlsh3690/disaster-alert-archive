@@ -117,6 +117,8 @@ clustering:
   enabled: ${CLUSTERING_ENABLED:false}
   similarity-threshold: 0.85
   candidate-time-window-hours: 168
+  # 한 알림이 이 수 초과 시군구에 발송되면 광역 브로드캐스트로 보고 단독 이벤트 처리 (blob 다리 차단)
+  max-region-span: 10
 
 springdoc:
   swagger-ui:
