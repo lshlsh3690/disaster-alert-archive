@@ -21,8 +21,11 @@ import java.time.format.DateTimeFormatter;
  * <p>대표 정보({@link #primaryDisasterType}, {@link #primaryRegionCode}, {@link #primaryRegionName})
  * 는 모두 첫 알림 기준 캐시. 화면 표시용 제목({@link #eventTitle}) 자동 생성.
  *
- * <p>상태머신(status, ACTIVE/MONITORING/RESOLVED) 컬럼은 다음 PR. 현 시점에서는
- * {@link #lastAlertAt} 으로 후보 검색 윈도우 + 상태 추론 모두 충당.
+ * <p><b>상태(active)는 저장하지 않고 파생 계산</b>한다. "사건 종료" 는 우리가 알 수 없는 값
+ * (행안부가 종료 신호 안 줌)이라 status 컬럼+스케줄러로 박제하지 않는다. 대신 유형에서 1회
+ * 산정한 {@link #cooldownHours} 만 저장하고, 조회 시 {@link #isActive(LocalDateTime)} 로
+ * {@code now - lastAlertAt < cooldown} 을 계산한다. 머지로 lastAlertAt 이 갱신되면 자동으로
+ * 다시 active 로 돌아온다.
  */
 @Entity
 @Table(name = "disaster_events")
@@ -59,6 +62,10 @@ public class DisasterEvent {
 
     @Column(name = "alert_count", nullable = false)
     private int alertCount;
+
+    /** 유형별 cooldown 시간. 생성 시 1회 산정, 이후 불변. active 파생 판정 기준. */
+    @Column(name = "cooldown_hours", nullable = false)
+    private int cooldownHours;
 
     @CreatedDate
     @Column(name = "created_at", nullable = false, updatable = false)
@@ -116,6 +123,7 @@ public class DisasterEvent {
                 .firstAlertAt(alertAt)
                 .lastAlertAt(alertAt)
                 .alertCount(1)
+                .cooldownHours(DisasterCooldown.hoursFor(disasterType))
                 .build();
     }
 
@@ -128,5 +136,14 @@ public class DisasterEvent {
             this.lastAlertAt = alertAt;
         }
         this.alertCount++;
+    }
+
+    /**
+     * 진행 중 여부 파생 계산 — 마지막 알림 후 cooldown 시간 이내면 true.
+     *
+     * @param now 기준 시각 (KST 주입). 보통 {@code LocalDateTime.now(ZoneId.of("Asia/Seoul"))}.
+     */
+    public boolean isActive(LocalDateTime now) {
+        return lastAlertAt.isAfter(now.minusHours(cooldownHours));
     }
 }
