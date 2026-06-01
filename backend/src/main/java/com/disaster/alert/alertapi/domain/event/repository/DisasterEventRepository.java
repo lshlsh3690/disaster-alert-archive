@@ -1,6 +1,8 @@
 package com.disaster.alert.alertapi.domain.event.repository;
 
 import com.disaster.alert.alertapi.domain.event.model.DisasterEvent;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -10,6 +12,40 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 public interface DisasterEventRepository extends JpaRepository<DisasterEvent, Long> {
+
+    // ── 조회 API ─────────────────────────────────────────────
+    // active 는 (now - last_alert_at < cooldown_hours) 파생값.
+    // DB now() 는 운영 JVM/DB 가 UTC 면 KST 값과 9시간 어긋나므로 쓰지 않고,
+    // 호출 측이 KST now 를 :now 로 주입한다.
+
+    /** 필터 없음 — 최신순 전체. */
+    Page<DisasterEvent> findAllByOrderByLastAlertAtDesc(Pageable pageable);
+
+    /** 진행 중(active=true): 마지막 알림이 cooldown 이내. */
+    @Query(value = """
+            SELECT * FROM disaster_events
+            WHERE last_alert_at > CAST(:now AS timestamp) - (cooldown_hours * interval '1 hour')
+            ORDER BY last_alert_at DESC
+            """,
+            countQuery = """
+            SELECT count(*) FROM disaster_events
+            WHERE last_alert_at > CAST(:now AS timestamp) - (cooldown_hours * interval '1 hour')
+            """,
+            nativeQuery = true)
+    Page<DisasterEvent> findActive(@Param("now") LocalDateTime now, Pageable pageable);
+
+    /** 지난 사건(active=false): 마지막 알림이 cooldown 경과. */
+    @Query(value = """
+            SELECT * FROM disaster_events
+            WHERE last_alert_at <= CAST(:now AS timestamp) - (cooldown_hours * interval '1 hour')
+            ORDER BY last_alert_at DESC
+            """,
+            countQuery = """
+            SELECT count(*) FROM disaster_events
+            WHERE last_alert_at <= CAST(:now AS timestamp) - (cooldown_hours * interval '1 hour')
+            """,
+            nativeQuery = true)
+    Page<DisasterEvent> findInactive(@Param("now") LocalDateTime now, Pageable pageable);
 
     /**
      * 클러스터링 후보 검색 — top-3 까지.
