@@ -89,6 +89,24 @@ public class EventClusteringService {
         }
     }
 
+    /**
+     * 배치 임베딩 생성 + 저장 (클러스터링 X).
+     *
+     * <p>백필 시 알림 1건마다 순차 호출하면 43k건에 수 시간 걸림. OpenAI 임베딩 API 는
+     * 한 번에 여러 입력을 받으므로 묶어서 호출 → 호출 수 1/배치크기로 감소.
+     * 임베딩은 알림별 독립이라 배치 가능(클러스터링은 순서 의존이라 별도 단계).
+     *
+     * @return 저장한 건수
+     */
+    @Transactional
+    public int storeEmbeddings(List<Long> alertIds, List<String> messages) {
+        List<float[]> vectors = embeddingModel.embed(messages);
+        for (int i = 0; i < alertIds.size(); i++) {
+            alertEmbeddingRepository.updateEmbedding(alertIds.get(i), toVectorText(vectors.get(i)));
+        }
+        return alertIds.size();
+    }
+
     private void doCluster(DisasterAlert alert) {
         // 1. 임베딩 확보 — 이미 저장돼 있으면 재사용(OpenAI 재호출 X), 없으면 생성 후 저장.
         //    덕분에 재클러스터링(임계값 튜닝)이 공짜+빠름: 비싼 임베딩은 1회만.

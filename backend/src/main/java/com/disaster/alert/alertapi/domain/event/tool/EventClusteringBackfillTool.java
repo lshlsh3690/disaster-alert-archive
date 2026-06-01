@@ -11,6 +11,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * 과거 disaster_alert 전체 임베딩 + 클러스터링 백필 도구.
@@ -18,24 +19,28 @@ import java.util.List;
  * <p><b>활성 조건</b>: Spring Profile {@code backfill} 활성 시에만 실행.
  * 일반 dev / 운영 부팅에서는 빈 등록 자체가 안 됨.
  *
- * <p><b>실행 절차 (Phase B)</b>
+ * <p><b>3가지 모드</b>
+ * <ul>
+ *   <li>기본: {@code embedding IS NULL} 알림을 1건씩 임베딩+클러스터링 (순차, 느림)</li>
+ *   <li>{@code --backfill.embed-only=true}: 임베딩만 <b>배치</b>로 생성·저장 (빠름, 클러스터링 X)</li>
+ *   <li>{@code --backfill.recluster=true}: 저장된 임베딩으로 재클러스터링 (OpenAI 호출 X, 튜닝용)</li>
+ * </ul>
+ *
+ * <p><b>권장 절차 (전체 백필/검증)</b>
  * <pre>
- * # 1. .env.dev 에 OPENAI_API_KEY 추가
- * # 2. clustering.enabled 활성화 + backfill profile 활성화
- * export CLUSTERING_ENABLED=true
- * export SPRING_PROFILES_ACTIVE=backfill
- * # 3. 샘플 검증 (limit 500)
- * cd backend
- * set -a && source ../.env.dev && set +a
- * ./gradlew bootRun --args='--backfill.limit=500'
+ * export CLUSTERING_ENABLED=true SPRING_PROFILES_ACTIVE=backfill
+ * cd backend && set -a && source ../.env.dev && set +a
+ * # 1) 배치 임베딩 (전체, ~분 단위)
+ * ./gradlew bootRun --args='--backfill.embed-only=true'
+ * # 2) 이벤트 비우고
+ * #    psql -c "TRUNCATE event_alert_mapping, disaster_events RESTART IDENTITY;"
+ * # 3) 저장 벡터로 클러스터링 (OpenAI 호출 X, ~분 단위)
+ * ./gradlew bootRun --args='--backfill.recluster=true'
+ * # 4) 임계값 튜닝: application.yml 수정 → (2)~(3) 반복 (공짜)
  * </pre>
  *
- * <p><b>처리 흐름</b>: disaster_alert 를 created_at ASC 로 정렬 → 한 건씩
- * {@link EventClusteringService#clusterNewAlert(Long)} 호출.
- * 알림이 created_at 순서대로 처리되어야 클러스터링이 시계열 누적 사건 흐름을 정확히 재현.
- *
- * <p><b>주의</b>: 백필 종료 후 별도 도구로 disaster_alert.embedding, disaster_events,
- * event_alert_mapping 을 V31_xx / V32 / V33 시드 SQL 로 덤프 (이번 PR 범위 외).
+ * <p><b>처리 흐름</b>: disaster_alert 를 created_at ASC 로 정렬해 클러스터링.
+ * 알림이 created_at 순서대로 처리되어야 시계열 누적 사건 흐름을 정확히 재현.
  */
 @Component
 @Profile("backfill")
@@ -47,10 +52,19 @@ public class EventClusteringBackfillTool implements ApplicationRunner {
     private final EventClusteringService eventClusteringService;
     private final JdbcTemplate jdbcTemplate;
 
+    /** 임베딩 배치 호출 크기 — OpenAI 한 번에 보낼 입력 수. */
+    private static final int EMBED_BATCH_SIZE = 200;
+
     @Override
     public void run(ApplicationArguments args) {
         Integer limit = parseLimit(args);
         boolean recluster = parseRecluster(args);
+        boolean embedOnly = parseFlag(args, "backfill.embed-only");
+
+        if (embedOnly) {
+            runEmbedOnly(limit);
+            return;
+        }
 
         List<Long> alertIds = fetchAlertIds(limit, recluster);
 
@@ -97,8 +111,45 @@ public class EventClusteringBackfillTool implements ApplicationRunner {
 
     /** {@code --backfill.recluster=true} 면 저장된 임베딩으로 재클러스터링(임계값 튜닝용). */
     private boolean parseRecluster(ApplicationArguments args) {
-        List<String> values = args.getOptionValues("backfill.recluster");
+        return parseFlag(args, "backfill.recluster");
+    }
+
+    private boolean parseFlag(ApplicationArguments args, String name) {
+        List<String> values = args.getOptionValues(name);
         return values != null && !values.isEmpty() && Boolean.parseBoolean(values.get(0));
+    }
+
+    /**
+     * 임베딩만 배치로 생성·저장 (클러스터링 X). embedding IS NULL 대상.
+     * 200건씩 묶어 OpenAI 호출 → 43k건도 분 단위.
+     */
+    private void runEmbedOnly(Integer limit) {
+        String sql = "SELECT disaster_alert_id, message FROM disaster_alert "
+                + "WHERE embedding IS NULL AND message IS NOT NULL AND message <> '' "
+                + "ORDER BY created_at ASC"
+                + (limit == null ? "" : " LIMIT " + limit);
+        List<Map<String, Object>> rows = jdbcTemplate.queryForList(sql);
+
+        log.info("embed-only 시작: 대상 {}건 (배치 {}건씩)", rows.size(), EMBED_BATCH_SIZE);
+        int done = 0;
+        int errors = 0;
+        long t0 = System.currentTimeMillis();
+
+        for (int i = 0; i < rows.size(); i += EMBED_BATCH_SIZE) {
+            List<Map<String, Object>> batch = rows.subList(i, Math.min(i + EMBED_BATCH_SIZE, rows.size()));
+            List<Long> ids = batch.stream().map(r -> ((Number) r.get("disaster_alert_id")).longValue()).toList();
+            List<String> msgs = batch.stream().map(r -> (String) r.get("message")).toList();
+            try {
+                eventClusteringService.storeEmbeddings(ids, msgs);
+                done += ids.size();
+            } catch (Exception e) {
+                errors += ids.size();
+                log.error("embed-only: 배치 실패 (offset {})", i, e);
+            }
+            long elapsed = System.currentTimeMillis() - t0;
+            log.info("embed-only 진행: {}/{} (errors={}, elapsed={}s)", done, rows.size(), errors, elapsed / 1000);
+        }
+        log.info("embed-only 완료: 저장={}, 오류={}, 소요={}s", done, errors, (System.currentTimeMillis() - t0) / 1000);
     }
 
     /**
