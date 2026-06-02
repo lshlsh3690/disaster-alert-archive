@@ -18,8 +18,10 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Optional;
 
 /**
@@ -58,6 +60,10 @@ public class EventClusteringService {
     /** 한 알림이 이 수를 초과하는 시군구에 발송되면 광역 브로드캐스트로 보고 단독 이벤트 처리. */
     @Value("${clustering.max-region-span:10}")
     private int maxRegionSpan;
+
+    /** 광역 알림이 이 수 이상 시도에 걸치면 '전국' 이벤트로 분류 (유형만 키). 미만이면 시도 광역. */
+    @Value("${clustering.nationwide-sido-span:8}")
+    private int nationwideSidoSpan;
 
     /**
      * 신규 알림에 대해 임베딩 생성 + 클러스터링 수행.
@@ -199,20 +205,45 @@ public class EventClusteringService {
     }
 
     /**
-     * 광역 broadcast 알림 처리. local 이벤트와는 절대 안 섞고(규칙 1·2), 같은 시도+유형의 기존
-     * broadcast 이벤트가 윈도우 안에 있으면 거기 머지, 없으면 신규 broadcast 이벤트로 만든다.
+     * 광역 broadcast 알림 처리. local 이벤트와는 절대 안 섞고(규칙 1·2), 같은 broadcast 끼리만 묶는다.
+     * 묶음 키는 시도 범위에 따라 두 갈래:
+     * <ul>
+     *   <li><b>전국</b> (시도 span &ge; {@code nationwide-sido-span}): 유형만 키, 라벨 "전국 {유형}",
+     *       {@code primary_region_code=null}. 행안부 전국 호우/대설 안내가 시도별로 흩어지지 않게 통합.</li>
+     *   <li><b>시도 광역</b> (그 미만): (최다 시군구 시도 + 유형) 키. 첫 지역이 아니라 <b>최다 시군구
+     *       시도</b>를 써서 지역 목록 순서에 흔들리지 않게 함.</li>
+     * </ul>
      *
      * <p>임베딩(본문)은 보지 않는다 — "발효/해제/격상" 처럼 본문이 달라도 같은 사건으로 묶기 위함.
-     * 대신 키를 (시도 prefix + 유형)으로 좁혀 시도 경계를 넘는 blob 을 차단한다.
-     * 유형이 '기타'/null 이면 본문이 제각각(물놀이 안전수칙·댐방류 등)이라 시도만으론 다른 사건이
-     * 섞이므로 머지하지 않고 신규로 둔다.
+     * 유형이 '기타'/null 이면 본문이 제각각(물놀이 안전수칙·댐방류 등)이라 머지하지 않고 신규로 둔다.
      */
     private void clusterBroadcast(DisasterAlert alert, String[] regionCodes, int sigunguSpan) {
-        String sido = sidoPrefix(regionCodes[0]);
         String type = alert.getDisasterType();
+        boolean informative = DisasterEvent.isInformativeType(type);
+        LocalDateTime since = alert.getCreatedAt().minusHours(candidateWindowHours);
+        int sidoSpan = distinctSidoCount(regionCodes);
 
-        if (DisasterEvent.isInformativeType(type)) {
-            LocalDateTime since = alert.getCreatedAt().minusHours(candidateWindowHours);
+        // 전국 — 유형만 키
+        if (sidoSpan >= nationwideSidoSpan) {
+            if (informative) {
+                Optional<DisasterEvent> target = disasterEventRepository
+                        .findFirstByBroadcastTrueAndPrimaryDisasterTypeAndPrimaryRegionCodeIsNullAndLastAlertAtAfterOrderByLastAlertAtDesc(
+                                type, since);
+                if (target.isPresent()) {
+                    log.info("clusterNewAlert: alertId={} 전국({}시도) → broadcast event={} 유형 머지({})",
+                            alert.getId(), sidoSpan, target.get().getId(), type);
+                    mergeIntoExisting(target.get().getId(), alert, 0.0);
+                    return;
+                }
+            }
+            log.info("clusterNewAlert: alertId={} 전국({}시도) — 신규 broadcast 이벤트", alert.getId(), sidoSpan);
+            createNewEvent(alert, null, "전국", true);
+            return;
+        }
+
+        // 시도 광역 — (최다 시군구 시도 + 유형) 키
+        String sido = dominantSidoPrefix(regionCodes);
+        if (informative) {
             Optional<DisasterEvent> target = disasterEventRepository
                     .findFirstByBroadcastTrueAndPrimaryDisasterTypeAndPrimaryRegionCodeStartingWithAndLastAlertAtAfterOrderByLastAlertAtDesc(
                             type, sido, since);
@@ -223,10 +254,9 @@ public class EventClusteringService {
                 return;
             }
         }
-
-        log.info("clusterNewAlert: alertId={} 광역({}시군구>{}) — 신규 broadcast 이벤트",
-                alert.getId(), sigunguSpan, maxRegionSpan);
-        createNewEvent(alert, regionCodes[0], extractSidoName(alert), true);
+        log.info("clusterNewAlert: alertId={} 광역({}시군구>{}, {}시도) — 신규 broadcast 이벤트",
+                alert.getId(), sigunguSpan, maxRegionSpan, sidoSpan);
+        createNewEvent(alert, firstCodeOfSido(regionCodes, sido), sidoNameForPrefix(alert, sido), true);
     }
 
     /** 시도 코드(법정동 코드 앞 2자) — broadcast 시도 키. */
@@ -234,12 +264,45 @@ public class EventClusteringService {
         return code != null && code.length() >= 2 ? code.substring(0, 2) : code;
     }
 
-    /** 첫 지역명의 시도 토큰만 추출. 예: "경상남도 창원시 의창구" → "경상남도". */
-    private String extractSidoName(DisasterAlert alert) {
-        String full = extractFirstRegionName(alert);
-        if (full == null) return null;
-        int sp = full.indexOf(' ');
-        return sp < 0 ? full : full.substring(0, sp);
+    /** 알림이 걸친 distinct 시도 수 — 전국/시도광역 분류용. */
+    private int distinctSidoCount(String[] regionCodes) {
+        java.util.Set<String> sido = new java.util.HashSet<>();
+        for (String code : regionCodes) sido.add(sidoPrefix(code));
+        return sido.size();
+    }
+
+    /** 가장 많은 시군구를 차지한 시도 prefix — 지역 목록 순서에 무관한 안정적 키. */
+    private String dominantSidoPrefix(String[] regionCodes) {
+        Map<String, Integer> count = new HashMap<>();
+        for (String code : regionCodes) count.merge(sidoPrefix(code), 1, Integer::sum);
+        return count.entrySet().stream()
+                .max(Map.Entry.comparingByValue())
+                .map(Map.Entry::getKey)
+                .orElse(sidoPrefix(regionCodes[0]));
+    }
+
+    /** 지정 시도에 속한 첫 지역 코드 — primary_region_code 로 저장(StartingWith 매칭용). */
+    private String firstCodeOfSido(String[] regionCodes, String sido) {
+        for (String code : regionCodes) {
+            if (sido.equals(sidoPrefix(code))) return code;
+        }
+        return regionCodes[0];
+    }
+
+    /** 지정 시도에 속한 지역명의 시도 토큰. 예: prefix "48" → "경상남도". */
+    private String sidoNameForPrefix(DisasterAlert alert, String sido) {
+        List<DisasterAlertRegion> regions = alert.getDisasterAlertRegions();
+        if (regions == null) return null;
+        for (DisasterAlertRegion r : regions) {
+            String code = r.getId().getDistrictCode();
+            if (code != null && sido.equals(sidoPrefix(code)) && r.getLegalDistrict() != null) {
+                String name = r.getLegalDistrict().getName();
+                if (name == null) return null;
+                int sp = name.indexOf(' ');
+                return sp < 0 ? name : name.substring(0, sp);
+            }
+        }
+        return null;
     }
 
     /** 시군구(코드 앞 5자) 기준 distinct 개수 — 광역 알림 판정용. */
