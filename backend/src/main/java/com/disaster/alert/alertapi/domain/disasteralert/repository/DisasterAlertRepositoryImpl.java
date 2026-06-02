@@ -1,6 +1,7 @@
 package com.disaster.alert.alertapi.domain.disasteralert.repository;
 
 import com.disaster.alert.alertapi.domain.disasteralert.dto.*;
+import com.disaster.alert.alertapi.domain.weather.model.QWeatherObservation;
 import com.disaster.alert.alertapi.domain.disasteralert.model.DisasterAlert;
 import com.disaster.alert.alertapi.domain.disasteralert.model.DisasterLevel;
 import com.disaster.alert.alertapi.domain.disasteralert.model.QDisasterAlertRegion;
@@ -241,9 +242,9 @@ public class DisasterAlertRepositoryImpl implements DisasterAlertRepositoryCusto
 
     @Override
     public List<DisasterAlertStatResponse.HourlyStat> getStatsByHour(AlertSearchRequest request) {
-        // PostgreSQL: EXTRACT(DOW FROM ...) returns 0=Sun, 1=Mon, ..., 6=Sat
-        NumberExpression<Integer> dow  = Expressions.numberTemplate(Integer.class, "EXTRACT(DOW FROM {0})", disasterAlert.createdAt);
-        NumberExpression<Integer> hour = disasterAlert.createdAt.hour();
+        // PostgreSQL: date_part('dow', ...) returns 0=Sun, 1=Mon, ..., 6=Sat
+        NumberExpression<Integer> dow  = Expressions.numberTemplate(Integer.class, "function('date_part', 'dow', {0})", disasterAlert.createdAt);
+        NumberExpression<Integer> hour = Expressions.numberTemplate(Integer.class, "function('date_part', 'hour', {0})", disasterAlert.createdAt);
         List<Tuple> rows = queryFactory
                 .select(dow, hour, disasterAlert.id.countDistinct())
                 .from(disasterAlert)
@@ -501,5 +502,226 @@ public class DisasterAlertRepositoryImpl implements DisasterAlertRepositoryCusto
         if (includeOfficial) total += this.countAlertsDistinct(req);
         if (includeUser) total += this.countUserAlertsDistinct(req);
         return new PageImpl<>(slice, pageable, total);
+    }
+
+    @Override
+    public List<WeatherCorrelationDto> getWeatherCorrelation(AlertSearchRequest request) {
+        com.disaster.alert.alertapi.domain.weather.model.QWeatherObservation wo =
+                com.disaster.alert.alertapi.domain.weather.model.QWeatherObservation.weatherObservation;
+
+        NumberExpression<Integer> year  = disasterAlert.createdAt.year();
+        NumberExpression<Integer> month = disasterAlert.createdAt.month();
+        NumberExpression<Integer> day   = disasterAlert.createdAt.dayOfMonth();
+
+        List<Tuple> rows = queryFactory
+                .select(
+                        year,
+                        month,
+                        day,
+                        disasterAlert.id.countDistinct(),
+                        wo.temperature.avg(),
+                        wo.precipitation.max(),
+                        wo.windSpeed.avg()
+                )
+                .from(disasterAlert)
+                .join(disasterAlert.disasterAlertRegions, disasterAlertRegion)
+                .join(disasterAlertRegion.legalDistrict, legalDistrict)
+                .leftJoin(wo).on(
+                        wo.legalDistrictCode.eq(legalDistrict.code)
+                        .and(wo.observedAt.year().eq(disasterAlert.createdAt.year()))
+                        .and(wo.observedAt.month().eq(disasterAlert.createdAt.month()))
+                        .and(wo.observedAt.dayOfMonth().eq(disasterAlert.createdAt.dayOfMonth()))
+                )
+                .where(byAlertCondition(request), regionFilterOnJoin(request))
+                .groupBy(year, month, day)
+                .orderBy(year.asc(), month.asc(), day.asc())
+                .fetch();
+
+        if (rows.isEmpty()) return List.of();
+
+        // 날짜별 최다 재난 유형 (별도 쿼리)
+        List<Tuple> typeRows = queryFactory
+                .select(year, month, day, disasterAlert.disasterType, disasterAlert.id.countDistinct())
+                .from(disasterAlert)
+                .where(byAlertCondition(request), disasterAlert.disasterType.isNotNull())
+                .groupBy(year, month, day, disasterAlert.disasterType)
+                .orderBy(year.asc(), month.asc(), day.asc(), disasterAlert.id.countDistinct().desc())
+                .fetch();
+
+        Map<String, String> primaryTypeByDate = new LinkedHashMap<>();
+        for (Tuple t : typeRows) {
+            if (t.get(0, Integer.class) == null) continue;
+            String key = String.format("%04d-%02d-%02d",
+                    t.get(0, Integer.class), t.get(1, Integer.class), t.get(2, Integer.class));
+            primaryTypeByDate.putIfAbsent(key, t.get(3, String.class));
+        }
+
+        return rows.stream()
+                .filter(t -> t.get(0, Integer.class) != null)
+                .map(t -> {
+                    String dateKey = String.format("%04d-%02d-%02d",
+                            t.get(0, Integer.class), t.get(1, Integer.class), t.get(2, Integer.class));
+                    return new WeatherCorrelationDto(
+                            dateKey,
+                            t.get(3, Long.class),
+                            t.get(4, Double.class),
+                            t.get(5, Double.class),
+                            t.get(6, Double.class),
+                            primaryTypeByDate.get(dateKey)
+                    );
+                })
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    public List<WeatherTypeStatDto> getWeatherByType(AlertSearchRequest request) {
+        QWeatherObservation wo = QWeatherObservation.weatherObservation;
+        NumberExpression<Integer> year  = disasterAlert.createdAt.year();
+        NumberExpression<Integer> month = disasterAlert.createdAt.month();
+        NumberExpression<Integer> day   = disasterAlert.createdAt.dayOfMonth();
+
+        List<Tuple> rows = queryFactory
+                .select(year, month, day,
+                        disasterAlert.disasterType,
+                        disasterAlert.id.countDistinct(),
+                        wo.temperature.avg(),
+                        wo.precipitation.max())
+                .from(disasterAlert)
+                .join(disasterAlert.disasterAlertRegions, disasterAlertRegion)
+                .join(disasterAlertRegion.legalDistrict, legalDistrict)
+                .leftJoin(wo).on(
+                        wo.legalDistrictCode.eq(legalDistrict.code)
+                        .and(wo.observedAt.year().eq(disasterAlert.createdAt.year()))
+                        .and(wo.observedAt.month().eq(disasterAlert.createdAt.month()))
+                        .and(wo.observedAt.dayOfMonth().eq(disasterAlert.createdAt.dayOfMonth())))
+                .where(byAlertCondition(request), regionFilterOnJoin(request),
+                        disasterAlert.disasterType.isNotNull())
+                .groupBy(year, month, day, disasterAlert.disasterType)
+                .orderBy(year.asc(), month.asc(), day.asc(), disasterAlert.id.countDistinct().desc())
+                .fetch();
+
+        return rows.stream()
+                .filter(t -> t.get(0, Integer.class) != null)
+                .map(t -> new WeatherTypeStatDto(
+                        String.format("%04d-%02d-%02d",
+                                t.get(0, Integer.class), t.get(1, Integer.class), t.get(2, Integer.class)),
+                        t.get(3, String.class),
+                        t.get(4, Long.class),
+                        t.get(5, Double.class),
+                        t.get(6, Double.class)))
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    public List<WeatherRegionStatDto> getWeatherBySido(AlertSearchRequest request) {
+        QWeatherObservation wo = QWeatherObservation.weatherObservation;
+        NumberExpression<Integer> year  = disasterAlert.createdAt.year();
+        NumberExpression<Integer> month = disasterAlert.createdAt.month();
+        NumberExpression<Integer> day   = disasterAlert.createdAt.dayOfMonth();
+
+        StringTemplate norm = Expressions.stringTemplate(
+                "function('btrim', function('regexp_replace', {0}, '\\\\s+', ' ', 'g'))", legalDistrict.name);
+        StringTemplate sido = Expressions.stringTemplate("function('split_part', {0}, ' ', 1)", norm);
+
+        List<Tuple> rows = queryFactory
+                .select(year, month, day, sido,
+                        disasterAlert.id.countDistinct(),
+                        wo.temperature.avg(),
+                        wo.precipitation.max())
+                .from(disasterAlert)
+                .join(disasterAlert.disasterAlertRegions, disasterAlertRegion)
+                .join(disasterAlertRegion.legalDistrict, legalDistrict)
+                .leftJoin(wo).on(
+                        wo.legalDistrictCode.eq(legalDistrict.code)
+                        .and(wo.observedAt.year().eq(disasterAlert.createdAt.year()))
+                        .and(wo.observedAt.month().eq(disasterAlert.createdAt.month()))
+                        .and(wo.observedAt.dayOfMonth().eq(disasterAlert.createdAt.dayOfMonth())))
+                .where(byAlertCondition(request), regionFilterOnJoin(request))
+                .groupBy(year, month, day, sido)
+                .orderBy(year.asc(), month.asc(), day.asc())
+                .fetch();
+
+        return rows.stream()
+                .filter(t -> t.get(0, Integer.class) != null)
+                .map(t -> new WeatherRegionStatDto(
+                        String.format("%04d-%02d-%02d",
+                                t.get(0, Integer.class), t.get(1, Integer.class), t.get(2, Integer.class)),
+                        t.get(3, String.class),
+                        t.get(4, Long.class),
+                        t.get(5, Double.class),
+                        t.get(6, Double.class)))
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    public List<WeatherRegionStatDto> getWeatherBySigungu(AlertSearchRequest request) {
+        QWeatherObservation wo = QWeatherObservation.weatherObservation;
+        NumberExpression<Integer> year  = disasterAlert.createdAt.year();
+        NumberExpression<Integer> month = disasterAlert.createdAt.month();
+        NumberExpression<Integer> day   = disasterAlert.createdAt.dayOfMonth();
+
+        StringTemplate norm = Expressions.stringTemplate(
+                "function('btrim', function('regexp_replace', {0}, '\\\\s+', ' ', 'g'))", legalDistrict.name);
+        StringTemplate sigungu = Expressions.stringTemplate(
+                "CASE WHEN function('split_part', {0}, ' ', 2) = '' " +
+                "THEN function('split_part', {0}, ' ', 1) " +
+                "ELSE function('split_part', {0}, ' ', 1) || ' ' || function('split_part', {0}, ' ', 2) END",
+                norm);
+
+        List<Tuple> rows = queryFactory
+                .select(year, month, day, sigungu,
+                        disasterAlert.id.countDistinct(),
+                        wo.temperature.avg(),
+                        wo.precipitation.max())
+                .from(disasterAlert)
+                .join(disasterAlert.disasterAlertRegions, disasterAlertRegion)
+                .join(disasterAlertRegion.legalDistrict, legalDistrict)
+                .leftJoin(wo).on(
+                        wo.legalDistrictCode.eq(legalDistrict.code)
+                        .and(wo.observedAt.year().eq(disasterAlert.createdAt.year()))
+                        .and(wo.observedAt.month().eq(disasterAlert.createdAt.month()))
+                        .and(wo.observedAt.dayOfMonth().eq(disasterAlert.createdAt.dayOfMonth())))
+                .where(byAlertCondition(request), regionFilterOnJoin(request))
+                .groupBy(year, month, day, sigungu)
+                .orderBy(year.asc(), month.asc(), day.asc())
+                .fetch();
+
+        return rows.stream()
+                .filter(t -> t.get(0, Integer.class) != null)
+                .map(t -> new WeatherRegionStatDto(
+                        String.format("%04d-%02d-%02d",
+                                t.get(0, Integer.class), t.get(1, Integer.class), t.get(2, Integer.class)),
+                        t.get(3, String.class),
+                        t.get(4, Long.class),
+                        t.get(5, Double.class),
+                        t.get(6, Double.class)))
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    public Optional<AlertWeatherDto> getAlertWeather(Long alertId) {
+        com.disaster.alert.alertapi.domain.weather.model.QWeatherObservation wo =
+                com.disaster.alert.alertapi.domain.weather.model.QWeatherObservation.weatherObservation;
+
+        Tuple result = queryFactory
+                .select(wo.temperature.avg(), wo.precipitation.avg(), wo.windSpeed.avg())
+                .from(disasterAlert)
+                .join(disasterAlert.disasterAlertRegions, disasterAlertRegion)
+                .join(disasterAlertRegion.legalDistrict, legalDistrict)
+                .leftJoin(wo).on(
+                        wo.legalDistrictCode.eq(legalDistrict.code)
+                        .and(wo.observedAt.year().eq(disasterAlert.createdAt.year()))
+                        .and(wo.observedAt.month().eq(disasterAlert.createdAt.month()))
+                        .and(wo.observedAt.dayOfMonth().eq(disasterAlert.createdAt.dayOfMonth()))
+                )
+                .where(disasterAlert.id.eq(alertId))
+                .fetchOne();
+
+        if (result == null) return Optional.empty();
+        Double temp   = result.get(0, Double.class);
+        Double precip = result.get(1, Double.class);
+        Double wind   = result.get(2, Double.class);
+        if (temp == null && precip == null && wind == null) return Optional.empty();
+        return Optional.of(new AlertWeatherDto(temp, precip, wind));
     }
 }

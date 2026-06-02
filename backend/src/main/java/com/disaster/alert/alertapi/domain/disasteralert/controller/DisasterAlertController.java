@@ -125,6 +125,33 @@ public class DisasterAlertController {
         return ResponseEntity.ok(disasterAlertService.getLatestAlert(limit, lang));
     }
 
+    @GetMapping("/stats/weather-correlation")
+    public ResponseEntity<List<WeatherCorrelationDto>> getWeatherCorrelation(AlertSearchRequest request) {
+        return ResponseEntity.ok(disasterAlertService.getWeatherCorrelation(request));
+    }
+
+    @GetMapping("/stats/weather-by-type")
+    public ResponseEntity<List<WeatherTypeStatDto>> getWeatherByType(AlertSearchRequest request) {
+        return ResponseEntity.ok(disasterAlertService.getWeatherByType(request));
+    }
+
+    @GetMapping("/stats/weather-by-region")
+    public ResponseEntity<List<WeatherRegionStatDto>> getWeatherByRegion(
+            AlertSearchRequest request,
+            @RequestParam(defaultValue = "sido") String groupBy) {
+        List<WeatherRegionStatDto> data = "sigungu".equals(groupBy)
+                ? disasterAlertService.getWeatherBySigungu(request)
+                : disasterAlertService.getWeatherBySido(request);
+        return ResponseEntity.ok(data);
+    }
+
+    @GetMapping("/{id}/weather")
+    public ResponseEntity<AlertWeatherDto> getAlertWeather(@PathVariable Long id) {
+        return disasterAlertService.getAlertWeather(id)
+                .map(ResponseEntity::ok)
+                .orElse(ResponseEntity.noContent().build());
+    }
+
     /**
      * 대시보드 요약 통계 (카운트만 반환하므로 lang 파라미터 없음).
      */
