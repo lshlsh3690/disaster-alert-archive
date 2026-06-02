@@ -86,6 +86,16 @@ public class DisasterEvent {
     private static final int MESSAGE_PREVIEW_LEN = 30;
 
     /**
+     * disaster_type 이 사건을 식별할 만큼 정보가 있는지.
+     * null/blank/"기타" 류는 false — 제목 본문 fallback, broadcast 시도+유형 병합 제외에 사용.
+     */
+    public static boolean isInformativeType(String disasterType) {
+        return disasterType != null
+                && !disasterType.isBlank()
+                && !UNINFORMATIVE_TYPES.contains(disasterType);
+    }
+
+    /**
      * 첫 알림 기준 신규 이벤트 생성용 팩토리.
      *
      * <p>제목 자동 생성 규칙:
@@ -106,9 +116,7 @@ public class DisasterEvent {
             boolean broadcast
     ) {
         String safeRegion = regionName == null ? "지역미상" : regionName;
-        boolean typeInformative = disasterType != null
-                && !disasterType.isBlank()
-                && !UNINFORMATIVE_TYPES.contains(disasterType);
+        boolean typeInformative = isInformativeType(disasterType);
 
         String titleMiddle;
         if (typeInformative) {

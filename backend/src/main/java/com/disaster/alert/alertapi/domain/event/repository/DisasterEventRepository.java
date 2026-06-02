@@ -10,6 +10,7 @@ import org.springframework.data.repository.query.Param;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 
 public interface DisasterEventRepository extends JpaRepository<DisasterEvent, Long> {
 
@@ -89,6 +90,24 @@ public interface DisasterEventRepository extends JpaRepository<DisasterEvent, Lo
             @Param("regionCodes") String[] regionCodes,
             @Param("sinceTime") LocalDateTime sinceTime
     );
+
+    /**
+     * 광역 broadcast 이벤트 머지 대상 검색 — 같은 시도 + 같은 유형 + 윈도우 안의 broadcast 이벤트 1개.
+     *
+     * <p>일반 클러스터링({@link #findTopCandidates})과 달리 <b>임베딩(본문)을 보지 않는다</b>.
+     * "폭염주의보 발효" / "폭염주의보 해제" / "폭염경보 격상" 처럼 본문이 달라 코사인이 낮아도
+     * 같은 "{시도} {유형}" 사건으로 묶기 위함. 대신 키를 (시도 prefix + disasterType)로 제한해
+     * 시도 경계를 넘는 다지역 blob 을 원천 차단한다.
+     *
+     * <p>{@code is_broadcast=true} 인 이벤트끼리만 묶이고(규칙 1 유지: local 후보검색 안 탐),
+     * 머지돼도 플래그는 그대로라 local 알림 후보에서 계속 제외된다(규칙 2 유지).
+     *
+     * @param primaryDisasterType 새 알림 유형 (예: "폭염")
+     * @param sidoPrefix          시도 코드 앞 2자리 (예: "48" = 경남)
+     * @param lastAlertAt         윈도우 하한 (이 시각 이후 last_alert_at 인 이벤트만)
+     */
+    Optional<DisasterEvent> findFirstByBroadcastTrueAndPrimaryDisasterTypeAndPrimaryRegionCodeStartingWithAndLastAlertAtAfterOrderByLastAlertAtDesc(
+            String primaryDisasterType, String sidoPrefix, LocalDateTime lastAlertAt);
 
     /**
      * 새 알림이 머지된 후 이벤트의 last_alert_at, alert_count 갱신.
