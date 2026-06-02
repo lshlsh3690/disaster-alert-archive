@@ -81,3 +81,38 @@ export const ZDashboardSummary = z.object({
   totalCombinedCount: z.number(),
 });
 export type DashboardSummary = z.infer<typeof ZDashboardSummary>;
+
+export const ZWeatherTypeStat = z.object({
+  date: z.string(),
+  type: z.string().nullable(),
+  count: z.number(),
+  avgTemp: z.number().nullable(),
+  maxPrecip: z.number().nullable(),
+});
+export type WeatherTypeStat = z.infer<typeof ZWeatherTypeStat>;
+
+export const ZWeatherRegionStat = z.object({
+  date: z.string(),
+  region: z.string(),
+  count: z.number(),
+  avgTemp: z.number().nullable(),
+  maxPrecip: z.number().nullable(),
+});
+export type WeatherRegionStat = z.infer<typeof ZWeatherRegionStat>;
+
+export const ZWeatherCorrelationStat = z.object({
+  date: z.string(),
+  count: z.number(),
+  avgTemp: z.number().nullable(),
+  maxPrecip: z.number().nullable(),
+  avgWindSpeed: z.number().nullable(),
+  primaryType: z.string().nullable(),
+});
+export type WeatherCorrelationStat = z.infer<typeof ZWeatherCorrelationStat>;
+
+export const ZAlertWeatherSnapshot = z.object({
+  temp: z.number().nullable(),
+  precip: z.number().nullable(),
+  windSpeed: z.number().nullable(),
+}).nullable();
+export type AlertWeatherSnapshot = z.infer<typeof ZAlertWeatherSnapshot>;

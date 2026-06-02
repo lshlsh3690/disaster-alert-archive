@@ -434,6 +434,26 @@ public class DisasterAlertService {
         return disasterAlertRepository.getStatsByMonthType(request);
     }
 
+    public List<WeatherCorrelationDto> getWeatherCorrelation(AlertSearchRequest request) {
+        return disasterAlertRepository.getWeatherCorrelation(request);
+    }
+
+    public List<WeatherTypeStatDto> getWeatherByType(AlertSearchRequest request) {
+        return disasterAlertRepository.getWeatherByType(request);
+    }
+
+    public List<WeatherRegionStatDto> getWeatherBySido(AlertSearchRequest request) {
+        return disasterAlertRepository.getWeatherBySido(request);
+    }
+
+    public List<WeatherRegionStatDto> getWeatherBySigungu(AlertSearchRequest request) {
+        return disasterAlertRepository.getWeatherBySigungu(request);
+    }
+
+    public Optional<AlertWeatherDto> getAlertWeather(Long alertId) {
+        return disasterAlertRepository.getAlertWeather(alertId);
+    }
+
     // ============================================================================
     //  다국어 응답 — 내부 헬퍼
     // ============================================================================

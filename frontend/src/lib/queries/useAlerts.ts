@@ -1,6 +1,6 @@
 // hooks/useAlerts.ts
 import { useQuery, keepPreviousData } from "@tanstack/react-query";
-import { fetchLatestAlerts, searchAlerts, fetchAlert, fetchStats, type AlertSearchRequest, fetchLatestAlertsBySido, fetchSigunguStats, searchCombinedAlerts, fetchDashboardSummary, fetchSigungu, fetchDailyStats, fetchHourlyStats, fetchMonthlyTypeStats } from "@/api/alertApi";
+import { fetchLatestAlerts, searchAlerts, fetchAlert, fetchStats, type AlertSearchRequest, fetchLatestAlertsBySido, fetchSigunguStats, searchCombinedAlerts, fetchDashboardSummary, fetchSigungu, fetchDailyStats, fetchHourlyStats, fetchMonthlyTypeStats, fetchWeatherCorrelation, fetchWeatherByType, fetchWeatherByRegion, fetchAlertWeather } from "@/api/alertApi";
 import { fetchUserAlert, fetchUserAlerts } from "@/api/userAlertApi";
 
 export function useLatestAlerts(limit = 5) {
@@ -118,5 +118,43 @@ export function useDashboardSummary() {
     queryKey: ["dashboard-summary"],
     queryFn: () => fetchDashboardSummary(),
     staleTime: 30_000,
+  });
+}
+
+export function useWeatherCorrelation(params: AlertSearchRequest) {
+  return useQuery({
+    queryKey: ["weather-correlation", params],
+    queryFn: () => fetchWeatherCorrelation(params),
+    placeholderData: keepPreviousData,
+    staleTime: 60_000,
+  });
+}
+
+export function useWeatherByType(params: AlertSearchRequest) {
+  return useQuery({
+    queryKey: ["weather-by-type", params],
+    queryFn: () => fetchWeatherByType(params),
+    placeholderData: keepPreviousData,
+    staleTime: 60_000,
+    retry: 1,
+  });
+}
+
+export function useWeatherByRegion(params: AlertSearchRequest, groupBy: "sido" | "sigungu") {
+  return useQuery({
+    queryKey: ["weather-by-region", params, groupBy],
+    queryFn: () => fetchWeatherByRegion(params, groupBy),
+    placeholderData: keepPreviousData,
+    staleTime: 60_000,
+    retry: 1,
+  });
+}
+
+export function useAlertWeather(id: number) {
+  return useQuery({
+    queryKey: ["alert-weather", id],
+    queryFn: () => fetchAlertWeather(id),
+    enabled: !!id,
+    staleTime: Infinity,
   });
 }
