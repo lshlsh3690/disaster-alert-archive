@@ -127,13 +127,11 @@ public class EventClusteringService {
             return;
         }
 
-        // 광역 브로드캐스트(다수 시군구 발송)는 단독 이벤트로 — blob 다리 차단.
-        // 후보 검색도 머지도 안 하고, is_broadcast=true 로 만들어 다른 알림 후보에서도 제외.
+        // 광역 브로드캐스트(다수 시군구 발송)는 local 이벤트와 안 섞음 — blob 다리 차단(규칙 1·2).
+        // 단, 같은 시도+유형 broadcast 끼리는 묶어 "{시도} {유형}" 단일 사건으로 통합(파편 방지).
         int sigunguSpan = distinctSigunguCount(regionCodes);
         if (sigunguSpan > maxRegionSpan) {
-            log.info("clusterNewAlert: alertId={} 광역({}시군구>{}) — 단독 broadcast 이벤트",
-                    alert.getId(), sigunguSpan, maxRegionSpan);
-            createNewEvent(alert, regionCodes[0], extractFirstRegionName(alert), true);
+            clusterBroadcast(alert, regionCodes, sigunguSpan);
             return;
         }
 
@@ -198,6 +196,50 @@ public class EventClusteringService {
         eventAlertMappingRepository.save(EventAlertMapping.of(saved.getId(), alert.getId(), 1));
         log.info("clusterNewAlert: alertId={} → 신규 event={} (broadcast={}, title='{}')",
                 alert.getId(), saved.getId(), broadcast, saved.getEventTitle());
+    }
+
+    /**
+     * 광역 broadcast 알림 처리. local 이벤트와는 절대 안 섞고(규칙 1·2), 같은 시도+유형의 기존
+     * broadcast 이벤트가 윈도우 안에 있으면 거기 머지, 없으면 신규 broadcast 이벤트로 만든다.
+     *
+     * <p>임베딩(본문)은 보지 않는다 — "발효/해제/격상" 처럼 본문이 달라도 같은 사건으로 묶기 위함.
+     * 대신 키를 (시도 prefix + 유형)으로 좁혀 시도 경계를 넘는 blob 을 차단한다.
+     * 유형이 '기타'/null 이면 본문이 제각각(물놀이 안전수칙·댐방류 등)이라 시도만으론 다른 사건이
+     * 섞이므로 머지하지 않고 신규로 둔다.
+     */
+    private void clusterBroadcast(DisasterAlert alert, String[] regionCodes, int sigunguSpan) {
+        String sido = sidoPrefix(regionCodes[0]);
+        String type = alert.getDisasterType();
+
+        if (DisasterEvent.isInformativeType(type)) {
+            LocalDateTime since = alert.getCreatedAt().minusHours(candidateWindowHours);
+            Optional<DisasterEvent> target = disasterEventRepository
+                    .findFirstByBroadcastTrueAndPrimaryDisasterTypeAndPrimaryRegionCodeStartingWithAndLastAlertAtAfterOrderByLastAlertAtDesc(
+                            type, sido, since);
+            if (target.isPresent()) {
+                log.info("clusterNewAlert: alertId={} 광역({}시군구) → broadcast event={} 시도+유형 머지({} {})",
+                        alert.getId(), sigunguSpan, target.get().getId(), sido, type);
+                mergeIntoExisting(target.get().getId(), alert, 0.0);
+                return;
+            }
+        }
+
+        log.info("clusterNewAlert: alertId={} 광역({}시군구>{}) — 신규 broadcast 이벤트",
+                alert.getId(), sigunguSpan, maxRegionSpan);
+        createNewEvent(alert, regionCodes[0], extractSidoName(alert), true);
+    }
+
+    /** 시도 코드(법정동 코드 앞 2자) — broadcast 시도 키. */
+    private String sidoPrefix(String code) {
+        return code != null && code.length() >= 2 ? code.substring(0, 2) : code;
+    }
+
+    /** 첫 지역명의 시도 토큰만 추출. 예: "경상남도 창원시 의창구" → "경상남도". */
+    private String extractSidoName(DisasterAlert alert) {
+        String full = extractFirstRegionName(alert);
+        if (full == null) return null;
+        int sp = full.indexOf(' ');
+        return sp < 0 ? full : full.substring(0, sp);
     }
 
     /** 시군구(코드 앞 5자) 기준 distinct 개수 — 광역 알림 판정용. */
