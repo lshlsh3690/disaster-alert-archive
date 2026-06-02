@@ -119,7 +119,7 @@ public class RiskCalculationService {
         }
 
         // 6. event_region_impact upsert (멱등)
-        regions.forEach(region -> impactRepo.upser t(eventId, region, round3(baseScore)));
+        regions.forEach(region -> impactRepo.upsert(eventId, region, round3(baseScore)));
 
         log.debug("recomputeEventRisk: eventId={} type={} base={} regions={}",
                 eventId, type, baseScore, regions.size());
