@@ -110,6 +110,16 @@ public interface DisasterEventRepository extends JpaRepository<DisasterEvent, Lo
             String primaryDisasterType, String sidoPrefix, LocalDateTime lastAlertAt);
 
     /**
+     * 전국 broadcast 이벤트 머지 대상 검색 — 같은 유형 + 윈도우 안의 전국 이벤트 1개.
+     *
+     * <p>전국 이벤트는 특정 시도에 귀속되지 않으므로 {@code primary_region_code = null} 로 저장하고,
+     * 시도 키 없이 유형만으로 묶는다(라벨 "전국 {유형}"). 행안부 전국 호우/대설 안내처럼 17개 시도
+     * 전체에 발송되는 알림이 시도별로 흩어지지 않게 하나로 통합.
+     */
+    Optional<DisasterEvent> findFirstByBroadcastTrueAndPrimaryDisasterTypeAndPrimaryRegionCodeIsNullAndLastAlertAtAfterOrderByLastAlertAtDesc(
+            String primaryDisasterType, LocalDateTime lastAlertAt);
+
+    /**
      * 새 알림이 머지된 후 이벤트의 last_alert_at, alert_count 갱신.
      *
      * <p>JPA Dirty Checking 도 가능하지만 동시성 + 명시성 위해 native UPDATE 사용.
