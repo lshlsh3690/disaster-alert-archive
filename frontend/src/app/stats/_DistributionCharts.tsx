@@ -176,7 +176,7 @@ export function HorizontalBar({ data }: { data: RegionStat[] }) {
           <YAxis type="category" dataKey="region" width={80} axisLine={false} tickLine={false}
             tick={{ fontSize: 11, fill: "#374151" }} />
           <Tooltip content={<TooltipContent />} cursor={{ fill: "#f3f4f6" }} />
-          <Bar dataKey="count" radius={[0, 3, 3, 0]} barSize={14}>
+          <Bar dataKey="count" radius={[0, 3, 3, 0]} barSize={14} isAnimationActive={false}>
             {/* 각 막대에 개별 색상 적용 */}
             {data.map((_, i) => (
               <Cell key={i} fill={BAR_COLORS[i % BAR_COLORS.length]} />
@@ -228,7 +228,7 @@ export function VerticalBar({
           <YAxis axisLine={false} tickLine={false}
             tick={{ fontSize: 10, fill: "#9ca3af" }} width={32} />
           <Tooltip content={<TooltipContent />} cursor={{ fill: "#f3f4f6" }} />
-          <Bar dataKey="count" radius={[3, 3, 0, 0]} maxBarSize={40}>
+          <Bar dataKey="count" radius={[3, 3, 0, 0]} maxBarSize={40} isAnimationActive={false}>
             {data.map((d, i) => (
               // 최댓값 막대는 빨간색, 나머지는 팔레트 색상 또는 개별 지정 색상
               <Cell key={i}

@@ -74,10 +74,10 @@ export function WeatherByTypeChart({ data }: { data: WeatherTypeStat[] }) {
           {types.map((t, i) => (
             <Bar key={t} yAxisId="cnt" dataKey={t} stackId="s"
               fill={STACKED_COLORS[i % STACKED_COLORS.length]} maxBarSize={24}
-              radius={i === types.length - 1 ? [2, 2, 0, 0] : [0, 0, 0, 0]} />
+              radius={i === types.length - 1 ? [2, 2, 0, 0] : [0, 0, 0, 0]} isAnimationActive={false} />
           ))}
           <Line yAxisId="temp" type="monotone" dataKey="_avgTemp" stroke="#f97316"
-            strokeWidth={2} dot={false} name="_avgTemp" />
+            strokeWidth={2} dot={false} name="_avgTemp" isAnimationActive={false} />
         </ComposedChart>
       </ResponsiveContainer>
     </div>
@@ -144,10 +144,10 @@ export function WeatherByRegionChart({ data, regionLabel }: { data: WeatherRegio
             {topRegions.map((r, i) => (
               <Bar key={r} yAxisId="cnt" dataKey={r} stackId="s"
                 fill={BAR_COLORS[i % BAR_COLORS.length]} maxBarSize={24}
-                radius={i === topRegions.length - 1 ? [2, 2, 0, 0] : [0, 0, 0, 0]} />
+                radius={i === topRegions.length - 1 ? [2, 2, 0, 0] : [0, 0, 0, 0]} isAnimationActive={false} />
             ))}
             <Line yAxisId="temp" type="monotone" dataKey="_avgTemp" stroke="#f97316"
-              strokeWidth={2} dot={false} name="_avgTemp" />
+              strokeWidth={2} dot={false} name="_avgTemp" isAnimationActive={false} />
           </ComposedChart>
         </ResponsiveContainer>
       </div>
@@ -206,11 +206,11 @@ export function WeatherOverlayChart({ data }: { data: WeatherCorrelationStat[] }
           <Tooltip content={<TooltipContent />} />
           <Legend wrapperStyle={{ fontSize: 11 }}
             formatter={(v: string) => ({ count: "발생건수", avgTemp: "평균기온", tempRange: "기온범위", maxPrecip: "최대강수(mm)" }[v] ?? v)} />
-          <Bar yAxisId="cnt" dataKey="count" fill="#3b82f6" fillOpacity={0.7} radius={[2, 2, 0, 0]} maxBarSize={20} />
+          <Bar yAxisId="cnt" dataKey="count" fill="#3b82f6" fillOpacity={0.7} radius={[2, 2, 0, 0]} maxBarSize={20} isAnimationActive={false} />
           <Area yAxisId="temp" type="monotone" dataKey="tempRange" stroke="none"
-            fill="#f97316" fillOpacity={0.12} activeDot={false} legendType="none" />
-          <Line yAxisId="temp" type="monotone" dataKey="avgTemp" stroke="#f97316" strokeWidth={2} dot={false} />
-          <Line yAxisId="temp" type="monotone" dataKey="maxPrecip" stroke="#06b6d4" strokeWidth={1.5} dot={false} strokeDasharray="4 2" />
+            fill="#f97316" fillOpacity={0.12} activeDot={false} legendType="none" isAnimationActive={false} />
+          <Line yAxisId="temp" type="monotone" dataKey="avgTemp" stroke="#f97316" strokeWidth={2} dot={false} isAnimationActive={false} />
+          <Line yAxisId="temp" type="monotone" dataKey="maxPrecip" stroke="#06b6d4" strokeWidth={1.5} dot={false} strokeDasharray="4 2" isAnimationActive={false} />
         </ComposedChart>
       </ResponsiveContainer>
     </div>

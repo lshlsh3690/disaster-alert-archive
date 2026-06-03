@@ -124,6 +124,7 @@ export function LineChart({ data }: { data: DailyStat[] }) {
             stroke="#2563eb"
             strokeWidth={2}
             fill="url(#lineGrad)"
+            isAnimationActive={false}
             // dot prop: 최고점에만 빨간 원을 그립니다
             dot={(props: { cx?: number; cy?: number; index: number }) => {
               const { cx, cy, index } = props;
@@ -178,7 +179,7 @@ export function DailyBar({ data }: { data: DailyStat[] }) {
           <YAxis axisLine={false} tickLine={false}
             tick={{ fontSize: 9, fill: "#9ca3af" }} width={32} />
           <Tooltip content={<TooltipContent />} cursor={{ fill: "#f3f4f6" }} />
-          <Bar dataKey="count" fill="#3b82f6" radius={[2, 2, 0, 0]} maxBarSize={40} />
+          <Bar dataKey="count" fill="#3b82f6" radius={[2, 2, 0, 0]} maxBarSize={40} isAnimationActive={false} />
         </BarChart>
       </ResponsiveContainer>
     </div>
@@ -624,8 +625,8 @@ export function CompareBars({
                 value === "ly" ? String(currentYear - 1) : String(currentYear)
               } />
             {/* ly: 작년 (회색), ty: 올해 (파란색) */}
-            <Bar dataKey="ly" fill="#cbd5e1" radius={[3, 3, 0, 0]} maxBarSize={16} />
-            <Bar dataKey="ty" fill="#2563eb" radius={[3, 3, 0, 0]} maxBarSize={16} />
+            <Bar dataKey="ly" fill="#cbd5e1" radius={[3, 3, 0, 0]} maxBarSize={16} isAnimationActive={false} />
+            <Bar dataKey="ty" fill="#2563eb" radius={[3, 3, 0, 0]} maxBarSize={16} isAnimationActive={false} />
           </BarChart>
         </ResponsiveContainer>
       </div>
