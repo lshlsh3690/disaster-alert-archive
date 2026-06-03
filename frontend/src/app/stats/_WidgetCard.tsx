@@ -5,7 +5,7 @@ import type { DailyStat, HourlyStat, MonthlyTypeStat, WeatherCorrelationStat, We
 import type { TypeStat, LevelStat, RegionStat, LibItem, WidgetItem } from "./_constants";
 import { EmptyChart, LoadingChart } from "./_charts";
 import { DonutChart, HorizontalBar, VerticalBar, LevelsCard } from "./_DistributionCharts";
-import { LineChart, DailyBar, Heatmap, DayOfWeekBar, HourBar, StackedArea, StackedBar, CompareBars, CompareLines } from "./_TimeCharts";
+import { LineChart, DailyBar, Heatmap, DayOfWeekBar, HourBar, CompareBars, CompareLines } from "./_TimeCharts";
 import { WeatherCorrelationScatter, WeatherOverlayChart, WeatherByTypeChart, WeatherByRegionChart } from "./_WeatherCharts";
 
 // ─── 일별/시간별 토글 ────────────────────────────────────────────────────────
@@ -103,8 +103,15 @@ export function WidgetContent({ kind, variant, typeStats, regionStats, levelStat
 
     case "stacked": {
       const stackData = isSubMonth ? dailyTypeStats : monthlyTypeStats;
-      if (variant === "bar") return <StackedBar data={stackData} types={topTypes} />;
-      return <StackedArea data={stackData} types={topTypes} />;
+      const typeAgg = topTypes.map(type => ({
+        type,
+        count: stackData.filter(d => d.type === type).reduce((s, d) => s + d.count, 0),
+      })).filter(d => d.count > 0);
+      const typeAggTotal = typeAgg.reduce((s, d) => s + d.count, 0);
+      if (typeAggTotal === 0) return <EmptyChart />;
+      if (variant === "donut") return <DonutChart data={typeAgg} total={typeAggTotal} />;
+      if (variant === "hbar") return <HorizontalBar data={typeAgg.map(d => ({ region: d.type, count: d.count }))} />;
+      return <VerticalBar data={typeAgg.map(d => ({ label: d.type, count: d.count }))} />;
     }
 
     case "compare":
