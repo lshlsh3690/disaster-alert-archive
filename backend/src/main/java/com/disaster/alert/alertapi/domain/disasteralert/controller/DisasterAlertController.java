@@ -100,6 +100,13 @@ public class DisasterAlertController {
         return ResponseEntity.ok(disasterAlertService.countByMonthType(request));
     }
 
+    @GetMapping("/stats/daily-type")
+    public ResponseEntity<List<DisasterAlertStatResponse.MonthlyTypeStat>> countByDateType(
+            AlertSearchRequest request
+    ) {
+        return ResponseEntity.ok(disasterAlertService.countByDateType(request));
+    }
+
     /**
      * 재난문자 상세 조회.
      *

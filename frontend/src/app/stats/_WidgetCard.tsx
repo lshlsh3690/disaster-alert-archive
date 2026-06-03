@@ -25,7 +25,7 @@ function GranularityToggle({ value, onChange }: { value: "daily" | "hourly"; onC
 
 // ─── 위젯 콘텐츠 디스패처 ────────────────────────────────────────────────────
 
-export function WidgetContent({ kind, variant, typeStats, regionStats, levelStats, dailyStats, hourlyStats, monthlyTypeStats, thisYearData, lastYearData, currentYear, weatherStats, weatherTypeStats, weatherRegionStats, weatherHourlyStats, weatherHourlyTypeStats, weatherHourlyRegionStats, isShortPeriod, regionLabel, loadingWeather, loadingWeatherHourly, scrollableRegion, isLoading }: {
+export function WidgetContent({ kind, variant, typeStats, regionStats, levelStats, dailyStats, hourlyStats, monthlyTypeStats, dailyTypeStats, isSubMonth, thisYearData, lastYearData, currentYear, weatherStats, weatherTypeStats, weatherRegionStats, weatherHourlyStats, weatherHourlyTypeStats, weatherHourlyRegionStats, isShortPeriod, regionLabel, loadingWeather, loadingWeatherHourly, scrollableRegion, isLoading }: {
   kind: string;
   variant: string;
   typeStats: TypeStat[];
@@ -34,6 +34,8 @@ export function WidgetContent({ kind, variant, typeStats, regionStats, levelStat
   dailyStats: DailyStat[];
   hourlyStats: HourlyStat[];
   monthlyTypeStats: MonthlyTypeStat[];
+  dailyTypeStats: MonthlyTypeStat[];
+  isSubMonth: boolean;
   thisYearData: DailyStat[];
   lastYearData: DailyStat[];
   currentYear: number;
@@ -99,9 +101,11 @@ export function WidgetContent({ kind, variant, typeStats, regionStats, levelStat
       if (variant === "hour") return <HourBar data={hourlyStats} />;
       return <Heatmap data={hourlyStats} />;
 
-    case "stacked":
-      if (variant === "bar") return <StackedBar data={monthlyTypeStats} types={topTypes} />;
-      return <StackedArea data={monthlyTypeStats} types={topTypes} />;
+    case "stacked": {
+      const stackData = isSubMonth ? dailyTypeStats : monthlyTypeStats;
+      if (variant === "bar") return <StackedBar data={stackData} types={topTypes} />;
+      return <StackedArea data={stackData} types={topTypes} />;
+    }
 
     case "compare":
       if (variant === "line") return <CompareLines thisYearData={thisYearData} lastYearData={lastYearData} currentYear={currentYear} />;

@@ -434,6 +434,10 @@ public class DisasterAlertService {
         return disasterAlertRepository.getStatsByMonthType(request);
     }
 
+    public List<DisasterAlertStatResponse.MonthlyTypeStat> countByDateType(AlertSearchRequest request) {
+        return disasterAlertRepository.getStatsByDateType(request);
+    }
+
     public List<WeatherCorrelationDto> getWeatherCorrelation(AlertSearchRequest request) {
         return disasterAlertRepository.getWeatherCorrelation(request);
     }

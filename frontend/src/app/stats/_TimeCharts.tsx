@@ -371,8 +371,8 @@ export function StackedArea({
 }) {
   if (data.length === 0 || types.length === 0) return <EmptyChart />;
 
-  // 최근 12개월만 사용
-  const months = [...new Set(data.map(d => d.month))].sort().slice(-12);
+  const isDaily = data.length > 0 && data[0].month.length === 10;
+  const months = [...new Set(data.map(d => d.month))].sort().slice(isDaily ? -60 : -12);
   if (months.length === 0) return <EmptyChart />;
 
   // 특정 월·유형의 건수를 찾는 헬퍼 함수
@@ -421,7 +421,7 @@ export function StackedArea({
           (i % Math.max(1, Math.floor(n / 5)) === 0 || i === n - 1) && (
             <text key={m} x={xs(i)} y={h - padB + 13}
               textAnchor="middle" fontSize="9" fill="#9ca3af">
-              {`${parseInt(m.slice(5))}월`}
+              {m.length === 10 ? m.slice(5) : `${parseInt(m.slice(5))}월`}
             </text>
           )
         )}
@@ -459,7 +459,8 @@ export function StackedBar({
   data: MonthlyTypeStat[];
   types: string[];
 }) {
-  const months = [...new Set(data.map(d => d.month))].sort().slice(-12);
+  const isDaily = data.length > 0 && data[0].month.length === 10;
+  const months = [...new Set(data.map(d => d.month))].sort().slice(isDaily ? -60 : -12);
   if (months.length === 0) return <EmptyChart />;
 
   const monthData = months.map(m => {
@@ -469,7 +470,7 @@ export function StackedBar({
       count: data.find(d => d.month === m && d.type === t)?.count ?? 0,
     }));
     return {
-      label: `${parseInt(m.slice(5))}월`,
+      label: m.length === 10 ? m.slice(5) : `${parseInt(m.slice(5))}월`,
       total: segments.reduce((s, g) => s + g.count, 0),
       segments,
     };

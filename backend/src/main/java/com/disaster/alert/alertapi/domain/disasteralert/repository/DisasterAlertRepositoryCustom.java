@@ -35,6 +35,8 @@ public interface DisasterAlertRepositoryCustom {
 
     List<DisasterAlertStatResponse.MonthlyTypeStat> getStatsByMonthType(AlertSearchRequest request);
 
+    List<DisasterAlertStatResponse.MonthlyTypeStat> getStatsByDateType(AlertSearchRequest request);
+
     Page<CombinedAlertResponse> searchCombined(AlertSearchRequest request, String source, Pageable pageable);
 
     List<WeatherCorrelationDto> getWeatherCorrelation(AlertSearchRequest request);

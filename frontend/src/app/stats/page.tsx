@@ -3,7 +3,7 @@
 import { Suspense, useState, useEffect, useMemo, useCallback } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { useAlertStats, useSidoStats, useSigunguStats, useDailyStats, useHourlyStats, useMonthlyTypeStats, useWeatherCorrelation, useWeatherByType, useWeatherByRegion, useWeatherHourlyCorrelation, useWeatherHourlyByType, useWeatherHourlyByRegion } from "@/lib/queries/useAlerts";
+import { useAlertStats, useSidoStats, useSigunguStats, useDailyStats, useHourlyStats, useMonthlyTypeStats, useDailyTypeStats, useWeatherCorrelation, useWeatherByType, useWeatherByRegion, useWeatherHourlyCorrelation, useWeatherHourlyByType, useWeatherHourlyByRegion } from "@/lib/queries/useAlerts";
 import type { DailyStat, WeatherCorrelationStat, WeatherTypeStat, WeatherRegionStat } from "@/types/alerts";
 import { levelTextToCode } from "@/ui/level";
 import type { TypeStat, LevelStat, RegionStat, LibItem, WidgetItem } from "./_constants";
@@ -200,8 +200,8 @@ function StatsPageInner() {
   const { data: dailyStatsRaw,    isLoading: loadingDaily }       = useDailyStats(statsParams);
   const { data: hourlyStatsRaw,   isLoading: loadingHourly }      = useHourlyStats(statsParams);
   const { data: monthlyTypeRaw,   isLoading: loadingMonthlyType } = useMonthlyTypeStats(statsParams);
-  const dailyStats      = dailyStatsRaw    ?? [];
-  const hourlyStats     = hourlyStatsRaw   ?? [];
+  const dailyStats       = dailyStatsRaw   ?? [];
+  const hourlyStats      = hourlyStatsRaw  ?? [];
   const monthlyTypeStats = monthlyTypeRaw  ?? [];
 
   const currentYear = useMemo(() => new Date().getFullYear(), []);
@@ -233,7 +233,10 @@ function StatsPageInner() {
   const weatherTypeStats   = weatherTypeRaw   ?? [];
   const weatherRegionStats = weatherRegionRaw ?? [];
 
+  const isSubMonth    = periodDays < 30;
   const isShortPeriod = periodDays <= 7;
+  const { data: dailyTypeRaw, isLoading: loadingDailyType } = useDailyTypeStats(statsParams, isSubMonth);
+  const dailyTypeStats = dailyTypeRaw ?? [];
   const { data: weatherHourlyRaw,       isLoading: loadingWeatherHourly       } = useWeatherHourlyCorrelation(statsParams, isShortPeriod);
   const { data: weatherHourlyTypeRaw,   isLoading: loadingWeatherHourlyType   } = useWeatherHourlyByType(statsParams, isShortPeriod);
   const { data: weatherHourlyRegionRaw, isLoading: loadingWeatherHourlyRegion } = useWeatherHourlyByRegion(statsParams, regionLevel, isShortPeriod);
@@ -328,6 +331,7 @@ function StatsPageInner() {
               <WidgetContent kind={lib.kind} variant={w.variant ?? lib.variants?.[0]?.key ?? ""}
                 typeStats={typeStats} regionStats={regionStats} levelStats={levelStats}
                 dailyStats={dailyStats} hourlyStats={hourlyStats} monthlyTypeStats={monthlyTypeStats}
+                dailyTypeStats={dailyTypeStats} isSubMonth={isSubMonth}
                 thisYearData={thisYearData} lastYearData={lastYearData} currentYear={currentYear}
                 weatherStats={weatherStats}
                 weatherTypeStats={weatherTypeStats}
@@ -344,7 +348,7 @@ function StatsPageInner() {
                   lib.kind === "line"    ? loadingDaily :
                   lib.kind === "hbar"    ? (sido ? loadingSigungu : loadingSido) :
                   lib.kind === "heatmap" ? loadingHourly :
-                  lib.kind === "stacked" ? loadingMonthlyType :
+                  lib.kind === "stacked" ? (isSubMonth ? loadingDailyType : loadingMonthlyType) :
                   lib.kind === "compare" ? (loadingThisYear || loadingLastYear) :
                   loadingStats
                 } />

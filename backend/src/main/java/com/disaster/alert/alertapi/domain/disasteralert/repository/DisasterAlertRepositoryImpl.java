@@ -285,6 +285,29 @@ public class DisasterAlertRepositoryImpl implements DisasterAlertRepositoryCusto
                 .collect(Collectors.toList());
     }
 
+    @Override
+    public List<DisasterAlertStatResponse.MonthlyTypeStat> getStatsByDateType(AlertSearchRequest request) {
+        NumberExpression<Integer> year  = disasterAlert.createdAt.year();
+        NumberExpression<Integer> month = disasterAlert.createdAt.month();
+        NumberExpression<Integer> day   = disasterAlert.createdAt.dayOfMonth();
+        List<Tuple> rows = queryFactory
+                .select(year, month, day, disasterAlert.disasterType, disasterAlert.id.countDistinct())
+                .from(disasterAlert)
+                .where(byAlertCondition(request).and(disasterAlert.disasterType.isNotNull()))
+                .groupBy(year, month, day, disasterAlert.disasterType)
+                .orderBy(year.asc(), month.asc(), day.asc())
+                .fetch();
+        return rows.stream()
+                .filter(t -> t.get(0, Integer.class) != null)
+                .map(t -> new DisasterAlertStatResponse.MonthlyTypeStat(
+                        String.format("%04d-%02d-%02d",
+                                t.get(0, Integer.class), t.get(1, Integer.class), t.get(2, Integer.class)),
+                        t.get(3, String.class),
+                        t.get(4, Long.class)
+                ))
+                .collect(Collectors.toList());
+    }
+
     private BooleanBuilder byAlertCondition(AlertSearchRequest condition) {
         BooleanBuilder b = new BooleanBuilder();
         //시간

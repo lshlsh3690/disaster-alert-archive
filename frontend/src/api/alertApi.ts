@@ -95,6 +95,11 @@ export async function fetchMonthlyTypeStats(params: AlertSearchRequest): Promise
   return z.array(ZMonthlyTypeStat).parse(res.data);
 }
 
+export async function fetchDailyTypeStats(params: AlertSearchRequest): Promise<MonthlyTypeStat[]> {
+  const res = await instance.get("/api/v1/alerts/stats/daily-type", { params });
+  return z.array(ZMonthlyTypeStat).parse(res.data);
+}
+
 export async function fetchDashboardSummary(): Promise<DashboardSummary> {
   const res = await instance.get("/api/v1/alerts/dashboard/summary");
   const data = ZDashboardSummary.parse(res.data);

@@ -1,6 +1,6 @@
 // hooks/useAlerts.ts
 import { useQuery, keepPreviousData } from "@tanstack/react-query";
-import { fetchLatestAlerts, searchAlerts, fetchAlert, fetchStats, type AlertSearchRequest, fetchLatestAlertsBySido, fetchSigunguStats, searchCombinedAlerts, fetchDashboardSummary, fetchSigungu, fetchDailyStats, fetchHourlyStats, fetchMonthlyTypeStats, fetchWeatherCorrelation, fetchWeatherByType, fetchWeatherByRegion, fetchAlertWeather, fetchWeatherHourlyCorrelation, fetchWeatherHourlyByType, fetchWeatherHourlyByRegion } from "@/api/alertApi";
+import { fetchLatestAlerts, searchAlerts, fetchAlert, fetchStats, type AlertSearchRequest, fetchLatestAlertsBySido, fetchSigunguStats, searchCombinedAlerts, fetchDashboardSummary, fetchSigungu, fetchDailyStats, fetchHourlyStats, fetchMonthlyTypeStats, fetchDailyTypeStats, fetchWeatherCorrelation, fetchWeatherByType, fetchWeatherByRegion, fetchAlertWeather, fetchWeatherHourlyCorrelation, fetchWeatherHourlyByType, fetchWeatherHourlyByRegion } from "@/api/alertApi";
 import { fetchUserAlert, fetchUserAlerts } from "@/api/userAlertApi";
 
 export function useLatestAlerts(limit = 5) {
@@ -108,6 +108,16 @@ export function useMonthlyTypeStats(params: AlertSearchRequest) {
   return useQuery({
     queryKey: ["alert-stats-monthly-type", params],
     queryFn: () => fetchMonthlyTypeStats(params),
+    placeholderData: keepPreviousData,
+    staleTime: 60_000,
+  });
+}
+
+export function useDailyTypeStats(params: AlertSearchRequest, enabled: boolean) {
+  return useQuery({
+    queryKey: ["alert-stats-daily-type", params],
+    queryFn: () => fetchDailyTypeStats(params),
+    enabled,
     placeholderData: keepPreviousData,
     staleTime: 60_000,
   });
