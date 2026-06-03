@@ -197,6 +197,17 @@ function StatsPageInner() {
 
   const levelStats: LevelStat[] = stats?.levelStats ?? [];
 
+  const [layout, setLayout] = useState<WidgetItem[]>(DEFAULT_LAYOUT);
+  useEffect(() => {
+    try {
+      const saved = sessionStorage.getItem("stats-widget-layout");
+      if (saved) setLayout(JSON.parse(saved) as WidgetItem[]);
+    } catch {}
+  }, []);
+
+  const hasCompare = layout.some(w => w.libId === "compare");
+  const hasWeather = layout.some(w => w.libId === "weather-overlay" || w.libId === "weather-scatter");
+
   const { data: dailyStatsRaw,    isLoading: loadingDaily }       = useDailyStats(statsParams);
   const { data: hourlyStatsRaw,   isLoading: loadingHourly }      = useHourlyStats(statsParams);
   const { data: monthlyTypeRaw,   isLoading: loadingMonthlyType } = useMonthlyTypeStats(statsParams);
@@ -206,8 +217,8 @@ function StatsPageInner() {
 
   const currentYear = useMemo(() => new Date().getFullYear(), []);
   const compareBase = useMemo(() => ({ ...statsParams, startDate: undefined, endDate: undefined }), [statsParams]);
-  const { data: thisYearRaw, isLoading: loadingThisYear } = useDailyStats({ ...compareBase, startDate: `${currentYear}-01-01`, endDate: `${currentYear}-12-31` });
-  const { data: lastYearRaw, isLoading: loadingLastYear } = useDailyStats({ ...compareBase, startDate: `${currentYear - 1}-01-01`, endDate: `${currentYear - 1}-12-31` });
+  const { data: thisYearRaw, isLoading: loadingThisYear } = useDailyStats({ ...compareBase, startDate: `${currentYear}-01-01`, endDate: `${currentYear}-12-31` }, hasCompare);
+  const { data: lastYearRaw, isLoading: loadingLastYear } = useDailyStats({ ...compareBase, startDate: `${currentYear - 1}-01-01`, endDate: `${currentYear - 1}-12-31` }, hasCompare);
   const thisYearData: DailyStat[] = thisYearRaw ?? [];
   const lastYearData: DailyStat[] = lastYearRaw ?? [];
 
@@ -223,13 +234,13 @@ function StatsPageInner() {
   }, [startDate, endDate]);
   const dailyAvg = Math.round(totalCount / periodDays);
 
-  const { data: weatherRaw, isLoading: loadingWeather } = useWeatherCorrelation(statsParams);
+  const { data: weatherRaw, isLoading: loadingWeather } = useWeatherCorrelation(statsParams, hasWeather);
   const weatherStats = weatherRaw ?? [];
 
   const regionLevel = sido ? "sigungu" : "sido";
   const regionLabel = sido ? "시/군/구별" : "시/도별";
-  const { data: weatherTypeRaw,   isLoading: loadingWeatherType   } = useWeatherByType(statsParams);
-  const { data: weatherRegionRaw, isLoading: loadingWeatherRegion } = useWeatherByRegion(statsParams, regionLevel);
+  const { data: weatherTypeRaw,   isLoading: loadingWeatherType   } = useWeatherByType(statsParams, hasWeather);
+  const { data: weatherRegionRaw, isLoading: loadingWeatherRegion } = useWeatherByRegion(statsParams, regionLevel, hasWeather);
   const weatherTypeStats   = weatherTypeRaw   ?? [];
   const weatherRegionStats = weatherRegionRaw ?? [];
 
@@ -237,20 +248,12 @@ function StatsPageInner() {
   const isShortPeriod = periodDays <= 7;
   const { data: dailyTypeRaw, isLoading: loadingDailyType } = useDailyTypeStats(statsParams, isSubMonth);
   const dailyTypeStats = dailyTypeRaw ?? [];
-  const { data: weatherHourlyRaw,       isLoading: loadingWeatherHourly       } = useWeatherHourlyCorrelation(statsParams, isShortPeriod);
-  const { data: weatherHourlyTypeRaw,   isLoading: loadingWeatherHourlyType   } = useWeatherHourlyByType(statsParams, isShortPeriod);
-  const { data: weatherHourlyRegionRaw, isLoading: loadingWeatherHourlyRegion } = useWeatherHourlyByRegion(statsParams, regionLevel, isShortPeriod);
+  const { data: weatherHourlyRaw,       isLoading: loadingWeatherHourly       } = useWeatherHourlyCorrelation(statsParams, isShortPeriod && hasWeather);
+  const { data: weatherHourlyTypeRaw,   isLoading: loadingWeatherHourlyType   } = useWeatherHourlyByType(statsParams, isShortPeriod && hasWeather);
+  const { data: weatherHourlyRegionRaw, isLoading: loadingWeatherHourlyRegion } = useWeatherHourlyByRegion(statsParams, regionLevel, isShortPeriod && hasWeather);
   const weatherHourlyStats       = weatherHourlyRaw       ?? [];
   const weatherHourlyTypeStats   = weatherHourlyTypeRaw   ?? [];
   const weatherHourlyRegionStats = weatherHourlyRegionRaw ?? [];
-
-  const [layout, setLayout] = useState<WidgetItem[]>(DEFAULT_LAYOUT);
-  useEffect(() => {
-    try {
-      const saved = sessionStorage.getItem("stats-widget-layout");
-      if (saved) setLayout(JSON.parse(saved) as WidgetItem[]);
-    } catch {}
-  }, []);
 
   const [drawerOpen, setDrawerOpen] = useState(false);
 

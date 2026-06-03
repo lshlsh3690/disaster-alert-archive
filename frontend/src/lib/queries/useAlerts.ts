@@ -86,10 +86,11 @@ export function useUserAlerts(params: { page?: number; size?: number; mine?: boo
   });
 }
 
-export function useDailyStats(params: AlertSearchRequest) {
+export function useDailyStats(params: AlertSearchRequest, enabled = true) {
   return useQuery({
     queryKey: ["alert-stats-daily", params],
     queryFn: () => fetchDailyStats(params),
+    enabled,
     placeholderData: keepPreviousData,
     staleTime: 60_000,
   });
@@ -131,29 +132,32 @@ export function useDashboardSummary() {
   });
 }
 
-export function useWeatherCorrelation(params: AlertSearchRequest) {
+export function useWeatherCorrelation(params: AlertSearchRequest, enabled = true) {
   return useQuery({
     queryKey: ["weather-correlation", params],
     queryFn: () => fetchWeatherCorrelation(params),
+    enabled,
     placeholderData: keepPreviousData,
     staleTime: 60_000,
   });
 }
 
-export function useWeatherByType(params: AlertSearchRequest) {
+export function useWeatherByType(params: AlertSearchRequest, enabled = true) {
   return useQuery({
     queryKey: ["weather-by-type", params],
     queryFn: () => fetchWeatherByType(params),
+    enabled,
     placeholderData: keepPreviousData,
     staleTime: 60_000,
     retry: 1,
   });
 }
 
-export function useWeatherByRegion(params: AlertSearchRequest, groupBy: "sido" | "sigungu") {
+export function useWeatherByRegion(params: AlertSearchRequest, groupBy: "sido" | "sigungu", enabled = true) {
   return useQuery({
     queryKey: ["weather-by-region", params, groupBy],
     queryFn: () => fetchWeatherByRegion(params, groupBy),
+    enabled,
     placeholderData: keepPreviousData,
     staleTime: 60_000,
     retry: 1,
