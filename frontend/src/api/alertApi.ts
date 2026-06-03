@@ -116,6 +116,21 @@ export async function fetchWeatherByRegion(params: AlertSearchRequest, groupBy: 
   return z.array(ZWeatherRegionStat).parse(res.data);
 }
 
+export async function fetchWeatherHourlyCorrelation(params: AlertSearchRequest): Promise<WeatherCorrelationStat[]> {
+  const res = await instance.get("/api/v1/alerts/stats/weather-correlation-hourly", { params });
+  return z.array(ZWeatherCorrelationStat).parse(res.data);
+}
+
+export async function fetchWeatherHourlyByType(params: AlertSearchRequest): Promise<WeatherTypeStat[]> {
+  const res = await instance.get("/api/v1/alerts/stats/weather-by-type-hourly", { params });
+  return z.array(ZWeatherTypeStat).parse(res.data);
+}
+
+export async function fetchWeatherHourlyByRegion(params: AlertSearchRequest, groupBy: "sido" | "sigungu"): Promise<WeatherRegionStat[]> {
+  const res = await instance.get("/api/v1/alerts/stats/weather-by-region-hourly", { params: { ...params, groupBy } });
+  return z.array(ZWeatherRegionStat).parse(res.data);
+}
+
 export async function fetchAlertWeather(id: number): Promise<AlertWeatherSnapshot> {
   const res = await instance.get(`/api/v1/alerts/${id}/weather`, { headers: { "X-Auth-Required": "false" } });
   if (res.status === 204) return null;

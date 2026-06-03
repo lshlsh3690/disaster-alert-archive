@@ -11,6 +11,8 @@ public class WeatherCorrelationDto {
     private String date;
     private long count;
     private Double avgTemp;
+    private Double minTemp;
+    private Double maxTemp;
     private Double maxPrecip;
     private Double avgWindSpeed;
     private String primaryType;

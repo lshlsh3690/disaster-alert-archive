@@ -10,5 +10,7 @@ public class WeatherTypeStatDto {
     private String type;
     private long count;
     private Double avgTemp;
+    private Double minTemp;
+    private Double maxTemp;
     private Double maxPrecip;
 }

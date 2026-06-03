@@ -45,5 +45,14 @@ public interface DisasterAlertRepositoryCustom {
 
     List<WeatherRegionStatDto> getWeatherBySigungu(AlertSearchRequest request);
 
+    // 시간별 (weather_observation 사용, 기간 7일 이하 전용)
+    List<WeatherCorrelationDto> getWeatherHourlyCorrelation(AlertSearchRequest request);
+
+    List<WeatherTypeStatDto> getWeatherHourlyByType(AlertSearchRequest request);
+
+    List<WeatherRegionStatDto> getWeatherHourlyBySido(AlertSearchRequest request);
+
+    List<WeatherRegionStatDto> getWeatherHourlyBySigungu(AlertSearchRequest request);
+
     Optional<AlertWeatherDto> getAlertWeather(Long alertId);
 }

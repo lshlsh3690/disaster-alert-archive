@@ -1,6 +1,6 @@
 // hooks/useAlerts.ts
 import { useQuery, keepPreviousData } from "@tanstack/react-query";
-import { fetchLatestAlerts, searchAlerts, fetchAlert, fetchStats, type AlertSearchRequest, fetchLatestAlertsBySido, fetchSigunguStats, searchCombinedAlerts, fetchDashboardSummary, fetchSigungu, fetchDailyStats, fetchHourlyStats, fetchMonthlyTypeStats, fetchWeatherCorrelation, fetchWeatherByType, fetchWeatherByRegion, fetchAlertWeather } from "@/api/alertApi";
+import { fetchLatestAlerts, searchAlerts, fetchAlert, fetchStats, type AlertSearchRequest, fetchLatestAlertsBySido, fetchSigunguStats, searchCombinedAlerts, fetchDashboardSummary, fetchSigungu, fetchDailyStats, fetchHourlyStats, fetchMonthlyTypeStats, fetchWeatherCorrelation, fetchWeatherByType, fetchWeatherByRegion, fetchAlertWeather, fetchWeatherHourlyCorrelation, fetchWeatherHourlyByType, fetchWeatherHourlyByRegion } from "@/api/alertApi";
 import { fetchUserAlert, fetchUserAlerts } from "@/api/userAlertApi";
 
 export function useLatestAlerts(limit = 5) {
@@ -147,6 +147,36 @@ export function useWeatherByRegion(params: AlertSearchRequest, groupBy: "sido" |
     placeholderData: keepPreviousData,
     staleTime: 60_000,
     retry: 1,
+  });
+}
+
+export function useWeatherHourlyCorrelation(params: AlertSearchRequest, enabled: boolean) {
+  return useQuery({
+    queryKey: ["weather-hourly-correlation", params],
+    queryFn: () => fetchWeatherHourlyCorrelation(params),
+    enabled,
+    placeholderData: keepPreviousData,
+    staleTime: 60_000,
+  });
+}
+
+export function useWeatherHourlyByType(params: AlertSearchRequest, enabled: boolean) {
+  return useQuery({
+    queryKey: ["weather-hourly-by-type", params],
+    queryFn: () => fetchWeatherHourlyByType(params),
+    enabled,
+    placeholderData: keepPreviousData,
+    staleTime: 60_000,
+  });
+}
+
+export function useWeatherHourlyByRegion(params: AlertSearchRequest, groupBy: "sido" | "sigungu", enabled: boolean) {
+  return useQuery({
+    queryKey: ["weather-hourly-by-region", params, groupBy],
+    queryFn: () => fetchWeatherHourlyByRegion(params, groupBy),
+    enabled,
+    placeholderData: keepPreviousData,
+    staleTime: 60_000,
   });
 }
 

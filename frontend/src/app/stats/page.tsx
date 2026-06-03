@@ -3,8 +3,8 @@
 import { Suspense, useState, useEffect, useMemo, useCallback } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { useAlertStats, useSidoStats, useSigunguStats, useDailyStats, useHourlyStats, useMonthlyTypeStats, useWeatherCorrelation, useWeatherByType, useWeatherByRegion } from "@/lib/queries/useAlerts";
-import type { DailyStat } from "@/types/alerts";
+import { useAlertStats, useSidoStats, useSigunguStats, useDailyStats, useHourlyStats, useMonthlyTypeStats, useWeatherCorrelation, useWeatherByType, useWeatherByRegion, useWeatherHourlyCorrelation, useWeatherHourlyByType, useWeatherHourlyByRegion } from "@/lib/queries/useAlerts";
+import type { DailyStat, WeatherCorrelationStat, WeatherTypeStat, WeatherRegionStat } from "@/types/alerts";
 import { levelTextToCode } from "@/ui/level";
 import type { TypeStat, LevelStat, RegionStat, LibItem, WidgetItem } from "./_constants";
 import { WIDGET_LIBRARY, DEFAULT_LAYOUT } from "./_constants";
@@ -24,8 +24,17 @@ function buildCsv(opts: {
   regionStats: RegionStat[];
   levelStats: LevelStat[];
   dailyStats: DailyStat[];
+  weatherStats: WeatherCorrelationStat[];
+  weatherTypeStats: WeatherTypeStat[];
+  weatherRegionStats: WeatherRegionStat[];
+  weatherHourlyStats: WeatherCorrelationStat[];
+  weatherHourlyTypeStats: WeatherTypeStat[];
+  weatherHourlyRegionStats: WeatherRegionStat[];
+  isShortPeriod: boolean;
 }): string {
-  const { filters, totalCount, dailyAvg, topType, topRegion, typeStats, regionStats, levelStats, dailyStats } = opts;
+  const { filters, totalCount, dailyAvg, topType, topRegion, typeStats, regionStats, levelStats, dailyStats,
+    weatherStats, weatherTypeStats, weatherRegionStats,
+    weatherHourlyStats, weatherHourlyTypeStats, weatherHourlyRegionStats, isShortPeriod } = opts;
   const rows: string[] = [];
   const row = (...cols: (string | number)[]) => rows.push(cols.map(c => `"${String(c).replace(/"/g, '""')}"`).join(","));
   const blank = () => rows.push("");
@@ -73,6 +82,56 @@ function buildCsv(opts: {
     section("## 일별 발생 추이");
     row("날짜", "건수");
     dailyStats.forEach(d => row(d.date, d.count));
+  }
+
+  const fmt = (v: number | null | undefined) => v == null ? "-" : String(v);
+
+  if (weatherStats.length > 0) {
+    section("## 일별 날씨-재난 상관관계");
+    row("날짜", "재난건수", "평균기온(℃)", "최저기온(℃)", "최고기온(℃)", "최대강수량(mm)", "평균풍속(m/s)", "주요재난유형");
+    weatherStats.forEach(d =>
+      row(d.date, d.count, fmt(d.avgTemp), fmt(d.minTemp), fmt(d.maxTemp), fmt(d.maxPrecip), fmt(d.avgWindSpeed), d.primaryType ?? "-")
+    );
+  }
+
+  if (weatherTypeStats.length > 0) {
+    section("## 재난유형별 날씨");
+    row("날짜", "재난유형", "건수", "평균기온(℃)", "최저기온(℃)", "최고기온(℃)", "최대강수량(mm)");
+    weatherTypeStats.forEach(d =>
+      row(d.date, d.type ?? "기타", d.count, fmt(d.avgTemp), fmt(d.minTemp), fmt(d.maxTemp), fmt(d.maxPrecip))
+    );
+  }
+
+  if (weatherRegionStats.length > 0) {
+    section("## 지역별 날씨");
+    row("날짜", "지역", "건수", "평균기온(℃)", "최저기온(℃)", "최고기온(℃)", "최대강수량(mm)");
+    weatherRegionStats.forEach(d =>
+      row(d.date, d.region, d.count, fmt(d.avgTemp), fmt(d.minTemp), fmt(d.maxTemp), fmt(d.maxPrecip))
+    );
+  }
+
+  if (isShortPeriod && weatherHourlyStats.length > 0) {
+    section("## 시간별 날씨-재난 상관관계");
+    row("일시", "재난건수", "평균기온(℃)", "최저기온(℃)", "최고기온(℃)", "최대강수량(mm)", "평균풍속(m/s)", "주요재난유형");
+    weatherHourlyStats.forEach(d =>
+      row(d.date, d.count, fmt(d.avgTemp), fmt(d.minTemp), fmt(d.maxTemp), fmt(d.maxPrecip), fmt(d.avgWindSpeed), d.primaryType ?? "-")
+    );
+  }
+
+  if (isShortPeriod && weatherHourlyTypeStats.length > 0) {
+    section("## 시간별 재난유형별 날씨");
+    row("일시", "재난유형", "건수", "평균기온(℃)", "최저기온(℃)", "최고기온(℃)", "최대강수량(mm)");
+    weatherHourlyTypeStats.forEach(d =>
+      row(d.date, d.type ?? "기타", d.count, fmt(d.avgTemp), fmt(d.minTemp), fmt(d.maxTemp), fmt(d.maxPrecip))
+    );
+  }
+
+  if (isShortPeriod && weatherHourlyRegionStats.length > 0) {
+    section("## 시간별 지역별 날씨");
+    row("일시", "지역", "건수", "평균기온(℃)", "최저기온(℃)", "최고기온(℃)", "최대강수량(mm)");
+    weatherHourlyRegionStats.forEach(d =>
+      row(d.date, d.region, d.count, fmt(d.avgTemp), fmt(d.minTemp), fmt(d.maxTemp), fmt(d.maxPrecip))
+    );
   }
 
   return rows.join("\n");
@@ -152,16 +211,6 @@ function StatsPageInner() {
   const thisYearData: DailyStat[] = thisYearRaw ?? [];
   const lastYearData: DailyStat[] = lastYearRaw ?? [];
 
-  const { data: weatherRaw, isLoading: loadingWeather } = useWeatherCorrelation(statsParams);
-  const weatherStats = weatherRaw ?? [];
-
-  const regionLevel = sido ? "sigungu" : "sido";
-  const regionLabel = sido ? "시/군/구별" : "시/도별";
-  const { data: weatherTypeRaw,   isLoading: loadingWeatherType   } = useWeatherByType(statsParams);
-  const { data: weatherRegionRaw, isLoading: loadingWeatherRegion } = useWeatherByRegion(statsParams, regionLevel);
-  const weatherTypeStats   = weatherTypeRaw   ?? [];
-  const weatherRegionStats = weatherRegionRaw ?? [];
-
   const topType    = typeStats[0];
   const topRegion  = regionStats[0];
   const totalCount = stats?.totalCount ?? 0;
@@ -173,6 +222,24 @@ function StatsPageInner() {
     return 30;
   }, [startDate, endDate]);
   const dailyAvg = Math.round(totalCount / periodDays);
+
+  const { data: weatherRaw, isLoading: loadingWeather } = useWeatherCorrelation(statsParams);
+  const weatherStats = weatherRaw ?? [];
+
+  const regionLevel = sido ? "sigungu" : "sido";
+  const regionLabel = sido ? "시/군/구별" : "시/도별";
+  const { data: weatherTypeRaw,   isLoading: loadingWeatherType   } = useWeatherByType(statsParams);
+  const { data: weatherRegionRaw, isLoading: loadingWeatherRegion } = useWeatherByRegion(statsParams, regionLevel);
+  const weatherTypeStats   = weatherTypeRaw   ?? [];
+  const weatherRegionStats = weatherRegionRaw ?? [];
+
+  const isShortPeriod = periodDays <= 7;
+  const { data: weatherHourlyRaw,       isLoading: loadingWeatherHourly       } = useWeatherHourlyCorrelation(statsParams, isShortPeriod);
+  const { data: weatherHourlyTypeRaw,   isLoading: loadingWeatherHourlyType   } = useWeatherHourlyByType(statsParams, isShortPeriod);
+  const { data: weatherHourlyRegionRaw, isLoading: loadingWeatherHourlyRegion } = useWeatherHourlyByRegion(statsParams, regionLevel, isShortPeriod);
+  const weatherHourlyStats       = weatherHourlyRaw       ?? [];
+  const weatherHourlyTypeStats   = weatherHourlyTypeRaw   ?? [];
+  const weatherHourlyRegionStats = weatherHourlyRegionRaw ?? [];
 
   const [layout, setLayout] = useState<WidgetItem[]>(DEFAULT_LAYOUT);
   useEffect(() => {
@@ -219,7 +286,9 @@ function StatsPageInner() {
               "키워드": keyword ?? "-",
               "출처": source ?? "ALL",
             };
-            const csv = buildCsv({ filters, totalCount, dailyAvg, topType, topRegion, typeStats, regionStats, levelStats, dailyStats });
+            const csv = buildCsv({ filters, totalCount, dailyAvg, topType, topRegion, typeStats, regionStats, levelStats, dailyStats,
+              weatherStats, weatherTypeStats, weatherRegionStats,
+              weatherHourlyStats, weatherHourlyTypeStats, weatherHourlyRegionStats, isShortPeriod });
             downloadCsv(`재난통계_${new Date().toISOString().slice(0, 10)}.csv`, csv);
           }} className="px-3 py-2 text-sm font-semibold rounded-lg border border-gray-200 bg-white text-gray-700 hover:border-green-400 hover:text-green-600 transition-colors flex items-center gap-1">
             ⬇ CSV
@@ -263,8 +332,13 @@ function StatsPageInner() {
                 weatherStats={weatherStats}
                 weatherTypeStats={weatherTypeStats}
                 weatherRegionStats={weatherRegionStats}
+                weatherHourlyStats={weatherHourlyStats}
+                weatherHourlyTypeStats={weatherHourlyTypeStats}
+                weatherHourlyRegionStats={weatherHourlyRegionStats}
+                isShortPeriod={isShortPeriod}
                 regionLabel={regionLabel}
                 loadingWeather={loadingWeather || loadingWeatherType || loadingWeatherRegion}
+                loadingWeatherHourly={loadingWeatherHourly || loadingWeatherHourlyType || loadingWeatherHourlyRegion}
                 scrollableRegion={lib.id === "sido-bar" && !!sido}
                 isLoading={
                   lib.kind === "line"    ? loadingDaily :

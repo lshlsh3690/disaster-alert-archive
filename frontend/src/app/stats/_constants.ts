@@ -42,7 +42,7 @@ export const WIDGET_LIBRARY: LibItem[] = [
   { id: "stacked",    kind: "stacked", title: "월별 유형별 발생",    desc: "유형별 월간 누적 발생 추이", help: "최근 12개월간 월별 재난문자를 유형별로 누적해 보여줍니다. 계절별 재난 패턴 파악에 유용합니다.",                                                 defaultSpan: 6,  icon: "🪜", variants: [{ key: "area", label: "면적" }, { key: "bar", label: "누적막대" }] },
   { id: "compare",    kind: "compare", title: "전년 동기 대비",      desc: "월별 발생 건수 YoY 비교",    help: "올해(파란색)와 작년(회색)의 월별 발생 건수를 비교합니다. 막대에 마우스를 올리면 월별 상세 수치를 확인할 수 있습니다.",                          defaultSpan: 12, icon: "⚖️", variants: [{ key: "bar", label: "막대" }, { key: "line", label: "꺾은선" }] },
   { id: "weather-overlay", kind: "weather",  title: "날씨·재난 상관관계",  desc: "기온·강수·발생건수 복합 차트", help: "날짜별 재난문자 발생 건수와 평균기온을 재난 유형별·지역별로 겹쳐 보여줍니다.", defaultSpan: 12, icon: "🌤️", variants: [{ key: "type", label: "유형별" }, { key: "region", label: "지역별" }] },
-  { id: "weather-scatter", kind: "weather2", title: "기온별 발생 산점도",   desc: "기온 vs 발생건수 산점도",      help: "평균기온(X축)과 발생건수(Y축)의 관계를 재난 유형별로 산점도로 나타냅니다. 버블 크기는 최대강수량을 나타냅니다.",           defaultSpan: 6,  icon: "🔵" },
+  { id: "weather-scatter", kind: "weather2", title: "기온별 발생 산점도",   desc: "기온 vs 발생건수 산점도",      help: "평균기온(X축)과 발생건수(Y축)의 관계를 재난 유형별로 산점도로 나타냅니다. 버블 크기는 최대강수량을 나타냅니다. 시계열 보기로 전환하면 발생건수·기온 추이를 함께 확인할 수 있습니다.",           defaultSpan: 6,  icon: "🔵", variants: [{ key: "scatter", label: "산점도" }, { key: "overlay", label: "시계열" }] },
 ];
 
 export const DEFAULT_LAYOUT: WidgetItem[] = [

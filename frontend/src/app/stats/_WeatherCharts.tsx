@@ -1,7 +1,7 @@
 "use client";
 
 import {
-  ComposedChart, Bar, Line,
+  ComposedChart, Bar, Line, Area,
   ScatterChart, Scatter, ZAxis,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend,
   ResponsiveContainer,
@@ -155,24 +155,38 @@ export function WeatherByRegionChart({ data, regionLabel }: { data: WeatherRegio
   );
 }
 
-// ─── 날씨 오버레이 (총 건수 + 기온·강수 복합) ────────────────────────────────
+// ─── 날씨 오버레이 (총 건수 + 기온 범위·강수 복합) ──────────────────────────
 
 export function WeatherOverlayChart({ data }: { data: WeatherCorrelationStat[] }) {
   if (data.length === 0) return <EmptyChart />;
   const labelStride = Math.max(1, Math.floor(data.length / 6));
 
-  const TooltipContent = ({ active, payload, label }: TTProps) => {
+  // minTemp/maxTemp 를 [min, max] 쌍으로 Area 에 넣기 위해 가공
+  const chartData = data.map(d => ({
+    ...d,
+    date: d.date.slice(5),
+    tempRange: d.minTemp != null && d.maxTemp != null ? [d.minTemp, d.maxTemp] as [number, number] : null,
+  }));
+
+  const TooltipContent = ({ active, payload }: TTProps) => {
     if (!active || !payload?.length) return null;
     const get = (key: string) => payload.find(p => p.dataKey === key)?.value;
-    const row = payload[0].payload as unknown as WeatherCorrelationStat;
+    const row = payload[0].payload as unknown as typeof chartData[number];
     return (
       <div style={TT_BOX}>
-        <p style={TT_LABEL}>{label}</p>
+        <p style={TT_LABEL}>{row.date}</p>
         <p style={{ ...TT_VALUE, color: "#60a5fa" }}>{(get("count") ?? 0).toLocaleString("ko-KR")}건</p>
         {row?.primaryType && (
           <p style={{ ...TT_LABEL, marginTop: 4 }}>주요 유형: <span style={{ color: "#e2e8f0" }}>{row.primaryType}</span></p>
         )}
-        {get("avgTemp") != null && <p style={TT_LABEL}>기온 {get("avgTemp")}°C</p>}
+        {row.avgTemp != null && (
+          <p style={TT_LABEL}>
+            기온 {row.avgTemp.toFixed(1)}°C
+            {row.minTemp != null && row.maxTemp != null && (
+              <span style={{ color: "#94a3b8" }}> ({row.minTemp.toFixed(1)}~{row.maxTemp.toFixed(1)})</span>
+            )}
+          </p>
+        )}
         {get("maxPrecip") != null && <p style={TT_LABEL}>강수 {get("maxPrecip")}mm</p>}
       </div>
     );
@@ -181,19 +195,20 @@ export function WeatherOverlayChart({ data }: { data: WeatherCorrelationStat[] }
   return (
     <div className="flex-1 min-h-0" style={{ height: "100%" }}>
       <ResponsiveContainer width="100%" height="100%">
-        <ComposedChart data={data} margin={{ top: 8, right: 24, bottom: 4, left: 4 }}>
+        <ComposedChart data={chartData} margin={{ top: 8, right: 24, bottom: 4, left: 4 }}>
           <CartesianGrid vertical={false} stroke="#f3f4f6" />
           <XAxis dataKey="date" axisLine={false} tickLine={false}
             tick={{ fontSize: 9, fill: "#9ca3af" }}
-            tickFormatter={(v: string) => v.slice(5)}
             interval={labelStride - 1} />
           <YAxis yAxisId="cnt" axisLine={false} tickLine={false} tick={{ fontSize: 9, fill: "#9ca3af" }} width={32} />
           <YAxis yAxisId="temp" orientation="right" axisLine={false} tickLine={false}
             tick={{ fontSize: 9, fill: "#f97316" }} width={36} tickFormatter={(v: number) => `${v}°`} />
           <Tooltip content={<TooltipContent />} />
           <Legend wrapperStyle={{ fontSize: 11 }}
-            formatter={(v: string) => ({ count: "발생건수", avgTemp: "평균기온(°C)", maxPrecip: "최대강수(mm)" }[v] ?? v)} />
+            formatter={(v: string) => ({ count: "발생건수", avgTemp: "평균기온", tempRange: "기온범위", maxPrecip: "최대강수(mm)" }[v] ?? v)} />
           <Bar yAxisId="cnt" dataKey="count" fill="#3b82f6" fillOpacity={0.7} radius={[2, 2, 0, 0]} maxBarSize={20} />
+          <Area yAxisId="temp" type="monotone" dataKey="tempRange" stroke="none"
+            fill="#f97316" fillOpacity={0.12} activeDot={false} legendType="none" />
           <Line yAxisId="temp" type="monotone" dataKey="avgTemp" stroke="#f97316" strokeWidth={2} dot={false} />
           <Line yAxisId="temp" type="monotone" dataKey="maxPrecip" stroke="#06b6d4" strokeWidth={1.5} dot={false} strokeDasharray="4 2" />
         </ComposedChart>
@@ -217,17 +232,23 @@ export function WeatherCorrelationScatter({ data }: { data: WeatherCorrelationSt
     color: colorMap[t],
     points: filtered
       .filter(d => (d.primaryType ?? "기타") === t)
-      .map(d => ({ x: d.avgTemp!, y: d.count, z: Math.max((d.maxPrecip ?? 0) + 1, 1), date: d.date })),
+      .map(d => ({ x: d.avgTemp!, y: d.count, z: Math.max((d.maxPrecip ?? 0) + 1, 1), date: d.date, minTemp: d.minTemp, maxTemp: d.maxTemp })),
   }));
 
   const TooltipContent = ({ active, payload }: TTProps) => {
     if (!active || !payload?.length) return null;
-    const p = payload[0].payload as unknown as { x: number; y: number; z: number; date: string };
+    const p = payload[0].payload as unknown as { x: number; y: number; z: number; date: string; minTemp: number | null; maxTemp: number | null };
     return (
       <div style={TT_BOX}>
         <p style={TT_LABEL}>{p.date}</p>
         <p style={TT_VALUE}>{p.y.toLocaleString("ko-KR")}건</p>
-        <p style={TT_LABEL}>기온 {p.x}°C · 강수 {(p.z - 1).toFixed(1)}mm</p>
+        <p style={TT_LABEL}>
+          평균기온 {p.x.toFixed(1)}°C
+          {p.minTemp != null && p.maxTemp != null && (
+            <span style={{ color: "#64748b" }}> ({p.minTemp.toFixed(1)}~{p.maxTemp.toFixed(1)})</span>
+          )}
+        </p>
+        <p style={TT_LABEL}>강수 {(p.z - 1).toFixed(1)}mm</p>
       </div>
     );
   };

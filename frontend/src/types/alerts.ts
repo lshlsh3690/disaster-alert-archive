@@ -87,6 +87,8 @@ export const ZWeatherTypeStat = z.object({
   type: z.string().nullable(),
   count: z.number(),
   avgTemp: z.number().nullable(),
+  minTemp: z.number().nullable(),
+  maxTemp: z.number().nullable(),
   maxPrecip: z.number().nullable(),
 });
 export type WeatherTypeStat = z.infer<typeof ZWeatherTypeStat>;
@@ -96,6 +98,8 @@ export const ZWeatherRegionStat = z.object({
   region: z.string(),
   count: z.number(),
   avgTemp: z.number().nullable(),
+  minTemp: z.number().nullable(),
+  maxTemp: z.number().nullable(),
   maxPrecip: z.number().nullable(),
 });
 export type WeatherRegionStat = z.infer<typeof ZWeatherRegionStat>;
@@ -104,6 +108,8 @@ export const ZWeatherCorrelationStat = z.object({
   date: z.string(),
   count: z.number(),
   avgTemp: z.number().nullable(),
+  minTemp: z.number().nullable(),
+  maxTemp: z.number().nullable(),
   maxPrecip: z.number().nullable(),
   avgWindSpeed: z.number().nullable(),
   primaryType: z.string().nullable(),

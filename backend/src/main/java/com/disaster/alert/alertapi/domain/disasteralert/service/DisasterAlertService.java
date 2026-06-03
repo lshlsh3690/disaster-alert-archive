@@ -450,6 +450,22 @@ public class DisasterAlertService {
         return disasterAlertRepository.getWeatherBySigungu(request);
     }
 
+    public List<WeatherCorrelationDto> getWeatherHourlyCorrelation(AlertSearchRequest request) {
+        return disasterAlertRepository.getWeatherHourlyCorrelation(request);
+    }
+
+    public List<WeatherTypeStatDto> getWeatherHourlyByType(AlertSearchRequest request) {
+        return disasterAlertRepository.getWeatherHourlyByType(request);
+    }
+
+    public List<WeatherRegionStatDto> getWeatherHourlyBySido(AlertSearchRequest request) {
+        return disasterAlertRepository.getWeatherHourlyBySido(request);
+    }
+
+    public List<WeatherRegionStatDto> getWeatherHourlyBySigungu(AlertSearchRequest request) {
+        return disasterAlertRepository.getWeatherHourlyBySigungu(request);
+    }
+
     public Optional<AlertWeatherDto> getAlertWeather(Long alertId) {
         return disasterAlertRepository.getAlertWeather(alertId);
     }

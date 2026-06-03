@@ -6,11 +6,26 @@ import type { TypeStat, LevelStat, RegionStat, LibItem, WidgetItem } from "./_co
 import { EmptyChart, LoadingChart } from "./_charts";
 import { DonutChart, HorizontalBar, VerticalBar, LevelsCard } from "./_DistributionCharts";
 import { LineChart, DailyBar, Heatmap, DayOfWeekBar, HourBar, StackedArea, StackedBar, CompareBars, CompareLines } from "./_TimeCharts";
-import { WeatherCorrelationScatter, WeatherByTypeChart, WeatherByRegionChart } from "./_WeatherCharts";
+import { WeatherCorrelationScatter, WeatherOverlayChart, WeatherByTypeChart, WeatherByRegionChart } from "./_WeatherCharts";
+
+// ─── 일별/시간별 토글 ────────────────────────────────────────────────────────
+
+function GranularityToggle({ value, onChange }: { value: "daily" | "hourly"; onChange: (v: "daily" | "hourly") => void }) {
+  return (
+    <div className="flex border border-gray-200 rounded overflow-hidden self-start">
+      {(["daily", "hourly"] as const).map(g => (
+        <button key={g} onClick={() => onChange(g)}
+          className={`px-2 py-0.5 text-[11px] font-medium transition-colors ${value === g ? "bg-blue-600 text-white" : "text-gray-400 hover:bg-gray-50"}`}>
+          {g === "daily" ? "일별" : "시간별"}
+        </button>
+      ))}
+    </div>
+  );
+}
 
 // ─── 위젯 콘텐츠 디스패처 ────────────────────────────────────────────────────
 
-export function WidgetContent({ kind, variant, typeStats, regionStats, levelStats, dailyStats, hourlyStats, monthlyTypeStats, thisYearData, lastYearData, currentYear, weatherStats, weatherTypeStats, weatherRegionStats, regionLabel, loadingWeather, scrollableRegion, isLoading }: {
+export function WidgetContent({ kind, variant, typeStats, regionStats, levelStats, dailyStats, hourlyStats, monthlyTypeStats, thisYearData, lastYearData, currentYear, weatherStats, weatherTypeStats, weatherRegionStats, weatherHourlyStats, weatherHourlyTypeStats, weatherHourlyRegionStats, isShortPeriod, regionLabel, loadingWeather, loadingWeatherHourly, scrollableRegion, isLoading }: {
   kind: string;
   variant: string;
   typeStats: TypeStat[];
@@ -25,11 +40,18 @@ export function WidgetContent({ kind, variant, typeStats, regionStats, levelStat
   weatherStats: WeatherCorrelationStat[];
   weatherTypeStats: WeatherTypeStat[];
   weatherRegionStats: WeatherRegionStat[];
+  weatherHourlyStats: WeatherCorrelationStat[];
+  weatherHourlyTypeStats: WeatherTypeStat[];
+  weatherHourlyRegionStats: WeatherRegionStat[];
+  isShortPeriod: boolean;
   regionLabel: string;
   loadingWeather: boolean;
+  loadingWeatherHourly: boolean;
   scrollableRegion?: boolean;
   isLoading?: boolean;
 }) {
+  const [granularity, setGranularity] = useState<"daily" | "hourly">("daily");
+
   if (isLoading) return <LoadingChart />;
   const typeTotal = typeStats.reduce((s, d) => s + d.count, 0);
   const typeAsBar = typeStats.slice(0, 8).map(d => ({ label: d.type ?? "기타", count: d.count }));
@@ -39,6 +61,8 @@ export function WidgetContent({ kind, variant, typeStats, regionStats, levelStat
   const levelForDonut = levelStats.map(d => ({ type: d.level ? (LEVEL_NAMES[d.level] ?? d.level) : "기타", count: d.count }));
   const levelTotal = levelStats.reduce((s, d) => s + d.count, 0);
   const topTypes = typeStats.slice(0, 4).map(d => d.type ?? "기타");
+
+  const isHourly = isShortPeriod && granularity === "hourly";
 
   switch (kind) {
     case "donut":
@@ -83,14 +107,34 @@ export function WidgetContent({ kind, variant, typeStats, regionStats, levelStat
       if (variant === "line") return <CompareLines thisYearData={thisYearData} lastYearData={lastYearData} currentYear={currentYear} />;
       return <CompareBars thisYearData={thisYearData} lastYearData={lastYearData} currentYear={currentYear} />;
 
-    case "weather":
-      if (loadingWeather) return <LoadingChart />;
-      if (variant === "region") return <WeatherByRegionChart data={weatherRegionStats} regionLabel={regionLabel} />;
-      return <WeatherByTypeChart data={weatherTypeStats} />;
+    case "weather": {
+      const loading = isHourly ? loadingWeatherHourly : loadingWeather;
+      if (loading) return <LoadingChart />;
+      const typeData   = isHourly ? weatherHourlyTypeStats   : weatherTypeStats;
+      const regionData = isHourly ? weatherHourlyRegionStats : weatherRegionStats;
+      return (
+        <div className="flex flex-col flex-1 min-h-0 gap-2">
+          {isShortPeriod && <GranularityToggle value={granularity} onChange={setGranularity} />}
+          {variant === "region"
+            ? <WeatherByRegionChart data={regionData} regionLabel={regionLabel} />
+            : <WeatherByTypeChart data={typeData} />}
+        </div>
+      );
+    }
 
-    case "weather2":
-      if (loadingWeather) return <LoadingChart />;
-      return <WeatherCorrelationScatter data={weatherStats} />;
+    case "weather2": {
+      const loading = isHourly ? loadingWeatherHourly : loadingWeather;
+      if (loading) return <LoadingChart />;
+      const corrData = isHourly ? weatherHourlyStats : weatherStats;
+      return (
+        <div className="flex flex-col flex-1 min-h-0 gap-2">
+          {isShortPeriod && <GranularityToggle value={granularity} onChange={setGranularity} />}
+          {variant === "overlay"
+            ? <WeatherOverlayChart data={corrData} />
+            : <WeatherCorrelationScatter data={corrData} />}
+        </div>
+      );
+    }
 
     default: return <EmptyChart />;
   }

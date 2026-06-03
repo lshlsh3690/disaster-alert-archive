@@ -10,5 +10,7 @@ public class WeatherRegionStatDto {
     private String region;
     private long count;
     private Double avgTemp;
+    private Double minTemp;
+    private Double maxTemp;
     private Double maxPrecip;
 }

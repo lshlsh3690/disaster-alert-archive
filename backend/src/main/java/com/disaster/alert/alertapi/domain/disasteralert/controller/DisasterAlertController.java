@@ -145,6 +145,26 @@ public class DisasterAlertController {
         return ResponseEntity.ok(data);
     }
 
+    @GetMapping("/stats/weather-correlation-hourly")
+    public ResponseEntity<List<WeatherCorrelationDto>> getWeatherHourlyCorrelation(AlertSearchRequest request) {
+        return ResponseEntity.ok(disasterAlertService.getWeatherHourlyCorrelation(request));
+    }
+
+    @GetMapping("/stats/weather-by-type-hourly")
+    public ResponseEntity<List<WeatherTypeStatDto>> getWeatherHourlyByType(AlertSearchRequest request) {
+        return ResponseEntity.ok(disasterAlertService.getWeatherHourlyByType(request));
+    }
+
+    @GetMapping("/stats/weather-by-region-hourly")
+    public ResponseEntity<List<WeatherRegionStatDto>> getWeatherHourlyByRegion(
+            AlertSearchRequest request,
+            @RequestParam(defaultValue = "sido") String groupBy) {
+        List<WeatherRegionStatDto> data = "sigungu".equals(groupBy)
+                ? disasterAlertService.getWeatherHourlyBySigungu(request)
+                : disasterAlertService.getWeatherHourlyBySido(request);
+        return ResponseEntity.ok(data);
+    }
+
     @GetMapping("/{id}/weather")
     public ResponseEntity<AlertWeatherDto> getAlertWeather(@PathVariable Long id) {
         return disasterAlertService.getAlertWeather(id)
