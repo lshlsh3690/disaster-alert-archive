@@ -13,6 +13,8 @@ public enum MergeMethod {
     EMBEDDING,
     /** 광역 broadcast 머지 (시도+유형 또는 전국 키, 임베딩 미사용). */
     BROADCAST,
-    /** cross-region LLM 판정 머지 (지역이 다른 같은 인물/개체 사건). */
+    /** cross-region 인물 결정적 매칭 머지 (이름+나이+키 일치, LLM 미사용). */
+    IDENTITY,
+    /** cross-region LLM 판정 머지 (동물·비정형 — 정형 키가 없어 LLM 으로 판정). */
     LLM
 }

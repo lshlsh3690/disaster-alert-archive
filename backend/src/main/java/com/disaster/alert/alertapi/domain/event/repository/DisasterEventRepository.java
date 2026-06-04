@@ -183,6 +183,42 @@ public interface DisasterEventRepository extends JpaRepository<DisasterEvent, Lo
     );
 
     /**
+     * cross-region 인물 후보 검색 — 임베딩이 아니라 <b>이름+나이 하드 매칭</b>.
+     *
+     * <p>실종 경찰문자는 "OOO씨(성별,N세) …" 로 정형화돼 있어, 같은 이름+나이면 거의 같은 사람이다.
+     * 임베딩 top-K(전부 ~0.9 유사한 실종 템플릿)로는 다른 사람을 잘못 묶어(정경남↔조래삼) precision
+     * 이 나빴음 → 이름+나이를 후보 게이트로 두고 LLM 은 그 안에서 인상착의 보조 확인만 한다.
+     *
+     * <p>나이는 정규식으로 매칭하되 앞에 숫자가 없도록 해 "170세"가 "70세"로 오매칭되는 것 방지.
+     * 키({@code height})가 있으면 같은 키(cm)까지 요구 — 같은 이름+나이라도 다른 사람(동명이인) 차단.
+     * 키가 없으면(추출 실패) 이름+나이만으로 매칭.
+     */
+    @Query(value = """
+            SELECT e.id AS event_id, MAX(e.last_alert_at) AS recency
+            FROM disaster_events e
+            JOIN event_alert_mapping m ON m.event_id = e.id
+            JOIN disaster_alert da ON da.disaster_alert_id = m.alert_id
+            WHERE e.last_alert_at > :sinceTime
+              AND e.is_broadcast = false
+              AND e.id <> :selfEventId
+              AND da.disaster_type = '기타'
+              AND da.message LIKE ('%' || :name || '씨%')
+              AND da.message ~ ('(^|[^0-9])' || :age || '세')
+              AND (CAST(:height AS varchar) IS NULL OR da.message LIKE ('%' || :height || 'cm%'))
+            GROUP BY e.id
+            ORDER BY recency DESC
+            LIMIT :limit
+            """, nativeQuery = true)
+    List<Object[]> findCrossRegionCandidatesByPerson(
+            @Param("name") String name,
+            @Param("age") String age,
+            @Param("height") String height,
+            @Param("sinceTime") LocalDateTime sinceTime,
+            @Param("selfEventId") Long selfEventId,
+            @Param("limit") int limit
+    );
+
+    /**
      * 이벤트 집계 재계산 (cross-region 병합 후) — alert_count / first_alert_at / last_alert_at 을
      * 현재 매핑된 알림들의 created_at 으로 다시 산정.
      */

@@ -139,7 +139,8 @@ clustering:
     similarity-floor: 0.6                     # 무관한 기타 거름용 (동일인 판정은 LLM 몫)
     span-cap-alerts: 30                       # cross-region 이벤트 최대 알림 수 (blob 방지)
     span-cap-sido: 10                         # 최대 걸친 시도 수
-    mover-keywords: "찾습니다|실종|수배|가출|배회|탈출|출몰|멧돼지|들개|늑대"
+    mover-keywords: "찾습니다|실종|수배|가출|배회|탈출|출몰|멧돼지|들개|늑대"   # 게이트(전체 이동신호)
+    animal-keywords: "탈출|출몰|멧돼지|들개|늑대"   # 인물(이름+나이) 아닌 동물·비정형만 임베딩+LLM
 
 springdoc:
   swagger-ui:
