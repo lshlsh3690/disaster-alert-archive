@@ -80,6 +80,7 @@ export function FilterBanner({
   levelText,
   keyword,
   source,
+  onFilterOpen,
 }: {
   sido?: string;
   sigungu?: string;
@@ -89,6 +90,7 @@ export function FilterBanner({
   levelText?: string;
   keyword?: string;
   source?: string;
+  onFilterOpen?: () => void;
 }) {
   // 값이 있는 필터만 태그 배열로 모읍니다
   // filter(Boolean): falsy 값(undefined, null, false)을 제거합니다
@@ -119,9 +121,15 @@ export function FilterBanner({
     return (
       <div className="bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm text-gray-500">
         전체 데이터를 보여주고 있어요.{" "}
-        <Link href="/alerts" className="text-blue-600 font-semibold hover:underline">
-          재난문자 페이지에서 필터링 →
-        </Link>
+        {onFilterOpen ? (
+          <button onClick={onFilterOpen} className="text-blue-600 font-semibold hover:underline">
+            필터 설정 →
+          </button>
+        ) : (
+          <Link href="/alerts" className="text-blue-600 font-semibold hover:underline">
+            재난문자 페이지에서 필터링 →
+          </Link>
+        )}
       </div>
     );
   }
@@ -150,9 +158,15 @@ export function FilterBanner({
       {/* 우측 정렬을 위한 빈 공간 */}
       <span className="flex-1" />
 
-      <Link href={alertsHref} className="text-xs text-blue-600 font-semibold hover:underline">
-        ↗ 필터 변경
-      </Link>
+      {onFilterOpen ? (
+        <button onClick={onFilterOpen} className="text-xs text-blue-600 font-semibold hover:underline">
+          ✎ 필터 변경
+        </button>
+      ) : (
+        <Link href={alertsHref} className="text-xs text-blue-600 font-semibold hover:underline">
+          ↗ 필터 변경
+        </Link>
+      )}
     </div>
   );
 }

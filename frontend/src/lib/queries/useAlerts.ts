@@ -1,6 +1,6 @@
 // hooks/useAlerts.ts
 import { useQuery, keepPreviousData } from "@tanstack/react-query";
-import { fetchLatestAlerts, searchAlerts, fetchAlert, fetchStats, type AlertSearchRequest, fetchLatestAlertsBySido, fetchSigunguStats, searchCombinedAlerts, fetchDashboardSummary, fetchSigungu, fetchDailyStats, fetchHourlyStats, fetchMonthlyTypeStats, fetchWeatherCorrelation, fetchWeatherByType, fetchWeatherByRegion, fetchAlertWeather } from "@/api/alertApi";
+import { fetchLatestAlerts, searchAlerts, fetchAlert, fetchStats, type AlertSearchRequest, fetchLatestAlertsBySido, fetchSigunguStats, searchCombinedAlerts, fetchDashboardSummary, fetchSigungu, fetchDailyStats, fetchHourlyStats, fetchMonthlyTypeStats, fetchDailyTypeStats, fetchWeatherCorrelation, fetchWeatherByType, fetchWeatherByRegion, fetchAlertWeather, fetchWeatherHourlyCorrelation, fetchWeatherHourlyByType, fetchWeatherHourlyByRegion } from "@/api/alertApi";
 import { fetchUserAlert, fetchUserAlerts } from "@/api/userAlertApi";
 
 export function useLatestAlerts(limit = 5) {
@@ -86,10 +86,11 @@ export function useUserAlerts(params: { page?: number; size?: number; mine?: boo
   });
 }
 
-export function useDailyStats(params: AlertSearchRequest) {
+export function useDailyStats(params: AlertSearchRequest, enabled = true) {
   return useQuery({
     queryKey: ["alert-stats-daily", params],
     queryFn: () => fetchDailyStats(params),
+    enabled,
     placeholderData: keepPreviousData,
     staleTime: 60_000,
   });
@@ -113,6 +114,16 @@ export function useMonthlyTypeStats(params: AlertSearchRequest) {
   });
 }
 
+export function useDailyTypeStats(params: AlertSearchRequest, enabled: boolean) {
+  return useQuery({
+    queryKey: ["alert-stats-daily-type", params],
+    queryFn: () => fetchDailyTypeStats(params),
+    enabled,
+    placeholderData: keepPreviousData,
+    staleTime: 60_000,
+  });
+}
+
 export function useDashboardSummary() {
   return useQuery({
     queryKey: ["dashboard-summary"],
@@ -121,32 +132,65 @@ export function useDashboardSummary() {
   });
 }
 
-export function useWeatherCorrelation(params: AlertSearchRequest) {
+export function useWeatherCorrelation(params: AlertSearchRequest, enabled = true) {
   return useQuery({
     queryKey: ["weather-correlation", params],
     queryFn: () => fetchWeatherCorrelation(params),
+    enabled,
     placeholderData: keepPreviousData,
     staleTime: 60_000,
   });
 }
 
-export function useWeatherByType(params: AlertSearchRequest) {
+export function useWeatherByType(params: AlertSearchRequest, enabled = true) {
   return useQuery({
     queryKey: ["weather-by-type", params],
     queryFn: () => fetchWeatherByType(params),
+    enabled,
     placeholderData: keepPreviousData,
     staleTime: 60_000,
     retry: 1,
   });
 }
 
-export function useWeatherByRegion(params: AlertSearchRequest, groupBy: "sido" | "sigungu") {
+export function useWeatherByRegion(params: AlertSearchRequest, groupBy: "sido" | "sigungu", enabled = true) {
   return useQuery({
     queryKey: ["weather-by-region", params, groupBy],
     queryFn: () => fetchWeatherByRegion(params, groupBy),
+    enabled,
     placeholderData: keepPreviousData,
     staleTime: 60_000,
     retry: 1,
+  });
+}
+
+export function useWeatherHourlyCorrelation(params: AlertSearchRequest, enabled: boolean) {
+  return useQuery({
+    queryKey: ["weather-hourly-correlation", params],
+    queryFn: () => fetchWeatherHourlyCorrelation(params),
+    enabled,
+    placeholderData: keepPreviousData,
+    staleTime: 60_000,
+  });
+}
+
+export function useWeatherHourlyByType(params: AlertSearchRequest, enabled: boolean) {
+  return useQuery({
+    queryKey: ["weather-hourly-by-type", params],
+    queryFn: () => fetchWeatherHourlyByType(params),
+    enabled,
+    placeholderData: keepPreviousData,
+    staleTime: 60_000,
+  });
+}
+
+export function useWeatherHourlyByRegion(params: AlertSearchRequest, groupBy: "sido" | "sigungu", enabled: boolean) {
+  return useQuery({
+    queryKey: ["weather-hourly-by-region", params, groupBy],
+    queryFn: () => fetchWeatherHourlyByRegion(params, groupBy),
+    enabled,
+    placeholderData: keepPreviousData,
+    staleTime: 60_000,
   });
 }
 

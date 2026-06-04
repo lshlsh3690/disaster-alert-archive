@@ -8,11 +8,12 @@ export function WidgetLibrary({ open, onClose, layout, onAdd, onRemove }: {
   onAdd: (item: LibItem) => void; onRemove: (id: string) => void;
 }) {
   if (!open) return null;
+  // 현재 레이아웃에서 사용 중인 위젯의 libId → 인스턴스 id 맵 (추가/삭제 버튼 분기에 사용)
   const usedMap = new Map(layout.map(w => [w.libId, w.id]));
   return (
     <>
-      <div className="absolute inset-0 bg-black/30 z-10" onClick={onClose} />
-      <aside className="absolute top-0 right-0 bottom-0 w-80 bg-white shadow-2xl z-20 flex flex-col">
+      <div className="fixed inset-0 bg-black/30 z-10" onClick={onClose} />
+      <aside className="fixed top-0 right-0 bottom-0 w-80 bg-white shadow-2xl z-20 flex flex-col" onClick={e => e.stopPropagation()}>
         <div className="flex items-center gap-2 px-4 py-3.5 border-b border-gray-200">
           <h3 className="flex-1 text-sm font-bold text-gray-900">위젯 관리</h3>
           <button onClick={onClose} className="w-7 h-7 border border-gray-200 rounded-lg text-gray-400 text-sm">×</button>

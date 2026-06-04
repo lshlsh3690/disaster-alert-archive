@@ -4,10 +4,10 @@ import { useEffect } from "react";
 import { useWatch, Path, FieldValues } from "react-hook-form";
 import { UseFormReturn } from "react-hook-form";
 import useSignupStore from "@/store/signupStore";
-import Button from "../Button";
+import Button from "../ui/Button";
 import { useCountdownContext } from "@/context/useCountdownContext";
 import { useEmailCodeVerify } from "@/lib/mutations/useEmailCodeVerify";
-import InputStatusMessage from "../InputStatusMessage";
+import InputStatusMessage from "../ui/InputStatusMessage";
 
 interface CodeInputProps<T extends FieldValues> {
   formMethods: UseFormReturn<T>;

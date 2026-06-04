@@ -3,7 +3,7 @@ import useNicknameDuplicationCheck from "@/lib/mutations/useNicknameDuplicationC
 import { useEffect } from "react";
 import { FieldValues, Path, UseFormReturn, useWatch } from "react-hook-form";
 import useSignupStore from "@/store/signupStore";
-import InputStatusMessage from "../InputStatusMessage";
+import InputStatusMessage from "../ui/InputStatusMessage";
 
 interface NicknameInputProps<T extends FieldValues> {
   formMethods: UseFormReturn<T>;

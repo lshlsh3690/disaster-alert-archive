@@ -35,6 +35,8 @@ public interface DisasterAlertRepositoryCustom {
 
     List<DisasterAlertStatResponse.MonthlyTypeStat> getStatsByMonthType(AlertSearchRequest request);
 
+    List<DisasterAlertStatResponse.MonthlyTypeStat> getStatsByDateType(AlertSearchRequest request);
+
     Page<CombinedAlertResponse> searchCombined(AlertSearchRequest request, String source, Pageable pageable);
 
     List<WeatherCorrelationDto> getWeatherCorrelation(AlertSearchRequest request);
@@ -44,6 +46,15 @@ public interface DisasterAlertRepositoryCustom {
     List<WeatherRegionStatDto> getWeatherBySido(AlertSearchRequest request);
 
     List<WeatherRegionStatDto> getWeatherBySigungu(AlertSearchRequest request);
+
+    // 시간별 (weather_observation 사용, 기간 7일 이하 전용)
+    List<WeatherCorrelationDto> getWeatherHourlyCorrelation(AlertSearchRequest request);
+
+    List<WeatherTypeStatDto> getWeatherHourlyByType(AlertSearchRequest request);
+
+    List<WeatherRegionStatDto> getWeatherHourlyBySido(AlertSearchRequest request);
+
+    List<WeatherRegionStatDto> getWeatherHourlyBySigungu(AlertSearchRequest request);
 
     Optional<AlertWeatherDto> getAlertWeather(Long alertId);
 }
