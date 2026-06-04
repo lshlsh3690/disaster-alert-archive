@@ -1,0 +1,12 @@
+-- 이벤트 active 판정 기준 — 유형별 cooldown 시간
+--
+-- "사건이 끝났다(RESOLVED)" 는 우리가 알 수 없는 값(행안부가 종료 신호 안 줌).
+-- 따라서 status 를 컬럼+스케줄러로 박제하지 않고, cooldown_hours 만 저장한 뒤
+-- 조회 시점에 (now - last_alert_at < cooldown_hours) 로 active 를 파생 계산한다.
+--
+-- cooldown_hours 는 이벤트 생성 시 primary_disaster_type 에서 1회 산정되며 이후 불변.
+--   168h: 산불/지진/지진해일/폭염/한파/전염병/가축질병/가뭄 (1주~수주 지속)
+--    72h: 태풍/홍수/호우/대설/산사태/풍랑/황사/환경오염/미세먼지/에너지
+--    24h: 화재/붕괴/폭발/강풍/정전/수도/통신/금융/테러/민방공/교통*/건조/안개
+--    72h: 기타/UNKNOWN (기본값)
+ALTER TABLE disaster_events ADD COLUMN cooldown_hours INT NOT NULL DEFAULT 72;

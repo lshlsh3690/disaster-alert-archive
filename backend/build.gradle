@@ -8,6 +8,10 @@ plugins {
 group = 'com.disaster.alert'
 version = '0.0.1-SNAPSHOT'
 
+ext {
+    springAiVersion = '1.0.0'
+}
+
 java {
     toolchain {
         languageVersion = JavaLanguageVersion.of(17)
@@ -24,6 +28,12 @@ repositories {
     mavenCentral()
 }
 
+dependencyManagement {
+    imports {
+        mavenBom "org.springframework.ai:spring-ai-bom:${springAiVersion}"
+    }
+}
+
 dependencies {
     // QueryDSL
     implementation 'com.querydsl:querydsl-jpa:5.0.0:jakarta'
@@ -31,6 +41,13 @@ dependencies {
     annotationProcessor "com.querydsl:querydsl-apt:5.0.0:jakarta"
     annotationProcessor 'jakarta.persistence:jakarta.persistence-api'
     annotationProcessor 'jakarta.annotation:jakarta.annotation-api'
+
+    // Spring AI — OpenAI Embedding (text-embedding-3-small, dimensions=512)
+    // 컨테이너 추가 없음. 기존 Spring Boot 프로세스 안에서 라이브러리로 동작.
+    implementation 'org.springframework.ai:spring-ai-starter-model-openai'
+
+    // pgvector JDBC 타입 매핑 (com.pgvector.PGvector)
+    implementation 'com.pgvector:pgvector:0.1.6'
 
     implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
     implementation 'org.springframework.boot:spring-boot-starter-actuator'

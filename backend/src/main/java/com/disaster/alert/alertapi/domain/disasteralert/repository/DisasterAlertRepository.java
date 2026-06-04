@@ -38,6 +38,17 @@ public interface DisasterAlertRepository extends JpaRepository<DisasterAlert, Lo
             """)
     List<Object[]> findAlertIdAndCodePairs(@Param("ids") List<Long> ids);
 
+    /**
+     * 여러 재난문자의 (alertId, 법정동 이름) 쌍을 한 번에 조회.
+     * 이벤트 타임라인에서 알림별 지역명을 N+1 없이 채우기 위한 batch 쿼리.
+     */
+    @Query("""
+              SELECT d.disasterAlert.id, d.legalDistrict.name
+              FROM DisasterAlertRegion d
+              WHERE d.disasterAlert.id IN :ids
+            """)
+    List<Object[]> findAlertIdAndRegionNamePairs(@Param("ids") List<Long> ids);
+
 
     @Query("""
               select new com.disaster.alert.alertapi.domain.disasteralert.dto.LatestAlertResponse(
