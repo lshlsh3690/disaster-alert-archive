@@ -211,6 +211,26 @@ public class EventClusteringService {
     }
 
     /**
+     * cross-region 병합 primitive — source 이벤트의 모든 매핑을 target 으로 옮기고 source 를 삭제.
+     *
+     * <p>실종자·탈출 동물이 시군구를 옮겨다녀 따로 만들어진 이벤트(대개 단일 알림)를, LLM 이 같은
+     * 사건으로 판정했을 때 하나로 합친다. 옮겨진 매핑은 sequence_no 를 이어붙이고 merge_method 를
+     * 지정(LLM)한다. 합친 뒤 target 의 alert_count/first/last_alert_at 을 재계산.
+     */
+    @Transactional
+    public void mergeEvents(Long sourceEventId, Long targetEventId, MergeMethod method) {
+        if (sourceEventId == null || targetEventId == null || sourceEventId.equals(targetEventId)) {
+            return;
+        }
+        int offset = eventAlertMappingRepository.countByEventId(targetEventId);
+        int moved = eventAlertMappingRepository.reassignToEvent(sourceEventId, targetEventId, offset, method.name());
+        disasterEventRepository.recomputeAggregates(targetEventId);
+        disasterEventRepository.deleteById(sourceEventId);
+        log.info("cross-region 머지: event {} → {} (method={}, moved={}, offset={})",
+                sourceEventId, targetEventId, method, moved, offset);
+    }
+
+    /**
      * 광역 broadcast 알림 처리. local 이벤트와는 절대 안 섞고(규칙 1·2), 같은 broadcast 끼리만 묶는다.
      * 묶음 키는 시도 범위에 따라 두 갈래:
      * <ul>

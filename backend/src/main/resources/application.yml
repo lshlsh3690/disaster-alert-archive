@@ -130,6 +130,16 @@ clustering:
   # 미만이면 시도 광역(최다 시군구 시도 + 유형 키). 전국 17개 시도 기준, 영남권(~5)·수도권(~3) 같은
   # 권역 클러스터는 시도 광역으로 남기고 행안부 전국 안내(17시도) 류만 전국으로 빼는 값.
   nationwide-sido-span: 8
+  # cross-region LLM 병합 — 지역 이동 사건(실종자·탈출 동물)을 LLM 으로 같은 사건 판정해 묶음.
+  # clusterNewAlert(local+broadcast)와 분리된 별도 단계라 recluster(공짜 튜닝)에 LLM 안 섞임.
+  cross-region:
+    enabled: ${CROSS_REGION_ENABLED:false}   # 실시간 토글 (clustering.enabled 와 별개)
+    candidate-window-hours: 336               # 14일 (실종·이동은 며칠~몇 주)
+    top-k: 5                                  # 임베딩 후보 상위 K (LLM 에 배치로 전달)
+    similarity-floor: 0.6                     # 무관한 기타 거름용 (동일인 판정은 LLM 몫)
+    span-cap-alerts: 30                       # cross-region 이벤트 최대 알림 수 (blob 방지)
+    span-cap-sido: 10                         # 최대 걸친 시도 수
+    mover-keywords: "찾습니다|실종|수배|가출|배회|탈출|출몰|멧돼지|들개|늑대"
 
 springdoc:
   swagger-ui:
