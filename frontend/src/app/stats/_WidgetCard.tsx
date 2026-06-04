@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import type { DailyStat, HourlyStat, MonthlyTypeStat, WeatherCorrelationStat, WeatherTypeStat, WeatherRegionStat } from "@/types/alerts";
 import type { TypeStat, LevelStat, RegionStat, LibItem, WidgetItem } from "./_constants";
 import { EmptyChart, LoadingChart } from "./_charts";
@@ -153,15 +153,23 @@ export function WidgetContent({ kind, variant, typeStats, regionStats, levelStat
 
 // ─── 위젯 카드 래퍼 ──────────────────────────────────────────────────────────
 
-export function WidgetCard({ widget, lib, onVariantChange, onRemove, titleOverride, children }: {
+export function WidgetCard({ widget, lib, onVariantChange, onRemove, titleOverride, isNew, children }: {
   widget: WidgetItem; lib: LibItem;
   onVariantChange: (id: string, variant: string) => void;
   onRemove: (id: string) => void;
   titleOverride?: string;
+  isNew?: boolean;
   children: React.ReactNode;
 }) {
   const cardRef = useRef<HTMLDivElement>(null);
   const [helpOpen, setHelpOpen] = useState(false);
+  const [highlighted, setHighlighted] = useState(false);
+  useEffect(() => {
+    if (!isNew) return;
+    const raf = requestAnimationFrame(() => setHighlighted(true));
+    const t = setTimeout(() => setHighlighted(false), 1600);
+    return () => { cancelAnimationFrame(raf); clearTimeout(t); };
+  }, [isNew]);
 
   const handleDownloadPng = async () => {
     if (!cardRef.current) return;
@@ -174,7 +182,7 @@ export function WidgetCard({ widget, lib, onVariantChange, onRemove, titleOverri
   };
 
   return (
-    <div ref={cardRef} className="bg-white rounded-xl shadow flex flex-col" style={{ gridColumn: `span ${widget.span}`, minHeight: 240 }}>
+    <div ref={cardRef} className={`bg-white rounded-xl shadow flex flex-col${highlighted ? " widget-added" : ""}`} style={{ gridColumn: `span ${widget.span}`, minHeight: 240 }}>
       <div className="flex items-center justify-between px-3.5 py-2.5 border-b border-gray-100">
         <div className="flex items-center gap-1.5">
           <span className="text-sm">{lib.icon}</span>

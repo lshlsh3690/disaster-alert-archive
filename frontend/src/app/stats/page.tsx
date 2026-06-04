@@ -256,6 +256,7 @@ function StatsPageInner() {
   const weatherHourlyRegionStats = weatherHourlyRegionRaw ?? [];
 
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [newWidgetId, setNewWidgetId] = useState<string | null>(null);
 
   const updateLayout = useCallback((updater: (l: WidgetItem[]) => WidgetItem[]) => {
     setLayout(l => {
@@ -267,9 +268,30 @@ function StatsPageInner() {
 
   const handleRemove        = useCallback((id: string) => updateLayout(l => l.filter(w => w.id !== id)), [updateLayout]);
   const handleVariantChange = useCallback((id: string, variant: string) => updateLayout(l => l.map(w => w.id === id ? { ...w, variant } : w)), [updateLayout]);
-  const handleAdd           = useCallback((item: LibItem) => {
-    updateLayout(l => [...l, { id: `w${Date.now()}`, libId: item.id, span: item.defaultSpan }]);
-    setDrawerOpen(false);
+  const handleAdd = useCallback((item: LibItem) => {
+    const newId = `w${Date.now()}`;
+    updateLayout(l => {
+      // 12컬럼 그리드에서 행별로 시뮬레이션해 빈 공간이 있는 첫 번째 행 뒤에 삽입
+      let col = 0;
+      let insertIdx = l.length;
+      for (let i = 0; i < l.length; i++) {
+        if (col + l[i].span > 12) col = 0;
+        col += l[i].span;
+        if (col === 12) {
+          // 이 행이 꽉 찼으므로 다음 행 시작
+          col = 0;
+        } else if (12 - col >= item.defaultSpan) {
+          // 이 행에 새 위젯이 들어갈 공간이 있음 → 행의 마지막 위젯 다음에 삽입
+          insertIdx = i + 1;
+          break;
+        }
+      }
+      const next = [...l];
+      next.splice(insertIdx, 0, { id: newId, libId: item.id, span: item.defaultSpan });
+      return next;
+    });
+    setNewWidgetId(newId);
+    setTimeout(() => setNewWidgetId(null), 1600);
   }, [updateLayout]);
 
   return (
@@ -330,7 +352,8 @@ function StatsPageInner() {
             <WidgetCard key={w.id} widget={w} lib={lib}
               onVariantChange={handleVariantChange}
               onRemove={handleRemove}
-              titleOverride={lib.id === "sido-bar" && sido ? `${sido} 시·군·구별 발생 건수` : undefined}>
+              titleOverride={lib.id === "sido-bar" && sido ? `${sido} 시·군·구별 발생 건수` : undefined}
+              isNew={w.id === newWidgetId}>
               <WidgetContent kind={lib.kind} variant={w.variant ?? lib.variants?.[0]?.key ?? ""}
                 typeStats={typeStats} regionStats={regionStats} levelStats={levelStats}
                 dailyStats={dailyStats} hourlyStats={hourlyStats} monthlyTypeStats={monthlyTypeStats}
