@@ -5,6 +5,7 @@ import com.disaster.alert.alertapi.domain.disasteralert.model.DisasterAlertRegio
 import com.disaster.alert.alertapi.domain.disasteralert.repository.DisasterAlertRepository;
 import com.disaster.alert.alertapi.domain.event.model.DisasterEvent;
 import com.disaster.alert.alertapi.domain.event.model.EventAlertMapping;
+import com.disaster.alert.alertapi.domain.event.model.MergeMethod;
 import com.disaster.alert.alertapi.domain.event.repository.AlertEmbeddingRepository;
 import com.disaster.alert.alertapi.domain.event.repository.DisasterEventRepository;
 import com.disaster.alert.alertapi.domain.event.repository.EventAlertMappingRepository;
@@ -154,7 +155,7 @@ public class EventClusteringService {
             Long eventId = ((Number) row[0]).longValue();
             double dist = ((Number) row[1]).doubleValue();
             if (dist <= mergeMaxDistance) {
-                mergeIntoExisting(eventId, alert, 1.0 - dist);
+                mergeIntoExisting(eventId, alert, 1.0 - dist, MergeMethod.EMBEDDING);
                 return;
             }
         }
@@ -184,13 +185,14 @@ public class EventClusteringService {
     /**
      * 기존 이벤트에 알림 머지. {@code similarity} 는 합류 시점 코사인 유사도(1 - dist)로,
      * event_alert_mapping 에 저장한다. broadcast 머지(임베딩 미사용)는 null 을 넘긴다.
+     * {@code method} 는 합류 방식 표식(EMBEDDING/BROADCAST).
      */
-    private void mergeIntoExisting(Long eventId, DisasterAlert alert, Double similarity) {
+    private void mergeIntoExisting(Long eventId, DisasterAlert alert, Double similarity, MergeMethod method) {
         int nextSeq = eventAlertMappingRepository.countByEventId(eventId) + 1;
-        eventAlertMappingRepository.save(EventAlertMapping.of(eventId, alert.getId(), nextSeq, similarity));
+        eventAlertMappingRepository.save(EventAlertMapping.of(eventId, alert.getId(), nextSeq, similarity, method));
         disasterEventRepository.incrementOnMerge(eventId, alert.getCreatedAt());
-        log.info("clusterNewAlert: alertId={} → event={} 머지 (similarity={}, seq={})",
-                alert.getId(), eventId, similarity, nextSeq);
+        log.info("clusterNewAlert: alertId={} → event={} 머지 (method={}, similarity={}, seq={})",
+                alert.getId(), eventId, method, similarity, nextSeq);
     }
 
     private void createNewEvent(DisasterAlert alert, String regionCode, String regionName, boolean broadcast) {
@@ -203,7 +205,7 @@ public class EventClusteringService {
                 broadcast
         );
         DisasterEvent saved = disasterEventRepository.save(event);
-        eventAlertMappingRepository.save(EventAlertMapping.of(saved.getId(), alert.getId(), 1));
+        eventAlertMappingRepository.save(EventAlertMapping.of(saved.getId(), alert.getId(), 1, null, MergeMethod.SEED));
         log.info("clusterNewAlert: alertId={} → 신규 event={} (broadcast={}, title='{}')",
                 alert.getId(), saved.getId(), broadcast, saved.getEventTitle());
     }
@@ -236,7 +238,7 @@ public class EventClusteringService {
                 if (target.isPresent()) {
                     log.info("clusterNewAlert: alertId={} 전국({}시도) → broadcast event={} 유형 머지({})",
                             alert.getId(), sidoSpan, target.get().getId(), type);
-                    mergeIntoExisting(target.get().getId(), alert, null);
+                    mergeIntoExisting(target.get().getId(), alert, null, MergeMethod.BROADCAST);
                     return;
                 }
             }
@@ -254,7 +256,7 @@ public class EventClusteringService {
             if (target.isPresent()) {
                 log.info("clusterNewAlert: alertId={} 광역({}시군구) → broadcast event={} 시도+유형 머지({} {})",
                         alert.getId(), sigunguSpan, target.get().getId(), sido, type);
-                mergeIntoExisting(target.get().getId(), alert, null);
+                mergeIntoExisting(target.get().getId(), alert, null, MergeMethod.BROADCAST);
                 return;
             }
         }
