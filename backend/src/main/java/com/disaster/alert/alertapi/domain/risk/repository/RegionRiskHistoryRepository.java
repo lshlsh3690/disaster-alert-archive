@@ -27,4 +27,14 @@ public interface RegionRiskHistoryRepository
     @Modifying
     @Query("DELETE FROM RegionRiskHistory h WHERE h.id.snapshotAt < :cutoff")
     int deleteOlderThan(@Param("cutoff") LocalDateTime cutoff);
+
+    /** 특정 기간 전지역 시계열 (타임슬라이더 히트맵 Hourly). */
+    @Query("""
+            SELECT h FROM RegionRiskHistory h
+            WHERE h.id.snapshotAt >= :start
+              AND h.id.snapshotAt <= :end
+            ORDER BY h.id.snapshotAt ASC
+            """)
+    List<RegionRiskHistory> findMapSeries(@Param("start") LocalDateTime start,
+                                          @Param("end") LocalDateTime end);
 }

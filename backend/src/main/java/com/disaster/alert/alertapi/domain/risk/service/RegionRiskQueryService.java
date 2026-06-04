@@ -29,6 +29,7 @@ public class RegionRiskQueryService {
 
     private final RegionRiskIndexRepository indexRepo;
     private final RegionRiskHistoryRepository historyRepo;
+    private final com.disaster.alert.alertapi.domain.risk.repository.RegionRiskDailyRepository dailyRepo;
     private final RegionRiskQueryRepository queryRepo;
 
     /** 전국 시군구 위험도 (히트맵). */
@@ -53,6 +54,46 @@ public class RegionRiskQueryService {
                 .toList();
 
         return new RegionRiskDetail(regionCode, score, topEventId, contributing, updatedAt);
+    }
+
+    /** 과거 특정 기간 내 시군구 기여 이벤트 목록 (히트맵 클릭 상세용). */
+    public List<ContributingEvent> historicalEvents(String regionCode, LocalDateTime start, LocalDateTime end) {
+        return queryRepo.findHistoricalEvents(regionCode, start, end).stream()
+                .map(row -> new ContributingEvent(
+                        row.eventId(), row.eventTitle(), row.disasterType(), row.impactScore()))
+                .toList();
+    }
+
+    /** 기간 내 전국 시군구 위험도 프레임 (타임슬라이더 히트맵). */
+    public java.util.Map<String, List<RegionRiskMapItem>> historicalMap(LocalDateTime start, LocalDateTime end) {
+        // 최근 90일(Retention) 범위인지 확인하여 Hourly / Daily 결정
+        LocalDateTime cutoff = LocalDateTime.now().minusDays(RiskConstants.HISTORY_RETENTION_DAYS);
+        
+        if (start.isAfter(cutoff)) {
+            // 전부 최근 90일 이내면 시간 단위(Hourly) 상세 프레임 제공
+            return historyRepo.findMapSeries(start, end).stream()
+                    .collect(java.util.stream.Collectors.groupingBy(
+                            h -> h.getId().getSnapshotAt().toString(),
+                            java.util.TreeMap::new,
+                            java.util.stream.Collectors.mapping(
+                                    h -> new RegionRiskMapItem(
+                                            h.getId().getRegionCode(), h.getRiskScore(), null, h.getId().getSnapshotAt()),
+                                    java.util.stream.Collectors.toList()
+                            )
+                    ));
+        } else {
+            // 90일을 넘어가는 과거면 일 단위(Daily) 요약 프레임 제공
+            return dailyRepo.findMapSeriesDaily(start.toLocalDate(), end.toLocalDate()).stream()
+                    .collect(java.util.stream.Collectors.groupingBy(
+                            d -> d.getId().getSnapshotDate().atStartOfDay().toString(),
+                            java.util.TreeMap::new,
+                            java.util.stream.Collectors.mapping(
+                                    d -> new RegionRiskMapItem(
+                                            d.getId().getRegionCode(), d.getRiskScore(), null, d.getId().getSnapshotDate().atStartOfDay()),
+                                    java.util.stream.Collectors.toList()
+                            )
+                    ));
+        }
     }
 
     /** 시군구 위험도 시계열 (트렌드 / Phase 2 Chronos UI). */

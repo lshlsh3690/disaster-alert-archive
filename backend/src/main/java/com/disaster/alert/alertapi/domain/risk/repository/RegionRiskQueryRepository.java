@@ -43,4 +43,32 @@ public class RegionRiskQueryRepository {
                         rs.getDouble("impact_score")),
                 sigunguCode, Timestamp.valueOf(since));
     }
+
+    public List<ContributingEventRow> findHistoricalEvents(String sigunguCode, LocalDateTime start, LocalDateTime end) {
+        // 위험도는 최대 7일(ACTIVE_WINDOW_DAYS) 동안 감쇠하며 여파를 미치므로,
+        // 해당 기간에 위험도를 발생시킨 과거 원인 이벤트까지 찾기 위해 검색 시작일을 7일 전으로 확장합니다.
+        LocalDateTime effectiveStart = start.minusDays(com.disaster.alert.alertapi.domain.risk.RiskConstants.ACTIVE_WINDOW_DAYS);
+        
+        String sql = """
+                SELECT DISTINCT
+                       e.id                   AS event_id,
+                       e.event_title          AS event_title,
+                       e.primary_disaster_type AS disaster_type,
+                       eri.impact_score       AS impact_score
+                FROM event_region_impact eri
+                JOIN disaster_events e ON e.id = eri.event_id
+                WHERE LEFT(eri.region_code, 5) = ?
+                  AND e.first_alert_at <= ?
+                  AND e.last_alert_at >= ?
+                ORDER BY eri.impact_score DESC
+                LIMIT 50
+                """;
+        return jdbc.query(sql,
+                (rs, n) -> new ContributingEventRow(
+                        rs.getLong("event_id"),
+                        rs.getString("event_title"),
+                        rs.getString("disaster_type"),
+                        rs.getDouble("impact_score")),
+                sigunguCode, Timestamp.valueOf(end), Timestamp.valueOf(effectiveStart));
+    }
 }
