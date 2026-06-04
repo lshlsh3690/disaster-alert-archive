@@ -2,6 +2,7 @@ package com.disaster.alert.alertapi.domain.event.tool;
 
 import com.disaster.alert.alertapi.domain.disasteralert.repository.DisasterAlertRepository;
 import com.disaster.alert.alertapi.domain.event.service.EventClusteringService;
+import com.disaster.alert.alertapi.domain.event.service.EventCrossRegionService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.ApplicationArguments;
@@ -50,6 +51,7 @@ public class EventClusteringBackfillTool implements ApplicationRunner {
 
     private final DisasterAlertRepository disasterAlertRepository;
     private final EventClusteringService eventClusteringService;
+    private final EventCrossRegionService eventCrossRegionService;
     private final JdbcTemplate jdbcTemplate;
 
     /** 임베딩 배치 호출 크기 — OpenAI 한 번에 보낼 입력 수. */
@@ -60,9 +62,14 @@ public class EventClusteringBackfillTool implements ApplicationRunner {
         Integer limit = parseLimit(args);
         boolean recluster = parseRecluster(args);
         boolean embedOnly = parseFlag(args, "backfill.embed-only");
+        boolean crossRegion = parseFlag(args, "backfill.cross-region");
 
         if (embedOnly) {
             runEmbedOnly(limit);
+            return;
+        }
+        if (crossRegion) {
+            runCrossRegion(limit);
             return;
         }
 
@@ -150,6 +157,42 @@ public class EventClusteringBackfillTool implements ApplicationRunner {
             log.info("embed-only 진행: {}/{} (errors={}, elapsed={}s)", done, rows.size(), errors, elapsed / 1000);
         }
         log.info("embed-only 완료: 저장={}, 오류={}, 소요={}s", done, errors, (System.currentTimeMillis() - t0) / 1000);
+    }
+
+    /**
+     * cross-region LLM 병합 백필 (recluster <b>후</b> 실행). 임베딩된 '기타' 알림을 created_at ASC 로
+     * 순회하며 {@link EventCrossRegionService#linkCrossRegion} 호출 — mover 게이트·LLM 판정은 내부에서.
+     *
+     * <p>{@code clustering.cross-region.enabled=true} 필요(아니면 전건 no-op). recluster 처럼
+     * 단일 프로세스로 실행. 비용은 mover 후보가 있는 건만 LLM(gpt-4o-mini) 호출.
+     */
+    private void runCrossRegion(Integer limit) {
+        String sql = "SELECT disaster_alert_id FROM disaster_alert "
+                + "WHERE embedding IS NOT NULL AND disaster_type = '기타' "
+                + "ORDER BY created_at ASC"
+                + (limit == null ? "" : " LIMIT " + limit);
+        List<Long> ids = jdbcTemplate.queryForList(sql, Long.class);
+
+        log.info("cross-region 백필 시작: 기타 임베딩 대상 {}건 (mover 게이트·LLM 은 서비스 내부)", ids.size());
+        int processed = 0;
+        int errors = 0;
+        long t0 = System.currentTimeMillis();
+        for (Long alertId : ids) {
+            try {
+                eventCrossRegionService.linkCrossRegion(alertId);
+                processed++;
+            } catch (Exception e) {
+                errors++;
+                log.error("cross-region: alertId={} 처리 중 오류", alertId, e);
+            }
+            if (processed % 100 == 0 && processed > 0) {
+                long elapsed = System.currentTimeMillis() - t0;
+                log.info("cross-region 진행: {}/{} (errors={}, elapsed={}s)",
+                        processed, ids.size(), errors, elapsed / 1000);
+            }
+        }
+        log.info("cross-region 백필 완료: 처리={}, 오류={}, 소요={}s",
+                processed, errors, (System.currentTimeMillis() - t0) / 1000);
     }
 
     /**
