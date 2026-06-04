@@ -130,7 +130,10 @@ clustering:
   # 미만이면 시도 광역(최다 시군구 시도 + 유형 키). 전국 17개 시도 기준, 영남권(~5)·수도권(~3) 같은
   # 권역 클러스터는 시도 광역으로 남기고 행안부 전국 안내(17시도) 류만 전국으로 빼는 값.
   nationwide-sido-span: 8
-  # cross-region LLM 병합 — 지역 이동 사건(실종자·탈출 동물)을 LLM 으로 같은 사건 판정해 묶음.
+  # 실종 인물 신원 클러스터링 윈도우 — 같은 이름+나이+키를 한 사람으로 보는 재신고 간격 (14일).
+  # 인물은 임베딩/지역이 아니라 신원으로만 묶음(같은 사람=한 이벤트, 다른 사람=다른 이벤트).
+  person-window-hours: 336
+  # cross-region LLM 병합 — 지역 이동 사건(탈출 동물 등 비정형)을 LLM 으로 같은 사건 판정해 묶음.
   # clusterNewAlert(local+broadcast)와 분리된 별도 단계라 recluster(공짜 튜닝)에 LLM 안 섞임.
   cross-region:
     enabled: ${CROSS_REGION_ENABLED:false}   # 실시간 토글 (clustering.enabled 와 별개)
