@@ -82,10 +82,11 @@ public class RiskCalculationService {
             return Set.of();
         }
 
-        String type = event.getPrimaryDisasterType();
+        String rawType = event.getPrimaryDisasterType();
+        final String finalType = "UNKNOWN".equals(rawType) ? "기타" : rawType;
 
         // 1. 유형 프로파일 (룰 → LLM fallback)
-        DisasterRiskProfile profile = profileRepo.findById(type)
+        DisasterRiskProfile profile = profileRepo.findById(finalType)
                 .orElseGet(() -> llmProfiler.resolveForEvent(event));
 
         // 2. 강도 (event 알림들 중 최대)
@@ -93,7 +94,7 @@ public class RiskCalculationService {
                 .map(intensityExtractor::extract)
                 .flatMap(Optional::stream)
                 .max(Double::compare)
-                .flatMap(v -> bracketRepo.findMultiplier(type, v))
+                .flatMap(v -> bracketRepo.findMultiplier(finalType, v))
                 .orElse(1.0);
 
         // 3. 정부 등급 (event 알림들 최고)
@@ -122,7 +123,7 @@ public class RiskCalculationService {
         regions.forEach(region -> impactRepo.upsert(eventId, region, round3(baseScore)));
 
         log.debug("recomputeEventRisk: eventId={} type={} base={} regions={}",
-                eventId, type, baseScore, regions.size());
+                eventId, finalType, baseScore, regions.size());
 
         // 7. 영향받은 시군구 집합 반환 (법정동 앞 5자리). 리스너가 이 지역만 즉시 재계산.
         return regions.stream()

@@ -19,9 +19,8 @@ import java.util.Set;
  * 커밋 전 읽기 레이스를 일으킴.
  *
  * <p>@Async 실행: {@code @EnableAsync} 는 전역 {@code global.config.AsyncConfig} 에 이미 선언돼 있다.
- * executor 빈이 여러 개(translationExecutor, riskTaskExecutor)라 이름 없는 {@code @Async} 는
- * {@code SimpleAsyncTaskExecutor} 로 fallback 되므로, 위험도 전용 풀
- * ({@code RiskAsyncConfig#riskTaskExecutor} — core2/max4/queue500)을 쓰도록 이름을 명시한다.
+ * 위험도 전용 스레드 풀({@code AsyncConfig#riskTaskExecutor})을 사용하여,
+ * 클러스터링과 분리된 스레드에서 무거운 위험도 계산이 비동기로 안전하게 처리된다.
  */
 @Component
 @RequiredArgsConstructor
