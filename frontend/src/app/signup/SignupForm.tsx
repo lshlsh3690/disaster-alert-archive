@@ -9,7 +9,7 @@ import { CountdownProvider } from "@/context/useCountdownContext";
 import { PasswordInputGroup } from "@/components/form/PasswordInputGroup";
 import { useEffect } from "react";
 import useSignup from "@/lib/mutations/useSignup";
-import Button from "@/components/Button";
+import Button from "@/components/ui/Button";
 import NicknameInput from "@/components/form/NicknameInput";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { SignupFormData, SignupFormValues, signup } from "@/types/signup";

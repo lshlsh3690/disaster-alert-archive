@@ -3,7 +3,7 @@
 import Link from "next/link";
 import LatestAlertsSection from "./LatestAlertsSection";
 import { useDashboardSummary } from "@/lib/queries/useAlerts";
-import KakaoMetroMap from "@/components/KakaoMetroMap";
+import KakaoMetroMap from "@/components/map/KakaoMetroMap";
 import { useLatestComments } from "@/lib/queries/useComments";
 import { useI18n } from "@/hooks/useI18n";
 

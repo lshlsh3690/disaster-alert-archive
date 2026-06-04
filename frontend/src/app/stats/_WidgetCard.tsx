@@ -1,5 +1,17 @@
 "use client";
 
+/**
+ * _WidgetCard.tsx
+ *
+ * 통계 페이지 위젯의 두 가지 핵심 컴포넌트를 담고 있습니다.
+ *
+ *   - WidgetContent : lib.kind 값을 보고 알맞은 차트 컴포넌트로 분기하는 디스패처.
+ *                    page.tsx에서 내려온 모든 데이터를 받아 각 차트에 필요한 것만 전달합니다.
+ *
+ *   - WidgetCard    : 헤더(제목·변형 토글·PNG 다운로드·삭제)와 콘텐츠 영역으로 이루어진 카드 래퍼.
+ *                    isNew prop이 true이면 추가 직후 파란 glow 애니메이션을 1.6초간 재생합니다.
+ */
+
 import { useState, useRef, useEffect } from "react";
 import type { DailyStat, HourlyStat, MonthlyTypeStat, WeatherCorrelationStat, WeatherTypeStat, WeatherRegionStat } from "@/types/alerts";
 import type { TypeStat, LevelStat, RegionStat, LibItem, WidgetItem } from "./_constants";
@@ -52,18 +64,28 @@ export function WidgetContent({ kind, variant, typeStats, regionStats, levelStat
   scrollableRegion?: boolean;
   isLoading?: boolean;
 }) {
+  // 날씨 위젯의 일별/시간별 전환 상태 (isShortPeriod일 때만 토글 표시)
   const [granularity, setGranularity] = useState<"daily" | "hourly">("daily");
 
   if (isLoading) return <LoadingChart />;
+  // 전체 유형 건수 합계 (도넛·비율 계산에 사용)
   const typeTotal = typeStats.reduce((s, d) => s + d.count, 0);
+  // 가로/세로 막대에 넘길 형태로 변환한 상위 8개 유형 데이터
   const typeAsBar = typeStats.slice(0, 8).map(d => ({ label: d.type ?? "기타", count: d.count }));
+  // 세로 막대/도넛에 넘길 형태로 변환한 지역 데이터 (scrollableRegion이면 전체, 아니면 상위 8개)
   const regionAsVBar = (scrollableRegion ? regionStats : regionStats.slice(0, 8)).map(d => ({ label: d.region, count: d.count }));
+  // 경보 단계 코드를 한글 이름으로 변환하는 맵
   const LEVEL_NAMES: Record<string, string> = { LEVEL_1: "안전안내", LEVEL_2: "긴급재난", LEVEL_3: "위급재난" };
+  // 막대 차트에 넘길 형태로 변환한 단계 데이터 (코드 → 한글 이름)
   const levelAsBar = levelStats.map(d => ({ label: d.level ? (LEVEL_NAMES[d.level] ?? d.level) : "기타", count: d.count }));
+  // 도넛 차트에 넘길 형태로 변환한 단계 데이터
   const levelForDonut = levelStats.map(d => ({ type: d.level ? (LEVEL_NAMES[d.level] ?? d.level) : "기타", count: d.count }));
+  // 전체 경보 단계 건수 합계
   const levelTotal = levelStats.reduce((s, d) => s + d.count, 0);
+  // 누적 차트에 표시할 상위 4개 유형 이름
   const topTypes = typeStats.slice(0, 4).map(d => d.type ?? "기타");
 
+  // 시간별 날씨 데이터를 사용할지 여부 (기간 ≤7일 && 사용자가 시간별 선택)
   const isHourly = isShortPeriod && granularity === "hourly";
 
   switch (kind) {
@@ -161,8 +183,11 @@ export function WidgetCard({ widget, lib, onVariantChange, onRemove, titleOverri
   isNew?: boolean;
   children: React.ReactNode;
 }) {
+  // PNG 다운로드 시 html-to-image로 캡처할 카드 DOM 참조
   const cardRef = useRef<HTMLDivElement>(null);
+  // ? 버튼 hover 시 도움말 툴팁 표시 여부
   const [helpOpen, setHelpOpen] = useState(false);
+  // 추가 직후 glow 애니메이션 활성 상태 (requestAnimationFrame으로 지연 적용)
   const [highlighted, setHighlighted] = useState(false);
   useEffect(() => {
     if (!isNew) return;
@@ -207,6 +232,7 @@ export function WidgetCard({ widget, lib, onVariantChange, onRemove, titleOverri
         </div>
         <div className="flex items-center gap-1.5">
           {lib.variants && lib.variants.length > 1 && (() => {
+            // 현재 선택된 변형 키 (없으면 라이브러리 첫 번째 변형)
             const cur = widget.variant ?? lib.variants![0].key;
             return (
               <div className="flex border border-gray-200 rounded overflow-hidden">

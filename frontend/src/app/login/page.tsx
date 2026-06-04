@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import OAuthButton from "@/components/OAuthButton";
+import OAuthButton from "@/components/ui/OAuthButton";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import useLogin from "@/lib/mutations/useLogin";

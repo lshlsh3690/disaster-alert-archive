@@ -1,5 +1,48 @@
 "use client";
 
+/**
+ * stats/page.tsx — 재난 통계 페이지
+ *
+ * ── 개요 ──────────────────────────────────────────────────────────────────────
+ * 재난문자 페이지(/alerts)에서 URL 파라미터로 넘어온 필터 조건을 받아
+ * 다양한 차트 위젯으로 분석 결과를 보여주는 대시보드입니다.
+ *
+ * ── 데이터 흐름 ───────────────────────────────────────────────────────────────
+ * 1. URL 파라미터 파싱
+ *    useSearchParams()로 sido·sigungu·startDate·endDate·type·level·keyword·source를 읽어
+ *    statsParams 객체로 통합합니다. 이 객체가 모든 React Query 훅의 공통 인자입니다.
+ *
+ * 2. 데이터 페칭 (React Query)
+ *    - useAlertStats   : 유형별·경보단계별 집계 (총 건수, TypeStat[], LevelStat[])
+ *    - useSidoStats    : 시·도별 건수 (RegionStat[])
+ *    - useSigunguStats : 시·군·구별 건수, sido 필터가 있을 때만 enabled
+ *    - useDailyStats   : 일별 건수 시계열 (DailyStat[])
+ *    - useHourlyStats  : 요일×시간대 히트맵용 집계
+ *    - useMonthlyTypeStats / useDailyTypeStats : 월별·일별 유형 누적 (stacked 위젯)
+ *    - useDailyStats ×2 : 전년/금년 비교용, hasCompare 위젯이 있을 때만 enabled
+ *    - useWeatherCorrelation / useWeatherByType / useWeatherByRegion :
+ *        날씨·재난 상관 데이터, hasWeather 위젯이 있을 때만 enabled
+ *    - useWeatherHourly* : 위 날씨 데이터의 시간별 버전, 기간 ≤7일일 때만 enabled
+ *
+ * 3. 데이터 가공 (useMemo)
+ *    - typeStats  : 건수 내림차순 정렬, null 타입 제거
+ *    - regionStats: sido 선택 시 시·군·구 데이터로 교체, 시·도 접두어 제거
+ *    - periodDays : startDate~endDate 일수 계산 (기본 30일)
+ *    - dailyAvg   : totalCount / periodDays
+ *    - isSubMonth / isShortPeriod : 기간에 따라 차트 세분성(일별↔시간별) 자동 전환
+ *
+ * 4. 위젯 레이아웃 & 프리셋
+ *    - 3개의 독립 프리셋을 localStorage에 저장 (stats-layout-1~3, stats-preset-active)
+ *    - 각 프리셋은 WidgetItem[] (id, libId, span, variant)의 배열
+ *    - LibItem(_constants.ts)가 위젯의 정적 정의, WidgetItem이 사용자 인스턴스
+ *    - 위젯 추가 시 12컬럼 그리드에서 빈 칸을 먼저 채우는 bin-packing 삽입
+ *
+ * 5. 렌더링
+ *    - KPI 4개 → 필터 배너 → 위젯 그리드 (12컬럼)
+ *    - 각 WidgetCard는 lib.kind를 보고 WidgetContent 디스패처가 알맞은 차트를 선택
+ *    - WidgetLibrary 드로어로 위젯 추가·삭제
+ */
+
 import { Suspense, useState, useEffect, useMemo, useCallback } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
@@ -171,6 +214,7 @@ function StatsPageInner() {
   const keyword   = searchParams.get("keyword")   ?? undefined;
   const source    = searchParams.get("source")    ?? undefined;
 
+  // URL 파라미터를 모든 React Query 훅의 공통 인자로 통합한 객체
   const statsParams = useMemo(() => {
     const levelCode = levelTextToCode(levelText);
     const region = sido && sigungu ? `${sido} ${sigungu}` : sido;
@@ -181,11 +225,13 @@ function StatsPageInner() {
   const { data: sidoStats,    isLoading: loadingSido }      = useSidoStats(statsParams);
   const { data: sigunguStats, isLoading: loadingSigungu }   = useSigunguStats({ ...statsParams, region: sido }, !!sido);
 
+  // 건수 내림차순 정렬, null 타입 제거한 유형별 집계
   const typeStats: TypeStat[] = useMemo(() =>
     (stats?.typeStats ?? []).filter(d => d.type).sort((a, b) => b.count - a.count),
     [stats]
   );
 
+  // sido 선택 시 시·군·구 데이터로 교체, 시·도 접두어 제거
   const regionStats: RegionStat[] = useMemo(() => {
     if (sido) {
       if (!sigunguStats || sigunguStats.length === 0) return [];
@@ -195,9 +241,12 @@ function StatsPageInner() {
     return sidoStats ?? [];
   }, [sido, sidoStats, sigunguStats]);
 
+  // 경보 단계별 집계 (가공 없이 API 결과 그대로)
   const levelStats: LevelStat[] = stats?.levelStats ?? [];
 
+  // 현재 활성화된 프리셋 번호 (1~3)
   const [activePreset, setActivePreset] = useState<1 | 2 | 3>(1);
+  // 현재 프리셋의 위젯 배치 배열 (localStorage에서 복원)
   const [layout, setLayout] = useState<WidgetItem[]>(DEFAULT_LAYOUT);
   useEffect(() => {
     try {
@@ -217,26 +266,36 @@ function StatsPageInner() {
     } catch {}
   }, []);
 
+  // 비교 위젯 존재 여부 → 전년/금년 데이터 페칭 여부 결정 (enabled 플래그)
   const hasCompare = layout.some(w => w.libId === "compare");
+  // 날씨 위젯 존재 여부 → 날씨 데이터 페칭 여부 결정 (enabled 플래그)
   const hasWeather = layout.some(w => w.libId === "weather-overlay" || w.libId === "weather-scatter");
 
   const { data: dailyStatsRaw,    isLoading: loadingDaily }       = useDailyStats(statsParams);
   const { data: hourlyStatsRaw,   isLoading: loadingHourly }      = useHourlyStats(statsParams);
   const { data: monthlyTypeRaw,   isLoading: loadingMonthlyType } = useMonthlyTypeStats(statsParams);
+  // API raw 데이터의 null-coalesce (로딩 중엔 빈 배열)
   const dailyStats       = dailyStatsRaw   ?? [];
   const hourlyStats      = hourlyStatsRaw  ?? [];
   const monthlyTypeStats = monthlyTypeRaw  ?? [];
 
+  // 올해 연도 (전년 비교 차트에서 currentYear-1 계산에 사용)
   const currentYear = useMemo(() => new Date().getFullYear(), []);
+  // 전년/금년 비교 페칭 시 날짜 범위를 뺀 공통 파라미터 베이스
   const compareBase = useMemo(() => ({ ...statsParams, startDate: undefined, endDate: undefined }), [statsParams]);
   const { data: thisYearRaw, isLoading: loadingThisYear } = useDailyStats({ ...compareBase, startDate: `${currentYear}-01-01`, endDate: `${currentYear}-12-31` }, hasCompare);
   const { data: lastYearRaw, isLoading: loadingLastYear } = useDailyStats({ ...compareBase, startDate: `${currentYear - 1}-01-01`, endDate: `${currentYear - 1}-12-31` }, hasCompare);
+  // 전년/금년 일별 데이터 null-coalesce
   const thisYearData: DailyStat[] = thisYearRaw ?? [];
   const lastYearData: DailyStat[] = lastYearRaw ?? [];
 
+  // KPI 카드에 표시하는 최다 유형 (typeStats 내림차순 첫 번째)
   const topType    = typeStats[0];
+  // KPI 카드에 표시하는 최다 지역 (regionStats 내림차순 첫 번째)
   const topRegion  = regionStats[0];
+  // KPI 카드·비율 계산용 전체 건수
   const totalCount = stats?.totalCount ?? 0;
+  // 필터 기간 일수 (startDate~endDate 없으면 기본 30일)
   const periodDays = useMemo(() => {
     if (startDate && endDate) {
       const diff = (new Date(endDate).getTime() - new Date(startDate).getTime()) / 86_400_000 + 1;
@@ -244,32 +303,44 @@ function StatsPageInner() {
     }
     return 30;
   }, [startDate, endDate]);
+  // 전체 건수를 기간 일수로 나눈 일 평균
   const dailyAvg = Math.round(totalCount / periodDays);
 
   const { data: weatherRaw, isLoading: loadingWeather } = useWeatherCorrelation(statsParams, hasWeather);
+  // 일별 날씨·재난 상관관계 데이터 null-coalesce
   const weatherStats = weatherRaw ?? [];
 
+  // sido 선택 여부에 따라 시군구/시도 레벨 결정 (WeatherByRegion API 파라미터)
   const regionLevel = sido ? "sigungu" : "sido";
+  // 날씨 지역 차트 제목용 레이블
   const regionLabel = sido ? "시/군/구별" : "시/도별";
   const { data: weatherTypeRaw,   isLoading: loadingWeatherType   } = useWeatherByType(statsParams, hasWeather);
   const { data: weatherRegionRaw, isLoading: loadingWeatherRegion } = useWeatherByRegion(statsParams, regionLevel, hasWeather);
+  // 재난 유형별/지역별 날씨 데이터 null-coalesce
   const weatherTypeStats   = weatherTypeRaw   ?? [];
   const weatherRegionStats = weatherRegionRaw ?? [];
 
+  // 기간 < 30일이면 true → 월별 대신 일별 누적 차트로 자동 전환
   const isSubMonth    = periodDays < 30;
+  // 기간 ≤ 7일이면 true → 시간별 날씨 데이터 페칭 활성화, 일별↔시간별 토글 표시
   const isShortPeriod = periodDays <= 7;
   const { data: dailyTypeRaw, isLoading: loadingDailyType } = useDailyTypeStats(statsParams, isSubMonth);
+  // isSubMonth일 때 stacked 위젯에서 월별 대신 사용하는 일별 유형 누적 데이터
   const dailyTypeStats = dailyTypeRaw ?? [];
   const { data: weatherHourlyRaw,       isLoading: loadingWeatherHourly       } = useWeatherHourlyCorrelation(statsParams, isShortPeriod && hasWeather);
   const { data: weatherHourlyTypeRaw,   isLoading: loadingWeatherHourlyType   } = useWeatherHourlyByType(statsParams, isShortPeriod && hasWeather);
   const { data: weatherHourlyRegionRaw, isLoading: loadingWeatherHourlyRegion } = useWeatherHourlyByRegion(statsParams, regionLevel, isShortPeriod && hasWeather);
+  // 시간별 날씨 데이터 null-coalesce (isShortPeriod일 때만 실제 데이터 채워짐)
   const weatherHourlyStats       = weatherHourlyRaw       ?? [];
   const weatherHourlyTypeStats   = weatherHourlyTypeRaw   ?? [];
   const weatherHourlyRegionStats = weatherHourlyRegionRaw ?? [];
 
+  // 위젯 드로어 열림 상태
   const [drawerOpen, setDrawerOpen] = useState(false);
+  // 방금 추가된 위젯의 id (1.6초 후 null → glow 애니메이션 종료)
   const [newWidgetId, setNewWidgetId] = useState<string | null>(null);
 
+  // 레이아웃을 변경하고 현재 프리셋의 localStorage 항목을 동시에 갱신하는 공통 업데이터
   const updateLayout = useCallback((updater: (l: WidgetItem[]) => WidgetItem[]) => {
     setLayout(l => {
       const next = updater(l);
@@ -281,6 +352,7 @@ function StatsPageInner() {
   const handleRemove        = useCallback((id: string) => updateLayout(l => l.filter(w => w.id !== id)), [updateLayout]);
   const handleVariantChange = useCallback((id: string, variant: string) => updateLayout(l => l.map(w => w.id === id ? { ...w, variant } : w)), [updateLayout]);
   const handleAdd = useCallback((item: LibItem) => {
+    // 타임스탬프 기반 고유 id → 같은 위젯 종류를 여러 번 추가해도 충돌 없음
     const newId = `w${Date.now()}`;
     updateLayout(l => {
       // 12컬럼 그리드에서 행별로 시뮬레이션해 빈 공간이 있는 첫 번째 행 뒤에 삽입

@@ -8,6 +8,7 @@ export function WidgetLibrary({ open, onClose, layout, onAdd, onRemove }: {
   onAdd: (item: LibItem) => void; onRemove: (id: string) => void;
 }) {
   if (!open) return null;
+  // 현재 레이아웃에서 사용 중인 위젯의 libId → 인스턴스 id 맵 (추가/삭제 버튼 분기에 사용)
   const usedMap = new Map(layout.map(w => [w.libId, w.id]));
   return (
     <>

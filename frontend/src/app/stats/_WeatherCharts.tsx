@@ -1,5 +1,21 @@
 "use client";
 
+/**
+ * _WeatherCharts.tsx
+ *
+ * 날씨와 재난 발생의 상관관계를 시각화하는 차트 컴포넌트 모음입니다.
+ *
+ * 포함된 컴포넌트:
+ *   - WeatherByTypeChart   : 재난 유형별 일별 누적 막대 + 평균기온 꺾은선
+ *   - WeatherByRegionChart : 지역별 일별 누적 막대 + 평균기온 꺾은선
+ *   - WeatherOverlayChart  : 총 발생건수·기온범위·강수량 복합 차트
+ *   - WeatherCorrelationScatter : 기온(X) vs 발생건수(Y) 버블 산점도
+ *
+ * 공통 특징:
+ *   - 날짜 수가 많으면 일별→주별→월별로 자동 집계해 막대 수를 제한 (getAggMode)
+ *   - 1.2초 이상 호버 시 툴팁이 고정(pin)되는 인터랙션 (LoadingDonut → 고정 팝업)
+ */
+
 import { useState, useRef, useEffect } from "react";
 import {
   ComposedChart, Bar, Line, Area,
@@ -10,17 +26,21 @@ import {
 import type { WeatherCorrelationStat, WeatherTypeStat, WeatherRegionStat } from "@/types/alerts";
 import { TYPE_COLORS, STACKED_COLORS, BAR_COLORS } from "./_constants";
 import { EmptyChart } from "./_charts";
+import { LoadingDonut } from "@/components/ui/LoadingDonut";
 
 // ─── 날짜 집계 헬퍼 ──────────────────────────────────────────────────────────
 
 type AggMode = "daily" | "weekly" | "monthly";
 
+// 날짜 수에 따라 집계 단위를 결정 (60일 이하: 일별, 181일 이상: 월별)
 function getAggMode(dateCount: number): AggMode {
   if (dateCount <= 60) return "daily";
   if (dateCount <= 180) return "weekly";
   return "monthly";
 }
 
+// 날짜 문자열을 집계 단위의 대표 키로 변환
+// weekly: 해당 날짜가 속한 주의 월요일 날짜를 키로 사용
 function getAggKey(date: string, mode: AggMode): string {
   if (mode === "daily") return date;
   if (mode === "monthly") return date.slice(0, 7);
@@ -30,30 +50,17 @@ function getAggKey(date: string, mode: AggMode): string {
   return d.toISOString().slice(0, 10);
 }
 
+// 집계 키를 차트 X축 레이블로 변환 (월별: "7월", 나머지: "MM-DD")
 function fmtKey(key: string, mode: AggMode): string {
   if (mode === "monthly") return `${parseInt(key.slice(5))}월`;
   return key.slice(5);
 }
 
+// 집계 단위 안내 텍스트 (차트 우상단에 표시)
 function aggModeLabel(mode: AggMode): string {
   if (mode === "weekly") return "주별 집계";
   if (mode === "monthly") return "월별 집계";
   return "";
-}
-
-// ─── 로딩 도넛 ───────────────────────────────────────────────────────────────
-
-function LoadingDonut({ progress }: { progress: number }) {
-  const r = 7, c = 2 * Math.PI * r;
-  const dash = (progress / 100) * c;
-  return (
-    <svg width={18} height={18} viewBox="0 0 18 18" style={{ display: "block" }}>
-      <circle cx={9} cy={9} r={r} fill="none" stroke="#334155" strokeWidth={2.5} />
-      <circle cx={9} cy={9} r={r} fill="none" stroke="#60a5fa" strokeWidth={2.5}
-        strokeDasharray={`${dash} ${c - dash}`}
-        transform="rotate(-90 9 9)" />
-    </svg>
-  );
 }
 
 // ─── 공통 툴팁 타입 · 스타일 ─────────────────────────────────────────────────
@@ -64,21 +71,31 @@ type TTProps = {
   label?: string;
 };
 
+// 툴팁 박스 공통 스타일
 const TT_BOX: React.CSSProperties = { background: "#1e293b", borderRadius: 6, padding: "6px 10px", border: "none" };
+// 툴팁 내 레이블(날짜, 지역명 등) 스타일
 const TT_LABEL: React.CSSProperties = { color: "#94a3b8", fontSize: 10, margin: "0 0 2px 0" };
+// 툴팁 내 강조 수치 스타일
 const TT_VALUE: React.CSSProperties = { color: "#fff", fontSize: 12, fontWeight: 700, margin: 0 };
 
 // ─── 날씨·유형별 누적 막대 ───────────────────────────────────────────────────
 
 export function WeatherByTypeChart({ data }: { data: WeatherTypeStat[] }) {
+  // 툴팁 핀 로딩 진행률 (0~100)
   const [progress, setProgress] = useState(0);
+  // 툴팁 고정 여부
   const [pinned, setPinned] = useState(false);
+  // 고정된 시점의 툴팁 데이터 스냅샷
   const [pinnedSnap, setPinnedSnap] = useState<{ label: string; payload: TTProps["payload"] } | null>(null);
+  // 1.2초 카운트다운 인터벌 ref
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  // 마지막으로 호버된 툴팁 데이터 (핀 시점에 스냅샷으로 복사됨)
   const lastPayloadRef = useRef<{ label: string; payload: TTProps["payload"] } | null>(null);
+  // 마우스가 차트 컨테이너 안에 있는지 여부 (X 버튼 클릭 후 재시작 판단용)
   const isHoveringRef = useRef(false);
   useEffect(() => () => { if (intervalRef.current) clearInterval(intervalRef.current); }, []);
 
+  // 1.2초 타이머 실행 (50ms 간격으로 progress 업데이트, 완료 시 핀 고정)
   const runTimer = () => {
     if (intervalRef.current) clearInterval(intervalRef.current);
     let elapsed = 0;
@@ -93,11 +110,14 @@ export function WeatherByTypeChart({ data }: { data: WeatherTypeStat[] }) {
       }
     }, 50);
   };
+  // 아직 고정되지 않은 경우에만 타이머 시작
   const startTimer = () => { if (!pinned) runTimer(); };
+  // 마우스가 나가면 타이머 중단, 미고정 상태면 progress 초기화
   const stopTimer = () => {
     if (intervalRef.current) clearInterval(intervalRef.current);
     if (!pinned) setProgress(0);
   };
+  // X 버튼: 고정 해제 후 마우스가 안에 있으면 타이머 즉시 재시작
   const handleClose = () => {
     setPinned(false);
     setPinnedSnap(null);
@@ -107,18 +127,22 @@ export function WeatherByTypeChart({ data }: { data: WeatherTypeStat[] }) {
 
   if (data.length === 0) return <EmptyChart />;
 
+  // 날짜별로 쪼개진 data를 유형 단위로 합산 → 상위 6개만 차트에 표시
   const typeTotals = new Map<string, number>();
   data.forEach(d => typeTotals.set(d.type ?? "기타", (typeTotals.get(d.type ?? "기타") ?? 0) + d.count));
   const types = [...typeTotals.entries()].sort((a, b) => b[1] - a[1]).slice(0, 6).map(([t]) => t);
+
+  // 중복 제거한 날짜 목록 → 집계 단위 결정
   const allDates = [...new Set(data.map(d => d.date))].sort();
   const mode = getAggMode(allDates.length);
 
-  // (key → date → avgTemp) 로 날짜별 기온 한 번만 집계
+  // 날짜별 평균 기온 (날짜 중복 방지: 첫 번째 값만 기록)
   const dateTemp = new Map<string, number | null>();
   data.forEach(d => { if (!dateTemp.has(d.date)) dateTemp.set(d.date, d.avgTemp ?? null); });
 
-  // (key → type → count) 집계
+  // 집계 키별 유형 건수 (key → type → count)
   const keyTypeCount = new Map<string, Map<string, number>>();
+  // 집계 키에 속한 원본 날짜 목록 (기온 평균 계산에 사용)
   const keyDates = new Map<string, Set<string>>();
   data.forEach(d => {
     const key = getAggKey(d.date, mode);
@@ -129,12 +153,16 @@ export function WeatherByTypeChart({ data }: { data: WeatherTypeStat[] }) {
     keyDates.get(key)!.add(d.date);
   });
 
+  // 정렬된 집계 키 목록
   const keys = [...keyTypeCount.keys()].sort();
+  // X축 레이블이 겹치지 않도록 표시 간격 (최대 6개 레이블 기준)
   const labelStride = Math.max(1, Math.floor(keys.length / 6));
 
+  // Recharts에 넘길 피벗 데이터: 각 행이 하나의 집계 기간, 열이 유형별 건수 + 평균기온
   type PivotRow = Record<string, number | null | string>;
   const pivoted: PivotRow[] = keys.map(key => {
     const typeMap = keyTypeCount.get(key)!;
+    // 해당 집계 기간에 속한 날짜들의 기온 평균
     const temps = [...keyDates.get(key)!].map(d => dateTemp.get(d) ?? null).filter((t): t is number => t != null);
     const obj: PivotRow = { date: fmtKey(key, mode) };
     types.forEach(t => { obj[t] = typeMap.get(t) ?? 0; });
@@ -222,14 +250,21 @@ export function WeatherByTypeChart({ data }: { data: WeatherTypeStat[] }) {
 // ─── 날씨·지역별 누적 막대 ───────────────────────────────────────────────────
 
 export function WeatherByRegionChart({ data, regionLabel }: { data: WeatherRegionStat[]; regionLabel: string }) {
+  // 툴팁 핀 로딩 진행률 (0~100)
   const [progress, setProgress] = useState(0);
+  // 툴팁 고정 여부
   const [pinned, setPinned] = useState(false);
+  // 고정된 시점의 툴팁 데이터 스냅샷
   const [pinnedSnap, setPinnedSnap] = useState<{ label: string; payload: TTProps["payload"] } | null>(null);
+  // 1.2초 카운트다운 인터벌 ref
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  // 마지막으로 호버된 툴팁 데이터
   const lastPayloadRef = useRef<{ label: string; payload: TTProps["payload"] } | null>(null);
+  // 마우스가 차트 컨테이너 안에 있는지 여부
   const isHoveringRef = useRef(false);
   useEffect(() => () => { if (intervalRef.current) clearInterval(intervalRef.current); }, []);
 
+  // 1.2초 타이머 실행
   const runTimer = () => {
     if (intervalRef.current) clearInterval(intervalRef.current);
     let elapsed = 0;
@@ -258,6 +293,7 @@ export function WeatherByRegionChart({ data, regionLabel }: { data: WeatherRegio
 
   if (data.length === 0) return <EmptyChart />;
 
+  // 지역별 총 건수 합산 → 상위 10개 지역만 차트에 표시
   const regionTotals = new Map<string, number>();
   data.forEach(d => regionTotals.set(d.region, (regionTotals.get(d.region) ?? 0) + d.count));
   const topRegions = [...regionTotals.entries()]
@@ -265,13 +301,17 @@ export function WeatherByRegionChart({ data, regionLabel }: { data: WeatherRegio
     .slice(0, 10)
     .map(([r]) => r);
 
+  // 중복 제거한 날짜 목록 → 집계 단위 결정
   const allDates = [...new Set(data.map(d => d.date))].sort();
   const mode = getAggMode(allDates.length);
 
+  // 날짜별 평균 기온
   const dateTemp = new Map<string, number | null>();
   data.forEach(d => { if (!dateTemp.has(d.date)) dateTemp.set(d.date, d.avgTemp ?? null); });
 
+  // 집계 키별 지역 건수 (key → region → count), 상위 10개 지역만 집계
   const keyRegionCount = new Map<string, Map<string, number>>();
+  // 집계 키에 속한 원본 날짜 목록
   const keyDates = new Map<string, Set<string>>();
   data.forEach(d => {
     if (!topRegions.includes(d.region)) return;
@@ -282,12 +322,16 @@ export function WeatherByRegionChart({ data, regionLabel }: { data: WeatherRegio
     keyDates.get(key)!.add(d.date);
   });
 
+  // 정렬된 집계 키 목록
   const keys = [...keyRegionCount.keys()].sort();
+  // X축 레이블 표시 간격
   const labelStride = Math.max(1, Math.floor(keys.length / 6));
 
+  // Recharts 피벗 데이터: 각 행이 하나의 집계 기간, 열이 지역별 건수 + 평균기온
   type PivotRow = Record<string, number | null | string>;
   const pivoted: PivotRow[] = keys.map(key => {
     const regionMap = keyRegionCount.get(key)!;
+    // 해당 집계 기간에 속한 날짜들의 기온 평균
     const temps = [...(keyDates.get(key) ?? [])].map(d => dateTemp.get(d) ?? null).filter((t): t is number => t != null);
     const obj: PivotRow = { date: fmtKey(key, mode) };
     topRegions.forEach(r => { obj[r] = regionMap.get(r) ?? 0; });
@@ -381,7 +425,7 @@ export function WeatherOverlayChart({ data }: { data: WeatherCorrelationStat[] }
 
   const mode = getAggMode(data.length);
 
-  // 집계
+  // 집계 키별 통계 누산 버퍼
   type AggRow = { count: number; tempSum: number; tempN: number; minTemp: number | null; maxTemp: number | null; maxPrecip: number | null; typeCount: Map<string, number> };
   const aggMap = new Map<string, AggRow>();
   data.forEach(d => {
@@ -396,12 +440,17 @@ export function WeatherOverlayChart({ data }: { data: WeatherCorrelationStat[] }
     if (d.primaryType) e.typeCount.set(d.primaryType, (e.typeCount.get(d.primaryType) ?? 0) + d.count);
   });
 
+  // 정렬된 집계 키 목록
   const keys = [...aggMap.keys()].sort();
+  // X축 레이블 표시 간격
   const labelStride = Math.max(1, Math.floor(keys.length / 6));
 
+  // Recharts에 넘길 최종 데이터: 기간별 건수·평균기온·기온범위·강수·주요유형
   const chartData = keys.map(key => {
     const e = aggMap.get(key)!;
+    // 해당 기간의 평균 기온 (소수점 1자리)
     const avgTemp = e.tempN > 0 ? Math.round(e.tempSum / e.tempN * 10) / 10 : null;
+    // 해당 기간에서 가장 많이 발생한 재난 유형
     const primaryType = e.typeCount.size > 0 ? [...e.typeCount.entries()].sort((a, b) => b[1] - a[1])[0][0] : null;
     return {
       date: fmtKey(key, mode),
@@ -411,6 +460,7 @@ export function WeatherOverlayChart({ data }: { data: WeatherCorrelationStat[] }
       maxTemp: e.maxTemp,
       maxPrecip: e.maxPrecip,
       primaryType,
+      // tempRange: Area 차트로 기온 범위(최저~최고)를 띠 형태로 표현하기 위한 배열값
       tempRange: e.minTemp != null && e.maxTemp != null ? [e.minTemp, e.maxTemp] as [number, number] : null,
     };
   });
@@ -467,13 +517,18 @@ export function WeatherOverlayChart({ data }: { data: WeatherCorrelationStat[] }
 // ─── 날씨 상관 산점도 ────────────────────────────────────────────────────────
 
 export function WeatherCorrelationScatter({ data }: { data: WeatherCorrelationStat[] }) {
+  // 기온 데이터가 없는 항목은 산점도에서 제외
   const filtered = data.filter(d => d.avgTemp != null);
   if (filtered.length === 0) return <EmptyChart />;
 
+  // 등장하는 재난 유형 목록 (중복 제거)
   const types = [...new Set(filtered.map(d => d.primaryType ?? "기타"))];
+  // 유형별 색상 매핑
   const colorMap: Record<string, string> = {};
   types.forEach((t, i) => { colorMap[t] = TYPE_COLORS[i % TYPE_COLORS.length]; });
 
+  // 유형별로 그룹핑된 산점도 데이터
+  // x: 평균기온, y: 발생건수, z: 강수량(버블 크기, 0 방지를 위해 +1)
   const grouped = types.map(t => ({
     name: t,
     color: colorMap[t],

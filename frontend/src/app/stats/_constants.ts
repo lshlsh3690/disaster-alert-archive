@@ -14,11 +14,16 @@ export interface WidgetItem { id: string; libId: string; span: number; variant?:
 
 // ─── 색상 팔레트 ──────────────────────────────────────────────────────────────
 
+// 도넛 차트·유형 범례에 쓰이는 기본 6색 팔레트
 export const TYPE_COLORS   = ["#3b82f6","#f59e0b","#f97316","#a855f7","#06b6d4","#9ca3af"];
+// 가로/세로 막대 차트에 쓰이는 8색 팔레트
 export const BAR_COLORS    = ["#ef4444","#f97316","#f59e0b","#3b82f6","#06b6d4","#a855f7","#6b7280","#9ca3af"];
+// 누적 차트(stacked) 유형별 4색 팔레트
 export const STACKED_COLORS = ["#3b82f6","#f59e0b","#f97316","#a855f7"];
+// 범용 다색 팔레트 (유형·지역 등 10가지)
 export const CHART_COLORS  = ["#3b82f6","#f97316","#22c55e","#a855f7","#ef4444","#eab308","#06b6d4","#ec4899","#84cc16","#f43f5e"];
 
+// 경보 단계별 표시 텍스트·색상 정의 (안전안내/긴급재난/위급재난)
 export const LEVEL_META: Record<string, { text: string; bg: string; textCls: string; border: string; solid: string }> = {
   LEVEL_1: { text: "안전안내", bg: "bg-blue-50",   textCls: "text-blue-700",   border: "border-blue-200",   solid: "#3b82f6" },
   LEVEL_2: { text: "긴급재난", bg: "bg-orange-50", textCls: "text-orange-700", border: "border-orange-200", solid: "#f97316" },
@@ -27,12 +32,14 @@ export const LEVEL_META: Record<string, { text: string; bg: string; textCls: str
 
 // ─── 히트맵 상수 ──────────────────────────────────────────────────────────────
 
+// 히트맵 Y축 요일 레이블 (월~일 순서)
 export const WEEKDAYS = ["월","화","수","목","금","토","일"];
 // PostgreSQL EXTRACT(DOW): 0=Sun,1=Mon,...,6=Sat → 표시 순서 Mon=0..Sun=6
 export const DOW_TO_IDX: Record<number, number> = { 1:0, 2:1, 3:2, 4:3, 5:4, 6:5, 0:6 };
 
 // ─── 위젯 라이브러리 정의 ─────────────────────────────────────────────────────
 
+// 사용 가능한 모든 위젯의 정적 정의 목록 (id, 차트 종류, 기본 스팬, 변형 옵션 등)
 export const WIDGET_LIBRARY: LibItem[] = [
   { id: "type-donut", kind: "donut",   title: "재난 유형 분포",     desc: "유형별 점유율 도넛 차트",    help: "현재 필터 기간의 재난문자를 유형별(폭염·태풍·산불 등)로 분류해 점유율을 보여줍니다.",                                                             defaultSpan: 6,  icon: "🍩", variants: [{ key: "donut", label: "도넛" }, { key: "hbar", label: "가로막대" }, { key: "vbar", label: "세로막대" }] },
   { id: "sido-bar",   kind: "hbar",    title: "시·도 TOP 8",        desc: "지역별 발생 건수 가로 막대", help: "시·도별 재난문자 발생 건수를 내림차순으로 나타냅니다. 재난문자 페이지에서 특정 시·도를 선택하면 해당 시·도의 시·군·구 전체 목록으로 전환됩니다.", defaultSpan: 6,  icon: "📊", variants: [{ key: "hbar", label: "가로막대" }, { key: "vbar", label: "세로막대" }, { key: "donut", label: "도넛" }] },
@@ -45,6 +52,7 @@ export const WIDGET_LIBRARY: LibItem[] = [
   { id: "weather-scatter", kind: "weather2", title: "기온별 발생 산점도",   desc: "기온 vs 발생건수 산점도",      help: "평균기온(X축)과 발생건수(Y축)의 관계를 재난 유형별로 산점도로 나타냅니다. 버블 크기는 최대강수량을 나타냅니다. 시계열 보기로 전환하면 발생건수·기온 추이를 함께 확인할 수 있습니다.",           defaultSpan: 6,  icon: "🔵", variants: [{ key: "scatter", label: "산점도" }, { key: "overlay", label: "시계열" }] },
 ];
 
+// 초기 로드 시 표시하는 기본 위젯 배치 (5개 위젯)
 export const DEFAULT_LAYOUT: WidgetItem[] = [
   { id: "w1", libId: "type-donut",       span: 6  },
   { id: "w2", libId: "sido-bar",         span: 6  },

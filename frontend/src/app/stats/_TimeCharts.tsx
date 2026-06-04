@@ -36,13 +36,16 @@ import { VerticalBar } from "./_DistributionCharts";
 
 // ─── 공통 툴팁 스타일 ─────────────────────────────────────────────────────────
 
+// 툴팁 컨테이너 공통 스타일 (어두운 배경·둥근 모서리)
 const TT_BOX: React.CSSProperties = {
   background: "#1e293b",
   borderRadius: 6,
   padding: "6px 10px",
   border: "none",
 };
+// 툴팁 제목(날짜 등) 스타일
 const TT_LABEL: React.CSSProperties = { color: "#94a3b8", fontSize: 10, margin: "0 0 2px 0" };
+// 툴팁 강조 수치 스타일
 const TT_VALUE: React.CSSProperties = { color: "#fff", fontSize: 12, fontWeight: 700, margin: 0 };
 
 // Recharts가 content 컴포넌트에 넘겨주는 props 타입
