@@ -18,9 +18,16 @@ public record EventListResponse(
         boolean active,
         LocalDateTime firstAlertAt,
         LocalDateTime lastAlertAt,
-        int alertCount
+        int alertCount,
+        String translatedTitle,
+        String language
 ) {
     public static EventListResponse of(DisasterEvent e, LocalDateTime now) {
+        return of(e, now, null, null);
+    }
+
+    /** translatedTitle/language 는 lang=ko(또는 미지원) 시 null (기존 클라 호환). */
+    public static EventListResponse of(DisasterEvent e, LocalDateTime now, String translatedTitle, String language) {
         return new EventListResponse(
                 e.getId(),
                 e.getEventTitle(),
@@ -29,7 +36,9 @@ public record EventListResponse(
                 e.isActive(now),
                 e.getFirstAlertAt(),
                 e.getLastAlertAt(),
-                e.getAlertCount()
+                e.getAlertCount(),
+                translatedTitle,
+                language
         );
     }
 }

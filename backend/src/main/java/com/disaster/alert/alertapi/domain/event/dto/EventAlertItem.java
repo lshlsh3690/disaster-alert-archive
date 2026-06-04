@@ -15,6 +15,10 @@ public record EventAlertItem(
         String disasterType,
         String emergencyLevel,
         LocalDateTime createdAt,
-        List<String> regionNames
+        List<String> regionNames,
+        String translatedMessage,
+        String translatedDisasterType,
+        List<String> translatedRegionNames,
+        String language
 ) {
 }

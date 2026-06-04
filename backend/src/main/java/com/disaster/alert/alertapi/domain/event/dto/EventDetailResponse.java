@@ -17,9 +17,17 @@ public record EventDetailResponse(
         LocalDateTime firstAlertAt,
         LocalDateTime lastAlertAt,
         int alertCount,
-        List<EventAlertItem> timeline
+        List<EventAlertItem> timeline,
+        String translatedTitle,
+        String language
 ) {
     public static EventDetailResponse of(DisasterEvent e, LocalDateTime now, List<EventAlertItem> timeline) {
+        return of(e, now, timeline, null, null);
+    }
+
+    /** translatedTitle/language 는 lang=ko(또는 미지원) 시 null. timeline 항목 번역은 EventAlertItem. */
+    public static EventDetailResponse of(DisasterEvent e, LocalDateTime now, List<EventAlertItem> timeline,
+                                         String translatedTitle, String language) {
         return new EventDetailResponse(
                 e.getId(),
                 e.getEventTitle(),
@@ -29,7 +37,9 @@ public record EventDetailResponse(
                 e.getFirstAlertAt(),
                 e.getLastAlertAt(),
                 e.getAlertCount(),
-                timeline
+                timeline,
+                translatedTitle,
+                language
         );
     }
 }
