@@ -197,11 +197,23 @@ function StatsPageInner() {
 
   const levelStats: LevelStat[] = stats?.levelStats ?? [];
 
+  const [activePreset, setActivePreset] = useState<1 | 2 | 3>(1);
   const [layout, setLayout] = useState<WidgetItem[]>(DEFAULT_LAYOUT);
   useEffect(() => {
     try {
-      const saved = sessionStorage.getItem("stats-widget-layout");
+      const p = (Number(localStorage.getItem("stats-preset-active")) || 1) as 1 | 2 | 3;
+      const saved = localStorage.getItem(`stats-layout-${p}`);
+      setActivePreset(p);
       if (saved) setLayout(JSON.parse(saved) as WidgetItem[]);
+    } catch {}
+  }, []);
+
+  const switchPreset = useCallback((p: 1 | 2 | 3) => {
+    setActivePreset(p);
+    try {
+      localStorage.setItem("stats-preset-active", String(p));
+      const saved = localStorage.getItem(`stats-layout-${p}`);
+      setLayout(saved ? (JSON.parse(saved) as WidgetItem[]) : DEFAULT_LAYOUT);
     } catch {}
   }, []);
 
@@ -261,10 +273,10 @@ function StatsPageInner() {
   const updateLayout = useCallback((updater: (l: WidgetItem[]) => WidgetItem[]) => {
     setLayout(l => {
       const next = updater(l);
-      try { sessionStorage.setItem("stats-widget-layout", JSON.stringify(next)); } catch {}
+      try { localStorage.setItem(`stats-layout-${activePreset}`, JSON.stringify(next)); } catch {}
       return next;
     });
-  }, []);
+  }, [activePreset]);
 
   const handleRemove        = useCallback((id: string) => updateLayout(l => l.filter(w => w.id !== id)), [updateLayout]);
   const handleVariantChange = useCallback((id: string, variant: string) => updateLayout(l => l.map(w => w.id === id ? { ...w, variant } : w)), [updateLayout]);
@@ -302,7 +314,16 @@ function StatsPageInner() {
           <h1 className="text-xl font-semibold">재난 통계</h1>
           <p className="text-sm text-gray-500">재난문자 페이지에서 필터링한 데이터를 다양한 차트로 분석합니다.</p>
         </div>
-        <div className="flex gap-2 shrink-0">
+        <div className="flex gap-2 shrink-0 items-center">
+          {/* 프리셋 탭 */}
+          <div className="flex border border-gray-200 rounded-lg overflow-hidden">
+            {([1, 2, 3] as const).map(p => (
+              <button key={p} onClick={() => switchPreset(p)}
+                className={`px-3 py-2 text-sm font-semibold transition-colors ${activePreset === p ? "bg-blue-600 text-white" : "text-gray-500 hover:bg-gray-50"}`}>
+                {p}
+              </button>
+            ))}
+          </div>
           <button onClick={() => {
             const filters: Record<string, string> = {
               "시·도": sido ?? "전체",
