@@ -37,7 +37,7 @@ function GranularityToggle({ value, onChange }: { value: "daily" | "hourly"; onC
 
 // ─── 위젯 콘텐츠 디스패처 ────────────────────────────────────────────────────
 
-export function WidgetContent({ kind, variant, typeStats, regionStats, levelStats, dailyStats, hourlyStats, monthlyTypeStats, dailyTypeStats, isSubMonth, thisYearData, lastYearData, currentYear, weatherStats, weatherTypeStats, weatherRegionStats, weatherHourlyStats, weatherHourlyTypeStats, weatherHourlyRegionStats, isShortPeriod, regionLabel, loadingWeather, loadingWeatherHourly, scrollableRegion, isLoading }: {
+export function WidgetContent({ kind, variant, typeStats, regionStats, levelStats, dailyStats, hourlyStats, monthlyTypeStats, dailyTypeStats, isSubMonth, thisYearData, lastYearData, currentYear, weatherStats, weatherTypeStats, weatherRegionStats, weatherHourlyStats, weatherHourlyTypeStats, weatherHourlyRegionStats, isShortPeriod, regionLabel, loadingWeather, loadingWeatherHourly, scrollableRegion, isLoading, onTypeClick, selectedType }: {
   kind: string;
   variant: string;
   typeStats: TypeStat[];
@@ -63,6 +63,8 @@ export function WidgetContent({ kind, variant, typeStats, regionStats, levelStat
   loadingWeatherHourly: boolean;
   scrollableRegion?: boolean;
   isLoading?: boolean;
+  onTypeClick?: (type: string) => void;
+  selectedType?: string;
 }) {
   // 날씨 위젯의 일별/시간별 전환 상태 (isShortPeriod일 때만 토글 표시)
   const [granularity, setGranularity] = useState<"daily" | "hourly">("daily");
@@ -91,9 +93,9 @@ export function WidgetContent({ kind, variant, typeStats, regionStats, levelStat
   switch (kind) {
     case "donut":
       if (typeTotal === 0) return <EmptyChart />;
-      if (variant === "hbar") return <HorizontalBar data={typeAsBar.map(d => ({ region: d.label, count: d.count }))} />;
-      if (variant === "vbar") return <VerticalBar data={typeAsBar} />;
-      return <DonutChart data={typeStats.slice(0, 6)} total={typeTotal} />;
+      if (variant === "hbar") return <HorizontalBar data={typeAsBar.map(d => ({ region: d.label, count: d.count }))} onBarClick={onTypeClick} />;
+      if (variant === "vbar") return <VerticalBar data={typeAsBar} onBarClick={onTypeClick} />;
+      return <DonutChart data={typeStats.slice(0, 6)} total={typeTotal} onTypeClick={onTypeClick} selectedType={selectedType} />;
 
     case "hbar": {
       if (regionStats.length === 0) return <EmptyChart />;
@@ -131,9 +133,9 @@ export function WidgetContent({ kind, variant, typeStats, regionStats, levelStat
       })).filter(d => d.count > 0);
       const typeAggTotal = typeAgg.reduce((s, d) => s + d.count, 0);
       if (typeAggTotal === 0) return <EmptyChart />;
-      if (variant === "donut") return <DonutChart data={typeAgg} total={typeAggTotal} />;
-      if (variant === "hbar") return <HorizontalBar data={typeAgg.map(d => ({ region: d.type, count: d.count }))} />;
-      return <VerticalBar data={typeAgg.map(d => ({ label: d.type, count: d.count }))} />;
+      if (variant === "donut") return <DonutChart data={typeAgg} total={typeAggTotal} onTypeClick={onTypeClick} selectedType={selectedType} />;
+      if (variant === "hbar") return <HorizontalBar data={typeAgg.map(d => ({ region: d.type, count: d.count }))} onBarClick={onTypeClick} />;
+      return <VerticalBar data={typeAgg.map(d => ({ label: d.type, count: d.count }))} onBarClick={onTypeClick} />;
     }
 
     case "compare":
@@ -175,12 +177,13 @@ export function WidgetContent({ kind, variant, typeStats, regionStats, levelStat
 
 // ─── 위젯 카드 래퍼 ──────────────────────────────────────────────────────────
 
-export function WidgetCard({ widget, lib, onVariantChange, onRemove, titleOverride, isNew, children }: {
+export function WidgetCard({ widget, lib, onVariantChange, onRemove, titleOverride, isNew, dragHandleListeners, children }: {
   widget: WidgetItem; lib: LibItem;
   onVariantChange: (id: string, variant: string) => void;
   onRemove: (id: string) => void;
   titleOverride?: string;
   isNew?: boolean;
+  dragHandleListeners?: Record<string, unknown>;
   children: React.ReactNode;
 }) {
   // PNG 다운로드 시 html-to-image로 캡처할 카드 DOM 참조
@@ -210,6 +213,13 @@ export function WidgetCard({ widget, lib, onVariantChange, onRemove, titleOverri
     <div ref={cardRef} className={`bg-white rounded-xl shadow flex flex-col${highlighted ? " widget-added" : ""}`} style={{ gridColumn: `span ${widget.span}`, minHeight: 240 }}>
       <div className="flex items-center justify-between px-3.5 py-2.5 border-b border-gray-100">
         <div className="flex items-center gap-1.5">
+          {dragHandleListeners && (
+            <span {...dragHandleListeners}
+              className="cursor-grab active:cursor-grabbing text-gray-300 hover:text-gray-400 select-none px-0.5"
+              title="드래그하여 순서 변경">
+              ⠿
+            </span>
+          )}
           <span className="text-sm">{lib.icon}</span>
           <h3 className="text-sm font-bold text-gray-800">{titleOverride ?? lib.title}</h3>
           {lib.sample && (

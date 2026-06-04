@@ -45,10 +45,16 @@
 
 import { Suspense, useState, useEffect, useMemo, useCallback } from "react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
-import { useAlertStats, useSidoStats, useSigunguStats, useDailyStats, useHourlyStats, useMonthlyTypeStats, useDailyTypeStats, useWeatherCorrelation, useWeatherByType, useWeatherByRegion, useWeatherHourlyCorrelation, useWeatherHourlyByType, useWeatherHourlyByRegion } from "@/lib/queries/useAlerts";
+import { useSearchParams, useRouter } from "next/navigation";
+import { DndContext, closestCenter, PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
+import type { DragEndEvent } from "@dnd-kit/core";
+import { SortableContext, rectSortingStrategy, arrayMove, useSortable } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+import { useAlertStats, useSidoStats, useSigunguStats, useDailyStats, useHourlyStats, useMonthlyTypeStats, useDailyTypeStats, useWeatherCorrelation, useWeatherByType, useWeatherByRegion, useWeatherHourlyCorrelation, useWeatherHourlyByType, useWeatherHourlyByRegion, useSigungu } from "@/lib/queries/useAlerts";
 import type { DailyStat, WeatherCorrelationStat, WeatherTypeStat, WeatherRegionStat } from "@/types/alerts";
 import { levelTextToCode } from "@/ui/level";
+import { METROS } from "@/ui/metros";
+import { DISASTER_TYPES } from "@/ui/disasterType";
 import type { TypeStat, LevelStat, RegionStat, LibItem, WidgetItem } from "./_constants";
 import { WIDGET_LIBRARY, DEFAULT_LAYOUT } from "./_constants";
 import { WidgetCard, WidgetContent } from "./_WidgetCard";
@@ -192,6 +198,34 @@ function downloadCsv(filename: string, csv: string) {
 }
 
 
+// ─── 정렬 가능한 위젯 카드 래퍼 ──────────────────────────────────────────────
+
+function SortableWidgetCard({ id, span, children, ...cardProps }: {
+  id: string;
+  span: number;
+  children: React.ReactNode;
+} & Omit<React.ComponentProps<typeof WidgetCard>, "dragHandleListeners">) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
+  return (
+    <div ref={setNodeRef}
+      style={{
+        gridColumn: `span ${span}`,
+        transform: CSS.Transform.toString(transform),
+        transition,
+        opacity: isDragging ? 0.4 : 1,
+        zIndex: isDragging ? 10 : undefined,
+        display: "flex",
+        flexDirection: "column",
+        minHeight: 240,
+      }}
+      {...attributes}>
+      <WidgetCard {...cardProps} dragHandleListeners={listeners as Record<string, unknown>}>
+        {children}
+      </WidgetCard>
+    </div>
+  );
+}
+
 // ─── 메인 ────────────────────────────────────────────────────────────────────
 
 export default function StatsPage() {
@@ -204,6 +238,7 @@ export default function StatsPage() {
 
 function StatsPageInner() {
   const searchParams = useSearchParams();
+  const router = useRouter();
 
   const sido      = searchParams.get("sido")      ?? undefined;
   const sigungu   = searchParams.get("sigungu")   ?? undefined;
@@ -214,6 +249,63 @@ function StatsPageInner() {
   const keyword   = searchParams.get("keyword")   ?? undefined;
   const source    = searchParams.get("source")    ?? undefined;
 
+  // ─── 필터 패널 ──────────────────────────────────────────────────────────────
+
+  // 필터 패널 열림 상태
+  const [filterOpen, setFilterOpen] = useState(false);
+  // 패널 내부에서 편집 중인 로컬 필터 값 (적용 버튼을 눌러야 URL에 반영됨)
+  const [localFilter, setLocalFilter] = useState({
+    sido: sido ?? "", sigungu: sigungu ?? "",
+    startDate: startDate ?? "", endDate: endDate ?? "",
+    type: type ?? "", levelText: levelText ?? "",
+  });
+
+  // 필터 패널을 열 때 현재 URL 파라미터로 로컬 상태 동기화
+  const openFilter = () => {
+    setLocalFilter({
+      sido: sido ?? "", sigungu: sigungu ?? "",
+      startDate: startDate ?? "", endDate: endDate ?? "",
+      type: type ?? "", levelText: levelText ?? "",
+    });
+    setFilterOpen(true);
+  };
+
+  // 시·도 변경 시 시·군·구 초기화
+  const setLocalSido = (v: string) =>
+    setLocalFilter(f => ({ ...f, sido: v, sigungu: "" }));
+
+  // 빠른 날짜 선택: 오늘 기준 N일 전 ~ 오늘
+  const setQuickDate = (days: number | "year") => {
+    const today = new Date();
+    const fmt = (d: Date) => d.toISOString().slice(0, 10);
+    if (days === "year") {
+      setLocalFilter(f => ({ ...f, startDate: `${today.getFullYear()}-01-01`, endDate: fmt(today) }));
+    } else {
+      const from = new Date(today);
+      from.setDate(from.getDate() - (days - 1));
+      setLocalFilter(f => ({ ...f, startDate: fmt(from), endDate: fmt(today) }));
+    }
+  };
+
+  // 적용 버튼: 로컬 필터를 URL 파라미터로 push → useSearchParams가 자동 업데이트
+  const applyFilter = () => {
+    const qs = new URLSearchParams();
+    if (localFilter.sido)      qs.set("sido",      localFilter.sido);
+    if (localFilter.sigungu)   qs.set("sigungu",   localFilter.sigungu);
+    if (localFilter.startDate) qs.set("startDate", localFilter.startDate);
+    if (localFilter.endDate)   qs.set("endDate",   localFilter.endDate);
+    if (localFilter.type)      qs.set("type",      localFilter.type);
+    if (localFilter.levelText) qs.set("levelText", localFilter.levelText);
+    router.push(`?${qs.toString()}`);
+    setFilterOpen(false);
+  };
+
+  // 시·도가 선택됐을 때 시·군·구 목록 로드
+  const { data: sigunguList } = useSigungu(localFilter.sido || undefined);
+
+  // 현재 URL에 적용된 필터가 하나라도 있는지 (필터 버튼 강조용)
+  const hasActiveFilter = !!(sido || sigungu || startDate || endDate || type || levelText);
+
   // URL 파라미터를 모든 React Query 훅의 공통 인자로 통합한 객체
   const statsParams = useMemo(() => {
     const levelCode = levelTextToCode(levelText);
@@ -221,9 +313,20 @@ function StatsPageInner() {
     return { region, startDate, endDate, type, level: levelCode, keyword, source: source as "ALL" | "OFFICIAL" | "USER" | undefined };
   }, [sido, sigungu, startDate, endDate, type, levelText, keyword, source]);
 
-  const { data: stats,        isLoading: loadingStats }     = useAlertStats(statsParams);
-  const { data: sidoStats,    isLoading: loadingSido }      = useSidoStats(statsParams);
-  const { data: sigunguStats, isLoading: loadingSigungu }   = useSigunguStats({ ...statsParams, region: sido }, !!sido);
+  // 차트 클릭으로 설정되는 인터랙티브 유형 필터 (URL 필터와 별개로 동작)
+  const [crossFilter, setCrossFilter] = useState<{ type?: string }>({});
+  const onTypeClick = useCallback((t: string) =>
+    setCrossFilter(f => f.type === t ? {} : { type: t }), []);
+
+  // crossFilter가 있으면 statsParams의 type을 덮어씀 → 모든 차트에 반영
+  const effectiveParams = useMemo(() => ({
+    ...statsParams,
+    ...(crossFilter.type ? { type: crossFilter.type } : {}),
+  }), [statsParams, crossFilter]);
+
+  const { data: stats,        isLoading: loadingStats }     = useAlertStats(effectiveParams);
+  const { data: sidoStats,    isLoading: loadingSido }      = useSidoStats(effectiveParams);
+  const { data: sigunguStats, isLoading: loadingSigungu }   = useSigunguStats({ ...effectiveParams, region: sido }, !!sido);
 
   // 건수 내림차순 정렬, null 타입 제거한 유형별 집계
   const typeStats: TypeStat[] = useMemo(() =>
@@ -271,9 +374,9 @@ function StatsPageInner() {
   // 날씨 위젯 존재 여부 → 날씨 데이터 페칭 여부 결정 (enabled 플래그)
   const hasWeather = layout.some(w => w.libId === "weather-overlay" || w.libId === "weather-scatter");
 
-  const { data: dailyStatsRaw,    isLoading: loadingDaily }       = useDailyStats(statsParams);
-  const { data: hourlyStatsRaw,   isLoading: loadingHourly }      = useHourlyStats(statsParams);
-  const { data: monthlyTypeRaw,   isLoading: loadingMonthlyType } = useMonthlyTypeStats(statsParams);
+  const { data: dailyStatsRaw,    isLoading: loadingDaily }       = useDailyStats(effectiveParams);
+  const { data: hourlyStatsRaw,   isLoading: loadingHourly }      = useHourlyStats(effectiveParams);
+  const { data: monthlyTypeRaw,   isLoading: loadingMonthlyType } = useMonthlyTypeStats(effectiveParams);
   // API raw 데이터의 null-coalesce (로딩 중엔 빈 배열)
   const dailyStats       = dailyStatsRaw   ?? [];
   const hourlyStats      = hourlyStatsRaw  ?? [];
@@ -282,7 +385,7 @@ function StatsPageInner() {
   // 올해 연도 (전년 비교 차트에서 currentYear-1 계산에 사용)
   const currentYear = useMemo(() => new Date().getFullYear(), []);
   // 전년/금년 비교 페칭 시 날짜 범위를 뺀 공통 파라미터 베이스
-  const compareBase = useMemo(() => ({ ...statsParams, startDate: undefined, endDate: undefined }), [statsParams]);
+  const compareBase = useMemo(() => ({ ...effectiveParams, startDate: undefined, endDate: undefined }), [effectiveParams]);
   const { data: thisYearRaw, isLoading: loadingThisYear } = useDailyStats({ ...compareBase, startDate: `${currentYear}-01-01`, endDate: `${currentYear}-12-31` }, hasCompare);
   const { data: lastYearRaw, isLoading: loadingLastYear } = useDailyStats({ ...compareBase, startDate: `${currentYear - 1}-01-01`, endDate: `${currentYear - 1}-12-31` }, hasCompare);
   // 전년/금년 일별 데이터 null-coalesce
@@ -306,7 +409,7 @@ function StatsPageInner() {
   // 전체 건수를 기간 일수로 나눈 일 평균
   const dailyAvg = Math.round(totalCount / periodDays);
 
-  const { data: weatherRaw, isLoading: loadingWeather } = useWeatherCorrelation(statsParams, hasWeather);
+  const { data: weatherRaw, isLoading: loadingWeather } = useWeatherCorrelation(effectiveParams, hasWeather);
   // 일별 날씨·재난 상관관계 데이터 null-coalesce
   const weatherStats = weatherRaw ?? [];
 
@@ -314,8 +417,8 @@ function StatsPageInner() {
   const regionLevel = sido ? "sigungu" : "sido";
   // 날씨 지역 차트 제목용 레이블
   const regionLabel = sido ? "시/군/구별" : "시/도별";
-  const { data: weatherTypeRaw,   isLoading: loadingWeatherType   } = useWeatherByType(statsParams, hasWeather);
-  const { data: weatherRegionRaw, isLoading: loadingWeatherRegion } = useWeatherByRegion(statsParams, regionLevel, hasWeather);
+  const { data: weatherTypeRaw,   isLoading: loadingWeatherType   } = useWeatherByType(effectiveParams, hasWeather);
+  const { data: weatherRegionRaw, isLoading: loadingWeatherRegion } = useWeatherByRegion(effectiveParams, regionLevel, hasWeather);
   // 재난 유형별/지역별 날씨 데이터 null-coalesce
   const weatherTypeStats   = weatherTypeRaw   ?? [];
   const weatherRegionStats = weatherRegionRaw ?? [];
@@ -324,12 +427,12 @@ function StatsPageInner() {
   const isSubMonth    = periodDays < 30;
   // 기간 ≤ 7일이면 true → 시간별 날씨 데이터 페칭 활성화, 일별↔시간별 토글 표시
   const isShortPeriod = periodDays <= 7;
-  const { data: dailyTypeRaw, isLoading: loadingDailyType } = useDailyTypeStats(statsParams, isSubMonth);
+  const { data: dailyTypeRaw, isLoading: loadingDailyType } = useDailyTypeStats(effectiveParams, isSubMonth);
   // isSubMonth일 때 stacked 위젯에서 월별 대신 사용하는 일별 유형 누적 데이터
   const dailyTypeStats = dailyTypeRaw ?? [];
-  const { data: weatherHourlyRaw,       isLoading: loadingWeatherHourly       } = useWeatherHourlyCorrelation(statsParams, isShortPeriod && hasWeather);
-  const { data: weatherHourlyTypeRaw,   isLoading: loadingWeatherHourlyType   } = useWeatherHourlyByType(statsParams, isShortPeriod && hasWeather);
-  const { data: weatherHourlyRegionRaw, isLoading: loadingWeatherHourlyRegion } = useWeatherHourlyByRegion(statsParams, regionLevel, isShortPeriod && hasWeather);
+  const { data: weatherHourlyRaw,       isLoading: loadingWeatherHourly       } = useWeatherHourlyCorrelation(effectiveParams, isShortPeriod && hasWeather);
+  const { data: weatherHourlyTypeRaw,   isLoading: loadingWeatherHourlyType   } = useWeatherHourlyByType(effectiveParams, isShortPeriod && hasWeather);
+  const { data: weatherHourlyRegionRaw, isLoading: loadingWeatherHourlyRegion } = useWeatherHourlyByRegion(effectiveParams, regionLevel, isShortPeriod && hasWeather);
   // 시간별 날씨 데이터 null-coalesce (isShortPeriod일 때만 실제 데이터 채워짐)
   const weatherHourlyStats       = weatherHourlyRaw       ?? [];
   const weatherHourlyTypeStats   = weatherHourlyTypeRaw   ?? [];
@@ -348,6 +451,17 @@ function StatsPageInner() {
       return next;
     });
   }, [activePreset]);
+
+  // 8px 이상 움직여야 드래그 시작 (클릭과 구분)
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
+  const handleDragEnd = useCallback(({ active, over }: DragEndEvent) => {
+    if (!over || active.id === over.id) return;
+    updateLayout(l => {
+      const oldIdx = l.findIndex(w => w.id === active.id);
+      const newIdx = l.findIndex(w => w.id === over.id);
+      return arrayMove(l, oldIdx, newIdx);
+    });
+  }, [updateLayout]);
 
   const handleRemove        = useCallback((id: string) => updateLayout(l => l.filter(w => w.id !== id)), [updateLayout]);
   const handleVariantChange = useCallback((id: string, variant: string) => updateLayout(l => l.map(w => w.id === id ? { ...w, variant } : w)), [updateLayout]);
@@ -386,7 +500,12 @@ function StatsPageInner() {
           <h1 className="text-xl font-semibold">재난 통계</h1>
           <p className="text-sm text-gray-500">재난문자 페이지에서 필터링한 데이터를 다양한 차트로 분석합니다.</p>
         </div>
-        <div className="flex gap-2 shrink-0 items-center">
+        <div className="flex gap-2 shrink-0 items-center flex-wrap justify-end">
+          {/* 필터 토글 버튼 */}
+          <button onClick={openFilter}
+            className={`px-3 py-2 text-sm font-semibold rounded-lg border transition-colors flex items-center gap-1 ${hasActiveFilter ? "border-blue-400 bg-blue-50 text-blue-700" : "border-gray-200 bg-white text-gray-700 hover:border-blue-300 hover:text-blue-600"}`}>
+            🔍 필터{hasActiveFilter ? " ●" : ""}
+          </button>
           {/* 프리셋 탭 */}
           <div className="flex border border-gray-200 rounded-lg overflow-hidden">
             {([1, 2, 3] as const).map(p => (
@@ -421,9 +540,100 @@ function StatsPageInner() {
         </div>
       </div>
 
+      {/* 접히는 필터 패널 */}
+      {filterOpen && (
+        <div className="bg-white border border-gray-200 rounded-xl shadow-sm px-4 py-4 space-y-3">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            {/* 시·도 */}
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-semibold text-gray-500">시·도</label>
+              <select value={localFilter.sido} onChange={e => setLocalSido(e.target.value)}
+                className="border border-gray-200 rounded-lg px-2 py-1.5 text-sm text-gray-800 focus:outline-none focus:border-blue-400">
+                <option value="">전체</option>
+                {METROS.map(m => <option key={m} value={m}>{m}</option>)}
+              </select>
+            </div>
+            {/* 시·군·구 */}
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-semibold text-gray-500">시·군·구</label>
+              <select value={localFilter.sigungu} onChange={e => setLocalFilter(f => ({ ...f, sigungu: e.target.value }))}
+                disabled={!localFilter.sido}
+                className="border border-gray-200 rounded-lg px-2 py-1.5 text-sm text-gray-800 focus:outline-none focus:border-blue-400 disabled:bg-gray-50 disabled:text-gray-400">
+                <option value="">전체</option>
+                {sigunguList?.filter(s => s.name !== "전체").map(s => (
+                  <option key={s.code} value={s.name}>{s.name}</option>
+                ))}
+              </select>
+            </div>
+            {/* 재난 유형 */}
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-semibold text-gray-500">재난 유형</label>
+              <select value={localFilter.type} onChange={e => setLocalFilter(f => ({ ...f, type: e.target.value }))}
+                className="border border-gray-200 rounded-lg px-2 py-1.5 text-sm text-gray-800 focus:outline-none focus:border-blue-400">
+                <option value="">전체</option>
+                {DISASTER_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+              </select>
+            </div>
+            {/* 경보 단계 */}
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-semibold text-gray-500">경보 단계</label>
+              <select value={localFilter.levelText} onChange={e => setLocalFilter(f => ({ ...f, levelText: e.target.value }))}
+                className="border border-gray-200 rounded-lg px-2 py-1.5 text-sm text-gray-800 focus:outline-none focus:border-blue-400">
+                <option value="">전체</option>
+                <option value="안전안내문자">안전안내</option>
+                <option value="긴급재난문자">긴급재난</option>
+                <option value="위급재난문자">위급재난</option>
+              </select>
+            </div>
+          </div>
+
+          {/* 기간 선택 */}
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-semibold text-gray-500">기간</label>
+            <div className="flex flex-wrap items-center gap-2">
+              <input type="date" value={localFilter.startDate} onChange={e => setLocalFilter(f => ({ ...f, startDate: e.target.value }))}
+                className="border border-gray-200 rounded-lg px-2 py-1.5 text-sm text-gray-800 focus:outline-none focus:border-blue-400" />
+              <span className="text-gray-400 text-sm">~</span>
+              <input type="date" value={localFilter.endDate} onChange={e => setLocalFilter(f => ({ ...f, endDate: e.target.value }))}
+                className="border border-gray-200 rounded-lg px-2 py-1.5 text-sm text-gray-800 focus:outline-none focus:border-blue-400" />
+              <div className="flex gap-1">
+                {([7, 30, 90] as const).map(d => (
+                  <button key={d} onClick={() => setQuickDate(d)}
+                    className="px-2.5 py-1.5 text-xs font-semibold border border-gray-200 rounded-lg text-gray-600 hover:border-blue-400 hover:text-blue-600 transition-colors">
+                    {d}일
+                  </button>
+                ))}
+                <button onClick={() => setQuickDate("year")}
+                  className="px-2.5 py-1.5 text-xs font-semibold border border-gray-200 rounded-lg text-gray-600 hover:border-blue-400 hover:text-blue-600 transition-colors">
+                  올해
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* 액션 버튼 */}
+          <div className="flex justify-end gap-2 pt-1">
+            <button onClick={() => setFilterOpen(false)}
+              className="px-4 py-1.5 text-sm font-semibold border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50 transition-colors">
+              취소
+            </button>
+            <button onClick={() => {
+              setLocalFilter({ sido: "", sigungu: "", startDate: "", endDate: "", type: "", levelText: "" });
+            }}
+              className="px-4 py-1.5 text-sm font-semibold border border-gray-200 rounded-lg text-gray-500 hover:bg-gray-50 transition-colors">
+              초기화
+            </button>
+            <button onClick={applyFilter}
+              className="px-4 py-1.5 text-sm font-semibold rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-colors">
+              적용
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* 필터 배너 */}
       <FilterBanner sido={sido} sigungu={sigungu} startDate={startDate} endDate={endDate}
-        type={type} levelText={levelText} keyword={keyword} source={source} />
+        type={type} levelText={levelText} keyword={keyword} source={source} onFilterOpen={openFilter} />
 
       {/* KPI */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -436,50 +646,70 @@ function StatsPageInner() {
           sub={topRegion ? `${topRegion.count.toLocaleString("ko-KR")}건` : "-"} />
       </div>
 
+      {/* 크로스 필터 배지: 차트 클릭으로 유형 필터 활성 시 표시 */}
+      {crossFilter.type && (
+        <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 bg-violet-50 border border-violet-200 rounded-lg px-3 py-1.5 text-sm text-violet-800">
+            <span className="text-xs">차트 필터</span>
+            <span className="font-bold">{crossFilter.type}</span>
+            <button onClick={() => setCrossFilter({})}
+              className="text-violet-400 hover:text-violet-700 font-bold leading-none ml-1">×</button>
+          </div>
+          <span className="text-xs text-gray-400">다른 유형 클릭 시 전환 · × 로 해제</span>
+        </div>
+      )}
+
       {/* 위젯 그리드 */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(12, 1fr)", gap: 12 }}>
-        {layout.map(w => {
-          const lib = WIDGET_LIBRARY.find(x => x.id === w.libId);
-          if (!lib) return null;
-          return (
-            <WidgetCard key={w.id} widget={w} lib={lib}
-              onVariantChange={handleVariantChange}
-              onRemove={handleRemove}
-              titleOverride={lib.id === "sido-bar" && sido ? `${sido} 시·군·구별 발생 건수` : undefined}
-              isNew={w.id === newWidgetId}>
-              <WidgetContent kind={lib.kind} variant={w.variant ?? lib.variants?.[0]?.key ?? ""}
-                typeStats={typeStats} regionStats={regionStats} levelStats={levelStats}
-                dailyStats={dailyStats} hourlyStats={hourlyStats} monthlyTypeStats={monthlyTypeStats}
-                dailyTypeStats={dailyTypeStats} isSubMonth={isSubMonth}
-                thisYearData={thisYearData} lastYearData={lastYearData} currentYear={currentYear}
-                weatherStats={weatherStats}
-                weatherTypeStats={weatherTypeStats}
-                weatherRegionStats={weatherRegionStats}
-                weatherHourlyStats={weatherHourlyStats}
-                weatherHourlyTypeStats={weatherHourlyTypeStats}
-                weatherHourlyRegionStats={weatherHourlyRegionStats}
-                isShortPeriod={isShortPeriod}
-                regionLabel={regionLabel}
-                loadingWeather={loadingWeather || loadingWeatherType || loadingWeatherRegion}
-                loadingWeatherHourly={loadingWeatherHourly || loadingWeatherHourlyType || loadingWeatherHourlyRegion}
-                scrollableRegion={lib.id === "sido-bar" && !!sido}
-                isLoading={
-                  lib.kind === "line"    ? loadingDaily :
-                  lib.kind === "hbar"    ? (sido ? loadingSigungu : loadingSido) :
-                  lib.kind === "heatmap" ? loadingHourly :
-                  lib.kind === "stacked" ? (isSubMonth ? loadingDailyType : loadingMonthlyType) :
-                  lib.kind === "compare" ? (loadingThisYear || loadingLastYear) :
-                  loadingStats
-                } />
-            </WidgetCard>
-          );
-        })}
-      </div>
+      <DndContext id="stats-widget-dnd" sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+        <SortableContext items={layout.map(w => w.id)} strategy={rectSortingStrategy}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(12, 1fr)", gap: 12 }}>
+            {layout.map(w => {
+              const lib = WIDGET_LIBRARY.find(x => x.id === w.libId);
+              if (!lib) return null;
+              return (
+                <SortableWidgetCard key={w.id} id={w.id} span={w.span} widget={w} lib={lib}
+                  onVariantChange={handleVariantChange}
+                  onRemove={handleRemove}
+                  titleOverride={lib.id === "sido-bar" && sido ? `${sido} 시·군·구별 발생 건수` : undefined}
+                  isNew={w.id === newWidgetId}>
+                  <WidgetContent kind={lib.kind} variant={w.variant ?? lib.variants?.[0]?.key ?? ""}
+                    typeStats={typeStats} regionStats={regionStats} levelStats={levelStats}
+                    dailyStats={dailyStats} hourlyStats={hourlyStats} monthlyTypeStats={monthlyTypeStats}
+                    dailyTypeStats={dailyTypeStats} isSubMonth={isSubMonth}
+                    thisYearData={thisYearData} lastYearData={lastYearData} currentYear={currentYear}
+                    weatherStats={weatherStats}
+                    weatherTypeStats={weatherTypeStats}
+                    weatherRegionStats={weatherRegionStats}
+                    weatherHourlyStats={weatherHourlyStats}
+                    weatherHourlyTypeStats={weatherHourlyTypeStats}
+                    weatherHourlyRegionStats={weatherHourlyRegionStats}
+                    isShortPeriod={isShortPeriod}
+                    regionLabel={regionLabel}
+                    loadingWeather={loadingWeather || loadingWeatherType || loadingWeatherRegion}
+                    loadingWeatherHourly={loadingWeatherHourly || loadingWeatherHourlyType || loadingWeatherHourlyRegion}
+                    scrollableRegion={lib.id === "sido-bar" && !!sido}
+                    onTypeClick={onTypeClick}
+                    selectedType={crossFilter.type}
+                    isLoading={
+                      lib.kind === "line"    ? loadingDaily :
+                      lib.kind === "hbar"    ? (sido ? loadingSigungu : loadingSido) :
+                      lib.kind === "heatmap" ? loadingHourly :
+                      lib.kind === "stacked" ? (isSubMonth ? loadingDailyType : loadingMonthlyType) :
+                      lib.kind === "compare" ? (loadingThisYear || loadingLastYear) :
+                      loadingStats
+                    } />
+                </SortableWidgetCard>
+              );
+            })}
+          </div>
+        </SortableContext>
+      </DndContext>
 
       {/* 안내 */}
       <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 text-xs text-blue-800 leading-relaxed">
-        💡 <b>+ 위젯</b> 버튼으로 차트를 추가하거나 제거할 수 있어요. 각 위젯 헤더의 토글로 차트 유형을 전환할 수 있습니다.
-        <Link href="/alerts" className="ml-2 underline font-semibold">재난문자 페이지에서 필터 설정 →</Link>
+        💡 이 통계는 <b>재난문자 검색 결과</b>와 연동됩니다. 지역·기간·유형을 검색하면 그 결과가 모든 차트에 반영돼요.
+        <b> + 위젯</b> 버튼으로 원하는 차트를 추가·제거하고, 헤더 토글로 차트 유형도 전환할 수 있습니다.
+        <Link href="/alerts" className="ml-2 underline font-semibold">재난문자 검색 페이지 →</Link>
       </div>
 
       {/* 위젯 드로어 */}

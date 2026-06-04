@@ -74,9 +74,13 @@ type TTProps = {
 export function DonutChart({
   data,
   total,
+  onTypeClick,
+  selectedType,
 }: {
   data: { type: string | null; count: number }[];
   total: number;
+  onTypeClick?: (type: string) => void;
+  selectedType?: string;
 }) {
   const r = 38;              // 원 반지름 (px 기준, SVG viewBox 100x100 내)
   const c = 2 * Math.PI * r; // 원의 전체 둘레 길이
@@ -119,22 +123,28 @@ export function DonutChart({
         </text>
       </svg>
 
-      {/* 범례 목록 */}
+      {/* 범례 목록 — onTypeClick이 있으면 클릭 가능, selectedType이 있으면 해당 항목 외 흐리게 */}
       <ul className="flex-1 space-y-1.5">
-        {data.map((d, i) => (
-          <li key={d.type ?? i} className="flex items-center gap-2 text-xs">
-            {/* 색상 사각형 */}
-            <span className="w-2 h-2 rounded-sm shrink-0"
-              style={{ background: TYPE_COLORS[i % TYPE_COLORS.length] }} />
-            <span className="flex-1 text-gray-700 truncate">{d.type ?? "기타"}</span>
-            <span className="text-gray-400">
-              {Math.round((d.count / total) * 100)}%
-            </span>
-            <span className="font-semibold text-gray-900 min-w-[36px] text-right">
-              {d.count.toLocaleString("ko-KR")}
-            </span>
-          </li>
-        ))}
+        {data.map((d, i) => {
+          const label = d.type ?? "기타";
+          const isSelected = selectedType === label;
+          const isDimmed = !!selectedType && !isSelected;
+          return (
+            <li key={d.type ?? i}
+              onClick={() => onTypeClick?.(label)}
+              className={`flex items-center gap-2 text-xs rounded px-1 -mx-1 transition-opacity
+                ${onTypeClick ? "cursor-pointer hover:bg-gray-50" : ""}
+                ${isDimmed ? "opacity-30" : ""}`}>
+              <span className="w-2 h-2 rounded-sm shrink-0"
+                style={{ background: TYPE_COLORS[i % TYPE_COLORS.length] }} />
+              <span className="flex-1 text-gray-700 truncate">{label}</span>
+              <span className="text-gray-400">{Math.round((d.count / total) * 100)}%</span>
+              <span className="font-semibold text-gray-900 min-w-[36px] text-right">
+                {d.count.toLocaleString("ko-KR")}
+              </span>
+            </li>
+          );
+        })}
       </ul>
     </div>
   );
@@ -150,7 +160,7 @@ export function DonutChart({
  *
  * @param data - { region: 지역명, count: 건수 }[] 배열
  */
-export function HorizontalBar({ data }: { data: RegionStat[] }) {
+export function HorizontalBar({ data, onBarClick }: { data: RegionStat[]; onBarClick?: (label: string) => void }) {
   if (data.length === 0) return <EmptyChart />;
 
   // 커스텀 툴팁: 마우스를 올렸을 때 지역명과 건수를 보여줍니다
@@ -176,8 +186,10 @@ export function HorizontalBar({ data }: { data: RegionStat[] }) {
           <YAxis type="category" dataKey="region" width={80} axisLine={false} tickLine={false}
             tick={{ fontSize: 11, fill: "#374151" }} />
           <Tooltip content={<TooltipContent />} cursor={{ fill: "#f3f4f6" }} />
-          <Bar dataKey="count" radius={[0, 3, 3, 0]} barSize={14} isAnimationActive={false}>
-            {/* 각 막대에 개별 색상 적용 */}
+          <Bar dataKey="count" radius={[0, 3, 3, 0]} barSize={14} isAnimationActive={false}
+            cursor={onBarClick ? "pointer" : "default"}
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            onClick={onBarClick ? (d: any) => onBarClick(d.region ?? "") : undefined}>
             {data.map((_, i) => (
               <Cell key={i} fill={BAR_COLORS[i % BAR_COLORS.length]} />
             ))}
@@ -201,8 +213,10 @@ export function HorizontalBar({ data }: { data: RegionStat[] }) {
  */
 export function VerticalBar({
   data,
+  onBarClick,
 }: {
   data: { label: string; count: number; color?: string }[];
+  onBarClick?: (label: string) => void;
 }) {
   if (data.length === 0) return <EmptyChart />;
 
@@ -228,9 +242,11 @@ export function VerticalBar({
           <YAxis axisLine={false} tickLine={false}
             tick={{ fontSize: 10, fill: "#9ca3af" }} width={32} />
           <Tooltip content={<TooltipContent />} cursor={{ fill: "#f3f4f6" }} />
-          <Bar dataKey="count" radius={[3, 3, 0, 0]} maxBarSize={40} isAnimationActive={false}>
+          <Bar dataKey="count" radius={[3, 3, 0, 0]} maxBarSize={40} isAnimationActive={false}
+            cursor={onBarClick ? "pointer" : "default"}
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            onClick={onBarClick ? (d: any) => onBarClick(d.label ?? "") : undefined}>
             {data.map((d, i) => (
-              // 최댓값 막대는 빨간색, 나머지는 팔레트 색상 또는 개별 지정 색상
               <Cell key={i}
                 fill={i === peakIdx ? "#ef4444" : (d.color ?? CHART_COLORS[i % CHART_COLORS.length])} />
             ))}

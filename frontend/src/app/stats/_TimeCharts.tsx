@@ -27,6 +27,7 @@ import {
   Tooltip,                     // 마우스 호버 팝업
   ReferenceLine,               // 평균선 같은 기준선
   Legend,                      // 범례
+  Brush,                       // 시계열 줌/팬 범위 선택기
   ResponsiveContainer,         // 부모 크기에 맞춘 자동 리사이즈
 } from "recharts";
 import type { DailyStat, HourlyStat, MonthlyTypeStat } from "@/types/alerts";
@@ -121,6 +122,13 @@ export function LineChart({ data }: { data: DailyStat[] }) {
           {/* 평균값 점선 기준선 */}
           <ReferenceLine y={avg} stroke="#f97316" strokeDasharray="3 2" />
 
+          {/* 30일 초과 시 줌/팬 범위 선택기 표시 */}
+          {data.length > 7 && (
+            <Brush dataKey="date" height={22} stroke="#93c5fd" fill="#eff6ff" travellerWidth={8}
+              tickFormatter={(v: string) => v.slice(5)}
+              style={{ fontSize: 9, fill: "#6b7280" }} />
+          )}
+
           <Area
             type="monotone"
             dataKey="count"
@@ -183,6 +191,11 @@ export function DailyBar({ data }: { data: DailyStat[] }) {
             tick={{ fontSize: 9, fill: "#9ca3af" }} width={32} />
           <Tooltip content={<TooltipContent />} cursor={{ fill: "#f3f4f6" }} />
           <Bar dataKey="count" fill="#3b82f6" radius={[2, 2, 0, 0]} maxBarSize={40} isAnimationActive={false} />
+          {data.length > 7 && (
+            <Brush dataKey="date" height={22} stroke="#93c5fd" fill="#eff6ff" travellerWidth={8}
+              tickFormatter={(v: string) => v.slice(5)}
+              style={{ fontSize: 9, fill: "#6b7280" }} />
+          )}
         </BarChart>
       </ResponsiveContainer>
     </div>
