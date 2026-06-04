@@ -69,5 +69,25 @@ public class RiskBackfillTool implements ApplicationRunner {
         long elapsed = (System.currentTimeMillis() - t0) / 1000;
         log.info("RiskBackfillTool 완료: 처리={}, 오류={}, 시군구={}, 소요={}s",
                 processed, errors, sigungus.size(), elapsed);
+                
+        log.info("RiskBackfillTool: 과거 모든 region_risk_history 데이터를 region_risk_daily 로 일괄 요약(Backfill) 시작...");
+        try {
+            jdbc.execute("""
+                INSERT INTO region_risk_daily (region_code, snapshot_date, risk_score)
+                SELECT region_code, MAX(snapshot_date), MAX(risk_score) FROM (
+                    SELECT DISTINCT ON (region_code, CAST(snapshot_at AS DATE))
+                           region_code, 
+                           CAST(snapshot_at AS DATE) AS snapshot_date,
+                           risk_score
+                    FROM region_risk_history
+                    ORDER BY region_code, CAST(snapshot_at AS DATE), risk_score DESC
+                ) sub
+                GROUP BY region_code, snapshot_date
+                ON CONFLICT (region_code, snapshot_date) DO NOTHING
+            """);
+            log.info("RiskBackfillTool: 일별 요약본 백필 완벽하게 성공!");
+        } catch (Exception e) {
+            log.error("RiskBackfillTool: 일별 요약본 백필 실패", e);
+        }
     }
 }
