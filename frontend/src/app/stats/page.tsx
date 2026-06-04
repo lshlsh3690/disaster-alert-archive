@@ -270,6 +270,7 @@ function StatsPageInner() {
 
   // 필터 패널을 열 때 현재 URL 파라미터로 로컬 상태 동기화
   const openFilter = () => {
+    if (filterOpen) { setFilterOpen(false); return; }
     setLocalFilter({
       sido: sido ?? "", sigungu: sigungu ?? "",
       startDate: startDate ?? "", endDate: endDate ?? "",
@@ -359,14 +360,32 @@ function StatsPageInner() {
   const [activePreset, setActivePreset] = useState<1 | 2 | 3>(1);
   // 현재 프리셋의 위젯 배치 배열 (localStorage에서 복원)
   const [layout, setLayout] = useState<WidgetItem[]>(DEFAULT_LAYOUT);
+  // 프리셋별 사용자 지정 이름 (기본값 "프리셋 1~3")
+  const [presetNames, setPresetNames] = useState<Record<1 | 2 | 3, string>>({ 1: "프리셋 1", 2: "프리셋 2", 3: "프리셋 3" });
+  // 현재 이름 편집 중인 프리셋 번호 (null이면 편집 안 함)
+  const [editingPreset, setEditingPreset] = useState<1 | 2 | 3 | null>(null);
+  const [editingName, setEditingName] = useState("");
   useEffect(() => {
     try {
       const p = (Number(localStorage.getItem("stats-preset-active")) || 1) as 1 | 2 | 3;
       const saved = localStorage.getItem(`stats-layout-${p}`);
+      const savedNames = localStorage.getItem("stats-preset-names");
       setActivePreset(p);
       if (saved) setLayout(JSON.parse(saved) as WidgetItem[]);
+      if (savedNames) setPresetNames(JSON.parse(savedNames));
     } catch {}
   }, []);
+
+  const commitPresetName = useCallback(() => {
+    if (editingPreset === null) return;
+    const name = editingName.trim() || `프리셋 ${editingPreset}`;
+    setPresetNames(prev => {
+      const next = { ...prev, [editingPreset]: name };
+      try { localStorage.setItem("stats-preset-names", JSON.stringify(next)); } catch {}
+      return next;
+    });
+    setEditingPreset(null);
+  }, [editingPreset, editingName]);
 
   const switchPreset = useCallback((p: 1 | 2 | 3) => {
     setActivePreset(p);
@@ -534,10 +553,35 @@ function StatsPageInner() {
           {/* 프리셋 탭 */}
           <div className="flex border border-gray-200 rounded-lg overflow-hidden">
             {([1, 2, 3] as const).map(p => (
-              <button key={p} onClick={() => switchPreset(p)}
-                className={`px-3 py-2 text-sm font-semibold transition-colors ${activePreset === p ? "bg-blue-600 text-white" : "text-gray-500 hover:bg-gray-50"}`}>
-                {p}
-              </button>
+              <div key={p}
+                className={`flex items-center gap-1.5 px-3 py-2 text-sm font-semibold transition-colors cursor-pointer
+                  ${activePreset === p ? "bg-blue-600 text-white" : "text-gray-500 hover:bg-gray-50"}`}
+                onClick={() => switchPreset(p)}>
+                {editingPreset === p ? (
+                  <input
+                    autoFocus
+                    value={editingName}
+                    onChange={e => setEditingName(e.target.value)}
+                    onBlur={commitPresetName}
+                    onKeyDown={e => { if (e.key === "Enter") commitPresetName(); if (e.key === "Escape") setEditingPreset(null); }}
+                    onClick={e => e.stopPropagation()}
+                    className="bg-transparent outline-none w-20 text-white placeholder-blue-200"
+                    maxLength={10}
+                  />
+                ) : (
+                  <>
+                    {presetNames[p]}
+                    {activePreset === p && (
+                      <span
+                        onClick={e => { e.stopPropagation(); setEditingPreset(p); setEditingName(presetNames[p]); }}
+                        className="text-blue-200 hover:text-white text-xs leading-none"
+                        title="이름 변경">
+                        ✏️
+                      </span>
+                    )}
+                  </>
+                )}
+              </div>
             ))}
           </div>
           <button onClick={() => {
