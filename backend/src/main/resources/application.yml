@@ -100,15 +100,22 @@ deepl:
   api-url: https://api-free.deepl.com/v2/translate
   enabled: true
 
-# Spring AI — OpenAI Embedding
+# Spring AI — OpenAI Embedding + Chat
 # 컨테이너 추가 없음. 기존 backend Spring Boot 프로세스 안에서 라이브러리로 동작.
+# base-url 은 embedding/chat 공용 — SSAFY GMS 프록시 토큰 사용(팀 risk 모듈과 공유).
 spring.ai:
   openai:
     api-key: ${OPENAI_API_KEY:dummy}
+    base-url: ${OPENAI_BASE_URL:https://api.openai.com}
     embedding:
       options:
         model: text-embedding-3-small
         dimensions: 512
+    # chat 모델 — risk 모듈 LlmRiskProfiler + 이벤트 cross-region 같은 사건 판정 공용
+    chat:
+      options:
+        model: gpt-4o-mini
+        temperature: 0.2
 
 # 이벤트 클러스터링 (임베딩 기반)
 # 지역 hard 필터: 같은 시군구 후보만, 코사인 유사도 >= similarity-threshold 면 머지.
