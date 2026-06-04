@@ -1,4 +1,4 @@
-import { Alert, LatestAlert, Stats, ZAlert, ZLatestAlert, ZPageMeta, ZPageMetaCombined, ZRegionStat, ZStats, ZDashboardSummary, type DashboardSummary } from "@/types/alerts";
+import { Alert, LatestAlert, Stats, ZAlert, ZLatestAlert, ZPageMeta, ZPageMetaCombined, ZRegionStat, ZStats, ZDashboardSummary, ZDailyStat, ZHourlyStat, ZMonthlyTypeStat, ZWeatherCorrelationStat, ZAlertWeatherSnapshot, ZWeatherTypeStat, ZWeatherRegionStat, type DashboardSummary, type DailyStat, type HourlyStat, type MonthlyTypeStat, type WeatherCorrelationStat, type AlertWeatherSnapshot, type WeatherTypeStat, type WeatherRegionStat } from "@/types/alerts";
 import instance from "./axios";
 import { z } from "zod";
 
@@ -61,6 +61,11 @@ export async function fetchSigunguStats(
   return z.array(ZRegionStat).parse(res.data);
 }
 
+export async function fetchDailyStats(params: AlertSearchRequest): Promise<DailyStat[]> {
+  const res = await instance.get("/api/v1/alerts/stats/daily", { params });
+  return z.array(ZDailyStat).parse(res.data);
+}
+
 export type Sigungu = {
   name: string;          // 한국어 원문 (검색 API 전달용)
   translatedName: string | null; // 번역된 이름 (화면 표시용)
@@ -80,8 +85,59 @@ export async function fetchSigungu(sido: string, lang = "ko"): Promise<Sigungu[]
   ).parse(res.data);
 }
 
+export async function fetchHourlyStats(params: AlertSearchRequest): Promise<HourlyStat[]> {
+  const res = await instance.get("/api/v1/alerts/stats/hourly", { params });
+  return z.array(ZHourlyStat).parse(res.data);
+}
+
+export async function fetchMonthlyTypeStats(params: AlertSearchRequest): Promise<MonthlyTypeStat[]> {
+  const res = await instance.get("/api/v1/alerts/stats/monthly-type", { params });
+  return z.array(ZMonthlyTypeStat).parse(res.data);
+}
+
+export async function fetchDailyTypeStats(params: AlertSearchRequest): Promise<MonthlyTypeStat[]> {
+  const res = await instance.get("/api/v1/alerts/stats/daily-type", { params });
+  return z.array(ZMonthlyTypeStat).parse(res.data);
+}
+
 export async function fetchDashboardSummary(): Promise<DashboardSummary> {
   const res = await instance.get("/api/v1/alerts/dashboard/summary");
   const data = ZDashboardSummary.parse(res.data);
   return data;
+}
+
+export async function fetchWeatherCorrelation(params: AlertSearchRequest): Promise<WeatherCorrelationStat[]> {
+  const res = await instance.get("/api/v1/alerts/stats/weather-correlation", { params });
+  return z.array(ZWeatherCorrelationStat).parse(res.data);
+}
+
+export async function fetchWeatherByType(params: AlertSearchRequest): Promise<WeatherTypeStat[]> {
+  const res = await instance.get("/api/v1/alerts/stats/weather-by-type", { params });
+  return z.array(ZWeatherTypeStat).parse(res.data);
+}
+
+export async function fetchWeatherByRegion(params: AlertSearchRequest, groupBy: "sido" | "sigungu"): Promise<WeatherRegionStat[]> {
+  const res = await instance.get("/api/v1/alerts/stats/weather-by-region", { params: { ...params, groupBy } });
+  return z.array(ZWeatherRegionStat).parse(res.data);
+}
+
+export async function fetchWeatherHourlyCorrelation(params: AlertSearchRequest): Promise<WeatherCorrelationStat[]> {
+  const res = await instance.get("/api/v1/alerts/stats/weather-correlation-hourly", { params });
+  return z.array(ZWeatherCorrelationStat).parse(res.data);
+}
+
+export async function fetchWeatherHourlyByType(params: AlertSearchRequest): Promise<WeatherTypeStat[]> {
+  const res = await instance.get("/api/v1/alerts/stats/weather-by-type-hourly", { params });
+  return z.array(ZWeatherTypeStat).parse(res.data);
+}
+
+export async function fetchWeatherHourlyByRegion(params: AlertSearchRequest, groupBy: "sido" | "sigungu"): Promise<WeatherRegionStat[]> {
+  const res = await instance.get("/api/v1/alerts/stats/weather-by-region-hourly", { params: { ...params, groupBy } });
+  return z.array(ZWeatherRegionStat).parse(res.data);
+}
+
+export async function fetchAlertWeather(id: number): Promise<AlertWeatherSnapshot> {
+  const res = await instance.get(`/api/v1/alerts/${id}/weather`, { headers: { "X-Auth-Required": "false" } });
+  if (res.status === 204) return null;
+  return ZAlertWeatherSnapshot.parse(res.data);
 }

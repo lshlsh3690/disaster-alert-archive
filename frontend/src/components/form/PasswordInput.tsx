@@ -1,5 +1,5 @@
 import { FieldValues, Path, UseFormReturn } from "react-hook-form";
-import InputStatusMessage from "../InputStatusMessage";
+import InputStatusMessage from "../ui/InputStatusMessage";
 import useSignupStore from "@/store/signupStore";
 
 interface PasswordInput<T extends FieldValues> {

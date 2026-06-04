@@ -157,7 +157,7 @@ public class EventClusteringService {
             Long eventId = ((Number) row[0]).longValue();
             double dist = ((Number) row[1]).doubleValue();
             if (dist <= mergeMaxDistance) {
-                mergeIntoExisting(eventId, alert, dist);
+                mergeIntoExisting(eventId, alert, 1.0 - dist);
                 return;
             }
         }
@@ -184,14 +184,18 @@ public class EventClusteringService {
         log.info("clusterNewAlert: alertId={} top-{} 후보: {}", alertId, candidates.size(), sb.toString().trim());
     }
 
-    private void mergeIntoExisting(Long eventId, DisasterAlert alert, double distance) {
+    /**
+     * 기존 이벤트에 알림 머지. {@code similarity} 는 합류 시점 코사인 유사도(1 - dist)로,
+     * event_alert_mapping 에 저장한다. broadcast 머지(임베딩 미사용)는 null 을 넘긴다.
+     */
+    private void mergeIntoExisting(Long eventId, DisasterAlert alert, Double similarity) {
         int nextSeq = eventAlertMappingRepository.countByEventId(eventId) + 1;
-        eventAlertMappingRepository.save(EventAlertMapping.of(eventId, alert.getId(), nextSeq));
+        eventAlertMappingRepository.save(EventAlertMapping.of(eventId, alert.getId(), nextSeq, similarity));
         disasterEventRepository.incrementOnMerge(eventId, alert.getCreatedAt());
         // 위험도 모듈 트리거 (커밋 후 @TransactionalEventListener 가 수신)
         eventPublisher.publishEvent(new AlertClusteredEvent(eventId, alert.getId()));
-        log.info("clusterNewAlert: alertId={} → event={} 머지 (dist={}, seq={})",
-                alert.getId(), eventId, distance, nextSeq);
+        log.info("clusterNewAlert: alertId={} → event={} 머지 (similarity={}, seq={})",
+                alert.getId(), eventId, similarity, nextSeq);
     }
 
     private void createNewEvent(DisasterAlert alert, String regionCode, String regionName, boolean broadcast) {
@@ -239,7 +243,7 @@ public class EventClusteringService {
                 if (target.isPresent()) {
                     log.info("clusterNewAlert: alertId={} 전국({}시도) → broadcast event={} 유형 머지({})",
                             alert.getId(), sidoSpan, target.get().getId(), type);
-                    mergeIntoExisting(target.get().getId(), alert, 0.0);
+                    mergeIntoExisting(target.get().getId(), alert, null);
                     return;
                 }
             }
@@ -257,7 +261,7 @@ public class EventClusteringService {
             if (target.isPresent()) {
                 log.info("clusterNewAlert: alertId={} 광역({}시군구) → broadcast event={} 시도+유형 머지({} {})",
                         alert.getId(), sigunguSpan, target.get().getId(), sido, type);
-                mergeIntoExisting(target.get().getId(), alert, 0.0);
+                mergeIntoExisting(target.get().getId(), alert, null);
                 return;
             }
         }

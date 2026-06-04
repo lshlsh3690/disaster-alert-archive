@@ -36,6 +36,7 @@ export default function Header() {
   const menu = [
     { name: t.nav.dashboard, href: "/dashboard" },
     { name: t.nav.alerts, href: "/alerts" },
+    { name: t.nav.stats, href: "/stats" },
     { name: t.nav.community, href: "/community" },
   ];
 
@@ -48,6 +49,7 @@ export default function Header() {
     logoutApi()
       .then(() => {
         logout();
+        localStorage.removeItem("fcm-token");
         setOpen(false);
         router.push("/");
       })

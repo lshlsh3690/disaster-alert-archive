@@ -1,6 +1,6 @@
 "use client";
 
-import OAuthButton from "@components/OAuthButton";
+import OAuthButton from "@/components/ui/OAuthButton";
 import Link from "next/link";
 import SignupForm from "./SignupForm";
 

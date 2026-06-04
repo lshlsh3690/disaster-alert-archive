@@ -79,6 +79,34 @@ public class DisasterAlertController {
         return ResponseEntity.ok(disasterAlertService.countBySigungu(request));
     }
 
+    @GetMapping("/stats/daily")
+    public ResponseEntity<List<DisasterAlertStatResponse.DailyStat>> countByDate(
+            AlertSearchRequest request
+    ) {
+        return ResponseEntity.ok(disasterAlertService.countByDate(request));
+    }
+
+    @GetMapping("/stats/hourly")
+    public ResponseEntity<List<DisasterAlertStatResponse.HourlyStat>> countByHour(
+            AlertSearchRequest request
+    ) {
+        return ResponseEntity.ok(disasterAlertService.countByHour(request));
+    }
+
+    @GetMapping("/stats/monthly-type")
+    public ResponseEntity<List<DisasterAlertStatResponse.MonthlyTypeStat>> countByMonthType(
+            AlertSearchRequest request
+    ) {
+        return ResponseEntity.ok(disasterAlertService.countByMonthType(request));
+    }
+
+    @GetMapping("/stats/daily-type")
+    public ResponseEntity<List<DisasterAlertStatResponse.MonthlyTypeStat>> countByDateType(
+            AlertSearchRequest request
+    ) {
+        return ResponseEntity.ok(disasterAlertService.countByDateType(request));
+    }
+
     /**
      * 재난문자 상세 조회.
      *
@@ -102,6 +130,53 @@ public class DisasterAlertController {
             @RequestParam(defaultValue = "ko") String lang
     ) {
         return ResponseEntity.ok(disasterAlertService.getLatestAlert(limit, lang));
+    }
+
+    @GetMapping("/stats/weather-correlation")
+    public ResponseEntity<List<WeatherCorrelationDto>> getWeatherCorrelation(AlertSearchRequest request) {
+        return ResponseEntity.ok(disasterAlertService.getWeatherCorrelation(request));
+    }
+
+    @GetMapping("/stats/weather-by-type")
+    public ResponseEntity<List<WeatherTypeStatDto>> getWeatherByType(AlertSearchRequest request) {
+        return ResponseEntity.ok(disasterAlertService.getWeatherByType(request));
+    }
+
+    @GetMapping("/stats/weather-by-region")
+    public ResponseEntity<List<WeatherRegionStatDto>> getWeatherByRegion(
+            AlertSearchRequest request,
+            @RequestParam(defaultValue = "sido") String groupBy) {
+        List<WeatherRegionStatDto> data = "sigungu".equals(groupBy)
+                ? disasterAlertService.getWeatherBySigungu(request)
+                : disasterAlertService.getWeatherBySido(request);
+        return ResponseEntity.ok(data);
+    }
+
+    @GetMapping("/stats/weather-correlation-hourly")
+    public ResponseEntity<List<WeatherCorrelationDto>> getWeatherHourlyCorrelation(AlertSearchRequest request) {
+        return ResponseEntity.ok(disasterAlertService.getWeatherHourlyCorrelation(request));
+    }
+
+    @GetMapping("/stats/weather-by-type-hourly")
+    public ResponseEntity<List<WeatherTypeStatDto>> getWeatherHourlyByType(AlertSearchRequest request) {
+        return ResponseEntity.ok(disasterAlertService.getWeatherHourlyByType(request));
+    }
+
+    @GetMapping("/stats/weather-by-region-hourly")
+    public ResponseEntity<List<WeatherRegionStatDto>> getWeatherHourlyByRegion(
+            AlertSearchRequest request,
+            @RequestParam(defaultValue = "sido") String groupBy) {
+        List<WeatherRegionStatDto> data = "sigungu".equals(groupBy)
+                ? disasterAlertService.getWeatherHourlyBySigungu(request)
+                : disasterAlertService.getWeatherHourlyBySido(request);
+        return ResponseEntity.ok(data);
+    }
+
+    @GetMapping("/{id}/weather")
+    public ResponseEntity<AlertWeatherDto> getAlertWeather(@PathVariable Long id) {
+        return disasterAlertService.getAlertWeather(id)
+                .map(ResponseEntity::ok)
+                .orElse(ResponseEntity.noContent().build());
     }
 
     /**

@@ -422,6 +422,58 @@ public class DisasterAlertService {
         return disasterAlertRepository.getStatsSigungu(request);
     }
 
+    public List<DisasterAlertStatResponse.DailyStat> countByDate(AlertSearchRequest request) {
+        return disasterAlertRepository.getStatsByDate(request);
+    }
+
+    public List<DisasterAlertStatResponse.HourlyStat> countByHour(AlertSearchRequest request) {
+        return disasterAlertRepository.getStatsByHour(request);
+    }
+
+    public List<DisasterAlertStatResponse.MonthlyTypeStat> countByMonthType(AlertSearchRequest request) {
+        return disasterAlertRepository.getStatsByMonthType(request);
+    }
+
+    public List<DisasterAlertStatResponse.MonthlyTypeStat> countByDateType(AlertSearchRequest request) {
+        return disasterAlertRepository.getStatsByDateType(request);
+    }
+
+    public List<WeatherCorrelationDto> getWeatherCorrelation(AlertSearchRequest request) {
+        return disasterAlertRepository.getWeatherCorrelation(request);
+    }
+
+    public List<WeatherTypeStatDto> getWeatherByType(AlertSearchRequest request) {
+        return disasterAlertRepository.getWeatherByType(request);
+    }
+
+    public List<WeatherRegionStatDto> getWeatherBySido(AlertSearchRequest request) {
+        return disasterAlertRepository.getWeatherBySido(request);
+    }
+
+    public List<WeatherRegionStatDto> getWeatherBySigungu(AlertSearchRequest request) {
+        return disasterAlertRepository.getWeatherBySigungu(request);
+    }
+
+    public List<WeatherCorrelationDto> getWeatherHourlyCorrelation(AlertSearchRequest request) {
+        return disasterAlertRepository.getWeatherHourlyCorrelation(request);
+    }
+
+    public List<WeatherTypeStatDto> getWeatherHourlyByType(AlertSearchRequest request) {
+        return disasterAlertRepository.getWeatherHourlyByType(request);
+    }
+
+    public List<WeatherRegionStatDto> getWeatherHourlyBySido(AlertSearchRequest request) {
+        return disasterAlertRepository.getWeatherHourlyBySido(request);
+    }
+
+    public List<WeatherRegionStatDto> getWeatherHourlyBySigungu(AlertSearchRequest request) {
+        return disasterAlertRepository.getWeatherHourlyBySigungu(request);
+    }
+
+    public Optional<AlertWeatherDto> getAlertWeather(Long alertId) {
+        return disasterAlertRepository.getAlertWeather(alertId);
+    }
+
     // ============================================================================
     //  다국어 응답 — 내부 헬퍼
     // ============================================================================
