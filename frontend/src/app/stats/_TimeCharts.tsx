@@ -327,7 +327,6 @@ export function DayOfWeekBar({ data }: { data: HourlyStat[] }) {
 
   // WEEKDAYS 순서(월~일)에 맞게 배열로 변환
   const bars = WEEKDAYS.map((label, di) => {
-    // DOW_TO_IDX의 역방향: 화면 인덱스(0=월) → PostgreSQL DOW 번호 찾기
     const dow = Number(
       Object.entries(DOW_TO_IDX).find(([, idx]) => idx === di)?.[0] ?? -1
     );
@@ -335,8 +334,15 @@ export function DayOfWeekBar({ data }: { data: HourlyStat[] }) {
   });
 
   if (bars.every(b => b.count === 0)) return <EmptyChart />;
-  // VerticalBar는 _DistributionCharts.tsx에서 가져옵니다
-  return <VerticalBar data={bars} />;
+  // 최솟값~최댓값 범위로 정규화해 색 차이를 명확하게 표현
+  const max = Math.max(...bars.map(b => b.count));
+  const min = Math.min(...bars.map(b => b.count));
+  const range = max - min || 1;
+  const colored = bars.map(b => ({
+    ...b,
+    color: `rgba(37,99,235,${0.15 + ((b.count - min) / range) * 0.75})`,
+  }));
+  return <VerticalBar data={colored} />;
 }
 
 // ─── 시간대별 집계 막대 ──────────────────────────────────────────────────────
@@ -361,7 +367,13 @@ export function HourBar({ data }: { data: HourlyStat[] }) {
   }));
 
   if (bars.every(b => b.count === 0)) return <EmptyChart />;
-  return <VerticalBar data={bars} />;
+  // 0 기준 정규화 (새벽 등 값이 거의 없는 구간과 피크 구간 대비가 자연스러움)
+  const max = Math.max(...bars.map(b => b.count)) || 1;
+  const colored = bars.map(b => ({
+    ...b,
+    color: `rgba(37,99,235,${0.15 + (b.count / max) * 0.75})`,
+  }));
+  return <VerticalBar data={colored} />;
 }
 
 // ─── 월별 유형별 누적 면적 차트 ─────────────────────────────────────────────
@@ -579,24 +591,29 @@ export function CompareBars({
   };
   const ty = agg(thisYearData), ly = agg(lastYearData);
 
-  // 1~12월 배열 생성 (데이터가 전혀 없는 달은 제외)
+  // 1~12월 배열 생성 (둘 다 0인 달만 제외)
+  const currentMonth = new Date().getMonth() + 1;
   const months = Array.from({ length: 12 }, (_, i) => {
     const key = String(i + 1).padStart(2, "0"); // "01" ~ "12"
-    return { label: `${i + 1}월`, ty: ty[key] ?? 0, ly: ly[key] ?? 0 };
+    return { label: `${i + 1}월`, ty: ty[key] ?? 0, ly: ly[key] ?? 0, monthNum: i + 1 };
   }).filter(m => m.ty > 0 || m.ly > 0);
 
   if (months.length === 0) return <EmptyChart />;
 
-  // 전체 YoY 증감률 계산
-  const totalTy = months.reduce((s, m) => s + m.ty, 0);
-  const totalLy = months.reduce((s, m) => s + m.ly, 0);
+  // 전체 YoY 증감률 계산 (미래 달 제외)
+  const pastMonths = months.filter(m => !(m.ty === 0 && m.monthNum > currentMonth));
+  const totalTy = pastMonths.reduce((s, m) => s + m.ty, 0);
+  const totalLy = pastMonths.reduce((s, m) => s + m.ly, 0);
   const yoy = totalLy > 0 ? Math.round(((totalTy - totalLy) / totalLy) * 100) : null;
 
   const TooltipContent = ({ active, payload, label }: TTProps) => {
     if (!active || !payload?.length) return null;
     const lyVal = payload.find(p => p.dataKey === "ly")?.value ?? 0;
     const tyVal = payload.find(p => p.dataKey === "ty")?.value ?? 0;
-    const diff = lyVal > 0 ? Math.round(((tyVal - lyVal) / lyVal) * 100) : null;
+    // 올해 데이터가 없고 아직 지나지 않은 달은 증감률 표시 안 함
+    const monthNum = months.find(m => m.label === label)?.monthNum ?? 0;
+    const isFuture = tyVal === 0 && monthNum > currentMonth;
+    const diff = !isFuture && lyVal > 0 ? Math.round(((tyVal - lyVal) / lyVal) * 100) : null;
     return (
       <div style={TT_BOX}>
         <p style={TT_LABEL}>{label}</p>
