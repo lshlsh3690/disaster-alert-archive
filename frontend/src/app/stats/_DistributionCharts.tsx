@@ -248,7 +248,7 @@ export function VerticalBar({
             onClick={onBarClick ? (d: any) => onBarClick(d.label ?? "") : undefined}>
             {data.map((d, i) => (
               <Cell key={i}
-                fill={i === peakIdx ? "#ef4444" : (d.color ?? CHART_COLORS[i % CHART_COLORS.length])} />
+                fill={d.color ?? (i === peakIdx ? "#ef4444" : CHART_COLORS[i % CHART_COLORS.length])} />
             ))}
           </Bar>
         </BarChart>
