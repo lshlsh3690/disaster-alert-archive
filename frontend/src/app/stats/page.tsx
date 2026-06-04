@@ -73,6 +73,7 @@ function buildCsv(opts: {
   regionStats: RegionStat[];
   levelStats: LevelStat[];
   dailyStats: DailyStat[];
+  quarterStats: { quarter: string; count: number }[];
   weatherStats: WeatherCorrelationStat[];
   weatherTypeStats: WeatherTypeStat[];
   weatherRegionStats: WeatherRegionStat[];
@@ -81,7 +82,7 @@ function buildCsv(opts: {
   weatherHourlyRegionStats: WeatherRegionStat[];
   isShortPeriod: boolean;
 }): string {
-  const { filters, totalCount, dailyAvg, topType, topRegion, typeStats, regionStats, levelStats, dailyStats,
+  const { filters, totalCount, dailyAvg, topType, topRegion, typeStats, regionStats, levelStats, dailyStats, quarterStats,
     weatherStats, weatherTypeStats, weatherRegionStats,
     weatherHourlyStats, weatherHourlyTypeStats, weatherHourlyRegionStats, isShortPeriod } = opts;
   const rows: string[] = [];
@@ -125,6 +126,13 @@ function buildCsv(opts: {
     levelStats.forEach(d =>
       row(d.level ? (levelNames[d.level] ?? d.level) : "기타", d.count, `${Math.round((d.count / levelTotal) * 100)}%`)
     );
+  }
+
+  if (quarterStats.length > 0) {
+    const quarterTotal = quarterStats.reduce((s, d) => s + d.count, 0) || 1;
+    section("## 분기별 발생 건수");
+    row("분기", "건수", "비율");
+    quarterStats.forEach(d => row(d.quarter, d.count, `${Math.round((d.count / quarterTotal) * 100)}%`));
   }
 
   if (dailyStats.length > 0) {
@@ -378,7 +386,7 @@ function StatsPageInner() {
   const { data: hourlyStatsRaw,   isLoading: loadingHourly }      = useHourlyStats(effectiveParams);
   const { data: monthlyTypeRaw,   isLoading: loadingMonthlyType } = useMonthlyTypeStats(effectiveParams);
   // API raw 데이터의 null-coalesce (로딩 중엔 빈 배열)
-  const dailyStats       = dailyStatsRaw   ?? [];
+  const dailyStats       = useMemo(() => dailyStatsRaw   ?? [], [dailyStatsRaw]);
   const hourlyStats      = hourlyStatsRaw  ?? [];
   const monthlyTypeStats = monthlyTypeRaw  ?? [];
 
@@ -437,6 +445,23 @@ function StatsPageInner() {
   const weatherHourlyStats       = weatherHourlyRaw       ?? [];
   const weatherHourlyTypeStats   = weatherHourlyTypeRaw   ?? [];
   const weatherHourlyRegionStats = weatherHourlyRegionRaw ?? [];
+
+  // 데이터 테이블 열림 상태 및 현재 탭
+  const [tableOpen, setTableOpen] = useState(false);
+  const [tableTab, setTableTab] = useState<"type" | "region" | "level" | "daily" | "quarter">("type");
+  // dailyStats를 분기별로 집계 (YYYY-Qn 키 순서 보장)
+  const quarterStats = useMemo(() => {
+    const map = new Map<string, number>();
+    dailyStats.forEach(d => {
+      const [year, month] = d.date.split("-").map(Number);
+      const q = Math.ceil(month / 3);
+      const key = `${year}-Q${q}`;
+      map.set(key, (map.get(key) ?? 0) + d.count);
+    });
+    return Array.from(map.entries())
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([quarter, count]) => ({ quarter, count }));
+  }, [dailyStats]);
 
   // 위젯 드로어 열림 상태
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -526,7 +551,7 @@ function StatsPageInner() {
               "키워드": keyword ?? "-",
               "출처": source ?? "ALL",
             };
-            const csv = buildCsv({ filters, totalCount, dailyAvg, topType, topRegion, typeStats, regionStats, levelStats, dailyStats,
+            const csv = buildCsv({ filters, totalCount, dailyAvg, topType, topRegion, typeStats, regionStats, levelStats, dailyStats, quarterStats,
               weatherStats, weatherTypeStats, weatherRegionStats,
               weatherHourlyStats, weatherHourlyTypeStats, weatherHourlyRegionStats, isShortPeriod });
             downloadCsv(`재난통계_${new Date().toISOString().slice(0, 10)}.csv`, csv);
@@ -644,6 +669,149 @@ function StatsPageInner() {
           sub={topType ? `${topType.count.toLocaleString("ko-KR")}건 · ${Math.round((topType.count / (totalCount || 1)) * 100)}%` : "-"} />
         <KpiBox icon="📍" label="최다 지역"       value={topRegion?.region ?? "-"}
           sub={topRegion ? `${topRegion.count.toLocaleString("ko-KR")}건` : "-"} />
+      </div>
+
+      {/* 데이터 요약 테이블: 접기/펼치기 */}
+      <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+        <button
+          onClick={() => setTableOpen(o => !o)}
+          className="w-full flex items-center justify-between px-4 py-3 text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-colors">
+          <span>📋 데이터 요약</span>
+          <span className="text-gray-400 text-xs">{tableOpen ? "▲ 접기" : "▼ 펼치기"}</span>
+        </button>
+
+        {tableOpen && (
+          <div className="border-t border-gray-100">
+            {/* 탭 */}
+            <div className="flex border-b border-gray-100 px-4 gap-4">
+              {([ ["type", "유형별"], ["region", "지역별"], ["level", "경보단계"], ["quarter", "분기별"], ["daily", "일별"] ] as const).map(([key, label]) => (
+                <button key={key} onClick={() => setTableTab(key)}
+                  className={`py-2 text-xs font-semibold border-b-2 transition-colors ${tableTab === key ? "border-blue-500 text-blue-600" : "border-transparent text-gray-400 hover:text-gray-600"}`}>
+                  {label}
+                </button>
+              ))}
+            </div>
+
+            <div className="overflow-x-auto">
+              {tableTab === "type" && (
+                <table className="w-full text-xs">
+                  <thead className="bg-gray-50"><tr>
+                    <th className="px-4 py-2 text-left font-semibold text-gray-500 w-8">순위</th>
+                    <th className="px-4 py-2 text-left font-semibold text-gray-500">유형</th>
+                    <th className="px-4 py-2 text-right font-semibold text-gray-500">건수</th>
+                    <th className="px-4 py-2 text-right font-semibold text-gray-500">비율</th>
+                  </tr></thead>
+                  <tbody className="divide-y divide-gray-50">
+                    {typeStats.length === 0
+                      ? <tr><td colSpan={4} className="px-4 py-6 text-center text-gray-400">데이터 없음</td></tr>
+                      : typeStats.map((d, i) => (
+                        <tr key={i} className="hover:bg-gray-50">
+                          <td className="px-4 py-2 text-gray-400">{i + 1}</td>
+                          <td className="px-4 py-2 text-gray-700">{d.type ?? "기타"}</td>
+                          <td className="px-4 py-2 text-right font-semibold text-gray-900">{d.count.toLocaleString("ko-KR")}</td>
+                          <td className="px-4 py-2 text-right text-gray-500">{Math.round((d.count / (totalCount || 1)) * 100)}%</td>
+                        </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+
+              {tableTab === "region" && (
+                <table className="w-full text-xs">
+                  <thead className="bg-gray-50"><tr>
+                    <th className="px-4 py-2 text-left font-semibold text-gray-500 w-8">순위</th>
+                    <th className="px-4 py-2 text-left font-semibold text-gray-500">지역</th>
+                    <th className="px-4 py-2 text-right font-semibold text-gray-500">건수</th>
+                    <th className="px-4 py-2 text-right font-semibold text-gray-500">비율</th>
+                  </tr></thead>
+                  <tbody className="divide-y divide-gray-50">
+                    {regionStats.length === 0
+                      ? <tr><td colSpan={4} className="px-4 py-6 text-center text-gray-400">데이터 없음</td></tr>
+                      : regionStats.map((d, i) => {
+                        const regionTotal = regionStats.reduce((s, r) => s + r.count, 0) || 1;
+                        return (
+                          <tr key={i} className="hover:bg-gray-50">
+                            <td className="px-4 py-2 text-gray-400">{i + 1}</td>
+                            <td className="px-4 py-2 text-gray-700">{d.region}</td>
+                            <td className="px-4 py-2 text-right font-semibold text-gray-900">{d.count.toLocaleString("ko-KR")}</td>
+                            <td className="px-4 py-2 text-right text-gray-500">{Math.round((d.count / regionTotal) * 100)}%</td>
+                          </tr>
+                        );
+                      })}
+                  </tbody>
+                </table>
+              )}
+
+              {tableTab === "level" && (() => {
+                const LEVEL_NAMES: Record<string, string> = { LEVEL_1: "안전안내", LEVEL_2: "긴급재난", LEVEL_3: "위급재난" };
+                const levelTotal = levelStats.reduce((s, d) => s + d.count, 0) || 1;
+                return (
+                  <table className="w-full text-xs">
+                    <thead className="bg-gray-50"><tr>
+                      <th className="px-4 py-2 text-left font-semibold text-gray-500">경보단계</th>
+                      <th className="px-4 py-2 text-right font-semibold text-gray-500">건수</th>
+                      <th className="px-4 py-2 text-right font-semibold text-gray-500">비율</th>
+                    </tr></thead>
+                    <tbody className="divide-y divide-gray-50">
+                      {levelStats.length === 0
+                        ? <tr><td colSpan={3} className="px-4 py-6 text-center text-gray-400">데이터 없음</td></tr>
+                        : levelStats.map((d, i) => (
+                          <tr key={i} className="hover:bg-gray-50">
+                            <td className="px-4 py-2 text-gray-700">{d.level ? (LEVEL_NAMES[d.level] ?? d.level) : "기타"}</td>
+                            <td className="px-4 py-2 text-right font-semibold text-gray-900">{d.count.toLocaleString("ko-KR")}</td>
+                            <td className="px-4 py-2 text-right text-gray-500">{Math.round((d.count / levelTotal) * 100)}%</td>
+                          </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                );
+              })()}
+
+              {tableTab === "quarter" && (() => {
+                const quarterTotal = quarterStats.reduce((s, d) => s + d.count, 0) || 1;
+                return (
+                  <table className="w-full text-xs">
+                    <thead className="bg-gray-50"><tr>
+                      <th className="px-4 py-2 text-left font-semibold text-gray-500">분기</th>
+                      <th className="px-4 py-2 text-right font-semibold text-gray-500">건수</th>
+                      <th className="px-4 py-2 text-right font-semibold text-gray-500">비율</th>
+                    </tr></thead>
+                    <tbody className="divide-y divide-gray-50">
+                      {quarterStats.length === 0
+                        ? <tr><td colSpan={3} className="px-4 py-6 text-center text-gray-400">데이터 없음</td></tr>
+                        : quarterStats.map((d, i) => (
+                          <tr key={i} className="hover:bg-gray-50">
+                            <td className="px-4 py-2 text-gray-700">{d.quarter}</td>
+                            <td className="px-4 py-2 text-right font-semibold text-gray-900">{d.count.toLocaleString("ko-KR")}</td>
+                            <td className="px-4 py-2 text-right text-gray-500">{Math.round((d.count / quarterTotal) * 100)}%</td>
+                          </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                );
+              })()}
+
+              {tableTab === "daily" && (
+                <table className="w-full text-xs">
+                  <thead className="bg-gray-50"><tr>
+                    <th className="px-4 py-2 text-left font-semibold text-gray-500">날짜</th>
+                    <th className="px-4 py-2 text-right font-semibold text-gray-500">건수</th>
+                  </tr></thead>
+                  <tbody className="divide-y divide-gray-50">
+                    {dailyStats.length === 0
+                      ? <tr><td colSpan={2} className="px-4 py-6 text-center text-gray-400">데이터 없음</td></tr>
+                      : dailyStats.map((d, i) => (
+                        <tr key={i} className="hover:bg-gray-50">
+                          <td className="px-4 py-2 text-gray-700">{d.date}</td>
+                          <td className="px-4 py-2 text-right font-semibold text-gray-900">{d.count.toLocaleString("ko-KR")}</td>
+                        </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* 크로스 필터 배지: 차트 클릭으로 유형 필터 활성 시 표시 */}
