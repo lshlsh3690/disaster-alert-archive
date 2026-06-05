@@ -109,6 +109,11 @@ spring.ai:
       options:
         model: text-embedding-3-small
         dimensions: 512
+    # chat 모델 (risk 모듈 LlmRiskProfiler — 35종에 없는 신규 유형 프로파일 산출용)
+    chat:
+      options:
+        model: gpt-4o-mini
+        temperature: 0.2
 
 # 이벤트 클러스터링 (임베딩 기반)
 # 지역 hard 필터: 같은 시군구 후보만, 코사인 유사도 >= similarity-threshold 면 머지.

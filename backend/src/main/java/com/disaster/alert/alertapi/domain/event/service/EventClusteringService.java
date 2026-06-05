@@ -9,10 +9,12 @@ import com.disaster.alert.alertapi.domain.event.repository.AlertEmbeddingReposit
 import com.disaster.alert.alertapi.domain.event.repository.DisasterEventRepository;
 import com.disaster.alert.alertapi.domain.event.repository.EventAlertMappingRepository;
 import com.disaster.alert.alertapi.domain.legaldistrict.model.LegalDistrict;
+import com.disaster.alert.alertapi.domain.risk.event.AlertClusteredEvent;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.embedding.EmbeddingModel;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -47,6 +49,7 @@ public class EventClusteringService {
     private final DisasterEventRepository disasterEventRepository;
     private final EventAlertMappingRepository eventAlertMappingRepository;
     private final AlertEmbeddingRepository alertEmbeddingRepository;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Value("${clustering.enabled:false}")
     private boolean enabled;
@@ -189,6 +192,8 @@ public class EventClusteringService {
         int nextSeq = eventAlertMappingRepository.countByEventId(eventId) + 1;
         eventAlertMappingRepository.save(EventAlertMapping.of(eventId, alert.getId(), nextSeq, similarity));
         disasterEventRepository.incrementOnMerge(eventId, alert.getCreatedAt());
+        // 위험도 모듈 트리거 (커밋 후 @TransactionalEventListener 가 수신)
+        eventPublisher.publishEvent(new AlertClusteredEvent(eventId, alert.getId()));
         log.info("clusterNewAlert: alertId={} → event={} 머지 (similarity={}, seq={})",
                 alert.getId(), eventId, similarity, nextSeq);
     }
@@ -204,6 +209,8 @@ public class EventClusteringService {
         );
         DisasterEvent saved = disasterEventRepository.save(event);
         eventAlertMappingRepository.save(EventAlertMapping.of(saved.getId(), alert.getId(), 1));
+        // 위험도 모듈 트리거 (커밋 후 @TransactionalEventListener 가 수신)
+        eventPublisher.publishEvent(new AlertClusteredEvent(saved.getId(), alert.getId()));
         log.info("clusterNewAlert: alertId={} → 신규 event={} (broadcast={}, title='{}')",
                 alert.getId(), saved.getId(), broadcast, saved.getEventTitle());
     }
