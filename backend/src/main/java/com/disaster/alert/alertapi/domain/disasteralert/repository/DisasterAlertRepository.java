@@ -68,4 +68,17 @@ public interface DisasterAlertRepository extends JpaRepository<DisasterAlert, Lo
 
     @Query("select count(d) from DisasterAlert d where d.createdAt >= CURRENT_DATE")
     long countToday();
+
+    /**
+     * 한 이벤트에 속한 모든 재난문자 + 영향 법정동을 fetch join 으로 조회 (위험도 계산용, N+1 방지).
+     * 알림→이벤트는 event_alert_mapping 경유 (entity join).
+     */
+    @Query("""
+            SELECT DISTINCT da FROM DisasterAlert da
+            LEFT JOIN FETCH da.disasterAlertRegions dar
+            LEFT JOIN FETCH dar.legalDistrict
+            JOIN EventAlertMapping m ON m.id.alertId = da.id
+            WHERE m.id.eventId = :eventId
+            """)
+    List<DisasterAlert> findByEventId(@org.springframework.data.repository.query.Param("eventId") Long eventId);
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import ReportButton from "@/components/alerts/ReportButton";
-import KakaoPolygonMap from "@/components/KakaoPolygonMap";
+import KakaoPolygonMap from "@/components/map/KakaoPolygonMap";
 import { useSearchCombinedAlerts, useSigungu, useSidoStats, useAlertStats, useSigunguStats } from "@/lib/queries/useAlerts";
 import { Alert } from "@/types/alerts";
 import { LEVEL_OPTIONS, levelTextToCode } from "@/ui/level";

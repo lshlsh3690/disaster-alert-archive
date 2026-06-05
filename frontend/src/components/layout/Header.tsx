@@ -49,6 +49,7 @@ export default function Header() {
     logoutApi()
       .then(() => {
         logout();
+        localStorage.removeItem("fcm-token");
         setOpen(false);
         router.push("/");
       })

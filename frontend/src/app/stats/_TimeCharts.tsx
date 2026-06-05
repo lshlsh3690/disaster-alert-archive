@@ -27,6 +27,7 @@ import {
   Tooltip,                     // 마우스 호버 팝업
   ReferenceLine,               // 평균선 같은 기준선
   Legend,                      // 범례
+  Brush,                       // 시계열 줌/팬 범위 선택기
   ResponsiveContainer,         // 부모 크기에 맞춘 자동 리사이즈
 } from "recharts";
 import type { DailyStat, HourlyStat, MonthlyTypeStat } from "@/types/alerts";
@@ -36,13 +37,16 @@ import { VerticalBar } from "./_DistributionCharts";
 
 // ─── 공통 툴팁 스타일 ─────────────────────────────────────────────────────────
 
+// 툴팁 컨테이너 공통 스타일 (어두운 배경·둥근 모서리)
 const TT_BOX: React.CSSProperties = {
   background: "#1e293b",
   borderRadius: 6,
   padding: "6px 10px",
   border: "none",
 };
+// 툴팁 제목(날짜 등) 스타일
 const TT_LABEL: React.CSSProperties = { color: "#94a3b8", fontSize: 10, margin: "0 0 2px 0" };
+// 툴팁 강조 수치 스타일
 const TT_VALUE: React.CSSProperties = { color: "#fff", fontSize: 12, fontWeight: 700, margin: 0 };
 
 // Recharts가 content 컴포넌트에 넘겨주는 props 타입
@@ -118,12 +122,20 @@ export function LineChart({ data }: { data: DailyStat[] }) {
           {/* 평균값 점선 기준선 */}
           <ReferenceLine y={avg} stroke="#f97316" strokeDasharray="3 2" />
 
+          {/* 30일 초과 시 줌/팬 범위 선택기 표시 */}
+          {data.length > 7 && (
+            <Brush dataKey="date" height={22} stroke="#93c5fd" fill="#eff6ff" travellerWidth={8}
+              tickFormatter={(v: string) => v.slice(5)}
+              style={{ fontSize: 9, fill: "#6b7280" }} />
+          )}
+
           <Area
             type="monotone"
             dataKey="count"
             stroke="#2563eb"
             strokeWidth={2}
             fill="url(#lineGrad)"
+            isAnimationActive={false}
             // dot prop: 최고점에만 빨간 원을 그립니다
             dot={(props: { cx?: number; cy?: number; index: number }) => {
               const { cx, cy, index } = props;
@@ -141,83 +153,51 @@ export function LineChart({ data }: { data: DailyStat[] }) {
   );
 }
 
-// ─── 일별 SVG 막대 차트 ──────────────────────────────────────────────────────
+// ─── 일별 막대 차트 ──────────────────────────────────────────────────────────
 
 /**
  * DailyBar
  *
- * 날짜별 건수를 순수 SVG로 그린 막대 차트입니다.
- * Recharts 없이 직접 rect 요소를 계산해 그립니다.
- * 마우스를 올리면 해당 막대 위에 날짜·건수 팝업이 나타납니다.
+ * 날짜별 건수를 Recharts BarChart로 표현합니다.
+ * ResponsiveContainer를 사용해 LineChart와 동일한 높이 제약을 받습니다.
  *
  * @param data - { date: "YYYY-MM-DD", count: number }[] 배열
  */
 export function DailyBar({ data }: { data: DailyStat[] }) {
-  // hoveredIdx: 마우스가 올라가 있는 막대의 인덱스 (null이면 없음)
-  const [hoveredIdx, setHoveredIdx] = useState<number | null>(null);
-
   if (data.length === 0) return <EmptyChart />;
 
-  const max = Math.max(...data.map(d => d.count)) || 1; // 최대값 (0 방지)
-  const W = 400;   // viewBox 가로 크기
-  const H = 140;   // viewBox 세로 크기
-  const PAD_X = 4; // 가로 여백
-  const PAD_Y = 16;// 세로 여백 (레이블 공간)
-  const innerW = W - PAD_X * 2;
-  // 막대 하나의 너비: 전체 가로를 막대 개수로 나누고 간격 1px를 뺍니다
-  const barW = Math.max(innerW / data.length - 1, 1);
-  // X축 레이블: 최대 6개만 표시
-  const step = Math.ceil(data.length / 6);
+  const labelStride = Math.max(1, Math.floor(data.length / 6));
+
+  const TooltipContent = ({ active, payload, label }: TTProps) => {
+    if (!active || !payload?.length) return null;
+    return (
+      <div style={TT_BOX}>
+        <p style={TT_LABEL}>{label}</p>
+        <p style={TT_VALUE}>{(payload[0].value ?? 0).toLocaleString("ko-KR")}건</p>
+      </div>
+    );
+  };
 
   return (
-    <div className="flex-1 flex flex-col min-h-0">
-      {/* preserveAspectRatio="none": SVG가 부모 width에 맞춰 비율 무시하고 늘어납니다 */}
-      <svg width="100%" viewBox={`0 0 ${W} ${H}`} className="flex-1 overflow-visible">
-        {data.map((d, i) => {
-          // 막대 높이: count가 max에서 차지하는 비율만큼 (PAD_Y 제외한 영역)
-          const bh = Math.max((d.count / max) * (H - PAD_Y), 1);
-          const x = PAD_X + i * (innerW / data.length);
-          return (
-            <rect
-              key={i}
-              x={x} y={H - PAD_Y - bh}
-              width={barW} height={bh}
-              fill={hoveredIdx === i ? "#1d4ed8" : "#3b82f6"}
-              rx={1}
-              onMouseEnter={() => setHoveredIdx(i)}
-              onMouseLeave={() => setHoveredIdx(null)}
-              style={{ cursor: "pointer" }}
-            />
-          );
-        })}
-
-        {/* 호버 팝업: hoveredIdx가 있을 때만 렌더링 */}
-        {hoveredIdx !== null && (() => {
-          const d = data[hoveredIdx];
-          // 화면 오른쪽 끝에서 잘리지 않도록 최대 x값을 제한합니다
-          const x = Math.min(PAD_X + hoveredIdx * (innerW / data.length), W - 90);
-          const bh = Math.max((d.count / max) * (H - PAD_Y), 1);
-          const y = H - PAD_Y - bh - 22; // 막대 상단 바로 위
-          return (
-            <>
-              <rect x={x} y={Math.max(y, 2)} width={86} height={18} rx={3} fill="#1f2937" />
-              <text x={x + 4} y={Math.max(y, 2) + 12} fontSize={9} fill="white">
-                {d.date.slice(5)}: {d.count.toLocaleString()}건
-              </text>
-            </>
-          );
-        })()}
-
-        {/* X축 날짜 레이블 */}
-        {data.map((d, i) => i % step === 0 && (
-          <text key={i}
-            x={PAD_X + i * (innerW / data.length)}
-            y={H - 2}
-            fontSize={8} fill="#9ca3af">
-            {d.date.slice(5)}
-          </text>
-        ))}
-      </svg>
+    <div className="flex-1 min-h-0" style={{ height: "100%" }}>
+      <ResponsiveContainer width="100%" height="100%">
+        <BarChart data={data} margin={{ top: 8, right: 8, bottom: 4, left: 4 }}>
+          <CartesianGrid vertical={false} stroke="#f3f4f6" />
+          <XAxis dataKey="date" axisLine={false} tickLine={false}
+            tick={{ fontSize: 9, fill: "#9ca3af" }}
+            tickFormatter={(v: string) => v.slice(5)}
+            interval={labelStride - 1} />
+          <YAxis axisLine={false} tickLine={false}
+            tick={{ fontSize: 9, fill: "#9ca3af" }} width={32} />
+          <Tooltip content={<TooltipContent />} cursor={{ fill: "#f3f4f6" }} />
+          <Bar dataKey="count" fill="#3b82f6" radius={[2, 2, 0, 0]} maxBarSize={40} isAnimationActive={false} />
+          {data.length > 7 && (
+            <Brush dataKey="date" height={22} stroke="#93c5fd" fill="#eff6ff" travellerWidth={8}
+              tickFormatter={(v: string) => v.slice(5)}
+              style={{ fontSize: 9, fill: "#6b7280" }} />
+          )}
+        </BarChart>
+      </ResponsiveContainer>
     </div>
   );
 }
@@ -278,7 +258,7 @@ export function Heatmap({ data }: { data: HourlyStat[] }) {
               <div
                 key={hi}
                 style={{
-                  aspectRatio: "1/1",
+                  height: 22,
                   // 건수가 0이면 회색, 있으면 파란색(농도는 비율에 비례)
                   background: v === 0
                     ? "#f3f4f6"
@@ -347,7 +327,6 @@ export function DayOfWeekBar({ data }: { data: HourlyStat[] }) {
 
   // WEEKDAYS 순서(월~일)에 맞게 배열로 변환
   const bars = WEEKDAYS.map((label, di) => {
-    // DOW_TO_IDX의 역방향: 화면 인덱스(0=월) → PostgreSQL DOW 번호 찾기
     const dow = Number(
       Object.entries(DOW_TO_IDX).find(([, idx]) => idx === di)?.[0] ?? -1
     );
@@ -355,8 +334,15 @@ export function DayOfWeekBar({ data }: { data: HourlyStat[] }) {
   });
 
   if (bars.every(b => b.count === 0)) return <EmptyChart />;
-  // VerticalBar는 _DistributionCharts.tsx에서 가져옵니다
-  return <VerticalBar data={bars} />;
+  // 최솟값~최댓값 범위로 정규화해 색 차이를 명확하게 표현
+  const max = Math.max(...bars.map(b => b.count));
+  const min = Math.min(...bars.map(b => b.count));
+  const range = max - min || 1;
+  const colored = bars.map(b => ({
+    ...b,
+    color: `rgba(37,99,235,${0.15 + ((b.count - min) / range) * 0.75})`,
+  }));
+  return <VerticalBar data={colored} />;
 }
 
 // ─── 시간대별 집계 막대 ──────────────────────────────────────────────────────
@@ -381,7 +367,13 @@ export function HourBar({ data }: { data: HourlyStat[] }) {
   }));
 
   if (bars.every(b => b.count === 0)) return <EmptyChart />;
-  return <VerticalBar data={bars} />;
+  // 0 기준 정규화 (새벽 등 값이 거의 없는 구간과 피크 구간 대비가 자연스러움)
+  const max = Math.max(...bars.map(b => b.count)) || 1;
+  const colored = bars.map(b => ({
+    ...b,
+    color: `rgba(37,99,235,${0.15 + (b.count / max) * 0.75})`,
+  }));
+  return <VerticalBar data={colored} />;
 }
 
 // ─── 월별 유형별 누적 면적 차트 ─────────────────────────────────────────────
@@ -408,8 +400,8 @@ export function StackedArea({
 }) {
   if (data.length === 0 || types.length === 0) return <EmptyChart />;
 
-  // 최근 12개월만 사용
-  const months = [...new Set(data.map(d => d.month))].sort().slice(-12);
+  const isDaily = data.length > 0 && data[0].month.length === 10;
+  const months = [...new Set(data.map(d => d.month))].sort().slice(isDaily ? -60 : -12);
   if (months.length === 0) return <EmptyChart />;
 
   // 특정 월·유형의 건수를 찾는 헬퍼 함수
@@ -458,7 +450,7 @@ export function StackedArea({
           (i % Math.max(1, Math.floor(n / 5)) === 0 || i === n - 1) && (
             <text key={m} x={xs(i)} y={h - padB + 13}
               textAnchor="middle" fontSize="9" fill="#9ca3af">
-              {`${parseInt(m.slice(5))}월`}
+              {m.length === 10 ? m.slice(5) : `${parseInt(m.slice(5))}월`}
             </text>
           )
         )}
@@ -496,7 +488,8 @@ export function StackedBar({
   data: MonthlyTypeStat[];
   types: string[];
 }) {
-  const months = [...new Set(data.map(d => d.month))].sort().slice(-12);
+  const isDaily = data.length > 0 && data[0].month.length === 10;
+  const months = [...new Set(data.map(d => d.month))].sort().slice(isDaily ? -60 : -12);
   if (months.length === 0) return <EmptyChart />;
 
   const monthData = months.map(m => {
@@ -506,7 +499,7 @@ export function StackedBar({
       count: data.find(d => d.month === m && d.type === t)?.count ?? 0,
     }));
     return {
-      label: `${parseInt(m.slice(5))}월`,
+      label: m.length === 10 ? m.slice(5) : `${parseInt(m.slice(5))}월`,
       total: segments.reduce((s, g) => s + g.count, 0),
       segments,
     };
@@ -598,24 +591,29 @@ export function CompareBars({
   };
   const ty = agg(thisYearData), ly = agg(lastYearData);
 
-  // 1~12월 배열 생성 (데이터가 전혀 없는 달은 제외)
+  // 1~12월 배열 생성 (둘 다 0인 달만 제외)
+  const currentMonth = new Date().getMonth() + 1;
   const months = Array.from({ length: 12 }, (_, i) => {
     const key = String(i + 1).padStart(2, "0"); // "01" ~ "12"
-    return { label: `${i + 1}월`, ty: ty[key] ?? 0, ly: ly[key] ?? 0 };
+    return { label: `${i + 1}월`, ty: ty[key] ?? 0, ly: ly[key] ?? 0, monthNum: i + 1 };
   }).filter(m => m.ty > 0 || m.ly > 0);
 
   if (months.length === 0) return <EmptyChart />;
 
-  // 전체 YoY 증감률 계산
-  const totalTy = months.reduce((s, m) => s + m.ty, 0);
-  const totalLy = months.reduce((s, m) => s + m.ly, 0);
+  // 전체 YoY 증감률 계산 (미래 달 제외)
+  const pastMonths = months.filter(m => !(m.ty === 0 && m.monthNum > currentMonth));
+  const totalTy = pastMonths.reduce((s, m) => s + m.ty, 0);
+  const totalLy = pastMonths.reduce((s, m) => s + m.ly, 0);
   const yoy = totalLy > 0 ? Math.round(((totalTy - totalLy) / totalLy) * 100) : null;
 
   const TooltipContent = ({ active, payload, label }: TTProps) => {
     if (!active || !payload?.length) return null;
     const lyVal = payload.find(p => p.dataKey === "ly")?.value ?? 0;
     const tyVal = payload.find(p => p.dataKey === "ty")?.value ?? 0;
-    const diff = lyVal > 0 ? Math.round(((tyVal - lyVal) / lyVal) * 100) : null;
+    // 올해 데이터가 없고 아직 지나지 않은 달은 증감률 표시 안 함
+    const monthNum = months.find(m => m.label === label)?.monthNum ?? 0;
+    const isFuture = tyVal === 0 && monthNum > currentMonth;
+    const diff = !isFuture && lyVal > 0 ? Math.round(((tyVal - lyVal) / lyVal) * 100) : null;
     return (
       <div style={TT_BOX}>
         <p style={TT_LABEL}>{label}</p>
@@ -660,8 +658,8 @@ export function CompareBars({
                 value === "ly" ? String(currentYear - 1) : String(currentYear)
               } />
             {/* ly: 작년 (회색), ty: 올해 (파란색) */}
-            <Bar dataKey="ly" fill="#cbd5e1" radius={[3, 3, 0, 0]} maxBarSize={16} />
-            <Bar dataKey="ty" fill="#2563eb" radius={[3, 3, 0, 0]} maxBarSize={16} />
+            <Bar dataKey="ly" fill="#cbd5e1" radius={[3, 3, 0, 0]} maxBarSize={16} isAnimationActive={false} />
+            <Bar dataKey="ty" fill="#2563eb" radius={[3, 3, 0, 0]} maxBarSize={16} isAnimationActive={false} />
           </BarChart>
         </ResponsiveContainer>
       </div>

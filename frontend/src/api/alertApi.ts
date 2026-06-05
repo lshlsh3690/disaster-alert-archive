@@ -95,6 +95,11 @@ export async function fetchMonthlyTypeStats(params: AlertSearchRequest): Promise
   return z.array(ZMonthlyTypeStat).parse(res.data);
 }
 
+export async function fetchDailyTypeStats(params: AlertSearchRequest): Promise<MonthlyTypeStat[]> {
+  const res = await instance.get("/api/v1/alerts/stats/daily-type", { params });
+  return z.array(ZMonthlyTypeStat).parse(res.data);
+}
+
 export async function fetchDashboardSummary(): Promise<DashboardSummary> {
   const res = await instance.get("/api/v1/alerts/dashboard/summary");
   const data = ZDashboardSummary.parse(res.data);
@@ -113,6 +118,21 @@ export async function fetchWeatherByType(params: AlertSearchRequest): Promise<We
 
 export async function fetchWeatherByRegion(params: AlertSearchRequest, groupBy: "sido" | "sigungu"): Promise<WeatherRegionStat[]> {
   const res = await instance.get("/api/v1/alerts/stats/weather-by-region", { params: { ...params, groupBy } });
+  return z.array(ZWeatherRegionStat).parse(res.data);
+}
+
+export async function fetchWeatherHourlyCorrelation(params: AlertSearchRequest): Promise<WeatherCorrelationStat[]> {
+  const res = await instance.get("/api/v1/alerts/stats/weather-correlation-hourly", { params });
+  return z.array(ZWeatherCorrelationStat).parse(res.data);
+}
+
+export async function fetchWeatherHourlyByType(params: AlertSearchRequest): Promise<WeatherTypeStat[]> {
+  const res = await instance.get("/api/v1/alerts/stats/weather-by-type-hourly", { params });
+  return z.array(ZWeatherTypeStat).parse(res.data);
+}
+
+export async function fetchWeatherHourlyByRegion(params: AlertSearchRequest, groupBy: "sido" | "sigungu"): Promise<WeatherRegionStat[]> {
+  const res = await instance.get("/api/v1/alerts/stats/weather-by-region-hourly", { params: { ...params, groupBy } });
   return z.array(ZWeatherRegionStat).parse(res.data);
 }
 

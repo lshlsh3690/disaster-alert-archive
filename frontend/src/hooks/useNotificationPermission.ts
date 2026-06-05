@@ -13,6 +13,11 @@ export const useNotificationPermission = () => {
 
   // FCM 토큰 발급
   const getFcmToken = useCallback(async (): Promise<string | null> => {
+    const cached = localStorage.getItem("fcm-token");
+    if (cached) {
+      setFcmToken(cached);
+      return cached;
+    }
 
     // SW 등록 후 활성화까지 대기
     if ("serviceWorker" in navigator) {
@@ -54,6 +59,8 @@ export const useNotificationPermission = () => {
 
       if (token) {
         console.log("🔥 FCM Token:", token);
+        localStorage.setItem("fcm-token", token);
+        setFcmToken(token);
         await registerFcmToken(token);
         return token;
       }

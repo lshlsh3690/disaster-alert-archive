@@ -1,9 +1,9 @@
 import useSignupStore from "@/store/signupStore";
 import { useEffect } from "react";
 import { FieldValues, Path, UseFormReturn, useWatch } from "react-hook-form";
-import Button from "@components/Button";
+import Button from "@/components/ui/Button";
 import { useSendEmailVerificationCode } from "@/lib/mutations/useSendEmailVerificationCode";
-import InputStatusMessage from "../InputStatusMessage";
+import InputStatusMessage from "../ui/InputStatusMessage";
 import { useOptionalCountdownContext } from "@/context/useCountdownContext";
 
 interface EmailInputProps<T extends FieldValues> {
