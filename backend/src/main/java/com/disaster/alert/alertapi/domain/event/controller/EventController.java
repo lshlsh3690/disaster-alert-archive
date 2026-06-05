@@ -32,16 +32,20 @@ public class EventController {
     @GetMapping
     public ResponseEntity<Page<EventListResponse>> list(
             @RequestParam(required = false) Boolean active,
+            @RequestParam(defaultValue = "ko") String lang,
             Pageable pageable
     ) {
-        return ResponseEntity.ok(eventQueryService.list(active, pageable));
+        return ResponseEntity.ok(eventQueryService.list(active, pageable, lang));
     }
 
     /**
-     * 이벤트 상세 + 타임라인 (소속 재난문자 시간순).
+     * 이벤트 상세 + 타임라인 (소속 재난문자 시간순). {@code lang} 으로 제목·타임라인 번역.
      */
     @GetMapping("/{id}")
-    public ResponseEntity<EventDetailResponse> detail(@PathVariable Long id) {
-        return ResponseEntity.ok(eventQueryService.detail(id));
+    public ResponseEntity<EventDetailResponse> detail(
+            @PathVariable Long id,
+            @RequestParam(defaultValue = "ko") String lang
+    ) {
+        return ResponseEntity.ok(eventQueryService.detail(id, lang));
     }
 }
