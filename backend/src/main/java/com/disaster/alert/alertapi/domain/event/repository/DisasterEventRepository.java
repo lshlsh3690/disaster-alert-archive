@@ -133,4 +133,106 @@ public interface DisasterEventRepository extends JpaRepository<DisasterEvent, Lo
             WHERE id = :eventId
             """, nativeQuery = true)
     int incrementOnMerge(@Param("eventId") Long eventId, @Param("alertAt") LocalDateTime alertAt);
+
+    // ── cross-region LLM 병합 ─────────────────────────────────────
+
+    /**
+     * cross-region 후보 이벤트 검색 — {@link #findTopCandidates}와 달리 <b>지역 필터를 제거</b>하고,
+     * 후보가 '이동 사건(기타 + mover 키워드)' 알림을 가진 이벤트인지로 한정한다.
+     *
+     * <p>실종자·탈출 동물처럼 지역이 달라 시군구가 안 겹치는 같은 사건을 찾기 위함. 임베딩 top-K 만
+     * 추리고(무관한 기타 거름), 실제 동일 인물/개체 판정은 LLM 이 한다.
+     *
+     * @param newEmbedding 대상 알림 임베딩 벡터 텍스트
+     * @param sinceTime    윈도우 하한 (cross-region 전용, 기본 14일)
+     * @param selfEventId  대상 알림이 속한 이벤트 (자기 제외)
+     * @param moverRegex   mover 키워드 정규식 (Postgres ~ 매칭)
+     * @param maxDistance  허용 최대 코사인 거리 (1 - similarity-floor)
+     * @param limit        top-K
+     * @return {eventId, minDistance} 0~K 행, 거리 오름차순
+     */
+    @Query(value = """
+            SELECT e.id AS event_id,
+                   MIN(da.embedding <=> CAST(:newEmbedding AS vector)) AS min_distance
+            FROM disaster_events e
+            JOIN event_alert_mapping m ON m.event_id = e.id
+            JOIN disaster_alert da ON da.disaster_alert_id = m.alert_id
+            WHERE e.last_alert_at > :sinceTime
+              AND e.is_broadcast = false
+              AND e.id <> :selfEventId
+              AND da.embedding IS NOT NULL
+              AND EXISTS (
+                  SELECT 1 FROM event_alert_mapping m2
+                  JOIN disaster_alert da2 ON da2.disaster_alert_id = m2.alert_id
+                  WHERE m2.event_id = e.id
+                    AND da2.disaster_type = '기타'
+                    AND da2.message ~ :moverRegex
+              )
+            GROUP BY e.id
+            HAVING MIN(da.embedding <=> CAST(:newEmbedding AS vector)) <= :maxDistance
+            ORDER BY min_distance ASC
+            LIMIT :limit
+            """, nativeQuery = true)
+    List<Object[]> findCrossRegionCandidates(
+            @Param("newEmbedding") String newEmbedding,
+            @Param("sinceTime") LocalDateTime sinceTime,
+            @Param("selfEventId") Long selfEventId,
+            @Param("moverRegex") String moverRegex,
+            @Param("maxDistance") double maxDistance,
+            @Param("limit") int limit
+    );
+
+    /**
+     * cross-region 인물 후보 검색 — 임베딩이 아니라 <b>이름+나이 하드 매칭</b>.
+     *
+     * <p>실종 경찰문자는 "OOO씨(성별,N세) …" 로 정형화돼 있어, 같은 이름+나이면 거의 같은 사람이다.
+     * 임베딩 top-K(전부 ~0.9 유사한 실종 템플릿)로는 다른 사람을 잘못 묶어(정경남↔조래삼) precision
+     * 이 나빴음 → 이름+나이를 후보 게이트로 두고 LLM 은 그 안에서 인상착의 보조 확인만 한다.
+     *
+     * <p>나이는 정규식으로 매칭하되 앞에 숫자가 없도록 해 "170세"가 "70세"로 오매칭되는 것 방지.
+     * 키({@code height})가 있으면 같은 키(cm)까지 요구 — 같은 이름+나이라도 다른 사람(동명이인) 차단.
+     * 키가 없으면(추출 실패) 이름+나이만으로 매칭.
+     */
+    @Query(value = """
+            SELECT e.id AS event_id, MAX(e.last_alert_at) AS recency
+            FROM disaster_events e
+            JOIN event_alert_mapping m ON m.event_id = e.id
+            JOIN disaster_alert da ON da.disaster_alert_id = m.alert_id
+            WHERE e.last_alert_at > :sinceTime
+              AND e.is_broadcast = false
+              AND e.id <> :selfEventId
+              AND da.disaster_type = '기타'
+              AND da.message LIKE ('%' || :name || '씨%')
+              AND da.message ~ ('(^|[^0-9])' || :age || '세')
+              AND (CAST(:height AS varchar) IS NULL OR da.message LIKE ('%' || :height || 'cm%'))
+            GROUP BY e.id
+            ORDER BY recency DESC
+            LIMIT :limit
+            """, nativeQuery = true)
+    List<Object[]> findCrossRegionCandidatesByPerson(
+            @Param("name") String name,
+            @Param("age") String age,
+            @Param("height") String height,
+            @Param("sinceTime") LocalDateTime sinceTime,
+            @Param("selfEventId") Long selfEventId,
+            @Param("limit") int limit
+    );
+
+    /**
+     * 이벤트 집계 재계산 (cross-region 병합 후) — alert_count / first_alert_at / last_alert_at 을
+     * 현재 매핑된 알림들의 created_at 으로 다시 산정.
+     */
+    @Modifying
+    @Query(value = """
+            UPDATE disaster_events SET
+                alert_count = (SELECT count(*) FROM event_alert_mapping WHERE event_id = :eventId),
+                first_alert_at = (SELECT min(da.created_at) FROM event_alert_mapping m
+                                  JOIN disaster_alert da ON da.disaster_alert_id = m.alert_id
+                                  WHERE m.event_id = :eventId),
+                last_alert_at = (SELECT max(da.created_at) FROM event_alert_mapping m
+                                 JOIN disaster_alert da ON da.disaster_alert_id = m.alert_id
+                                 WHERE m.event_id = :eventId)
+            WHERE id = :eventId
+            """, nativeQuery = true)
+    int recomputeAggregates(@Param("eventId") Long eventId);
 }

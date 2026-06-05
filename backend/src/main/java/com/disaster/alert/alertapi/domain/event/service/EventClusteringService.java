@@ -5,6 +5,8 @@ import com.disaster.alert.alertapi.domain.disasteralert.model.DisasterAlertRegio
 import com.disaster.alert.alertapi.domain.disasteralert.repository.DisasterAlertRepository;
 import com.disaster.alert.alertapi.domain.event.model.DisasterEvent;
 import com.disaster.alert.alertapi.domain.event.model.EventAlertMapping;
+import com.disaster.alert.alertapi.domain.event.model.MergeMethod;
+import com.disaster.alert.alertapi.domain.event.model.MissingPersonIdentity;
 import com.disaster.alert.alertapi.domain.event.repository.AlertEmbeddingRepository;
 import com.disaster.alert.alertapi.domain.event.repository.DisasterEventRepository;
 import com.disaster.alert.alertapi.domain.event.repository.EventAlertMappingRepository;
@@ -68,6 +70,10 @@ public class EventClusteringService {
     @Value("${clustering.nationwide-sido-span:8}")
     private int nationwideSidoSpan;
 
+    /** 실종 인물 신원 클러스터링 윈도우(시간). 같은 사람 재신고를 한 이벤트로 보는 간격. 기본 14일. */
+    @Value("${clustering.person-window-hours:336}")
+    private int personWindowHours;
+
     /**
      * 신규 알림에 대해 임베딩 생성 + 클러스터링 수행.
      *
@@ -118,6 +124,12 @@ public class EventClusteringService {
     }
 
     private void doCluster(DisasterAlert alert) {
+        // 0. 실종 인물(기타 + 이름·나이)은 신원(이름+나이+키)으로만 클러스터링 — 시군구·임베딩 무관.
+        //    같은 사람=한 이벤트(지역 옮겨도), 다른 사람=다른 이벤트(같은 시군구라도). broadcast 도 안 탐.
+        if (clusterPerson(alert)) {
+            return;
+        }
+
         // 1. 임베딩 확보 — 이미 저장돼 있으면 재사용(OpenAI 재호출 X), 없으면 생성 후 저장.
         //    덕분에 재클러스터링(임계값 튜닝)이 공짜+빠름: 비싼 임베딩은 1회만.
         String embeddingText = alertEmbeddingRepository.findEmbeddingText(alert.getId());
@@ -157,12 +169,46 @@ public class EventClusteringService {
             Long eventId = ((Number) row[0]).longValue();
             double dist = ((Number) row[1]).doubleValue();
             if (dist <= mergeMaxDistance) {
-                mergeIntoExisting(eventId, alert, 1.0 - dist);
+                mergeIntoExisting(eventId, alert, 1.0 - dist, MergeMethod.EMBEDDING);
                 return;
             }
         }
 
         createNewEvent(alert, regionCodes[0], extractFirstRegionName(alert), false);
+    }
+
+    /**
+     * 실종 인물 신원 클러스터링 — 같은 이름+나이+키 이벤트에 머지(시군구·임베딩 무관), 없으면 신규.
+     *
+     * <p>실종 경찰문자는 "OOO씨(성별,N세) …cm" 정형이라 동일인을 결정적으로 식별할 수 있다.
+     * 임베딩+지역으로 묶으면 (a) 지역 옮긴 같은 사람을 못 묶고 (b) 같은 시군구의 다른 실종자를
+     * 템플릿 유사도로 잘못 묶는다. 그래서 인물은 이 경로로만 처리(LLM·임베딩 미사용, recluster 공짜).
+     *
+     * @return 인물로 처리하면 true, 아니면(일반 재난·동물·비정형) false → 임베딩 경로로.
+     */
+    private boolean clusterPerson(DisasterAlert alert) {
+        if (!"기타".equals(alert.getDisasterType()) || !MissingPersonIdentity.isPerson(alert.getMessage())) {
+            return false;
+        }
+        String name = MissingPersonIdentity.name(alert.getMessage());
+        String age = MissingPersonIdentity.age(alert.getMessage());
+        String height = MissingPersonIdentity.height(alert.getMessage());
+        String key = name + " " + age + "세" + (height == null ? "" : " " + height + "cm");
+
+        LocalDateTime since = alert.getCreatedAt().minusHours(personWindowHours);
+        // 같은 이름+나이+키 이벤트 (시군구 무관). selfEventId=-1 → 제외 없음(신규 알림), top-1.
+        List<Object[]> rows = disasterEventRepository.findCrossRegionCandidatesByPerson(
+                name, age, height, since, -1L, 1);
+        if (!rows.isEmpty()) {
+            Long targetEventId = ((Number) rows.get(0)[0]).longValue();
+            mergeIntoExisting(targetEventId, alert, null, MergeMethod.IDENTITY);
+            log.info("clusterNewAlert(인물): alertId={} → event={} 동일인 머지({})", alert.getId(), targetEventId, key);
+        } else {
+            String[] codes = extractRegionCodes(alert);
+            createNewEvent(alert, codes.length > 0 ? codes[0] : null, extractFirstRegionName(alert), false);
+            log.info("clusterNewAlert(인물): alertId={} → 신규 이벤트({})", alert.getId(), key);
+        }
+        return true;
     }
 
     /**
@@ -187,15 +233,16 @@ public class EventClusteringService {
     /**
      * 기존 이벤트에 알림 머지. {@code similarity} 는 합류 시점 코사인 유사도(1 - dist)로,
      * event_alert_mapping 에 저장한다. broadcast 머지(임베딩 미사용)는 null 을 넘긴다.
+     * {@code method} 는 합류 방식 표식(EMBEDDING/BROADCAST).
      */
-    private void mergeIntoExisting(Long eventId, DisasterAlert alert, Double similarity) {
+    private void mergeIntoExisting(Long eventId, DisasterAlert alert, Double similarity, MergeMethod method) {
         int nextSeq = eventAlertMappingRepository.countByEventId(eventId) + 1;
-        eventAlertMappingRepository.save(EventAlertMapping.of(eventId, alert.getId(), nextSeq, similarity));
+        eventAlertMappingRepository.save(EventAlertMapping.of(eventId, alert.getId(), nextSeq, similarity, method));
         disasterEventRepository.incrementOnMerge(eventId, alert.getCreatedAt());
         // 위험도 모듈 트리거 (커밋 후 @TransactionalEventListener 가 수신)
         eventPublisher.publishEvent(new AlertClusteredEvent(eventId, alert.getId()));
-        log.info("clusterNewAlert: alertId={} → event={} 머지 (similarity={}, seq={})",
-                alert.getId(), eventId, similarity, nextSeq);
+        log.info("clusterNewAlert: alertId={} → event={} 머지 (method={}, similarity={}, seq={})",
+                alert.getId(), eventId, method, similarity, nextSeq);
     }
 
     private void createNewEvent(DisasterAlert alert, String regionCode, String regionName, boolean broadcast) {
@@ -208,11 +255,31 @@ public class EventClusteringService {
                 broadcast
         );
         DisasterEvent saved = disasterEventRepository.save(event);
-        eventAlertMappingRepository.save(EventAlertMapping.of(saved.getId(), alert.getId(), 1));
+        eventAlertMappingRepository.save(EventAlertMapping.of(saved.getId(), alert.getId(), 1, null, MergeMethod.SEED));
         // 위험도 모듈 트리거 (커밋 후 @TransactionalEventListener 가 수신)
         eventPublisher.publishEvent(new AlertClusteredEvent(saved.getId(), alert.getId()));
         log.info("clusterNewAlert: alertId={} → 신규 event={} (broadcast={}, title='{}')",
                 alert.getId(), saved.getId(), broadcast, saved.getEventTitle());
+    }
+
+    /**
+     * cross-region 병합 primitive — source 이벤트의 모든 매핑을 target 으로 옮기고 source 를 삭제.
+     *
+     * <p>실종자·탈출 동물이 시군구를 옮겨다녀 따로 만들어진 이벤트(대개 단일 알림)를, LLM 이 같은
+     * 사건으로 판정했을 때 하나로 합친다. 옮겨진 매핑은 sequence_no 를 이어붙이고 merge_method 를
+     * 지정(LLM)한다. 합친 뒤 target 의 alert_count/first/last_alert_at 을 재계산.
+     */
+    @Transactional
+    public void mergeEvents(Long sourceEventId, Long targetEventId, MergeMethod method) {
+        if (sourceEventId == null || targetEventId == null || sourceEventId.equals(targetEventId)) {
+            return;
+        }
+        int offset = eventAlertMappingRepository.countByEventId(targetEventId);
+        int moved = eventAlertMappingRepository.reassignToEvent(sourceEventId, targetEventId, offset, method.name());
+        disasterEventRepository.recomputeAggregates(targetEventId);
+        disasterEventRepository.deleteById(sourceEventId);
+        log.info("cross-region 머지: event {} → {} (method={}, moved={}, offset={})",
+                sourceEventId, targetEventId, method, moved, offset);
     }
 
     /**
@@ -243,7 +310,7 @@ public class EventClusteringService {
                 if (target.isPresent()) {
                     log.info("clusterNewAlert: alertId={} 전국({}시도) → broadcast event={} 유형 머지({})",
                             alert.getId(), sidoSpan, target.get().getId(), type);
-                    mergeIntoExisting(target.get().getId(), alert, null);
+                    mergeIntoExisting(target.get().getId(), alert, null, MergeMethod.BROADCAST);
                     return;
                 }
             }
@@ -261,7 +328,7 @@ public class EventClusteringService {
             if (target.isPresent()) {
                 log.info("clusterNewAlert: alertId={} 광역({}시군구) → broadcast event={} 시도+유형 머지({} {})",
                         alert.getId(), sigunguSpan, target.get().getId(), sido, type);
-                mergeIntoExisting(target.get().getId(), alert, null);
+                mergeIntoExisting(target.get().getId(), alert, null, MergeMethod.BROADCAST);
                 return;
             }
         }

@@ -37,16 +37,19 @@ public class EventAlertMapping {
     /**
      * 합류 시점 코사인 유사도 (같은 이벤트의 최근접 멤버 알림 대비, 1 - min distance).
      * 개발자용 튜닝/감사 신호 — 사용자 비노출. NULL = 비교 없이 들어온 행:
-     * 이벤트 첫 알림(seq=1), broadcast 머지(임베딩 미사용).
+     * 이벤트 첫 알림(seq=1), broadcast 머지(임베딩 미사용), LLM 머지.
      */
     @Column(name = "similarity_score")
     private Double similarityScore;
 
-    public static EventAlertMapping of(Long eventId, Long alertId, int sequenceNo) {
-        return of(eventId, alertId, sequenceNo, null);
-    }
+    /** 합류 방식 표식 (SEED/EMBEDDING/BROADCAST/LLM). 감사·튜닝용, 특히 LLM 머지 검수. */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "merge_method", length = 16)
+    private MergeMethod mergeMethod;
 
-    public static EventAlertMapping of(Long eventId, Long alertId, int sequenceNo, Double similarityScore) {
-        return new EventAlertMapping(new EventAlertMappingId(eventId, alertId), sequenceNo, null, similarityScore);
+    public static EventAlertMapping of(Long eventId, Long alertId, int sequenceNo,
+                                       Double similarityScore, MergeMethod mergeMethod) {
+        return new EventAlertMapping(
+                new EventAlertMappingId(eventId, alertId), sequenceNo, null, similarityScore, mergeMethod);
     }
 }
