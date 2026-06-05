@@ -10,7 +10,6 @@ import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
 import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
 
 /**
  * 재난 이벤트 — 시간 흐름에 따라 N개 재난문자가 누적된 사건 단위.
@@ -35,8 +34,6 @@ import java.time.format.DateTimeFormatter;
 @Builder
 @EntityListeners(AuditingEntityListener.class)
 public class DisasterEvent {
-
-    private static final DateTimeFormatter TITLE_DATE = DateTimeFormatter.ofPattern("yyyy-MM-dd");
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -118,18 +115,11 @@ public class DisasterEvent {
         String safeRegion = regionName == null ? "지역미상" : regionName;
         boolean typeInformative = isInformativeType(disasterType);
 
-        String titleMiddle;
-        if (typeInformative) {
-            titleMiddle = disasterType;
-        } else if (message != null && !message.isBlank()) {
-            String trimmed = message.strip();
-            titleMiddle = trimmed.length() > MESSAGE_PREVIEW_LEN
-                    ? trimmed.substring(0, MESSAGE_PREVIEW_LEN) + "..."
-                    : trimmed;
-        } else {
-            titleMiddle = "기타";
-        }
-        String title = String.format("%s %s (%s)", safeRegion, titleMiddle, alertAt.format(TITLE_DATE));
+        // 유형 있으면 유형, '기타'면 본문에서 규칙으로 깔끔한 라벨 산출.
+        String titleMiddle = typeInformative ? disasterType : gitaTitleMiddle(message);
+        // 날짜는 제목에 박지 않는다 — 생성 시점에 고정돼 갱신이 안 되기 때문.
+        // 화면은 응답의 first_alert_at / last_alert_at(갱신됨)으로 날짜 라벨을 표시한다.
+        String title = String.format("%s %s", safeRegion, titleMiddle);
 
         return DisasterEvent.builder()
                 .eventTitle(title)
@@ -142,6 +132,39 @@ public class DisasterEvent {
                 .cooldownHours(DisasterCooldown.hoursFor(disasterType))
                 .broadcast(broadcast)
                 .build();
+    }
+
+    /**
+     * '기타' 유형의 제목 가운데말 — 본문에서 규칙으로 깔끔한 라벨을 만든다.
+     * (유형명이 없어 본문 앞부분을 그대로 잘라 쓰면 문장 중간에서 끊겨 지저분하므로.)
+     *
+     * <p>실종 인물은 이름+나이로(동일인 식별 로직 재사용), 동물·안전안내는 키워드로 라벨링.
+     * 어디에도 안 걸리는 자유서술만 기존처럼 본문 앞부분을 쓴다.
+     */
+    private static String gitaTitleMiddle(String message) {
+        if (message == null || message.isBlank()) {
+            return "기타";
+        }
+        // 1. 실종 인물 — "{이름}({나이}) 실종"
+        if (MissingPersonIdentity.isPerson(message)) {
+            return MissingPersonIdentity.name(message) + "(" + MissingPersonIdentity.age(message) + ") 실종";
+        }
+        // 2. 동물
+        if (message.contains("멧돼지")) return "멧돼지 출몰";
+        if (message.contains("들개")) return "들개 출몰";
+        if (message.contains("늑대")) return "늑대 출몰";
+        if (message.contains("탈출")) return "동물 탈출";
+        if (message.contains("출몰")) return "동물 출몰";
+        // 3. 안전안내
+        if (message.contains("물놀이") || message.contains("계곡") || message.contains("해수욕")) return "물놀이 안전안내";
+        if (message.contains("방류") || message.contains("수문")) return "댐 방류 안내";
+        if (message.contains("단수") || message.contains("급수")) return "단수 안내";
+        if (message.contains("풍선")) return "대남 풍선";   // 북한 오물/쓰레기 풍선
+        // 4. 그 외 자유서술 — 본문 앞부분
+        String trimmed = message.strip();
+        return trimmed.length() > MESSAGE_PREVIEW_LEN
+                ? trimmed.substring(0, MESSAGE_PREVIEW_LEN) + "..."
+                : trimmed;
     }
 
     /**
