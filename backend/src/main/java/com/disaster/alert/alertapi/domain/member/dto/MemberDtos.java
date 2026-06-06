@@ -19,7 +19,7 @@ public class MemberDtos {
         @NotBlank @Email
         private String email;
 
-        @NotBlank @Size(min = 8, max = 64)
+        @NotBlank @Size(min = 8, max = 20)
         private String password;
 
         // 프론트와 호환: confirmPassword 유지
