@@ -6,6 +6,7 @@ import com.disaster.alert.alertapi.domain.disasteralert.model.DisasterAlert;
 import com.disaster.alert.alertapi.domain.disasteralert.model.DisasterLevel;
 import com.disaster.alert.alertapi.domain.disasteralert.repository.DisasterAlertRepository;
 import com.disaster.alert.alertapi.domain.disasteralert.repository.DisasterAlertTranslationRepository;
+import com.disaster.alert.alertapi.domain.event.repository.EventAlertMappingRepository;
 import com.disaster.alert.alertapi.domain.legaldistrict.model.LegalDistrict;
 import com.disaster.alert.alertapi.domain.legaldistrict.service.LegalDistrictTranslationService;
 import com.disaster.alert.alertapi.global.service.LegalDistrictCache;
@@ -43,6 +44,8 @@ public class DisasterAlertService {
     private final ObjectMapper objectMapper;
 
     private final LegalDistrictCache legalDistrictCache;
+
+    private final EventAlertMappingRepository eventAlertMappingRepository;
 
     // ─── 다국어 응답용 의존성 ──────────────────────────────
     private final TranslationService translationService;                          // lazy 번역 (message/disasterType)
@@ -363,6 +366,7 @@ public class DisasterAlertService {
 
         List<String> regionNames = disasterAlertRepository.legalDistrictNamesByAlertId(id);
         DisasterAlertDetailDto dto = new DisasterAlertDetailDto(alert, regionNames);
+        dto.setEventId(eventAlertMappingRepository.findEventIdByAlertId(id));
 
         SupportedLanguage.fromRequestParam(lang).ifPresent(language -> {
             // 1) 메시지/유형 번역 (없으면 lazy DeepL 호출)
