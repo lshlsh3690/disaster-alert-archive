@@ -1,12 +1,13 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import React, { useState } from "react";
+import Link from "next/link";
 import { useAuthStore } from "@/store/authStore";
 import { useLanguageStore } from "@/store/languageStore";
 import { useFavoriteRegions } from "@/lib/queries/useFavoriteRegions";
 import { useAddFavoriteRegion } from "@/lib/mutations/useAddFavoriteRegion";
 import { useDeleteFavoriteRegion } from "@/lib/mutations/useDeleteFavoriteRegion";
+import { useGuestFavoriteSync } from "@/hooks/useGuestFavoriteSync";
 import { useSigungu } from "@/lib/queries/useAlerts";
 import { useI18n } from "@/hooks/useI18n";
 import { METROS } from "@/ui/metros";
@@ -14,14 +15,12 @@ import { METROS } from "@/ui/metros";
 const MAX_REGIONS = 5;
 
 export default function FavoriteRegionsPage() {
-  const router = useRouter();
   const isLoggedIn = useAuthStore((s) => s.user !== null);
   const language = useLanguageStore((s) => s.language);
   const t = useI18n();
 
-  useEffect(() => {
-    if (!isLoggedIn) router.push("/login");
-  }, [isLoggedIn, router]);
+  // 로그인 시 게스트 데이터를 서버에 자동 병합
+  useGuestFavoriteSync();
 
   const { data: regions = [], isLoading } = useFavoriteRegions();
 
@@ -34,6 +33,14 @@ export default function FavoriteRegionsPage() {
     language
   );
 
+  const getRegionName = (code: string) => {
+    const found = sigunguList.find((s) => (s.code ?? "") === code);
+    if (!found) return code;
+    return found.name === "전체"
+      ? `${selectedSido} 전체`
+      : (found.translatedName ?? found.name);
+  };
+
   const addMutation = useAddFavoriteRegion({
     onSuccessCallback: () => {
       setSelectedSido("");
@@ -41,6 +48,7 @@ export default function FavoriteRegionsPage() {
       setErrorMsg("");
     },
     onErrorCallback: (msg) => setErrorMsg(msg),
+    getRegionName,
   });
 
   const deleteMutation = useDeleteFavoriteRegion({
@@ -72,6 +80,23 @@ export default function FavoriteRegionsPage() {
           최대 {MAX_REGIONS}개의 관심지역을 등록하고 재난문자 알림을 받을 수 있습니다.
         </p>
       </header>
+
+      {/* 비로그인 안내 배너 */}
+      {!isLoggedIn && (
+        <div className="bg-amber-50 border border-amber-200 text-amber-800 text-sm rounded-lg p-4 flex items-start gap-3">
+          <span className="text-lg leading-none">🔔</span>
+          <div>
+            <p className="font-medium">비로그인 상태입니다.</p>
+            <p className="mt-0.5 text-amber-700">
+              관심지역은 이 기기의 브라우저에 임시 저장됩니다.{" "}
+              <Link href="/login" className="underline font-semibold hover:text-amber-900">
+                로그인
+              </Link>
+              하시면 서버에 영구 저장되며 다른 기기에서도 사용할 수 있습니다.
+            </p>
+          </div>
+        </div>
+      )}
 
       {errorMsg && (
         <div className="bg-red-50 border border-red-200 text-red-600 text-sm rounded-lg p-3">

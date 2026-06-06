@@ -124,9 +124,14 @@ export default function Header() {
               )}
             </div>
           ) : (
-            <Link href="/login" className="text-blue-600 hover:underline font-medium">
-              {t.nav.login}
-            </Link>
+            <div className="flex items-center gap-3">
+              <Link href="/user/settings/regions" className="text-sm text-gray-600 hover:text-blue-600 hover:underline">
+                {t.nav.favoriteRegions}
+              </Link>
+              <Link href="/login" className="text-blue-600 hover:underline font-medium">
+                {t.nav.login}
+              </Link>
+            </div>
           )}
         </nav>
 
@@ -192,9 +197,14 @@ export default function Header() {
               </button>
             </>
           ) : (
-            <Link href="/login" className="block px-2 py-2 rounded hover:bg-gray-50 text-blue-600 font-medium" onClick={() => setMobileMenuOpen(false)}>
-              {t.nav.login}
-            </Link>
+            <>
+              <Link href="/user/settings/regions" className="block px-2 py-2 rounded hover:bg-gray-50" onClick={() => setMobileMenuOpen(false)}>
+                {t.nav.favoriteRegions}
+              </Link>
+              <Link href="/login" className="block px-2 py-2 rounded hover:bg-gray-50 text-blue-600 font-medium" onClick={() => setMobileMenuOpen(false)}>
+                {t.nav.login}
+              </Link>
+            </>
           )}
         </nav>
       )}
