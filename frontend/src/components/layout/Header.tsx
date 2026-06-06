@@ -99,7 +99,11 @@ export default function Header() {
             </select>
           </div>
           {isLoggedIn ? (
-            <div className="relative" ref={dropdownRef}>
+            <div className="flex items-center gap-3">
+              <Link href="/user/settings/regions" className="text-sm text-gray-600 hover:text-blue-600 hover:underline">
+                {t.nav.favoriteRegions}
+              </Link>
+              <div className="relative" ref={dropdownRef}>
               <button
                 onClick={() => setOpen((prev) => !prev)}
                 className="text-sm font-medium text-blue-600 hover:underline"
@@ -111,9 +115,6 @@ export default function Header() {
                   <Link href="/notifications" className="block px-4 py-2 hover:bg-gray-50" onClick={() => setOpen(false)}>
                     알림 이력
                   </Link>
-                  <Link href="/user/settings/regions" className="block px-4 py-2 hover:bg-gray-50" onClick={() => setOpen(false)}>
-                    {t.nav.favoriteRegions}
-                  </Link>
                   <Link href="/user/settings" className="block px-4 py-2 hover:bg-gray-50" onClick={() => setOpen(false)}>
                     {t.nav.settings}
                   </Link>
@@ -122,6 +123,7 @@ export default function Header() {
                   </button>
                 </div>
               )}
+              </div>
             </div>
           ) : (
             <div className="flex items-center gap-3">
