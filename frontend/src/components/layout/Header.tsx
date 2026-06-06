@@ -7,6 +7,7 @@ import { useAuthStore } from "@/store/authStore";
 import { useLanguageStore } from "@/store/languageStore";
 import { useEffect, useRef, useState } from "react";
 import { logoutApi } from "@/api/authApi";
+import { deleteGuestFcmToken } from "@/api/guestFcmApi";
 import { useRouter } from "next/navigation";
 import { useInitAuth } from "@/hooks/useInitAuth";
 import { LANGUAGES, LangCode } from "@/constants/language";
@@ -49,7 +50,9 @@ export default function Header() {
     logoutApi()
       .then(() => {
         logout();
+        const token = localStorage.getItem("fcm-token");
         localStorage.removeItem("fcm-token");
+        if (token) deleteGuestFcmToken(token);
         setOpen(false);
         router.push("/");
       })

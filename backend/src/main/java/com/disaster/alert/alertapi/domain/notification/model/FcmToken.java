@@ -24,7 +24,7 @@ public class FcmToken {
     private Long id;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "member_id", nullable = false)
+    @JoinColumn(name = "member_id", nullable = true)
     private Member member;
 
     @Column(nullable = false, columnDefinition = "TEXT")
@@ -45,6 +45,10 @@ public class FcmToken {
         this.member = member;
         this.token = token;
         this.deviceType = deviceType;
+    }
+
+    public void linkMember(Member member) {
+        this.member = member;
     }
 
     public void updateToken(String token) {

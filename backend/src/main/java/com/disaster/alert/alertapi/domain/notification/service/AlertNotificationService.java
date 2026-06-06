@@ -6,6 +6,7 @@ import com.disaster.alert.alertapi.domain.member.repository.MemberFavoriteRegion
 import com.disaster.alert.alertapi.domain.notification.model.NotificationType;
 import com.disaster.alert.alertapi.domain.notification.model.UserNotificationLog;
 import com.disaster.alert.alertapi.domain.notification.repository.FcmTokenRepository;
+import com.disaster.alert.alertapi.domain.notification.repository.GuestFcmRegionRepository;
 import com.disaster.alert.alertapi.domain.notification.repository.NotificationPreferenceRepository;
 import com.disaster.alert.alertapi.domain.notification.repository.UserNotificationLogRepository;
 import lombok.RequiredArgsConstructor;
@@ -14,7 +15,6 @@ import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Stream;
 
@@ -26,6 +26,7 @@ public class AlertNotificationService {
     private final MemberFavoriteRegionRepository favoriteRegionRepository;
     private final NotificationPreferenceRepository preferenceRepository;
     private final FcmTokenRepository fcmTokenRepository;
+    private final GuestFcmRegionRepository guestFcmRegionRepository;
     private final UserNotificationLogRepository notificationLogRepository;
     private final FcmSendService fcmSendService;
     private final DisasterAlertRepository disasterAlertRepository;
@@ -70,16 +71,43 @@ public class AlertNotificationService {
                     .distinct()
                     .toList();
 
-            if (memberIds.isEmpty()) return;
-
-            log.info("알림 발송 대상: {}명, alertId: {}", memberIds.size(), alertId);
-
-            for (Long memberId : memberIds) {
-                sendToMember(memberId, alertId, title, body);
+            if (!memberIds.isEmpty()) {
+                log.info("회원 알림 발송 대상: {}명, alertId: {}", memberIds.size(), alertId);
+                for (Long memberId : memberIds) {
+                    sendToMember(memberId, alertId, title, body);
+                }
             }
+
+            // 게스트 토큰 발송
+            sendToGuestTokens(allCodesToSearch, title, body);
 
         } catch (Exception e) {
             log.error("알림 트리거 실패 - alertId: {}, error: {}", alertId, e.getMessage());
+        }
+    }
+
+    private void sendToGuestTokens(List<String> regionCodes, String title, String body) {
+        try {
+            List<String> tokens = guestFcmRegionRepository
+                    .findAllByLegalDistrictCodeIn(regionCodes)
+                    .stream()
+                    .map(r -> r.getFcmToken())
+                    .distinct()
+                    .toList();
+
+            if (tokens.isEmpty()) return;
+
+            log.info("게스트 알림 발송 대상: {}개 토큰", tokens.size());
+
+            if (tokens.size() == 1) {
+                fcmSendService.sendToToken(tokens.get(0), title, body,
+                        NotificationType.PUSH.name(), null);
+            } else {
+                fcmSendService.sendToTokens(tokens, title, body,
+                        NotificationType.PUSH.name(), null);
+            }
+        } catch (Exception e) {
+            log.error("게스트 알림 발송 실패: {}", e.getMessage());
         }
     }
 
