@@ -8,6 +8,7 @@ import com.disaster.alert.alertapi.domain.disasteralert.repository.DisasterAlert
 import com.disaster.alert.alertapi.domain.event.dto.EventAlertItem;
 import com.disaster.alert.alertapi.domain.event.dto.EventDetailResponse;
 import com.disaster.alert.alertapi.domain.event.dto.EventListResponse;
+import com.disaster.alert.alertapi.domain.event.dto.EventSearchRequest;
 import com.disaster.alert.alertapi.domain.event.dto.EventTimelineRow;
 import com.disaster.alert.alertapi.domain.event.model.DisasterEvent;
 import com.disaster.alert.alertapi.domain.event.repository.DisasterEventRepository;
@@ -24,6 +25,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -57,24 +59,25 @@ public class EventQueryService {
     private final LegalDistrictTranslationService legalDistrictTranslationService;
 
     /**
-     * 이벤트 목록.
+     * 이벤트 목록 (유형/지역/기간/키워드 + active 필터). 정렬은 last_alert_at DESC 고정.
      *
-     * @param active null=전체, true=진행 중만, false=지난 사건만
-     * @param lang   ko(기본)/en/ja/zh — 제목 번역
+     * @param req  검색 조건 ({@link EventSearchRequest}). 모든 필드 선택적(null=조건 스킵)
+     * @param lang ko(기본)/en/ja/zh — 제목 번역
      */
     @Transactional
-    public Page<EventListResponse> list(Boolean active, Pageable pageable, String lang) {
+    public Page<EventListResponse> list(EventSearchRequest req, Pageable pageable, String lang) {
         LocalDateTime now = LocalDateTime.now(KST);
         Pageable pageOnly = PageRequest.of(pageable.getPageNumber(), pageable.getPageSize());
 
-        Page<DisasterEvent> page;
-        if (active == null) {
-            page = disasterEventRepository.findAllByOrderByLastAlertAtDesc(pageOnly);
-        } else if (active) {
-            page = disasterEventRepository.findActive(now, pageOnly);
-        } else {
-            page = disasterEventRepository.findInactive(now, pageOnly);
-        }
+        // 기간 경계: start=그날 00:00, end=그날 23:59:59.999999999 (alerts dateGoe/dateLoe 관례)
+        LocalDateTime start = req.getStartDate() == null ? null : req.getStartDate().atStartOfDay();
+        LocalDateTime end = req.getEndDate() == null ? null : req.getEndDate().atTime(LocalTime.MAX);
+
+        Page<DisasterEvent> page = disasterEventRepository.search(
+                req.getActive(), now,
+                req.getType(), req.getRegion(), req.getDistrictCode(),
+                start, end, req.getKeyword(),
+                pageOnly);
 
         Optional<SupportedLanguage> langOpt = SupportedLanguage.fromRequestParam(lang);
         if (langOpt.isEmpty()) {
