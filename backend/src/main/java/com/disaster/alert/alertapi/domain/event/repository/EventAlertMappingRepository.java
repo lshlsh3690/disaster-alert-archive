@@ -31,7 +31,7 @@ public interface EventAlertMappingRepository extends JpaRepository<EventAlertMap
             FROM EventAlertMapping m
             JOIN DisasterAlert da ON da.id = m.id.alertId
             WHERE m.id.eventId = :eventId
-            ORDER BY m.sequenceNo ASC
+            ORDER BY da.createdAt DESC
             """)
     List<EventTimelineRow> findTimelineRows(@Param("eventId") Long eventId);
 

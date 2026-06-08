@@ -116,7 +116,7 @@ export default function EventDetailPage() {
             }
 
             const isOpen = expandedDates.has(group.date);
-            const dateLabel = group.date.slice(5).replace("-", "/");
+            const dateLabel = group.date.slice(2).replace(/-/g, "/");
             return (
               <div key={group.date} className="mb-2">
                 <button
