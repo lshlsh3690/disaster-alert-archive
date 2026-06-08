@@ -69,7 +69,8 @@ public interface DisasterEventRepository extends JpaRepository<DisasterEvent, Lo
      */
     @Query(value = """
             SELECT * FROM disaster_events e
-            WHERE (CAST(:type AS varchar) IS NULL OR e.primary_disaster_type = :type)
+            WHERE e.alert_count >= 2
+              AND (CAST(:type AS varchar) IS NULL OR e.primary_disaster_type = :type)
               AND (CAST(:region AS varchar) IS NULL OR e.primary_region_name LIKE :region || '%')
               AND (CAST(:regionCode AS varchar) IS NULL OR e.primary_region_code = :regionCode)
               AND (CAST(:startDate AS timestamp) IS NULL OR e.last_alert_at  >= CAST(:startDate AS timestamp))
@@ -82,7 +83,8 @@ public interface DisasterEventRepository extends JpaRepository<DisasterEvent, Lo
             """,
             countQuery = """
             SELECT count(*) FROM disaster_events e
-            WHERE (CAST(:type AS varchar) IS NULL OR e.primary_disaster_type = :type)
+            WHERE e.alert_count >= 2
+              AND (CAST(:type AS varchar) IS NULL OR e.primary_disaster_type = :type)
               AND (CAST(:region AS varchar) IS NULL OR e.primary_region_name LIKE :region || '%')
               AND (CAST(:regionCode AS varchar) IS NULL OR e.primary_region_code = :regionCode)
               AND (CAST(:startDate AS timestamp) IS NULL OR e.last_alert_at  >= CAST(:startDate AS timestamp))
