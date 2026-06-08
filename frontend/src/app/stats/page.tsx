@@ -296,16 +296,28 @@ function StatsPageInner() {
     }
   };
 
-  // 적용 버튼: 로컬 필터를 URL 파라미터로 push → useSearchParams가 자동 업데이트
-  const applyFilter = () => {
+  // 프리셋에 저장하는 필터 형태 (localFilter와 동일한 편집 가능 필드)
+  type StatsFilter = { sido: string; sigungu: string; startDate: string; endDate: string; type: string; levelText: string };
+
+  // 필터 객체를 URL 파라미터로 push (keyword·source는 현재 값 유지)
+  // → useSearchParams가 자동 업데이트되어 모든 차트에 반영됨
+  const pushFilter = useCallback((f: StatsFilter) => {
     const qs = new URLSearchParams();
-    if (localFilter.sido)      qs.set("sido",      localFilter.sido);
-    if (localFilter.sigungu)   qs.set("sigungu",   localFilter.sigungu);
-    if (localFilter.startDate) qs.set("startDate", localFilter.startDate);
-    if (localFilter.endDate)   qs.set("endDate",   localFilter.endDate);
-    if (localFilter.type)      qs.set("type",      localFilter.type);
-    if (localFilter.levelText) qs.set("levelText", localFilter.levelText);
+    if (f.sido)      qs.set("sido",      f.sido);
+    if (f.sigungu)   qs.set("sigungu",   f.sigungu);
+    if (f.startDate) qs.set("startDate", f.startDate);
+    if (f.endDate)   qs.set("endDate",   f.endDate);
+    if (f.type)      qs.set("type",      f.type);
+    if (f.levelText) qs.set("levelText", f.levelText);
+    if (keyword)     qs.set("keyword",   keyword);
+    if (source)      qs.set("source",    source);
     router.push(`?${qs.toString()}`);
+  }, [router, keyword, source]);
+
+  // 적용 버튼: 현재 필터를 활성 프리셋에 저장하고 URL에 반영
+  const applyFilter = () => {
+    try { localStorage.setItem(`stats-filter-${activePreset}`, JSON.stringify(localFilter)); } catch {}
+    pushFilter(localFilter);
     setFilterOpen(false);
   };
 
@@ -393,8 +405,11 @@ function StatsPageInner() {
       localStorage.setItem("stats-preset-active", String(p));
       const saved = localStorage.getItem(`stats-layout-${p}`);
       setLayout(saved ? (JSON.parse(saved) as WidgetItem[]) : DEFAULT_LAYOUT);
+      // 프리셋에 저장된 필터가 있으면 URL에 반영해 차트에 적용
+      const savedFilter = localStorage.getItem(`stats-filter-${p}`);
+      if (savedFilter) pushFilter(JSON.parse(savedFilter) as StatsFilter);
     } catch {}
-  }, []);
+  }, [pushFilter]);
 
   // 비교 위젯 존재 여부 → 전년/금년 데이터 페칭 여부 결정 (enabled 플래그)
   const hasCompare = layout.some(w => w.libId === "compare");

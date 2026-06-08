@@ -517,6 +517,14 @@ export function WeatherOverlayChart({ data }: { data: WeatherCorrelationStat[] }
 // ─── 날씨 상관 산점도 ────────────────────────────────────────────────────────
 
 export function WeatherCorrelationScatter({ data }: { data: WeatherCorrelationStat[] }) {
+  // 범례 클릭으로 숨긴 유형 집합 (겹침이 심할 때 유형을 켜고 끄며 분리해 보기)
+  const [hidden, setHidden] = useState<Set<string>>(new Set());
+  const toggleType = (name: string) => setHidden(prev => {
+    const next = new Set(prev);
+    if (next.has(name)) next.delete(name); else next.add(name);
+    return next;
+  });
+
   // 기온 데이터가 없는 항목은 산점도에서 제외
   const filtered = data.filter(d => d.avgTemp != null);
   if (filtered.length === 0) return <EmptyChart />;
@@ -564,11 +572,19 @@ export function WeatherCorrelationScatter({ data }: { data: WeatherCorrelationSt
             tick={{ fontSize: 9, fill: "#9ca3af" }} tickFormatter={(v: number) => `${v}°`} />
           <YAxis type="number" dataKey="y" name="건수" axisLine={false} tickLine={false}
             tick={{ fontSize: 9, fill: "#9ca3af" }} width={32} />
-          <ZAxis type="number" dataKey="z" range={[30, 200]} />
+          {/* 버블 크기 범위를 줄여 점들이 서로 덜 겹치도록 함 */}
+          <ZAxis type="number" dataKey="z" range={[20, 120]} />
           <Tooltip content={<TooltipContent />} cursor={{ strokeDasharray: "3 3" }} />
-          <Legend wrapperStyle={{ fontSize: 11 }} />
+          {/* 범례 클릭 시 해당 유형 표시/숨김 토글 (숨긴 유형은 회색 처리) */}
+          <Legend wrapperStyle={{ fontSize: 11, cursor: "pointer" }}
+            onClick={(e: { value?: string }) => toggleType(String(e.value ?? ""))}
+            formatter={(value: string) => (
+              <span style={{ color: hidden.has(value) ? "#cbd5e1" : "#6b7280" }}>{value}</span>
+            )} />
           {grouped.map(g => (
-            <Scatter key={g.name} name={g.name} data={g.points} fill={g.color} fillOpacity={0.7} />
+            // 투명도를 낮추고 흰 테두리를 더해 겹쳐도 개별 점 윤곽이 구분되게 함
+            <Scatter key={g.name} name={g.name} data={g.points} fill={g.color}
+              fillOpacity={0.45} stroke="#fff" strokeWidth={0.5} hide={hidden.has(g.name)} />
           ))}
         </ScatterChart>
       </ResponsiveContainer>
