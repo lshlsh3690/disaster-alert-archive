@@ -22,6 +22,7 @@ import { Fragment, useState } from "react";
 import {
   BarChart, Bar, Cell,         // 막대 차트
   AreaChart, Area,             // 면적(영역) 차트
+  LineChart as RLineChart, Line, // 꺾은선 차트 (RLineChart: 파일 내 LineChart와 이름 충돌 회피)
   XAxis, YAxis,                // 가로·세로 축
   CartesianGrid,               // 배경 격자선
   Tooltip,                     // 마우스 호버 팝업
@@ -682,7 +683,9 @@ export function CompareBars({
  * CompareLines
  *
  * 올해(파란 실선)와 작년(회색 점선)을 같은 축에 그려 추세를 비교합니다.
- * Recharts 없이 순수 SVG path로 그립니다.
+ * CompareBars와 동일하게 Recharts ResponsiveContainer를 사용해
+ * 부모 카드 높이에 정확히 맞춥니다. (이전 순수 SVG 구현은 viewBox 비율 때문에
+ * 카드 높이를 초과해 넘치는 문제가 있었음)
  *
  * @param thisYearData - 올해 일별 데이터
  * @param lastYearData - 작년 일별 데이터
@@ -707,61 +710,88 @@ export function CompareLines({
   };
   const ty = agg(thisYearData), ly = agg(lastYearData);
 
+  // 1~12월 배열 생성 (둘 다 0인 달만 제외)
+  const currentMonth = new Date().getMonth() + 1;
   const months = Array.from({ length: 12 }, (_, i) => {
     const key = String(i + 1).padStart(2, "0");
-    return { label: `${i + 1}월`, ty: ty[key] ?? 0, ly: ly[key] ?? 0 };
+    return { label: `${i + 1}월`, ty: ty[key] ?? 0, ly: ly[key] ?? 0, monthNum: i + 1 };
   }).filter(m => m.ty > 0 || m.ly > 0);
 
   if (months.length === 0) return <EmptyChart />;
 
-  const max = Math.max(...months.flatMap(m => [m.ty, m.ly])) || 1;
-  const W = 300, H = 130, PAD = 12;
-  // 월 간격 (점과 점 사이 가로 거리)
-  const xStep = months.length > 1 ? (W - PAD * 2) / (months.length - 1) : 0;
-  // Y좌표: 값이 클수록 위(Y가 작아짐)
-  const yScale = (v: number) => PAD + (1 - v / max) * (H - PAD * 2);
-  // SVG path의 "M x,y L x,y L x,y ..." 형태 좌표 문자열 생성
-  const mkPath = (vals: number[]) =>
-    vals.map((v, i) => `${i === 0 ? "M" : "L"}${PAD + i * xStep},${yScale(v)}`).join(" ");
+  // 전체 YoY 증감률 계산 (미래 달 제외)
+  const pastMonths = months.filter(m => !(m.ty === 0 && m.monthNum > currentMonth));
+  const totalTy = pastMonths.reduce((s, m) => s + m.ty, 0);
+  const totalLy = pastMonths.reduce((s, m) => s + m.ly, 0);
+  const yoy = totalLy > 0 ? Math.round(((totalTy - totalLy) / totalLy) * 100) : null;
+
+  const TooltipContent = ({ active, payload, label }: TTProps) => {
+    if (!active || !payload?.length) return null;
+    const lyVal = payload.find(p => p.dataKey === "ly")?.value ?? 0;
+    const tyVal = payload.find(p => p.dataKey === "ty")?.value ?? 0;
+    const monthNum = months.find(m => m.label === label)?.monthNum ?? 0;
+    const isFuture = tyVal === 0 && monthNum > currentMonth;
+    const diff = !isFuture && lyVal > 0 ? Math.round(((tyVal - lyVal) / lyVal) * 100) : null;
+    return (
+      <div style={TT_BOX}>
+        <p style={TT_LABEL}>{label}</p>
+        <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 2 }}>
+          <span style={{ width: 8, height: 8, borderRadius: 2, background: "#cbd5e1", display: "inline-block", flexShrink: 0 }} />
+          <span style={{ color: "#fff", fontSize: 11 }}>
+            {currentYear - 1}: {lyVal.toLocaleString("ko-KR")}건
+          </span>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: diff !== null ? 4 : 0 }}>
+          <span style={{ width: 8, height: 8, borderRadius: 2, background: "#2563eb", display: "inline-block", flexShrink: 0 }} />
+          <span style={{ color: "#fff", fontSize: 11 }}>
+            {currentYear}: {tyVal.toLocaleString("ko-KR")}건
+          </span>
+        </div>
+        {diff !== null && (
+          <p style={{
+            color: tyVal >= lyVal ? "#f87171" : "#60a5fa",
+            fontWeight: 700, fontSize: 11, margin: 0, textAlign: "center",
+          }}>
+            {tyVal >= lyVal ? `↑ +${diff}%` : `↓ ${diff}%`}
+          </p>
+        )}
+      </div>
+    );
+  };
 
   return (
-    <div className="flex flex-col flex-1 gap-2 min-h-0">
-      <svg width="100%" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" className="flex-1">
-        {/* 작년: 회색 점선 */}
-        <path d={mkPath(months.map(m => m.ly))}
-          fill="none" stroke="#cbd5e1" strokeWidth="2" strokeDasharray="5 3" />
-        {/* 올해: 파란 실선 */}
-        <path d={mkPath(months.map(m => m.ty))}
-          fill="none" stroke="#2563eb" strokeWidth="2" />
-        {/* 데이터 포인트 원 */}
-        {months.map((m, i) => (
-          <Fragment key={i}>
-            <circle cx={PAD + i * xStep} cy={yScale(m.ly)} r={3} fill="#cbd5e1" />
-            <circle cx={PAD + i * xStep} cy={yScale(m.ty)} r={3} fill="#2563eb" />
-          </Fragment>
-        ))}
-      </svg>
-
-      {/* X축 월 레이블 */}
-      <div className="flex justify-between text-[9px] text-gray-400 px-1">
-        {months.map((m, i) => <span key={i}>{m.label}</span>)}
+    <div className="flex flex-col gap-2 flex-1 min-h-0">
+      <div className="flex-1 min-h-0" style={{ height: "100%" }}>
+        <ResponsiveContainer width="100%" height="100%">
+          <RLineChart data={months} margin={{ top: 4, right: 4, bottom: 4, left: 4 }}>
+            <CartesianGrid vertical={false} stroke="#f3f4f6" />
+            <XAxis dataKey="label" axisLine={false} tickLine={false}
+              tick={{ fontSize: 10, fill: "#9ca3af" }} />
+            <YAxis axisLine={false} tickLine={false}
+              tick={{ fontSize: 10, fill: "#9ca3af" }} width={32} />
+            <Tooltip content={<TooltipContent />} />
+            {/* formatter: Recharts 범례의 "ly"/"ty" 키를 연도로 변환 */}
+            <Legend wrapperStyle={{ fontSize: 12 }}
+              formatter={(value: string) =>
+                value === "ly" ? String(currentYear - 1) : String(currentYear)
+              } />
+            {/* ly: 작년 (회색 점선), ty: 올해 (파란 실선) */}
+            <Line dataKey="ly" stroke="#cbd5e1" strokeWidth={2} strokeDasharray="5 3"
+              dot={{ r: 3, fill: "#cbd5e1" }} isAnimationActive={false} />
+            <Line dataKey="ty" stroke="#2563eb" strokeWidth={2}
+              dot={{ r: 3, fill: "#2563eb" }} isAnimationActive={false} />
+          </RLineChart>
+        </ResponsiveContainer>
       </div>
 
-      {/* 범례 */}
-      <div className="flex gap-4 text-xs text-gray-500">
-        <span className="flex items-center gap-1.5">
-          <svg width="16" height="8">
-            <line x1="0" y1="4" x2="16" y2="4" stroke="#cbd5e1" strokeWidth="2" strokeDasharray="4 2" />
-          </svg>
-          {currentYear - 1}
-        </span>
-        <span className="flex items-center gap-1.5">
-          <svg width="16" height="8">
-            <line x1="0" y1="4" x2="16" y2="4" stroke="#2563eb" strokeWidth="2" />
-          </svg>
-          {currentYear}
-        </span>
-      </div>
+      {/* 전체 YoY 증감률 표시 */}
+      {yoy !== null && (
+        <div className="flex justify-end text-xs">
+          <span className={`font-bold ${yoy >= 0 ? "text-red-600" : "text-blue-600"}`}>
+            {yoy >= 0 ? `↑ +${yoy}%` : `↓ ${yoy}%`} (YoY)
+          </span>
+        </div>
+      )}
     </div>
   );
 }
