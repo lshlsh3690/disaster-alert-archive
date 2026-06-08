@@ -45,7 +45,7 @@
 
 import { Suspense, useState, useEffect, useMemo, useCallback } from "react";
 import Link from "next/link";
-import { useSearchParams, useRouter } from "next/navigation";
+import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import { DndContext, closestCenter, PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
 import type { DragEndEvent } from "@dnd-kit/core";
 import { SortableContext, rectSortingStrategy, arrayMove, useSortable } from "@dnd-kit/sortable";
@@ -247,6 +247,9 @@ export default function StatsPage() {
 function StatsPageInner() {
   const searchParams = useSearchParams();
   const router = useRouter();
+  // 현재 경로(/stats). router.push에 절대 경로를 넘기기 위함
+  // (쿼리스트링만 넘기는 상대 push는 App Router에서 URL이 갱신되지 않아 API가 호출되지 않음)
+  const pathname = usePathname();
 
   const sido      = searchParams.get("sido")      ?? undefined;
   const sigungu   = searchParams.get("sigungu")   ?? undefined;
@@ -311,8 +314,9 @@ function StatsPageInner() {
     if (f.levelText) qs.set("levelText", f.levelText);
     if (keyword)     qs.set("keyword",   keyword);
     if (source)      qs.set("source",    source);
-    router.push(`?${qs.toString()}`);
-  }, [router, keyword, source]);
+    const query = qs.toString();
+    router.push(query ? `${pathname}?${query}` : pathname);
+  }, [router, pathname, keyword, source]);
 
   // 적용 버튼: 현재 필터를 활성 프리셋에 저장하고 URL에 반영
   const applyFilter = () => {
