@@ -400,16 +400,28 @@ function StatsPageInner() {
   }, [editingPreset, editingName]);
 
   const switchPreset = useCallback((p: 1 | 2 | 3) => {
-    setActivePreset(p);
+    if (p === activePreset) return;
     try {
+      // 1) 떠나는 프리셋에 현재 필터 조합을 저장 (위젯 배치처럼 자동 보존)
+      const currentFilter: StatsFilter = {
+        sido: sido ?? "", sigungu: sigungu ?? "",
+        startDate: startDate ?? "", endDate: endDate ?? "",
+        type: type ?? "", levelText: levelText ?? "",
+      };
+      localStorage.setItem(`stats-filter-${activePreset}`, JSON.stringify(currentFilter));
+
+      // 2) 새 프리셋으로 전환 + 배치 복원
+      setActivePreset(p);
       localStorage.setItem("stats-preset-active", String(p));
       const saved = localStorage.getItem(`stats-layout-${p}`);
       setLayout(saved ? (JSON.parse(saved) as WidgetItem[]) : DEFAULT_LAYOUT);
-      // 프리셋에 저장된 필터가 있으면 URL에 반영해 차트에 적용
+
+      // 3) 새 프리셋의 필터 복원 (저장된 게 없으면 빈 필터로 초기화 → 다른 프리셋 필터가 새어 나오지 않음)
       const savedFilter = localStorage.getItem(`stats-filter-${p}`);
-      if (savedFilter) pushFilter(JSON.parse(savedFilter) as StatsFilter);
+      const emptyFilter: StatsFilter = { sido: "", sigungu: "", startDate: "", endDate: "", type: "", levelText: "" };
+      pushFilter(savedFilter ? (JSON.parse(savedFilter) as StatsFilter) : emptyFilter);
     } catch {}
-  }, [pushFilter]);
+  }, [activePreset, sido, sigungu, startDate, endDate, type, levelText, pushFilter]);
 
   // 비교 위젯 존재 여부 → 전년/금년 데이터 페칭 여부 결정 (enabled 플래그)
   const hasCompare = layout.some(w => w.libId === "compare");
