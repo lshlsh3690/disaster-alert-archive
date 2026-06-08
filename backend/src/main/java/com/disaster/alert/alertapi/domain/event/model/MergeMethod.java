@@ -16,5 +16,11 @@ public enum MergeMethod {
     /** cross-region 인물 결정적 매칭 머지 (이름+나이+키 일치, LLM 미사용). */
     IDENTITY,
     /** cross-region LLM 판정 머지 (동물·비정형 — 정형 키가 없어 LLM 으로 판정). */
-    LLM
+    LLM,
+    /**
+     * local borderline LLM 폴백 머지 — 같은 지역 후보지만 임베딩이 임계(0.85) 미만이라
+     * 임베딩으로는 못 묶은 사고성 사건(서소문 고가 붕괴처럼 같은 사건의 다른 측면 안내)을
+     * LLM 판정으로 묶는다. cross-region({@link #LLM})과 달리 같은 시군구 안에서 일어난다.
+     */
+    LLM_FALLBACK
 }

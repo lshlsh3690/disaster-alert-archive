@@ -22,11 +22,15 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
+import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 /**
  * 이벤트 클러스터링 핵심 서비스.
@@ -52,6 +56,7 @@ public class EventClusteringService {
     private final EventAlertMappingRepository eventAlertMappingRepository;
     private final AlertEmbeddingRepository alertEmbeddingRepository;
     private final ApplicationEventPublisher eventPublisher;
+    private final EventLLMDecisionService llmDecisionService;
 
     @Value("${clustering.enabled:false}")
     private boolean enabled;
@@ -73,6 +78,25 @@ public class EventClusteringService {
     /** 실종 인물 신원 클러스터링 윈도우(시간). 같은 사람 재신고를 한 이벤트로 보는 간격. 기본 14일. */
     @Value("${clustering.person-window-hours:336}")
     private int personWindowHours;
+
+    /** local borderline LLM 폴백 스위치 — 임베딩 임계 미만이지만 같은 사건일 수 있는 사고성 알림을 LLM 으로 판정. */
+    @Value("${clustering.llm-fallback.enabled:false}")
+    private boolean llmFallbackEnabled;
+
+    /** LLM 폴백 후보 거리 상한(코사인). (mergeMaxDistance, ceil] 구간 후보만 LLM 에 묻는다. */
+    @Value("${clustering.llm-fallback.distance-ceil:0.40}")
+    private double llmFallbackDistanceCeil;
+
+    /** LLM 폴백 적용 유형(쉼표 구분) — 특정 장소·시설의 일회성 사고만. 폭염·호우 등 기상특보 제외(과병합 방지). */
+    @Value("${clustering.llm-fallback.accident-types:기타,화재,산불,붕괴,교통사고,교통통제,교통,환경오염사고,정전,통신,테러,지진,지진해일,수도}")
+    private String accidentTypesCsv;
+
+    /** 동물·비정형 키워드 — LLM 폴백에서 제외(cross-region 단계가 담당). cross-region 설정과 공유. */
+    @Value("${clustering.cross-region.animal-keywords:탈출|출몰|멧돼지|들개|늑대}")
+    private String animalKeywords;
+
+    private Set<String> accidentTypes;
+    private Pattern animalPattern;
 
     /**
      * 신규 알림에 대해 임베딩 생성 + 클러스터링 수행.
@@ -174,7 +198,91 @@ public class EventClusteringService {
             }
         }
 
+        // 5.5 LLM 폴백 — 임베딩은 임계 미만이지만 같은 사건일 수 있는 사고성 알림을 LLM 으로 판정.
+        //     "서소문 고가 붕괴"처럼 같은 사고를 여러 기관이 다른 측면(도로통제/열차중지)으로 보내
+        //     본문 임베딩이 갈리는 케이스를 묶는다. 폭염 등 기상특보는 화이트리스트에서 제외(과병합 방지).
+        if (tryLlmFallback(alert, candidates, mergeMaxDistance)) {
+            return;
+        }
+
         createNewEvent(alert, regionCodes[0], extractFirstRegionName(alert), false);
+    }
+
+    /**
+     * borderline 후보(임베딩 임계 미만, ceil 이내)를 LLM 으로 동일 사건 판정해 머지 시도.
+     *
+     * <p>게이트: {@code llm-fallback.enabled} + 사고성 유형(화이트리스트) + 동물·비정형 아님
+     * (동물은 cross-region 단계, 인물은 {@link #clusterPerson} 앞단에서 이미 분기). 후보가 없거나
+     * LLM 이 NONE(보수적)이면 false → 신규 이벤트로 진행.
+     *
+     * @return LLM 이 같은 사건으로 판정해 머지하면 true
+     */
+    private boolean tryLlmFallback(DisasterAlert alert, List<Object[]> candidates, double mergeMaxDistance) {
+        if (!llmFallbackEnabled || !isAccidentType(alert.getDisasterType()) || isAnimalCase(alert.getMessage())) {
+            return false;
+        }
+
+        // borderline 후보: 임베딩 임계는 못 넘었지만(>mergeMaxDistance) ceil 이내인 같은 지역 후보.
+        // candidates 는 거리 ASC 정렬이라 가까운 후보부터 담긴다.
+        List<Long> borderlineIds = new ArrayList<>();
+        for (Object[] row : candidates) {
+            double dist = ((Number) row[1]).doubleValue();
+            if (dist > mergeMaxDistance && dist <= llmFallbackDistanceCeil) {
+                borderlineIds.add(((Number) row[0]).longValue());
+            }
+        }
+        if (borderlineIds.isEmpty()) {
+            return false;
+        }
+
+        Map<Long, String> repMessages = representativeMessages(borderlineIds);
+        List<EventLLMDecisionService.Candidate> cands = new ArrayList<>(borderlineIds.size());
+        for (Long id : borderlineIds) {
+            cands.add(new EventLLMDecisionService.Candidate(id, repMessages.getOrDefault(id, "")));
+        }
+
+        Integer pick = llmDecisionService.pickSameGeneralIncident(alert.getMessage(), cands);
+        if (pick == null) {
+            return false;
+        }
+        Long targetEventId = cands.get(pick).eventId();
+        log.info("clusterNewAlert(LLM폴백): alertId={} → event={} 같은 사건 판정 머지 (type={}, 후보 {}건)",
+                alert.getId(), targetEventId, alert.getDisasterType(), cands.size());
+        mergeIntoExisting(targetEventId, alert, null, MergeMethod.LLM_FALLBACK);
+        return true;
+    }
+
+    /** 사고성 유형 화이트리스트 매칭 (LLM 폴백 적용 대상). */
+    private boolean isAccidentType(String type) {
+        if (type == null) {
+            return false;
+        }
+        if (accidentTypes == null) {
+            accidentTypes = Arrays.stream(accidentTypesCsv.split(","))
+                    .map(String::trim).filter(s -> !s.isEmpty())
+                    .collect(Collectors.toSet());
+        }
+        return accidentTypes.contains(type.trim());
+    }
+
+    /** 동물·비정형(탈출/출몰/멧돼지 등) 알림 여부 — LLM 폴백 제외(cross-region 담당). */
+    private boolean isAnimalCase(String msg) {
+        if (msg == null) {
+            return false;
+        }
+        if (animalPattern == null) {
+            animalPattern = Pattern.compile(animalKeywords);
+        }
+        return animalPattern.matcher(msg).find();
+    }
+
+    /** 후보 이벤트들의 대표(seed) 본문 조회 → {eventId: message}. LLM 프롬프트용. */
+    private Map<Long, String> representativeMessages(List<Long> eventIds) {
+        Map<Long, String> map = new HashMap<>();
+        for (Object[] row : eventAlertMappingRepository.findRepresentativeMessages(eventIds)) {
+            map.put(((Number) row[0]).longValue(), (String) row[1]);
+        }
+        return map;
     }
 
     /**
