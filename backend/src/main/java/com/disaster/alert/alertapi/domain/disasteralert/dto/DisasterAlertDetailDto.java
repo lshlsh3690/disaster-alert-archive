@@ -18,6 +18,7 @@ public class DisasterAlertDetailDto {
     private LocalDateTime modifiedDate;
     private String originalRegion;
     private List<String> legalDistrictNames;
+    private Long eventId;
     private String translatedMessage;
     private String translatedDisasterType;
     private List<String> translatedRegionNames;

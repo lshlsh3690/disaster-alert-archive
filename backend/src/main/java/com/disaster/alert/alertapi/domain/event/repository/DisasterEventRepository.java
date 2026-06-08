@@ -49,6 +49,63 @@ public interface DisasterEventRepository extends JpaRepository<DisasterEvent, Lo
     Page<DisasterEvent> findInactive(@Param("now") LocalDateTime now, Pageable pageable);
 
     /**
+     * 조회 API 필터 검색 — active + 유형/지역/기간/키워드를 nullable 가드로 결합한 단일 쿼리.
+     *
+     * <p>각 파라미터는 null 이면 해당 조건 스킵({@code CAST(:x AS …) IS NULL OR …}). native 쿼리에서
+     * null 파라미터의 타입 추론 실패({@code could not determine data type})를 막기 위해 모두 명시 CAST.
+     *
+     * <ul>
+     *   <li>{@code type}   — primary_disaster_type exact</li>
+     *   <li>{@code region} — primary_region_name prefix(LIKE 'region%'). 시도/"시도 시군구" 둘 다. <b>근사치</b>
+     *                        (전국 broadcast 이벤트는 region_code=null·name 도 시도 아님 → 빠질 수 있음)</li>
+     *   <li>{@code regionCode} — primary_region_code exact (선택)</li>
+     *   <li>기간 — <b>겹침(overlap)</b>: first_alert_at ≤ end AND last_alert_at ≥ start.
+     *             startDate 가드는 last_alert_at≥start, endDate 가드는 first_alert_at≤end 로 분리해 각각 nullable.</li>
+     *   <li>{@code keyword} — event_title contains</li>
+     *   <li>{@code active} — null=전체 / true=cooldown 이내(진행 중) / false=경과(지난 사건). per-row cooldown_hours interval 연산.</li>
+     * </ul>
+     *
+     * <p>정렬은 목록 전체와 동일하게 last_alert_at DESC 고정. countQuery 는 동일 WHERE 를 복제(누락 시 오집계).
+     */
+    @Query(value = """
+            SELECT * FROM disaster_events e
+            WHERE (CAST(:type AS varchar) IS NULL OR e.primary_disaster_type = :type)
+              AND (CAST(:region AS varchar) IS NULL OR e.primary_region_name LIKE :region || '%')
+              AND (CAST(:regionCode AS varchar) IS NULL OR e.primary_region_code = :regionCode)
+              AND (CAST(:startDate AS timestamp) IS NULL OR e.last_alert_at  >= CAST(:startDate AS timestamp))
+              AND (CAST(:endDate   AS timestamp) IS NULL OR e.first_alert_at <= CAST(:endDate   AS timestamp))
+              AND (CAST(:keyword AS varchar) IS NULL OR e.event_title LIKE '%' || :keyword || '%')
+              AND (CAST(:active AS boolean) IS NULL
+                   OR (CAST(:active AS boolean) = TRUE  AND e.last_alert_at >  CAST(:now AS timestamp) - (cooldown_hours * interval '1 hour'))
+                   OR (CAST(:active AS boolean) = FALSE AND e.last_alert_at <= CAST(:now AS timestamp) - (cooldown_hours * interval '1 hour')))
+            ORDER BY e.last_alert_at DESC
+            """,
+            countQuery = """
+            SELECT count(*) FROM disaster_events e
+            WHERE (CAST(:type AS varchar) IS NULL OR e.primary_disaster_type = :type)
+              AND (CAST(:region AS varchar) IS NULL OR e.primary_region_name LIKE :region || '%')
+              AND (CAST(:regionCode AS varchar) IS NULL OR e.primary_region_code = :regionCode)
+              AND (CAST(:startDate AS timestamp) IS NULL OR e.last_alert_at  >= CAST(:startDate AS timestamp))
+              AND (CAST(:endDate   AS timestamp) IS NULL OR e.first_alert_at <= CAST(:endDate   AS timestamp))
+              AND (CAST(:keyword AS varchar) IS NULL OR e.event_title LIKE '%' || :keyword || '%')
+              AND (CAST(:active AS boolean) IS NULL
+                   OR (CAST(:active AS boolean) = TRUE  AND e.last_alert_at >  CAST(:now AS timestamp) - (cooldown_hours * interval '1 hour'))
+                   OR (CAST(:active AS boolean) = FALSE AND e.last_alert_at <= CAST(:now AS timestamp) - (cooldown_hours * interval '1 hour')))
+            """,
+            nativeQuery = true)
+    Page<DisasterEvent> search(
+            @Param("active") Boolean active,
+            @Param("now") LocalDateTime now,
+            @Param("type") String type,
+            @Param("region") String region,
+            @Param("regionCode") String regionCode,
+            @Param("startDate") LocalDateTime startDate,
+            @Param("endDate") LocalDateTime endDate,
+            @Param("keyword") String keyword,
+            Pageable pageable
+    );
+
+    /**
      * 클러스터링 후보 검색 — 같은 지역(시군구 교집합) 이벤트 중 top-3.
      *
      * <p>조건 (AND):
