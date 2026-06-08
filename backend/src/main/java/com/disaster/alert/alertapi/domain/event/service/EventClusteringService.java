@@ -235,10 +235,19 @@ public class EventClusteringService {
             return false;
         }
 
+        // 후보 이벤트도 사고성 유형(seed 기준)이어야 머지 — 화이트리스트 알림이 기상특보(호우/한파/풍랑)
+        // 이벤트에 빨려들어가는 과병합 차단. (예: '비 예보' 호우 이벤트에 '난방기 화재' 알림이 흡수되던 케이스)
         Map<Long, String> repMessages = representativeMessages(borderlineIds);
         List<EventLLMDecisionService.Candidate> cands = new ArrayList<>(borderlineIds.size());
         for (Long id : borderlineIds) {
+            DisasterEvent ev = disasterEventRepository.findById(id).orElse(null);
+            if (ev == null || !isAccidentType(ev.getPrimaryDisasterType())) {
+                continue;
+            }
             cands.add(new EventLLMDecisionService.Candidate(id, repMessages.getOrDefault(id, "")));
+        }
+        if (cands.isEmpty()) {
+            return false;
         }
 
         Integer pick = llmDecisionService.pickSameGeneralIncident(alert.getMessage(), cands);
