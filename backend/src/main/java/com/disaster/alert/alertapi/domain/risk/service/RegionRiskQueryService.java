@@ -1,10 +1,12 @@
 package com.disaster.alert.alertapi.domain.risk.service;
 
 import com.disaster.alert.alertapi.domain.risk.RiskConstants;
+import com.disaster.alert.alertapi.domain.risk.controller.dto.RiskResponses.AlertRiskResponse;
 import com.disaster.alert.alertapi.domain.risk.controller.dto.RiskResponses.ContributingEvent;
 import com.disaster.alert.alertapi.domain.risk.controller.dto.RiskResponses.RegionRiskDetail;
 import com.disaster.alert.alertapi.domain.risk.controller.dto.RiskResponses.RegionRiskMapItem;
 import com.disaster.alert.alertapi.domain.risk.controller.dto.RiskResponses.RiskHistoryPoint;
+import com.disaster.alert.alertapi.domain.risk.repository.projection.AlertRiskRow;
 import com.disaster.alert.alertapi.domain.risk.repository.RegionRiskHistoryRepository;
 import com.disaster.alert.alertapi.domain.risk.repository.RegionRiskIndexRepository;
 import com.disaster.alert.alertapi.domain.risk.repository.RegionRiskQueryRepository;
@@ -15,6 +17,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 
 /**
  * 지역 위험도 조회(읽기 전용) 애플리케이션 서비스.
@@ -94,6 +97,21 @@ public class RegionRiskQueryService {
                             )
                     ));
         }
+    }
+
+    /**
+     * 재난문자 단건 위험도.
+     * alert가 이벤트에 클러스터링되지 않았거나 아직 위험도 계산 전이면 empty.
+     */
+    public Optional<AlertRiskResponse> alertRisk(Long alertId) {
+        List<AlertRiskRow> rows = queryRepo.findByAlertId(alertId);
+        if (rows.isEmpty()) return Optional.empty();
+
+        AlertRiskRow first = rows.get(0);
+        List<AlertRiskResponse.RegionImpact> impacts = rows.stream()
+                .map(r -> new AlertRiskResponse.RegionImpact(r.regionCode(), r.impactScore()))
+                .toList();
+        return Optional.of(new AlertRiskResponse(alertId, first.eventId(), first.eventTitle(), first.disasterType(), impacts));
     }
 
     /** 시군구 위험도 시계열 (트렌드 / Phase 2 Chronos UI). */

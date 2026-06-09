@@ -1,5 +1,6 @@
 package com.disaster.alert.alertapi.domain.risk.repository;
 
+import com.disaster.alert.alertapi.domain.risk.repository.projection.AlertRiskRow;
 import com.disaster.alert.alertapi.domain.risk.repository.projection.ContributingEventRow;
 import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -42,6 +43,31 @@ public class RegionRiskQueryRepository {
                         rs.getString("disaster_type"),
                         rs.getDouble("impact_score")),
                 sigunguCode, Timestamp.valueOf(since));
+    }
+
+    /** 재난문자 단건 → 소속 이벤트 → 지역별 영향 행 목록. alert가 이벤트에 매핑되지 않았으면 빈 리스트 반환. */
+    public List<AlertRiskRow> findByAlertId(Long alertId) {
+        String sql = """
+                SELECT
+                    eam.event_id                  AS event_id,
+                    de.event_title                AS event_title,
+                    de.primary_disaster_type      AS disaster_type,
+                    eri.region_code               AS region_code,
+                    eri.impact_score              AS impact_score
+                FROM event_alert_mapping eam
+                JOIN disaster_events de  ON de.id           = eam.event_id
+                JOIN event_region_impact eri ON eri.event_id = eam.event_id
+                WHERE eam.alert_id = ?
+                ORDER BY eri.impact_score DESC
+                """;
+        return jdbc.query(sql,
+                (rs, n) -> new AlertRiskRow(
+                        rs.getLong("event_id"),
+                        rs.getString("event_title"),
+                        rs.getString("disaster_type"),
+                        rs.getString("region_code"),
+                        rs.getDouble("impact_score")),
+                alertId);
     }
 
     public List<ContributingEventRow> findHistoricalEvents(String sigunguCode, LocalDateTime start, LocalDateTime end) {
