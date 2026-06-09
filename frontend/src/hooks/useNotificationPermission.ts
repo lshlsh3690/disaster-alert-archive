@@ -1,8 +1,8 @@
-// frontend/src/hooks/useNotificationPermission.ts
 import { useState, useEffect, useCallback } from "react";
 import { getFirebaseMessaging, getToken } from "@/lib/firebase";
-
-const VAPID_KEY = process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY;
+import { registerGuestFcmToken } from "@/api/guestFcmApi";
+import { useGuestFavoriteRegionsStore } from "@/store/guestFavoriteRegionsStore";
+import { useAuthStore } from "@/store/authStore";
 
 export type NotificationPermissionStatus = "default" | "granted" | "denied" | "unsupported";
 
@@ -11,7 +11,9 @@ export const useNotificationPermission = () => {
   const [fcmToken, setFcmToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
-  // FCM 토큰 발급
+  const isLoggedIn = useAuthStore((s) => s.user !== null);
+  const guestRegions = useGuestFavoriteRegionsStore((s) => s.regions);
+
   const getFcmToken = useCallback(async (): Promise<string | null> => {
     const cached = localStorage.getItem("fcm-token");
     if (cached) {
@@ -19,18 +21,16 @@ export const useNotificationPermission = () => {
       return cached;
     }
 
-    // SW 등록 후 활성화까지 대기
     if ("serviceWorker" in navigator) {
       await navigator.serviceWorker.register("/firebase-messaging-sw.js", {
         scope: "/firebase-cloud-messaging-push-scope",
       });
     }
 
-    // 재시도 로직 (SW 활성화 + Firebase 간헐적 401 모두 대응)
     return await retryGetToken(3);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // 초기 권한 상태 확인 + 이미 granted면 토큰 재등록
   useEffect(() => {
     if (typeof window === "undefined" || !("Notification" in window)) {
       setPermission("unsupported");
@@ -42,6 +42,15 @@ export const useNotificationPermission = () => {
       getFcmToken();
     }
   }, [getFcmToken]);
+
+  // 비로그인 상태에서 관심지역 변경 시 서버 게스트 토큰 동기화
+  useEffect(() => {
+    if (isLoggedIn) return;
+    const token = localStorage.getItem("fcm-token");
+    if (!token || guestRegions.length === 0) return;
+    const codes = guestRegions.map((r) => r.legalDistrictCode);
+    registerGuestFcmToken(token, codes);
+  }, [isLoggedIn, guestRegions]);
 
   async function retryGetToken(retries: number): Promise<string | null> {
     try {
@@ -58,10 +67,9 @@ export const useNotificationPermission = () => {
       });
 
       if (token) {
-        console.log("🔥 FCM Token:", token);
         localStorage.setItem("fcm-token", token);
         setFcmToken(token);
-        await registerFcmToken(token);
+        await registerFcmToken(token, isLoggedIn, guestRegions.map((r) => r.legalDistrictCode));
         return token;
       }
       return null;
@@ -71,13 +79,11 @@ export const useNotificationPermission = () => {
         console.error("FCM 토큰 발급 최종 실패");
         return null;
       }
-      // 재시도 전 대기 (점진적 증가)
       await new Promise(resolve => setTimeout(resolve, 1500));
       return retryGetToken(retries - 1);
     }
   }
 
-  // 알림 권한 요청
   const requestPermission = useCallback(async (): Promise<boolean> => {
     if (typeof window === "undefined" || !("Notification" in window)) return false;
 
@@ -102,22 +108,22 @@ export const useNotificationPermission = () => {
   return { permission, fcmToken, isLoading, requestPermission };
 };
 
-// BE fcm_token API 호출
-async function registerFcmToken(token: string) {
+async function registerFcmToken(token: string, isLoggedIn: boolean, guestCodes: string[]) {
   const isTWA = document.referrer.includes("android-app://");
   const deviceType = isTWA ? "ANDROID" : "WEB";
 
-  try {
-    await fetch("/api/v1/fcm-token", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      credentials: "include",
-      body: JSON.stringify({
-        token,
-        deviceType
-      }),
-    });
-  } catch (error) {
-    console.error("FCM 토큰 등록 실패:", error);
+  if (isLoggedIn) {
+    try {
+      await fetch("/api/v1/fcm-token", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ token, deviceType }),
+      });
+    } catch (error) {
+      console.error("FCM 토큰 등록 실패:", error);
+    }
+  } else {
+    await registerGuestFcmToken(token, guestCodes);
   }
 }

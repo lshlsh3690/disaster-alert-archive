@@ -14,6 +14,7 @@ export const ZAlert = z.object({
   disasterType: z.string().nullable().optional(),
   originalRegion: z.string().nullable().optional(),
   regionNames: z.array(z.string()).default([]),
+  eventId: z.number().nullable().optional(),
   translatedMessage: z.string().nullable().optional(),
   translatedDisasterType: z.string().nullable().optional(),
   translatedRegionNames: z.array(z.string()).nullable().optional(),

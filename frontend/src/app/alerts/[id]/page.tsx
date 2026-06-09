@@ -1,7 +1,9 @@
 "use client";
 
+import Link from "next/link";
 import { useAlert, useUserAlert } from "@/lib/queries/useAlerts";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
+import { useI18n } from "@/hooks/useI18n";
 import { useDeleteUserAlert } from "@/lib/mutations/useDeleteUserAlert";
 import { useAuthStore } from "@/store/authStore";
 import { useComments, useCreateComment, useDeleteComment, useInfiniteComments, useUpdateComment } from "@/lib/queries/useComments";
@@ -15,6 +17,7 @@ export default function AlertDetailPage() {
   const source = (sp.get("source") || "OFFICIAL").toUpperCase();
   const isUser = source === "USER";
   const [lang, setLang] = useState<"ko" | "en">("ko");
+  const t = useI18n();
   const { data: offData, isLoading: offLoading } = useAlert(isUser ? 0 : id, lang);
   const { data: userData, isLoading: userLoading } = useUserAlert(isUser ? id : 0);
   const data = isUser ? userData : offData;
@@ -91,6 +94,14 @@ export default function AlertDetailPage() {
         <div className="text-sm text-gray-600">{lang === "en" ? "Level" : "레벨"}: {data.emergencyLevelText ?? "-"}</div>
         <div className="text-sm text-gray-600">{lang === "en" ? "Region" : "지역"}: {regionText}</div>
         {!(isUser) && <div className="text-xs text-gray-400">SN: {offData?.sn ?? "-"}</div>}
+        {!isUser && offData?.eventId && (
+          <Link
+            href={`/events/${offData.eventId}`}
+            className="inline-flex items-center gap-1 text-sm text-blue-600 hover:underline"
+          >
+            {t.events.viewEvent} →
+          </Link>
+        )}
         {canEdit && (
           <div className="pt-2 flex gap-2">
             <button

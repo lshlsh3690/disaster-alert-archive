@@ -2,6 +2,8 @@ package com.disaster.alert.alertapi.scheduler;
 
 import com.disaster.alert.alertapi.api.DisasterOpenApiClient;
 import com.disaster.alert.alertapi.domain.disasteralert.service.DisasterAlertService;
+import com.disaster.alert.alertapi.domain.event.service.EventClusteringService;
+import com.disaster.alert.alertapi.domain.event.service.EventCrossRegionService;
 import com.disaster.alert.alertapi.domain.notification.service.AlertNotificationService;
 import com.disaster.alert.alertapi.global.translation.TranslationService;
 import lombok.RequiredArgsConstructor;
@@ -20,6 +22,8 @@ public class DisasterFetchScheduler {
     private final DisasterAlertService alertService;
     private final TranslationService translationService;
     private final AlertNotificationService alertNotificationService;
+    private final EventClusteringService eventClusteringService;
+    private final EventCrossRegionService eventCrossRegionService;
 
     // 매 10분마다 실행
     @Scheduled(cron = "0 0/10 * * * *")
@@ -39,6 +43,10 @@ public class DisasterFetchScheduler {
             translationService.translateAndSaveAsync(alertId);
             // FCM 알림 트리거
             alertNotificationService.triggerNotification(alertId);
+            // 이벤트 클러스터링 (clustering.enabled=false 시 no-op)
+            eventClusteringService.clusterNewAlert(alertId);
+            // 기타(지역 이동 유형) cross-region LLM 병합 (clustering.cross-region.enabled=false 시 no-op)
+            eventCrossRegionService.linkCrossRegion(alertId);
         });
     }
 }

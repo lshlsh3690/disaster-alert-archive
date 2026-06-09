@@ -7,6 +7,7 @@ import { useAuthStore } from "@/store/authStore";
 import { useLanguageStore } from "@/store/languageStore";
 import { useEffect, useRef, useState } from "react";
 import { logoutApi } from "@/api/authApi";
+import { deleteGuestFcmToken } from "@/api/guestFcmApi";
 import { useRouter } from "next/navigation";
 import { useInitAuth } from "@/hooks/useInitAuth";
 import { LANGUAGES, LangCode } from "@/constants/language";
@@ -36,6 +37,7 @@ export default function Header() {
   const menu = [
     { name: t.nav.dashboard, href: "/dashboard" },
     { name: t.nav.alerts, href: "/alerts" },
+    { name: t.nav.events, href: "/events" },
     { name: t.nav.stats, href: "/stats" },
     { name: t.nav.community, href: "/community" },
   ];
@@ -49,7 +51,9 @@ export default function Header() {
     logoutApi()
       .then(() => {
         logout();
+        const token = localStorage.getItem("fcm-token");
         localStorage.removeItem("fcm-token");
+        if (token) deleteGuestFcmToken(token);
         setOpen(false);
         router.push("/");
       })
@@ -99,7 +103,11 @@ export default function Header() {
             </select>
           </div>
           {isLoggedIn ? (
-            <div className="relative" ref={dropdownRef}>
+            <div className="flex items-center gap-3">
+              <Link href="/user/settings/regions" className="text-sm text-gray-600 hover:text-blue-600 hover:underline">
+                {t.nav.favoriteRegions}
+              </Link>
+              <div className="relative" ref={dropdownRef}>
               <button
                 onClick={() => setOpen((prev) => !prev)}
                 className="text-sm font-medium text-blue-600 hover:underline"
@@ -111,9 +119,6 @@ export default function Header() {
                   <Link href="/notifications" className="block px-4 py-2 hover:bg-gray-50" onClick={() => setOpen(false)}>
                     알림 이력
                   </Link>
-                  <Link href="/user/settings/regions" className="block px-4 py-2 hover:bg-gray-50" onClick={() => setOpen(false)}>
-                    {t.nav.favoriteRegions}
-                  </Link>
                   <Link href="/user/settings" className="block px-4 py-2 hover:bg-gray-50" onClick={() => setOpen(false)}>
                     {t.nav.settings}
                   </Link>
@@ -122,11 +127,17 @@ export default function Header() {
                   </button>
                 </div>
               )}
+              </div>
             </div>
           ) : (
-            <Link href="/login" className="text-blue-600 hover:underline font-medium">
-              {t.nav.login}
-            </Link>
+            <div className="flex items-center gap-3">
+              <Link href="/user/settings/regions" className="text-sm text-gray-600 hover:text-blue-600 hover:underline">
+                {t.nav.favoriteRegions}
+              </Link>
+              <Link href="/login" className="text-blue-600 hover:underline font-medium">
+                {t.nav.login}
+              </Link>
+            </div>
           )}
         </nav>
 
@@ -192,9 +203,14 @@ export default function Header() {
               </button>
             </>
           ) : (
-            <Link href="/login" className="block px-2 py-2 rounded hover:bg-gray-50 text-blue-600 font-medium" onClick={() => setMobileMenuOpen(false)}>
-              {t.nav.login}
-            </Link>
+            <>
+              <Link href="/user/settings/regions" className="block px-2 py-2 rounded hover:bg-gray-50" onClick={() => setMobileMenuOpen(false)}>
+                {t.nav.favoriteRegions}
+              </Link>
+              <Link href="/login" className="block px-2 py-2 rounded hover:bg-gray-50 text-blue-600 font-medium" onClick={() => setMobileMenuOpen(false)}>
+                {t.nav.login}
+              </Link>
+            </>
           )}
         </nav>
       )}

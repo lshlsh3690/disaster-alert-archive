@@ -100,6 +100,61 @@ deepl:
   api-url: https://api-free.deepl.com/v2/translate
   enabled: true
 
+# Spring AI — OpenAI Embedding + Chat
+# 컨테이너 추가 없음. 기존 backend Spring Boot 프로세스 안에서 라이브러리로 동작.
+# base-url 은 embedding/chat 공용 — SSAFY GMS 프록시 토큰 사용(팀 risk 모듈과 공유).
+spring.ai:
+  openai:
+    api-key: ${OPENAI_API_KEY:dummy}
+    base-url: ${OPENAI_BASE_URL:https://api.openai.com}
+    embedding:
+      options:
+        model: text-embedding-3-small
+        dimensions: 512
+    # chat 모델 공용 — risk 모듈 LlmRiskProfiler(35종에 없는 신규 유형 프로파일) + 이벤트 cross-region 같은 사건 판정
+    chat:
+      options:
+        model: gpt-4o-mini
+        temperature: 0.2
+
+# 이벤트 클러스터링 (임베딩 기반)
+# 지역 hard 필터: 같은 시군구 후보만, 코사인 유사도 >= similarity-threshold 면 머지.
+# (cross-region 자동병합은 폭염 등 템플릿형 메시지에서 다지역 blob 을 만들어 제거 — 실데이터 검증)
+clustering:
+  enabled: ${CLUSTERING_ENABLED:false}
+  similarity-threshold: 0.85
+  candidate-time-window-hours: 168
+  # 한 알림이 이 수 초과 시군구에 발송되면 광역 브로드캐스트로 보고 단독 이벤트 처리 (blob 다리 차단)
+  max-region-span: 10
+  # 광역 알림이 이 수 이상 시도에 걸치면 '전국' 이벤트로 분류 (유형만 키, 라벨 "전국 {유형}").
+  # 미만이면 시도 광역(최다 시군구 시도 + 유형 키). 전국 17개 시도 기준, 영남권(~5)·수도권(~3) 같은
+  # 권역 클러스터는 시도 광역으로 남기고 행안부 전국 안내(17시도) 류만 전국으로 빼는 값.
+  nationwide-sido-span: 8
+  # 실종 인물 신원 클러스터링 윈도우 — 같은 이름+나이+키를 한 사람으로 보는 재신고 간격 (14일).
+  # 인물은 임베딩/지역이 아니라 신원으로만 묶음(같은 사람=한 이벤트, 다른 사람=다른 이벤트).
+  person-window-hours: 336
+  # local borderline LLM 폴백 — 같은 시군구 후보지만 임베딩이 임계(0.85) 미만이라 못 묶은
+  # '사고성' 사건을 LLM 으로 동일 사건 판정해 묶는다. "서소문 고가 붕괴"처럼 같은 사고를 여러
+  # 기관이 다른 측면(도로통제/KTX/경의선)으로 보내 본문 임베딩이 갈리는 케이스 대응.
+  # 폭염·호우 등 기상특보는 발효/해제 반복이 borderline 에 걸려 LLM 이 과병합하므로 화이트리스트로 제외.
+  # recluster 시에도 enabled=true 면 동작(임베딩 임계 튜닝만 할 땐 false 로 두면 LLM 호출 0=공짜).
+  llm-fallback:
+    enabled: ${LLM_FALLBACK_ENABLED:false}   # 실시간/백필 공용 토글 (clustering.enabled 와 별개)
+    distance-ceil: 0.40                        # (mergeMaxDistance=0.15, 0.40] 구간 후보만 LLM 에 질의
+    # 특정 장소·시설의 일회성 사고만 (실데이터 borderline 분석 기반). 기타는 동물·실종 게이트로 추가 제외.
+    accident-types: "기타,화재,산불,붕괴,교통사고,교통통제,교통,환경오염사고,정전,통신,테러,지진,지진해일,수도"
+  # cross-region LLM 병합 — 지역 이동 사건(탈출 동물 등 비정형)을 LLM 으로 같은 사건 판정해 묶음.
+  # clusterNewAlert(local+broadcast)와 분리된 별도 단계라 recluster(공짜 튜닝)에 LLM 안 섞임.
+  cross-region:
+    enabled: ${CROSS_REGION_ENABLED:false}   # 실시간 토글 (clustering.enabled 와 별개)
+    candidate-window-hours: 336               # 14일 (실종·이동은 며칠~몇 주)
+    top-k: 5                                  # 임베딩 후보 상위 K (LLM 에 배치로 전달)
+    similarity-floor: 0.6                     # 무관한 기타 거름용 (동일인 판정은 LLM 몫)
+    span-cap-alerts: 30                       # cross-region 이벤트 최대 알림 수 (blob 방지)
+    span-cap-sido: 10                         # 최대 걸친 시도 수
+    mover-keywords: "찾습니다|실종|수배|가출|배회|탈출|출몰|멧돼지|들개|늑대"   # 게이트(전체 이동신호)
+    animal-keywords: "탈출|출몰|멧돼지|들개|늑대"   # 인물(이름+나이) 아닌 동물·비정형만 임베딩+LLM
+
 springdoc:
   swagger-ui:
     path: /swagger-ui.html
