@@ -27,6 +27,9 @@ import java.time.LocalDateTime;
 @EntityListeners(AuditingEntityListener.class)
 public class DisasterRiskProfile {
 
+    /** spread_coeff 기본값(DB DEFAULT 와 일치). LLM 생성 신규 유형의 초기 확산 강도. */
+    public static final double DEFAULT_SPREAD_COEFF = 0.3;
+
     @Id
     @Column(name = "disaster_type", length = 50)
     private String disasterType;
@@ -36,6 +39,10 @@ public class DisasterRiskProfile {
 
     @Column(name = "half_life_hours", nullable = false)
     private int halfLifeHours;
+
+    /** 인접 시군구로 번지는 확산 강도(0~1). 이웃 위험도 = 진원 source × spreadCoeff^거리. */
+    @Column(name = "spread_coeff", nullable = false)
+    private double spreadCoeff;
 
     @Column(name = "is_llm_generated", nullable = false)
     private boolean llmGenerated;
@@ -53,6 +60,7 @@ public class DisasterRiskProfile {
                 .disasterType(disasterType)
                 .baseWeight(baseWeight)
                 .halfLifeHours(halfLifeHours)
+                .spreadCoeff(DEFAULT_SPREAD_COEFF)
                 .llmGenerated(true)
                 .operatorConfirmed(false)
                 .build();

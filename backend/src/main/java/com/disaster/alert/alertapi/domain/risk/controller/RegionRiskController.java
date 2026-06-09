@@ -56,4 +56,12 @@ public class RegionRiskController {
                                                                        @RequestParam(defaultValue = "7") int days) {
         return ResponseEntity.ok(ApiResponse.success(queryService.history(regionCode, days)));
     }
+
+    /** 재난문자 단건이 속한 이벤트의 지역별 위험도 영향. 클러스터링 전이면 204. */
+    @GetMapping("/alerts/{alertId}/risk")
+    public ResponseEntity<AlertRiskResponse> alertRisk(@PathVariable Long alertId) {
+        return queryService.alertRisk(alertId)
+                .map(ResponseEntity::ok)
+                .orElse(ResponseEntity.noContent().build());
+    }
 }

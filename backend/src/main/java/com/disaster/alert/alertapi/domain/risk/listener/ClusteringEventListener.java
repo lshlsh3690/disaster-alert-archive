@@ -36,10 +36,15 @@ public class ClusteringEventListener {
             // 1. 이벤트 영향(impact) 재계산 → 영향받은 시군구 집합 반환
             Set<String> affectedSigungu = riskService.recomputeEventRisk(event.eventId());
 
-            // 2. 영향받은 시군구만 즉시 region_risk_index 재계산 (문자 도착 시 실시간 갱신).
+            // 2. 영향받은 시군구의 자기 위험도(source) 재계산 (문자 도착 시 실시간 갱신).
             //    리스너는 외부 빈이라 프록시 호출이 정상 동작 → C3(자기호출) 문제 없음.
-            //    영향 지역만 도므로(태풍도 ~250개 한정) long-tx 없음.
-            affectedSigungu.forEach(riskService::recomputeRegionRisk);
+            affectedSigungu.forEach(riskService::recomputeRegionSource);
+
+            // 3. 인접 그래프 전파로 effective(risk_score) 갱신.
+            //    이웃까지 번지므로 영향 지역만이 아니라 전체 전파 1회(전 그래프 ~ms).
+            if (!affectedSigungu.isEmpty()) {
+                riskService.propagateEffective();
+            }
 
         } catch (Exception e) {
             // 위험도 실패가 수집/클러스터링 파이프라인에 영향 주지 않도록 격리.

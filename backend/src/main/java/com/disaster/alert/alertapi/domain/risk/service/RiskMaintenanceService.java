@@ -41,14 +41,22 @@ public class RiskMaintenanceService {
 
         if (targets.isEmpty()) return;
 
+        // 1. 활성/잔존 시군구의 자기 위험도(source) 재계산
         targets.forEach(code -> {
             try {
-                riskService.recomputeRegionRisk(code);
+                riskService.recomputeRegionSource(code);
             } catch (Exception e) {
                 log.error("지역 위험도 재계산 실패 region={}", code, e);
             }
         });
-        log.debug("recomputeActiveRegions: {}개 시군구 재계산", targets.size());
+
+        // 2. 인접 전파로 effective(risk_score) 갱신 (전 그래프 1회)
+        try {
+            riskService.propagateEffective();
+        } catch (Exception e) {
+            log.error("위험도 공간 확산 전파 실패", e);
+        }
+        log.debug("recomputeActiveRegions: {}개 시군구 재계산 + 전파", targets.size());
     }
 
     /** 시계열 스냅샷 (Phase 2 Chronos 입력 축적) */

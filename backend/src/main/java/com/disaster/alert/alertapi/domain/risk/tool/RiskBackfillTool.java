@@ -55,16 +55,19 @@ public class RiskBackfillTool implements ApplicationRunner {
             }
         }
 
-        // 전체 시군구 1회 강제 재계산 (region_risk_index 즉시 채우기)
+        // 전체 시군구 1회 강제 재계산 (자기 위험도 source 즉시 채우기)
         List<String> sigungus = jdbc.queryForList(
                 "SELECT DISTINCT LEFT(region_code, 5) FROM event_region_impact", String.class);
         sigungus.forEach(code -> {
             try {
-                riskService.recomputeRegionRisk(code);
+                riskService.recomputeRegionSource(code);
             } catch (Exception e) {
                 log.error("backfill 지역 재계산 실패 region={}", code, e);
             }
         });
+
+        // 인접 전파로 effective(risk_score) 채우기 (전 그래프 1회)
+        riskService.propagateEffective();
 
         long elapsed = (System.currentTimeMillis() - t0) / 1000;
         log.info("RiskBackfillTool 완료: 처리={}, 오류={}, 시군구={}, 소요={}s",

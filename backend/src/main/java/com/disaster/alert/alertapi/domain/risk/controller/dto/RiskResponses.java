@@ -40,4 +40,15 @@ public final class RiskResponses {
             LocalDateTime snapshotAt,
             double riskScore
     ) {}
+
+    /** GET /api/v1/alerts/{id}/risk — 재난문자 단건 위험도. */
+    public record AlertRiskResponse(
+            Long alertId,
+            Long eventId,
+            String eventTitle,
+            String disasterType,
+            List<RegionImpact> regionImpacts
+    ) {
+        public record RegionImpact(String regionCode, double impactScore) {}
+    }
 }
