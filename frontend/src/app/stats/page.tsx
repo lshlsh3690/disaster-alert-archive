@@ -389,8 +389,25 @@ function StatsPageInner() {
       setActivePreset(p);
       if (saved) setLayout(JSON.parse(saved) as WidgetItem[]);
       if (savedNames) setPresetNames(JSON.parse(savedNames));
+      // URL에 필터가 없을 때만 저장된 필터 복원 (URL 우선)
+      const hasUrlFilter = ["sido", "sigungu", "startDate", "endDate", "type", "levelText"]
+        .some(k => new URLSearchParams(window.location.search).get(k));
+      if (!hasUrlFilter) {
+        const savedFilter = localStorage.getItem(`stats-filter-${p}`);
+        if (savedFilter) {
+          const f = JSON.parse(savedFilter) as { sido: string; sigungu: string; startDate: string; endDate: string; type: string; levelText: string };
+          const qs = new URLSearchParams();
+          if (f.sido)      qs.set("sido",      f.sido);
+          if (f.sigungu)   qs.set("sigungu",   f.sigungu);
+          if (f.startDate) qs.set("startDate", f.startDate);
+          if (f.endDate)   qs.set("endDate",   f.endDate);
+          if (f.type)      qs.set("type",      f.type);
+          if (f.levelText) qs.set("levelText", f.levelText);
+          router.replace(`?${qs.toString()}`);
+        }
+      }
     } catch {}
-  }, []);
+  }, [router]);
 
   const commitPresetName = useCallback(() => {
     if (editingPreset === null) return;
