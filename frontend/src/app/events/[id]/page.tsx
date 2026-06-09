@@ -163,7 +163,7 @@ function TimelineNode({
   lang: string;
 }) {
   const dt = new Date(item.createdAt);
-  const timeStr = `${dt.getMonth() + 1}/${dt.getDate()} ${String(dt.getHours()).padStart(2, "0")}:${String(dt.getMinutes()).padStart(2, "0")}`;
+  const timeStr = `${String(dt.getFullYear()).slice(2)}/${String(dt.getMonth() + 1).padStart(2, "0")}/${String(dt.getDate()).padStart(2, "0")} ${String(dt.getHours()).padStart(2, "0")}:${String(dt.getMinutes()).padStart(2, "0")}`;
 
   const message =
     lang !== "ko" && item.translatedMessage ? item.translatedMessage : item.message;
