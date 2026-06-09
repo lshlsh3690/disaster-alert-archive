@@ -296,7 +296,7 @@ function StatsPageInner() {
     }
   };
 
-  // 적용 버튼: 로컬 필터를 URL 파라미터로 push → useSearchParams가 자동 업데이트
+  // 적용 버튼: 로컬 필터를 URL 파라미터로 push + 현재 프리셋에 저장
   const applyFilter = () => {
     const qs = new URLSearchParams();
     if (localFilter.sido)      qs.set("sido",      localFilter.sido);
@@ -305,6 +305,7 @@ function StatsPageInner() {
     if (localFilter.endDate)   qs.set("endDate",   localFilter.endDate);
     if (localFilter.type)      qs.set("type",      localFilter.type);
     if (localFilter.levelText) qs.set("levelText", localFilter.levelText);
+    try { localStorage.setItem(`stats-filter-${activePreset}`, JSON.stringify(localFilter)); } catch {}
     router.push(`?${qs.toString()}`);
     setFilterOpen(false);
   };
@@ -373,8 +374,25 @@ function StatsPageInner() {
       setActivePreset(p);
       if (saved) setLayout(JSON.parse(saved) as WidgetItem[]);
       if (savedNames) setPresetNames(JSON.parse(savedNames));
+      // URL에 필터가 없을 때만 저장된 필터 복원 (URL 우선)
+      const hasUrlFilter = ["sido", "sigungu", "startDate", "endDate", "type", "levelText"]
+        .some(k => new URLSearchParams(window.location.search).get(k));
+      if (!hasUrlFilter) {
+        const savedFilter = localStorage.getItem(`stats-filter-${p}`);
+        if (savedFilter) {
+          const f = JSON.parse(savedFilter) as { sido: string; sigungu: string; startDate: string; endDate: string; type: string; levelText: string };
+          const qs = new URLSearchParams();
+          if (f.sido)      qs.set("sido",      f.sido);
+          if (f.sigungu)   qs.set("sigungu",   f.sigungu);
+          if (f.startDate) qs.set("startDate", f.startDate);
+          if (f.endDate)   qs.set("endDate",   f.endDate);
+          if (f.type)      qs.set("type",      f.type);
+          if (f.levelText) qs.set("levelText", f.levelText);
+          router.replace(`?${qs.toString()}`);
+        }
+      }
     } catch {}
-  }, []);
+  }, [router]);
 
   const commitPresetName = useCallback(() => {
     if (editingPreset === null) return;
@@ -393,8 +411,22 @@ function StatsPageInner() {
       localStorage.setItem("stats-preset-active", String(p));
       const saved = localStorage.getItem(`stats-layout-${p}`);
       setLayout(saved ? (JSON.parse(saved) as WidgetItem[]) : DEFAULT_LAYOUT);
+      const savedFilter = localStorage.getItem(`stats-filter-${p}`);
+      if (savedFilter) {
+        const f = JSON.parse(savedFilter) as typeof localFilter;
+        const qs = new URLSearchParams();
+        if (f.sido)      qs.set("sido",      f.sido);
+        if (f.sigungu)   qs.set("sigungu",   f.sigungu);
+        if (f.startDate) qs.set("startDate", f.startDate);
+        if (f.endDate)   qs.set("endDate",   f.endDate);
+        if (f.type)      qs.set("type",      f.type);
+        if (f.levelText) qs.set("levelText", f.levelText);
+        router.push(`?${qs.toString()}`);
+      } else {
+        router.push("?");
+      }
     } catch {}
-  }, []);
+  }, [router]);
 
   // 비교 위젯 존재 여부 → 전년/금년 데이터 페칭 여부 결정 (enabled 플래그)
   const hasCompare = layout.some(w => w.libId === "compare");
