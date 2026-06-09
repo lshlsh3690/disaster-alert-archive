@@ -26,11 +26,21 @@ public class RegionRiskIndex {
     @Column(name = "region_code", length = 20)
     private String regionCode;
 
+    /** effective 위험도 — 이웃에서 번져온 값까지 결합한 최종 점수(FE 노출). */
     @Column(name = "risk_score", nullable = false)
     private double riskScore;
 
+    /** effective 점수의 진원 이벤트(이웃에서 번졌으면 그 이웃의 top event). 설명용. */
     @Column(name = "top_event_id")
     private Long topEventId;
+
+    /** source 위험도 — 자기 시군구 직접 impact 만(전파 전). 확산 계산의 입력. */
+    @Column(name = "source_score", nullable = false)
+    private double sourceScore;
+
+    /** source 점수의 top 이벤트(자기 시군구 기준). */
+    @Column(name = "source_top_event_id")
+    private Long sourceTopEventId;
 
     @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
