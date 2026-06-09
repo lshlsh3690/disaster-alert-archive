@@ -18,8 +18,8 @@ public interface RegionRiskIndexRepository extends JpaRepository<RegionRiskIndex
      */
     @Modifying
     @Query(value = """
-            INSERT INTO region_risk_index (region_code, source_score, source_top_event_id, updated_at)
-            VALUES (:regionCode, :score, :topEventId, :updatedAt)
+            INSERT INTO region_risk_index (region_code, source_score, source_top_event_id, risk_score, updated_at)
+            VALUES (:regionCode, :score, :topEventId, 0.0, :updatedAt)
             ON CONFLICT (region_code)
             DO UPDATE SET source_score = :score,
                           source_top_event_id = :topEventId,
