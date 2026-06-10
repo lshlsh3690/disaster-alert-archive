@@ -2,6 +2,7 @@ package com.disaster.alert.alertapi.domain.event.model;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Set;
 import java.util.regex.Pattern;
 
 /**
@@ -43,6 +44,14 @@ public final class AnimalIdentity {
         SPECIES_REGEX.forEach((species, regex) -> PATTERNS.put(species, Pattern.compile(regex)));
     }
 
+    /**
+     * 토착종 — 지역에 귀속돼 국지적으로만 움직이는 야생동물(멧돼지·들개·뱀). 시군구 단위로 정밀
+     * 태깅되며, cross-region 은 <b>시군구 인접</b>만 허용(옆 동네 이동은 살리되, 인접 시도를 전이적으로
+     * 타고 전국이 한 사건으로 묶이는 과병합 차단). 그 외 종(늑대·사슴·곰·소)은 농장·동물원 탈출처럼
+     * 멀리 이동하고 시도 레벨로 태깅되는 경우가 많아 시도 인접을 쓴다.
+     */
+    private static final Set<String> ENDEMIC = Set.of("멧돼지", "들개", "뱀");
+
     private AnimalIdentity() {
     }
 
@@ -67,5 +76,13 @@ public final class AnimalIdentity {
      */
     public static String speciesRegex(String species) {
         return species == null ? null : SPECIES_REGEX.get(species);
+    }
+
+    /**
+     * 토착종 여부 — true 면 cross-region 인접 게이트를 <b>시군구</b> 단위로(국지 이동), false 면
+     * <b>시도</b> 단위로(원거리 이동) 적용한다. 사전에 없는 종(null)도 false.
+     */
+    public static boolean isEndemic(String species) {
+        return species != null && ENDEMIC.contains(species);
     }
 }

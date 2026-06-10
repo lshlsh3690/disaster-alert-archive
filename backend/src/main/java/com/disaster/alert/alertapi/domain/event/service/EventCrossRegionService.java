@@ -100,8 +100,18 @@ public class EventCrossRegionService {
         return AnimalIdentity.species(msg) != null;
     }
 
-    /** 대상 알림의 distinct 시도 코드(앞 2자) — 인접 게이트 기준. 순서 보존. */
+    /** 대상 알림의 distinct 시도 코드(앞 2자) — 이동종 인접 게이트 기준. 순서 보존. */
     private List<String> extractSidoCodes(DisasterAlert alert) {
+        return extractCodePrefixes(alert, 2);
+    }
+
+    /** 대상 알림의 distinct 시군구 코드(앞 5자) — 토착종 인접 게이트 기준. 순서 보존. */
+    private List<String> extractSigunguCodes(DisasterAlert alert) {
+        return extractCodePrefixes(alert, 5);
+    }
+
+    /** 알림 지역 코드를 앞 {@code len}자로 잘라 distinct(순서 보존) 목록 반환. */
+    private List<String> extractCodePrefixes(DisasterAlert alert, int len) {
         List<DisasterAlertRegion> regions = alert.getDisasterAlertRegions();
         if (regions == null || regions.isEmpty()) {
             return List.of();
@@ -109,8 +119,8 @@ public class EventCrossRegionService {
         Set<String> codes = new LinkedHashSet<>();
         for (DisasterAlertRegion r : regions) {
             String code = r.getId().getDistrictCode();
-            if (code != null && code.length() >= 2) {
-                codes.add(code.substring(0, 2));
+            if (code != null && code.length() >= len) {
+                codes.add(code.substring(0, len));
             }
         }
         return new ArrayList<>(codes);
@@ -130,13 +140,9 @@ public class EventCrossRegionService {
             return;
         }
         // 종 하드게이트 — 식별 못 하면 cross-region 안 함(보수적). 다른 종끼리 묶이는 과병합 차단.
-        String speciesRegex = AnimalIdentity.speciesRegex(AnimalIdentity.species(alert.getMessage()));
+        String species = AnimalIdentity.species(alert.getMessage());
+        String speciesRegex = AnimalIdentity.speciesRegex(species);
         if (speciesRegex == null) {
-            return;
-        }
-        // 인접 게이트 기준 — 대상 알림 시도(앞 2자). 지역 없으면 인접 판정 불가 → skip.
-        List<String> sidoCodes = extractSidoCodes(alert);
-        if (sidoCodes.isEmpty()) {
             return;
         }
         String embeddingText = alertEmbeddingRepository.findEmbeddingText(alert.getId());
@@ -144,8 +150,24 @@ public class EventCrossRegionService {
             return;
         }
         LocalDateTime since = alert.getCreatedAt().minusHours(windowHours);
-        List<Object[]> rows = disasterEventRepository.findCrossRegionCandidates(
-                embeddingText, since, selfEventId, speciesRegex, sidoCodes, 1.0 - similarityFloor, topK);
+        // 인접 게이트는 종 분류에 따라 단위가 다르다 — 토착종(멧돼지·들개·뱀)은 시군구 인접(국지 이동),
+        // 이동종(늑대·사슴·곰·소)은 시도 인접(원거리 이동·시도 레벨 태깅). 지역 없으면 판정 불가 → skip.
+        List<Object[]> rows;
+        if (AnimalIdentity.isEndemic(species)) {
+            List<String> sigunguCodes = extractSigunguCodes(alert);
+            if (sigunguCodes.isEmpty()) {
+                return;
+            }
+            rows = disasterEventRepository.findCrossRegionCandidatesSigungu(
+                    embeddingText, since, selfEventId, speciesRegex, sigunguCodes, 1.0 - similarityFloor, topK);
+        } else {
+            List<String> sidoCodes = extractSidoCodes(alert);
+            if (sidoCodes.isEmpty()) {
+                return;
+            }
+            rows = disasterEventRepository.findCrossRegionCandidatesSido(
+                    embeddingText, since, selfEventId, speciesRegex, sidoCodes, 1.0 - similarityFloor, topK);
+        }
         if (rows.isEmpty()) {
             return;
         }

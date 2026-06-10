@@ -46,4 +46,17 @@ class AnimalIdentityTest {
         assertThat(AnimalIdentity.speciesRegex("들개")).isEqualTo("들개|대형견|유기견");
         assertThat(AnimalIdentity.speciesRegex("멧돼지")).isEqualTo("멧돼지");
     }
+
+    @Test
+    @DisplayName("토착종(시군구 인접)과 이동종(시도 인접)을 구분한다")
+    void classifiesEndemicVsMobile() {
+        assertThat(AnimalIdentity.isEndemic("멧돼지")).isTrue();
+        assertThat(AnimalIdentity.isEndemic("들개")).isTrue();
+        assertThat(AnimalIdentity.isEndemic("뱀")).isTrue();
+        assertThat(AnimalIdentity.isEndemic("늑대")).isFalse();
+        assertThat(AnimalIdentity.isEndemic("사슴")).isFalse();
+        assertThat(AnimalIdentity.isEndemic("곰")).isFalse();
+        assertThat(AnimalIdentity.isEndemic("소")).isFalse();
+        assertThat(AnimalIdentity.isEndemic(null)).isFalse();
+    }
 }

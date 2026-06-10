@@ -195,30 +195,23 @@ public interface DisasterEventRepository extends JpaRepository<DisasterEvent, Lo
 
     // ── cross-region LLM 병합 ─────────────────────────────────────
 
+    // cross-region 후보 검색은 {@link #findTopCandidates}와 달리 지역 hard 필터(교집합)를 제거하되
+    // 두 게이트로 한정한다(동물 과병합 방지):
+    //   ① 종 게이트: 후보 이벤트가 대상과 같은 종(speciesRegex) 알림을 가져야 함. 동물 문자는 본문
+    //      임베딩이 종과 무관하게 균일해(늑대 탈출 ≈ 멧돼지 출몰) 종을 안 가르면 다른 종끼리 묶인다.
+    //   ② 인접 게이트: 후보 이벤트가 대상 지역과 같거나 인접한 지역을 포함해야 함. 동물은 물리적으로
+    //      옆 지역을 거쳐 이동하므로 비인접은 다른 개체로 보고 차단. 인접 단위는 종에 따라 둘로 나뉜다
+    //      (아래 Sido/Sigungu 두 메서드). 통과한 top-K 후보의 동일개체 판정은 LLM 이 한다.
+
     /**
-     * cross-region 후보 이벤트 검색 — {@link #findTopCandidates}와 달리 <b>지역 hard 필터(교집합)를
-     * 제거</b>하되, 다음 두 게이트로 한정한다(동물 과병합 방지):
-     * <ul>
-     *   <li><b>종 게이트</b>: 후보 이벤트가 대상과 <b>같은 종</b>(speciesRegex) 알림을 가져야 함.
-     *       동물 문자는 본문 임베딩이 종과 무관하게 균일해(늑대 탈출 ≈ 멧돼지 출몰) 종을 안 가르면
-     *       다른 종끼리 묶인다. 종을 하드게이트로 둔다(실종 인물의 이름+나이 게이트와 같은 철학).</li>
-     *   <li><b>인접 게이트</b>: 후보 이벤트가 대상 알림 시도(코드 앞 2자)와 <b>같거나 인접</b>한 시도의
-     *       지역을 포함해야 함. 인접 시도는 {@code region_adjacency}(시군구 인접쌍)를 시도로 투영해
-     *       도출한다. 동물은 물리적으로 옆 지역을 거쳐 이동하므로, 비인접 시도(예: 부산↔서울) 같은
-     *       종은 다른 개체로 보고 차단. 이동 개체는 인접 시도 체인으로 footprint 가 이어져 한 이벤트로 유지.
-     *       <br>시군구가 아니라 <b>시도</b> 단위인 이유: 동물 알림은 시도 레벨 코드(예 {@code 30000}
-     *       대전 전체)로 태깅되는 경우가 많아 시군구 인접 그래프에 안 잡힌다. 앞 2자는 두 경우 모두 견고.</li>
-     * </ul>
+     * cross-region 후보 검색 — <b>시도(코드 앞 2자) 인접</b> 게이트. 이동종(늑대·사슴·곰·소)용.
      *
-     * <p>두 게이트를 통과한 임베딩 top-K 후보에 대해 실제 동일 개체 판정은 LLM 이 한다.
+     * <p>탈출 동물은 멀리 이동하고 알림이 시도 레벨 코드(예 {@code 30000} 대전 전체)로 태깅되는
+     * 경우가 많아 시군구 인접 그래프에 안 잡힌다 → 앞 2자(시도)로 비교. 인접 시도는
+     * {@code region_adjacency}(시군구 인접쌍)를 시도로 투영해 도출. 이동 개체는 인접 시도 체인으로
+     * footprint 가 이어져 한 이벤트로 유지된다.
      *
-     * @param newEmbedding 대상 알림 임베딩 벡터 텍스트
-     * @param sinceTime    윈도우 하한 (cross-region 전용, 기본 14일)
-     * @param selfEventId  대상 알림이 속한 이벤트 (자기 제외)
-     * @param speciesRegex 대상 종 매칭 정규식 (Postgres ~ 매칭, {@link com.disaster.alert.alertapi.domain.event.model.AnimalIdentity})
-     * @param sidoCodes    대상 알림 시도 코드(앞 2자) — 인접 게이트 기준
-     * @param maxDistance  허용 최대 코사인 거리 (1 - similarity-floor)
-     * @param limit        top-K
+     * @param sidoCodes 대상 알림 시도 코드(앞 2자) — 인접 게이트 기준
      * @return {eventId, minDistance} 0~K 행, 거리 오름차순
      */
     @Query(value = """
@@ -256,12 +249,68 @@ public interface DisasterEventRepository extends JpaRepository<DisasterEvent, Lo
             ORDER BY min_distance ASC
             LIMIT :limit
             """, nativeQuery = true)
-    List<Object[]> findCrossRegionCandidates(
+    List<Object[]> findCrossRegionCandidatesSido(
             @Param("newEmbedding") String newEmbedding,
             @Param("sinceTime") LocalDateTime sinceTime,
             @Param("selfEventId") Long selfEventId,
             @Param("speciesRegex") String speciesRegex,
             @Param("sidoCodes") List<String> sidoCodes,
+            @Param("maxDistance") double maxDistance,
+            @Param("limit") int limit
+    );
+
+    /**
+     * cross-region 후보 검색 — <b>시군구(코드 앞 5자) 인접</b> 게이트. 토착종(멧돼지·들개·뱀)용.
+     *
+     * <p>토착 야생동물은 지역에 귀속돼 국지적으로만 움직이고 알림이 구체 시군구로 정밀 태깅된다.
+     * 시도 인접을 쓰면 같은 종 출몰이 인접 시도를 전이적으로 타고 전국이 한 사건으로 묶이는
+     * 과병합이 난다(부산→경남→대구). 시군구 인접({@code region_adjacency} 직접 매칭)으로 좁혀
+     * "옆 동네 이동"(예: 부산진구↔동래구)만 살리고 전이적 과확장을 막는다.
+     *
+     * @param sigunguCodes 대상 알림 시군구 코드(앞 5자) — 인접 게이트 기준
+     * @return {eventId, minDistance} 0~K 행, 거리 오름차순
+     */
+    @Query(value = """
+            SELECT e.id AS event_id,
+                   MIN(da.embedding <=> CAST(:newEmbedding AS vector)) AS min_distance
+            FROM disaster_events e
+            JOIN event_alert_mapping m ON m.event_id = e.id
+            JOIN disaster_alert da ON da.disaster_alert_id = m.alert_id
+            WHERE e.last_alert_at > :sinceTime
+              AND e.is_broadcast = false
+              AND e.id <> :selfEventId
+              AND da.embedding IS NOT NULL
+              AND EXISTS (
+                  SELECT 1 FROM event_alert_mapping m2
+                  JOIN disaster_alert da2 ON da2.disaster_alert_id = m2.alert_id
+                  WHERE m2.event_id = e.id
+                    AND da2.disaster_type = '기타'
+                    AND da2.message ~ :speciesRegex
+              )
+              AND EXISTS (
+                  SELECT 1 FROM event_alert_mapping m3
+                  JOIN disaster_alert_region dar ON dar.disaster_alert_id = m3.alert_id
+                  WHERE m3.event_id = e.id
+                    AND (
+                        LEFT(dar.legal_district_code, 5) IN (:sigunguCodes)
+                        OR EXISTS (
+                            SELECT 1 FROM region_adjacency ra
+                            WHERE ra.region_code IN (:sigunguCodes)
+                              AND ra.neighbor_code = LEFT(dar.legal_district_code, 5)
+                        )
+                    )
+              )
+            GROUP BY e.id
+            HAVING MIN(da.embedding <=> CAST(:newEmbedding AS vector)) <= :maxDistance
+            ORDER BY min_distance ASC
+            LIMIT :limit
+            """, nativeQuery = true)
+    List<Object[]> findCrossRegionCandidatesSigungu(
+            @Param("newEmbedding") String newEmbedding,
+            @Param("sinceTime") LocalDateTime sinceTime,
+            @Param("selfEventId") Long selfEventId,
+            @Param("speciesRegex") String speciesRegex,
+            @Param("sigunguCodes") List<String> sigunguCodes,
             @Param("maxDistance") double maxDistance,
             @Param("limit") int limit
     );
