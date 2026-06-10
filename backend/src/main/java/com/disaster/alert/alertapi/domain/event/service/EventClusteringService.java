@@ -95,8 +95,17 @@ public class EventClusteringService {
     @Value("${clustering.cross-region.animal-keywords:탈출|출몰|멧돼지|들개|늑대}")
     private String animalKeywords;
 
+    /** 전국 통합 유형(쉼표 구분) — 지역 무관 단일 사건. 태풍처럼 시군구 단위로 쪼개져도 하나로 묶는다. */
+    @Value("${clustering.global-types:태풍}")
+    private String globalTypesCsv;
+
+    /** 전국 통합 유형의 머지 윈도우(시간). 같은 윈도우 안의 같은 유형이면 한 사건. 기본 7일(168h). */
+    @Value("${clustering.global-window-hours:168}")
+    private int globalWindowHours;
+
     private Set<String> accidentTypes;
     private Pattern animalPattern;
+    private Set<String> globalTypes;
 
     /**
      * 신규 알림에 대해 임베딩 생성 + 클러스터링 수행.
@@ -151,6 +160,13 @@ public class EventClusteringService {
         // 0. 실종 인물(기타 + 이름·나이)은 신원(이름+나이+키)으로만 클러스터링 — 시군구·임베딩 무관.
         //    같은 사람=한 이벤트(지역 옮겨도), 다른 사람=다른 이벤트(같은 시군구라도). broadcast 도 안 탐.
         if (clusterPerson(alert)) {
+            return;
+        }
+
+        // 0.5 전국 통합 유형(태풍 등)은 지역·임베딩 무관하게 시간 윈도우로만 단일 이벤트에 묶는다.
+        //     태풍 알림은 대부분 시군구 단위로 쪼개져 발송돼(span 게이트 미달) local 경로의 지역
+        //     hard 필터에 막혀 시군구마다 이벤트가 생겼다. 유형 자체를 키로 써서 임베딩 전에 분기.
+        if (clusterGlobalType(alert)) {
             return;
         }
 
@@ -326,6 +342,51 @@ public class EventClusteringService {
             log.info("clusterNewAlert(인물): alertId={} → 신규 이벤트({})", alert.getId(), key);
         }
         return true;
+    }
+
+    /**
+     * 전국 통합 유형 클러스터링 — 태풍처럼 본질적으로 지역 무관한 단일 사건 유형을, 윈도우 안의
+     * 같은 유형 전국 broadcast 이벤트 하나에 머지(없으면 신규). 지역·임베딩을 보지 않는다.
+     *
+     * <p>태풍 알림은 대부분 시군구 단위로 따로 발송돼({@code sigungu_span=1}) {@link #clusterBroadcast}
+     * 의 span 게이트({@code maxRegionSpan})를 못 넘고, local 임베딩 경로의 지역 hard 필터에 막혀
+     * 시군구마다 별도 이벤트가 됐다. 유형 자체를 키로 삼아 이 파편화를 막는다. 인물 IDENTITY 와 같은
+     * 철학(유형이 신원). 같은 윈도우(기본 7일) 안의 연속 발송은 같은 태풍으로 간주.
+     *
+     * @return 전국 통합 유형으로 처리하면 true, 아니면(일반 유형) false → 임베딩 경로로.
+     */
+    private boolean clusterGlobalType(DisasterAlert alert) {
+        if (!isGlobalType(alert.getDisasterType())) {
+            return false;
+        }
+        String type = alert.getDisasterType();
+        LocalDateTime since = alert.getCreatedAt().minusHours(globalWindowHours);
+        // 전국 broadcast(region_code=null) 이벤트만 키로 — broadcast 격리 규칙과 일관(local 과 안 섞임).
+        Optional<DisasterEvent> target = disasterEventRepository
+                .findFirstByBroadcastTrueAndPrimaryDisasterTypeAndPrimaryRegionCodeIsNullAndLastAlertAtAfterOrderByLastAlertAtDesc(
+                        type, since);
+        if (target.isPresent()) {
+            mergeIntoExisting(target.get().getId(), alert, null, MergeMethod.GLOBAL_TYPE);
+            log.info("clusterNewAlert(전국통합): alertId={} → event={} 유형 머지({})",
+                    alert.getId(), target.get().getId(), type);
+        } else {
+            createNewEvent(alert, null, "전국", true);
+            log.info("clusterNewAlert(전국통합): alertId={} → 신규 전국 이벤트({})", alert.getId(), type);
+        }
+        return true;
+    }
+
+    /** 전국 통합 유형(태풍 등) 화이트리스트 매칭 — 지역·임베딩 무관 단일 이벤트 대상. */
+    private boolean isGlobalType(String type) {
+        if (type == null) {
+            return false;
+        }
+        if (globalTypes == null) {
+            globalTypes = Arrays.stream(globalTypesCsv.split(","))
+                    .map(String::trim).filter(s -> !s.isEmpty())
+                    .collect(Collectors.toSet());
+        }
+        return globalTypes.contains(type.trim());
     }
 
     /**
