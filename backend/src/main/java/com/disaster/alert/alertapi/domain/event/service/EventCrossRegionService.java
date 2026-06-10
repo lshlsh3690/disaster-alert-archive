@@ -1,7 +1,9 @@
 package com.disaster.alert.alertapi.domain.event.service;
 
 import com.disaster.alert.alertapi.domain.disasteralert.model.DisasterAlert;
+import com.disaster.alert.alertapi.domain.disasteralert.model.DisasterAlertRegion;
 import com.disaster.alert.alertapi.domain.disasteralert.repository.DisasterAlertRepository;
+import com.disaster.alert.alertapi.domain.event.model.AnimalIdentity;
 import com.disaster.alert.alertapi.domain.event.model.DisasterEvent;
 import com.disaster.alert.alertapi.domain.event.model.MergeMethod;
 import com.disaster.alert.alertapi.domain.event.model.MissingPersonIdentity;
@@ -17,10 +19,11 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.regex.Pattern;
+import java.util.Set;
 
 /**
  * 동물·비정형 이동 사건 cross-region LLM 병합.
@@ -60,22 +63,6 @@ public class EventCrossRegionService {
     @Value("${clustering.cross-region.span-cap-sido:10}")
     private int spanCapSido;
 
-    @Value("${clustering.cross-region.mover-keywords:찾습니다|실종|수배|가출|배회|탈출|출몰|멧돼지|들개|늑대}")
-    private String moverKeywords;
-
-    /** 동물·비정형 판정용 키워드. 인물(이름+나이) 아닌 기타 알림 중 이 키워드 있으면 임베딩+LLM. */
-    @Value("${clustering.cross-region.animal-keywords:탈출|출몰|멧돼지|들개|늑대}")
-    private String animalKeywords;
-
-    private Pattern animalPattern;
-
-    private Pattern animalPattern() {
-        if (animalPattern == null) {
-            animalPattern = Pattern.compile(animalKeywords);
-        }
-        return animalPattern;
-    }
-
     /**
      * 동물·비정형 이동 알림을 기존 이벤트에 cross-region 병합 시도.
      * 전제: 이미 {@link EventClusteringService#clusterNewAlert}로 어떤 이벤트(임베딩 클러스터)에 속해 있음.
@@ -101,7 +88,7 @@ public class EventCrossRegionService {
         }
     }
 
-    /** 게이트: disaster_type='기타' AND 인물 아님(신원 클러스터링 대상 제외) AND 동물 키워드 포함. */
+    /** 게이트: disaster_type='기타' AND 인물 아님(신원 클러스터링 대상 제외) AND 종 식별됨. */
     private boolean isAnimalCase(DisasterAlert alert) {
         if (!"기타".equals(alert.getDisasterType())) {
             return false;
@@ -110,7 +97,23 @@ public class EventCrossRegionService {
         if (msg == null || MissingPersonIdentity.isPerson(msg)) {
             return false;
         }
-        return animalPattern().matcher(msg).find();
+        return AnimalIdentity.species(msg) != null;
+    }
+
+    /** 대상 알림의 distinct 시도 코드(앞 2자) — 인접 게이트 기준. 순서 보존. */
+    private List<String> extractSidoCodes(DisasterAlert alert) {
+        List<DisasterAlertRegion> regions = alert.getDisasterAlertRegions();
+        if (regions == null || regions.isEmpty()) {
+            return List.of();
+        }
+        Set<String> codes = new LinkedHashSet<>();
+        for (DisasterAlertRegion r : regions) {
+            String code = r.getId().getDistrictCode();
+            if (code != null && code.length() >= 2) {
+                codes.add(code.substring(0, 2));
+            }
+        }
+        return new ArrayList<>(codes);
     }
 
     /**
@@ -126,13 +129,23 @@ public class EventCrossRegionService {
         if (eventAlertMappingRepository.countDistinctSidoByEventId(selfEventId) >= 2) {
             return;
         }
+        // 종 하드게이트 — 식별 못 하면 cross-region 안 함(보수적). 다른 종끼리 묶이는 과병합 차단.
+        String speciesRegex = AnimalIdentity.speciesRegex(AnimalIdentity.species(alert.getMessage()));
+        if (speciesRegex == null) {
+            return;
+        }
+        // 인접 게이트 기준 — 대상 알림 시도(앞 2자). 지역 없으면 인접 판정 불가 → skip.
+        List<String> sidoCodes = extractSidoCodes(alert);
+        if (sidoCodes.isEmpty()) {
+            return;
+        }
         String embeddingText = alertEmbeddingRepository.findEmbeddingText(alert.getId());
         if (embeddingText == null) {
             return;
         }
         LocalDateTime since = alert.getCreatedAt().minusHours(windowHours);
         List<Object[]> rows = disasterEventRepository.findCrossRegionCandidates(
-                embeddingText, since, selfEventId, moverKeywords, 1.0 - similarityFloor, topK);
+                embeddingText, since, selfEventId, speciesRegex, sidoCodes, 1.0 - similarityFloor, topK);
         if (rows.isEmpty()) {
             return;
         }

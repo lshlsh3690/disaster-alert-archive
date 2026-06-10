@@ -196,16 +196,27 @@ public interface DisasterEventRepository extends JpaRepository<DisasterEvent, Lo
     // ── cross-region LLM 병합 ─────────────────────────────────────
 
     /**
-     * cross-region 후보 이벤트 검색 — {@link #findTopCandidates}와 달리 <b>지역 필터를 제거</b>하고,
-     * 후보가 '이동 사건(기타 + mover 키워드)' 알림을 가진 이벤트인지로 한정한다.
+     * cross-region 후보 이벤트 검색 — {@link #findTopCandidates}와 달리 <b>지역 hard 필터(교집합)를
+     * 제거</b>하되, 다음 두 게이트로 한정한다(동물 과병합 방지):
+     * <ul>
+     *   <li><b>종 게이트</b>: 후보 이벤트가 대상과 <b>같은 종</b>(speciesRegex) 알림을 가져야 함.
+     *       동물 문자는 본문 임베딩이 종과 무관하게 균일해(늑대 탈출 ≈ 멧돼지 출몰) 종을 안 가르면
+     *       다른 종끼리 묶인다. 종을 하드게이트로 둔다(실종 인물의 이름+나이 게이트와 같은 철학).</li>
+     *   <li><b>인접 게이트</b>: 후보 이벤트가 대상 알림 시도(코드 앞 2자)와 <b>같거나 인접</b>한 시도의
+     *       지역을 포함해야 함. 인접 시도는 {@code region_adjacency}(시군구 인접쌍)를 시도로 투영해
+     *       도출한다. 동물은 물리적으로 옆 지역을 거쳐 이동하므로, 비인접 시도(예: 부산↔서울) 같은
+     *       종은 다른 개체로 보고 차단. 이동 개체는 인접 시도 체인으로 footprint 가 이어져 한 이벤트로 유지.
+     *       <br>시군구가 아니라 <b>시도</b> 단위인 이유: 동물 알림은 시도 레벨 코드(예 {@code 30000}
+     *       대전 전체)로 태깅되는 경우가 많아 시군구 인접 그래프에 안 잡힌다. 앞 2자는 두 경우 모두 견고.</li>
+     * </ul>
      *
-     * <p>실종자·탈출 동물처럼 지역이 달라 시군구가 안 겹치는 같은 사건을 찾기 위함. 임베딩 top-K 만
-     * 추리고(무관한 기타 거름), 실제 동일 인물/개체 판정은 LLM 이 한다.
+     * <p>두 게이트를 통과한 임베딩 top-K 후보에 대해 실제 동일 개체 판정은 LLM 이 한다.
      *
      * @param newEmbedding 대상 알림 임베딩 벡터 텍스트
      * @param sinceTime    윈도우 하한 (cross-region 전용, 기본 14일)
      * @param selfEventId  대상 알림이 속한 이벤트 (자기 제외)
-     * @param moverRegex   mover 키워드 정규식 (Postgres ~ 매칭)
+     * @param speciesRegex 대상 종 매칭 정규식 (Postgres ~ 매칭, {@link com.disaster.alert.alertapi.domain.event.model.AnimalIdentity})
+     * @param sidoCodes    대상 알림 시도 코드(앞 2자) — 인접 게이트 기준
      * @param maxDistance  허용 최대 코사인 거리 (1 - similarity-floor)
      * @param limit        top-K
      * @return {eventId, minDistance} 0~K 행, 거리 오름차순
@@ -225,7 +236,20 @@ public interface DisasterEventRepository extends JpaRepository<DisasterEvent, Lo
                   JOIN disaster_alert da2 ON da2.disaster_alert_id = m2.alert_id
                   WHERE m2.event_id = e.id
                     AND da2.disaster_type = '기타'
-                    AND da2.message ~ :moverRegex
+                    AND da2.message ~ :speciesRegex
+              )
+              AND EXISTS (
+                  SELECT 1 FROM event_alert_mapping m3
+                  JOIN disaster_alert_region dar ON dar.disaster_alert_id = m3.alert_id
+                  WHERE m3.event_id = e.id
+                    AND (
+                        LEFT(dar.legal_district_code, 2) IN (:sidoCodes)
+                        OR EXISTS (
+                            SELECT 1 FROM region_adjacency ra
+                            WHERE LEFT(ra.region_code, 2) IN (:sidoCodes)
+                              AND LEFT(ra.neighbor_code, 2) = LEFT(dar.legal_district_code, 2)
+                        )
+                    )
               )
             GROUP BY e.id
             HAVING MIN(da.embedding <=> CAST(:newEmbedding AS vector)) <= :maxDistance
@@ -236,7 +260,8 @@ public interface DisasterEventRepository extends JpaRepository<DisasterEvent, Lo
             @Param("newEmbedding") String newEmbedding,
             @Param("sinceTime") LocalDateTime sinceTime,
             @Param("selfEventId") Long selfEventId,
-            @Param("moverRegex") String moverRegex,
+            @Param("speciesRegex") String speciesRegex,
+            @Param("sidoCodes") List<String> sidoCodes,
             @Param("maxDistance") double maxDistance,
             @Param("limit") int limit
     );
