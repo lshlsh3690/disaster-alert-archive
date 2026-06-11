@@ -196,12 +196,18 @@ public interface DisasterEventRepository extends JpaRepository<DisasterEvent, Lo
     // ── cross-region LLM 병합 ─────────────────────────────────────
 
     // cross-region 후보 검색은 {@link #findTopCandidates}와 달리 지역 hard 필터(교집합)를 제거하되
-    // 두 게이트로 한정한다(동물 과병합 방지):
+    // 세 게이트로 한정한다(동물 과병합 방지):
     //   ① 종 게이트: 후보 이벤트가 대상과 같은 종(speciesRegex) 알림을 가져야 함. 동물 문자는 본문
     //      임베딩이 종과 무관하게 균일해(늑대 탈출 ≈ 멧돼지 출몰) 종을 안 가르면 다른 종끼리 묶인다.
     //   ② 인접 게이트: 후보 이벤트가 대상 지역과 같거나 인접한 지역을 포함해야 함. 동물은 물리적으로
     //      옆 지역을 거쳐 이동하므로 비인접은 다른 개체로 보고 차단. 인접 단위는 종에 따라 둘로 나뉜다
     //      (아래 Sido/Sigungu 두 메서드). 통과한 top-K 후보의 동일개체 판정은 LLM 이 한다.
+    //   ③ 시간 게이트(양방향): 후보 이벤트가 처리 알림의 ±윈도우와 겹쳐야 함
+    //      (last_alert_at > sinceTime AND first_alert_at < untilTime). 하한만 두면 cross-region 백필이
+    //      base 후 '모든 이벤트 선존재' 상태로 돌아, 처리 알림보다 몇 년 미래의 같은 종·인접 이벤트도
+    //      last_alert_at > sinceTime 을 만족해 후보가 된다 → LLM 이 "같은 동네 같은 동물" 이라 묶어
+    //      같은 시군구 멧돼지 출몰 수년치가 한 사건(수백일 span)으로 과병합. 상한(untilTime)으로
+    //      윈도우 밖에서 시작한 이벤트를 거르면 live(미래 알림 미존재)와 동일 의미가 된다.
 
     /**
      * cross-region 후보 검색 — <b>시도(코드 앞 2자) 인접</b> 게이트. 이동종(늑대·사슴·곰·소)용.
@@ -221,6 +227,7 @@ public interface DisasterEventRepository extends JpaRepository<DisasterEvent, Lo
             JOIN event_alert_mapping m ON m.event_id = e.id
             JOIN disaster_alert da ON da.disaster_alert_id = m.alert_id
             WHERE e.last_alert_at > :sinceTime
+              AND e.first_alert_at < :untilTime
               AND e.is_broadcast = false
               AND e.id <> :selfEventId
               AND da.embedding IS NOT NULL
@@ -252,6 +259,7 @@ public interface DisasterEventRepository extends JpaRepository<DisasterEvent, Lo
     List<Object[]> findCrossRegionCandidatesSido(
             @Param("newEmbedding") String newEmbedding,
             @Param("sinceTime") LocalDateTime sinceTime,
+            @Param("untilTime") LocalDateTime untilTime,
             @Param("selfEventId") Long selfEventId,
             @Param("speciesRegex") String speciesRegex,
             @Param("sidoCodes") List<String> sidoCodes,
@@ -277,6 +285,7 @@ public interface DisasterEventRepository extends JpaRepository<DisasterEvent, Lo
             JOIN event_alert_mapping m ON m.event_id = e.id
             JOIN disaster_alert da ON da.disaster_alert_id = m.alert_id
             WHERE e.last_alert_at > :sinceTime
+              AND e.first_alert_at < :untilTime
               AND e.is_broadcast = false
               AND e.id <> :selfEventId
               AND da.embedding IS NOT NULL
@@ -308,6 +317,7 @@ public interface DisasterEventRepository extends JpaRepository<DisasterEvent, Lo
     List<Object[]> findCrossRegionCandidatesSigungu(
             @Param("newEmbedding") String newEmbedding,
             @Param("sinceTime") LocalDateTime sinceTime,
+            @Param("untilTime") LocalDateTime untilTime,
             @Param("selfEventId") Long selfEventId,
             @Param("speciesRegex") String speciesRegex,
             @Param("sigunguCodes") List<String> sigunguCodes,

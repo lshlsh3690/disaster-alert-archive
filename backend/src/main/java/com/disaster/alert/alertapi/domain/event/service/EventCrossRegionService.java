@@ -149,7 +149,11 @@ public class EventCrossRegionService {
         if (embeddingText == null) {
             return;
         }
+        // 시간 게이트는 양방향 — 후보 이벤트가 처리 알림의 [created-window, created+window] 와 겹쳐야 한다.
+        // 하한(since)만 두면 백필이 모든 이벤트 선존재 상태로 돌아 미래 이벤트까지 후보가 돼(같은 시군구
+        // 멧돼지 출몰 수년치가 한 사건으로 과병합), 상한(until)으로 윈도우 밖에서 시작한 이벤트를 거른다.
         LocalDateTime since = alert.getCreatedAt().minusHours(windowHours);
+        LocalDateTime until = alert.getCreatedAt().plusHours(windowHours);
         // 인접 게이트는 종 분류에 따라 단위가 다르다 — 토착종(멧돼지·들개·뱀)은 시군구 인접(국지 이동),
         // 이동종(늑대·사슴·곰·소)은 시도 인접(원거리 이동·시도 레벨 태깅). 지역 없으면 판정 불가 → skip.
         List<Object[]> rows;
@@ -159,14 +163,14 @@ public class EventCrossRegionService {
                 return;
             }
             rows = disasterEventRepository.findCrossRegionCandidatesSigungu(
-                    embeddingText, since, selfEventId, speciesRegex, sigunguCodes, 1.0 - similarityFloor, topK);
+                    embeddingText, since, until, selfEventId, speciesRegex, sigunguCodes, 1.0 - similarityFloor, topK);
         } else {
             List<String> sidoCodes = extractSidoCodes(alert);
             if (sidoCodes.isEmpty()) {
                 return;
             }
             rows = disasterEventRepository.findCrossRegionCandidatesSido(
-                    embeddingText, since, selfEventId, speciesRegex, sidoCodes, 1.0 - similarityFloor, topK);
+                    embeddingText, since, until, selfEventId, speciesRegex, sidoCodes, 1.0 - similarityFloor, topK);
         }
         if (rows.isEmpty()) {
             return;
