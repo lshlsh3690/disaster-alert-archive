@@ -138,7 +138,7 @@ public interface DisasterEventRepository extends JpaRepository<DisasterEvent, Lo
               AND EXISTS (
                   SELECT 1 FROM disaster_alert_region dar
                   WHERE dar.disaster_alert_id = da.disaster_alert_id
-                    AND dar.legal_district_code = ANY(CAST(:regionCodes AS varchar[]))
+                    AND LEFT(dar.legal_district_code, 5) = ANY(CAST(:sigunguCodes AS varchar[]))
               )
             GROUP BY e.id
             ORDER BY min_distance ASC
@@ -146,7 +146,7 @@ public interface DisasterEventRepository extends JpaRepository<DisasterEvent, Lo
             """, nativeQuery = true)
     List<Object[]> findTopCandidates(
             @Param("newEmbedding") String newEmbedding,
-            @Param("regionCodes") String[] regionCodes,
+            @Param("sigunguCodes") String[] sigunguCodes,
             @Param("sinceTime") LocalDateTime sinceTime
     );
 
