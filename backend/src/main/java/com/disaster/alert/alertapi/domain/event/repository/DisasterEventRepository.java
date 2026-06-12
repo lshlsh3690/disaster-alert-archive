@@ -151,6 +151,46 @@ public interface DisasterEventRepository extends JpaRepository<DisasterEvent, Lo
     );
 
     /**
+     * 지역앵커 유형 머지 대상 검색 — 같은 유형 + 같은 시군구(footprint 교집합) + 윈도우 안의
+     * non-broadcast 이벤트 중 가장 최근 1개. 산불·산사태·홍수처럼 "유형+시군구가 곧 사건"인 이산
+     * 재난용.
+     *
+     * <p>{@link #findTopCandidates}와 달리 <b>임베딩(본문)을 보지 않는다</b> — 한 산불/호우 episode 가
+     * 같은 시군구에서 며칠 burst 로 쏟아질 때 본문 텍스트가 갈려(코사인&lt;0.85) 임베딩으로는 한 사건이
+     * 수십 개로 파편화되기 때문. 유형 자체를 키로 삼되, 태풍({@link #findFirstByBroadcastTrue...})처럼
+     * 전국으로 풀지 않고 <b>시군구 교집합</b>으로 묶어 전국 blob 을 차단한다.
+     *
+     * <p>시군구 매칭은 이벤트 footprint 전체(걸친 모든 알림 지역)와 새 알림 시군구의 교집합({@link
+     * #findTopCandidates}와 동일한 EXISTS 필터). {@code is_broadcast=false}만 — 광역 산불은 호출 측이
+     * span 게이트로 걸러 broadcast 경로로 보낸다. 동률(같은 윈도우 다수 후보)은 last_alert_at DESC 로 결정적.
+     *
+     * @param type         새 알림 유형 (예: "산불")
+     * @param sigunguCodes 새 알림 시군구 코드(앞 5자) 배열 — footprint 교집합 키
+     * @param sinceTime    윈도우 하한 (유형별: 산불 14일 / 산사태·홍수 7일 전)
+     * @return 머지할 이벤트 id, 없으면 empty(신규 이벤트)
+     */
+    @Query(value = """
+            SELECT e.id
+            FROM disaster_events e
+            WHERE e.is_broadcast = false
+              AND e.primary_disaster_type = :type
+              AND e.last_alert_at > :sinceTime
+              AND EXISTS (
+                  SELECT 1 FROM event_alert_mapping m
+                  JOIN disaster_alert_region dar ON dar.disaster_alert_id = m.alert_id
+                  WHERE m.event_id = e.id
+                    AND LEFT(dar.legal_district_code, 5) = ANY(CAST(:sigunguCodes AS varchar[]))
+              )
+            ORDER BY e.last_alert_at DESC
+            LIMIT 1
+            """, nativeQuery = true)
+    Optional<Long> findRegionalTypeMergeTarget(
+            @Param("type") String type,
+            @Param("sigunguCodes") String[] sigunguCodes,
+            @Param("sinceTime") LocalDateTime sinceTime
+    );
+
+    /**
      * 광역 broadcast 이벤트 머지 대상 검색 — 같은 시도 + 같은 유형 + 윈도우 안의 broadcast 이벤트 1개.
      *
      * <p>일반 클러스터링({@link #findTopCandidates})과 달리 <b>임베딩(본문)을 보지 않는다</b>.

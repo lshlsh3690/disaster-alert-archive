@@ -103,9 +103,19 @@ public class EventClusteringService {
     @Value("${clustering.global-window-hours:168}")
     private int globalWindowHours;
 
+    /**
+     * 지역앵커 유형(유형:윈도우시간 CSV) — 산불·산사태·홍수처럼 유형+시군구가 곧 사건인 이산 재난.
+     * 태풍(global-types, 전국)과 달리 시군구 스코프. 윈도우는 유형별로 다르다 — 산불은 재발화 주기가
+     * 길어 14일(336h), 호우성(산사태·홍수)은 같은 날 burst 라 7일(168h). 계절 연속형(폭염·호우특보 등)은
+     * 절대 넣지 말 것(같은 시군구 매일 발령 → span blob).
+     */
+    @Value("${clustering.regional-types:산불:336,산사태:168,홍수:168}")
+    private String regionalTypesCsv;
+
     private Set<String> accidentTypes;
     private Pattern animalPattern;
     private Set<String> globalTypes;
+    private Map<String, Integer> regionalTypeWindows;
 
     /**
      * 신규 알림에 대해 임베딩 생성 + 클러스터링 수행.
@@ -167,6 +177,14 @@ public class EventClusteringService {
         //     태풍 알림은 대부분 시군구 단위로 쪼개져 발송돼(span 게이트 미달) local 경로의 지역
         //     hard 필터에 막혀 시군구마다 이벤트가 생겼다. 유형 자체를 키로 써서 임베딩 전에 분기.
         if (clusterGlobalType(alert)) {
+            return;
+        }
+
+        // 0.7 지역앵커 유형(산불·산사태·홍수) — 유형+시군구가 곧 사건. 같은 시군구·같은 유형·유형별
+        //     윈도우 안이면 임베딩 무관하게 단일 이벤트로 묶는다. 한 산불/호우 episode 가 같은 시군구에서
+        //     며칠 burst 로 쏟아질 때 본문 텍스트가 갈려(코사인<0.85) 임베딩 경로가 한 사건을 수십 개로
+        //     파편화하던 것을 차단. 태풍(GLOBAL_TYPE)과 같은 철학이되 전국이 아니라 시군구 스코프(blob 방지).
+        if (clusterRegionalType(alert)) {
             return;
         }
 
@@ -389,6 +407,77 @@ public class EventClusteringService {
                     .collect(Collectors.toSet());
         }
         return globalTypes.contains(type.trim());
+    }
+
+    /**
+     * 지역앵커 유형 클러스터링 — 산불·산사태·홍수처럼 "유형+지역이 곧 사건"인 이산 재난을, 같은 시군구·
+     * 같은 유형·유형별 윈도우 안의 기존 이벤트에 머지(없으면 신규). 지역·유형은 보되 임베딩·LLM 은 안 본다.
+     *
+     * <p>이 유형들은 한 사건(산불/호우 episode)이 같은 시군구에서 며칠 burst 로 쏟아지며 본문 텍스트가
+     * 갈려(코사인&lt;0.85) local 임베딩 경로가 한 사건을 수십 개로 파편화했다(예: 산청 산불 16조각). 유형
+     * 자체를 키로 삼아 막는다 — 인물 IDENTITY·태풍 GLOBAL_TYPE 과 같은 철학이되, 태풍이 지역을 버리는
+     * 것과 달리 <b>시군구 스코프</b>라 전국 blob 이 안 생긴다. episode 간 갭이 윈도우보다 커서(실측: 산불
+     * 재발화 7~30일, 호우성 같은 날 burst 후 9~25일) 서로 다른 episode 는 자연 분리된다.
+     *
+     * <p>윈도우는 유형별 — 산불 14일(재발화 길다), 산사태·홍수 7일(같은 날 burst). 광역 broadcast
+     * (span&gt;{@code maxRegionSpan})·지역 없음은 여기서 처리하지 않고 false → 기존 broadcast/임베딩
+     * 경로로 넘긴다(전국 산불이 시군구로 안 쪼개지게 격리 유지).
+     *
+     * @return 지역앵커 유형으로 처리하면 true, 아니면(일반 유형·광역·지역없음) false → 임베딩 경로로.
+     */
+    private boolean clusterRegionalType(DisasterAlert alert) {
+        Integer windowHours = regionalTypeWindowHours(alert.getDisasterType());
+        if (windowHours == null) {
+            return false;
+        }
+        String[] regionCodes = extractRegionCodes(alert);
+        if (regionCodes.length == 0) {
+            return false;  // 지역 없으면 시군구 키 못 만듦 → 임베딩 경로(신규 생성)로
+        }
+        // 광역 broadcast(다수 시군구)는 여기서 안 잡고 기존 broadcast 경로가 (시도+유형/전국) 키로 격리.
+        // 전국 산불이 시군구마다 쪼개지지 않게 — span 게이트는 local 경로와 동일 기준.
+        if (distinctSigunguCount(regionCodes) > maxRegionSpan) {
+            return false;
+        }
+        String[] sigungu = sigunguPrefixes(regionCodes);
+        LocalDateTime since = alert.getCreatedAt().minusHours(windowHours);
+        Optional<Long> target = disasterEventRepository.findRegionalTypeMergeTarget(
+                alert.getDisasterType(), sigungu, since);
+        if (target.isPresent()) {
+            mergeIntoExisting(target.get(), alert, null, MergeMethod.REGIONAL_TYPE);
+            log.info("clusterNewAlert(지역앵커): alertId={} → event={} 유형+시군구 머지({}, window={}h)",
+                    alert.getId(), target.get(), alert.getDisasterType(), windowHours);
+        } else {
+            createNewEvent(alert, regionCodes[0], extractFirstRegionName(alert), false);
+            log.info("clusterNewAlert(지역앵커): alertId={} → 신규 이벤트({}, window={}h)",
+                    alert.getId(), alert.getDisasterType(), windowHours);
+        }
+        return true;
+    }
+
+    /**
+     * 지역앵커 유형이면 유형별 머지 윈도우(시간), 아니면 null. CSV {@code "유형:시간,유형:시간"} 1회 파싱.
+     * 잘못된 토큰은 건너뛴다(부분 실패가 전체를 막지 않게).
+     */
+    private Integer regionalTypeWindowHours(String type) {
+        if (type == null) {
+            return null;
+        }
+        if (regionalTypeWindows == null) {
+            Map<String, Integer> m = new HashMap<>();
+            for (String pair : regionalTypesCsv.split(",")) {
+                String[] kv = pair.split(":");
+                if (kv.length == 2) {
+                    try {
+                        m.put(kv[0].trim(), Integer.parseInt(kv[1].trim()));
+                    } catch (NumberFormatException e) {
+                        log.warn("regional-types 파싱 실패: '{}' — 건너뜀", pair);
+                    }
+                }
+            }
+            regionalTypeWindows = m;
+        }
+        return regionalTypeWindows.get(type.trim());
     }
 
     /**

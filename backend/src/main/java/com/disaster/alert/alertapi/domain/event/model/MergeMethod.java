@@ -29,5 +29,12 @@ public enum MergeMethod {
      * 쪼개져 발송돼도({@link #BROADCAST} span 게이트를 못 넘어도) 단일 사건으로 통합.
      * {@link MissingPersonIdentity} 인물처럼 유형 자체가 키라 임베딩을 보지 않는다.
      */
-    GLOBAL_TYPE
+    GLOBAL_TYPE,
+    /**
+     * 지역앵커 유형 머지 — 산불·산사태·홍수처럼 "유형+시군구가 곧 사건"인 이산 재난을 같은 시군구·
+     * 같은 유형·유형별 윈도우(산불 14일/호우성 7일) 안에서 임베딩·LLM 무관하게 하나로 묶는다.
+     * 한 산불/호우 episode 가 본문 텍스트 차이(코사인&lt;0.85)로 수십 개 이벤트로 파편화되던 것을 차단.
+     * 전국 단일인 {@link #GLOBAL_TYPE}(태풍)과 같은 철학이되 시군구 스코프(전국 blob 방지).
+     */
+    REGIONAL_TYPE
 }
