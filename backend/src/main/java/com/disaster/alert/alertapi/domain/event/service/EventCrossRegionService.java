@@ -1,7 +1,9 @@
 package com.disaster.alert.alertapi.domain.event.service;
 
 import com.disaster.alert.alertapi.domain.disasteralert.model.DisasterAlert;
+import com.disaster.alert.alertapi.domain.disasteralert.model.DisasterAlertRegion;
 import com.disaster.alert.alertapi.domain.disasteralert.repository.DisasterAlertRepository;
+import com.disaster.alert.alertapi.domain.event.model.AnimalIdentity;
 import com.disaster.alert.alertapi.domain.event.model.DisasterEvent;
 import com.disaster.alert.alertapi.domain.event.model.MergeMethod;
 import com.disaster.alert.alertapi.domain.event.model.MissingPersonIdentity;
@@ -17,10 +19,11 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.regex.Pattern;
+import java.util.Set;
 
 /**
  * 동물·비정형 이동 사건 cross-region LLM 병합.
@@ -60,22 +63,6 @@ public class EventCrossRegionService {
     @Value("${clustering.cross-region.span-cap-sido:10}")
     private int spanCapSido;
 
-    @Value("${clustering.cross-region.mover-keywords:찾습니다|실종|수배|가출|배회|탈출|출몰|멧돼지|들개|늑대}")
-    private String moverKeywords;
-
-    /** 동물·비정형 판정용 키워드. 인물(이름+나이) 아닌 기타 알림 중 이 키워드 있으면 임베딩+LLM. */
-    @Value("${clustering.cross-region.animal-keywords:탈출|출몰|멧돼지|들개|늑대}")
-    private String animalKeywords;
-
-    private Pattern animalPattern;
-
-    private Pattern animalPattern() {
-        if (animalPattern == null) {
-            animalPattern = Pattern.compile(animalKeywords);
-        }
-        return animalPattern;
-    }
-
     /**
      * 동물·비정형 이동 알림을 기존 이벤트에 cross-region 병합 시도.
      * 전제: 이미 {@link EventClusteringService#clusterNewAlert}로 어떤 이벤트(임베딩 클러스터)에 속해 있음.
@@ -101,7 +88,7 @@ public class EventCrossRegionService {
         }
     }
 
-    /** 게이트: disaster_type='기타' AND 인물 아님(신원 클러스터링 대상 제외) AND 동물 키워드 포함. */
+    /** 게이트: disaster_type='기타' AND 인물 아님(신원 클러스터링 대상 제외) AND 종 식별됨. */
     private boolean isAnimalCase(DisasterAlert alert) {
         if (!"기타".equals(alert.getDisasterType())) {
             return false;
@@ -110,7 +97,33 @@ public class EventCrossRegionService {
         if (msg == null || MissingPersonIdentity.isPerson(msg)) {
             return false;
         }
-        return animalPattern().matcher(msg).find();
+        return AnimalIdentity.species(msg) != null;
+    }
+
+    /** 대상 알림의 distinct 시도 코드(앞 2자) — 이동종 인접 게이트 기준. 순서 보존. */
+    private List<String> extractSidoCodes(DisasterAlert alert) {
+        return extractCodePrefixes(alert, 2);
+    }
+
+    /** 대상 알림의 distinct 시군구 코드(앞 5자) — 토착종 인접 게이트 기준. 순서 보존. */
+    private List<String> extractSigunguCodes(DisasterAlert alert) {
+        return extractCodePrefixes(alert, 5);
+    }
+
+    /** 알림 지역 코드를 앞 {@code len}자로 잘라 distinct(순서 보존) 목록 반환. */
+    private List<String> extractCodePrefixes(DisasterAlert alert, int len) {
+        List<DisasterAlertRegion> regions = alert.getDisasterAlertRegions();
+        if (regions == null || regions.isEmpty()) {
+            return List.of();
+        }
+        Set<String> codes = new LinkedHashSet<>();
+        for (DisasterAlertRegion r : regions) {
+            String code = r.getId().getDistrictCode();
+            if (code != null && code.length() >= len) {
+                codes.add(code.substring(0, len));
+            }
+        }
+        return new ArrayList<>(codes);
     }
 
     /**
@@ -126,13 +139,39 @@ public class EventCrossRegionService {
         if (eventAlertMappingRepository.countDistinctSidoByEventId(selfEventId) >= 2) {
             return;
         }
+        // 종 하드게이트 — 식별 못 하면 cross-region 안 함(보수적). 다른 종끼리 묶이는 과병합 차단.
+        String species = AnimalIdentity.species(alert.getMessage());
+        String speciesRegex = AnimalIdentity.speciesRegex(species);
+        if (speciesRegex == null) {
+            return;
+        }
         String embeddingText = alertEmbeddingRepository.findEmbeddingText(alert.getId());
         if (embeddingText == null) {
             return;
         }
+        // 시간 게이트는 양방향 — 후보 이벤트가 처리 알림의 [created-window, created+window] 와 겹쳐야 한다.
+        // 하한(since)만 두면 백필이 모든 이벤트 선존재 상태로 돌아 미래 이벤트까지 후보가 돼(같은 시군구
+        // 멧돼지 출몰 수년치가 한 사건으로 과병합), 상한(until)으로 윈도우 밖에서 시작한 이벤트를 거른다.
         LocalDateTime since = alert.getCreatedAt().minusHours(windowHours);
-        List<Object[]> rows = disasterEventRepository.findCrossRegionCandidates(
-                embeddingText, since, selfEventId, moverKeywords, 1.0 - similarityFloor, topK);
+        LocalDateTime until = alert.getCreatedAt().plusHours(windowHours);
+        // 인접 게이트는 종 분류에 따라 단위가 다르다 — 토착종(멧돼지·들개·뱀)은 시군구 인접(국지 이동),
+        // 이동종(늑대·사슴·곰·소)은 시도 인접(원거리 이동·시도 레벨 태깅). 지역 없으면 판정 불가 → skip.
+        List<Object[]> rows;
+        if (AnimalIdentity.isEndemic(species)) {
+            List<String> sigunguCodes = extractSigunguCodes(alert);
+            if (sigunguCodes.isEmpty()) {
+                return;
+            }
+            rows = disasterEventRepository.findCrossRegionCandidatesSigungu(
+                    embeddingText, since, until, selfEventId, speciesRegex, sigunguCodes, 1.0 - similarityFloor, topK);
+        } else {
+            List<String> sidoCodes = extractSidoCodes(alert);
+            if (sidoCodes.isEmpty()) {
+                return;
+            }
+            rows = disasterEventRepository.findCrossRegionCandidatesSido(
+                    embeddingText, since, until, selfEventId, speciesRegex, sidoCodes, 1.0 - similarityFloor, topK);
+        }
         if (rows.isEmpty()) {
             return;
         }
