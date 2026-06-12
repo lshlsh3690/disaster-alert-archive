@@ -182,7 +182,9 @@ public class EventClusteringService {
 
         LocalDateTime since = alert.getCreatedAt().minusHours(candidateWindowHours);
         // 후보는 이미 지역 hard 필터(시군구 교집합) 통과한 같은 지역 이벤트들.
-        List<Object[]> candidates = disasterEventRepository.findTopCandidates(embeddingText, regionCodes, since);
+        // 코드 granularity 차이(군레벨 4886000000 vs 읍면동 4886036000)를 흡수하려 시군구(앞 5자) 교집합으로 매칭.
+        // 같은 시군구·같은 사건이 읍면동 태깅 차이로 갈리던 과소병합(예: 산청 산불 시천면↔군레벨) 차단.
+        List<Object[]> candidates = disasterEventRepository.findTopCandidates(embeddingText, sigunguPrefixes(regionCodes), since);
 
         // 4. top-3 후보 로깅 (임계값 튜닝 / 디버깅용)
         logCandidates(alert.getId(), candidates);
@@ -498,6 +500,20 @@ public class EventClusteringService {
             }
         }
         return null;
+    }
+
+    /**
+     * 지역 코드들의 distinct 시군구 prefix(앞 5자) — local 후보 지역 hard 필터를 읍면동이 아닌 시군구 단위로 맞춤.
+     * 같은 사건이라도 한 알림은 군레벨(4886000000), 다른 알림은 읍면동(4886036000)으로 태깅돼 full code 정확
+     * 일치로는 교집합이 0이 되던 과소병합(산청 산불 등)을 차단. 임베딩≥0.85 + 시간 윈도우는 그대로라 같은
+     * 시군구·유사본문·근접시각만 묶인다.
+     */
+    private String[] sigunguPrefixes(String[] regionCodes) {
+        java.util.LinkedHashSet<String> set = new java.util.LinkedHashSet<>();
+        for (String code : regionCodes) {
+            if (code != null && code.length() >= 5) set.add(code.substring(0, 5));
+        }
+        return set.toArray(new String[0]);
     }
 
     /** 시군구(코드 앞 5자) 기준 distinct 개수 — 광역 알림 판정용. */
