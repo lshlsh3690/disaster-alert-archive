@@ -70,6 +70,7 @@ public interface DisasterEventRepository extends JpaRepository<DisasterEvent, Lo
     @Query(value = """
             SELECT * FROM disaster_events e
             WHERE e.alert_count >= 2
+              AND (CAST(:advisory AS boolean) IS NULL OR e.is_advisory = CAST(:advisory AS boolean))
               AND (CAST(:type AS varchar) IS NULL OR e.primary_disaster_type = :type)
               AND (CAST(:region AS varchar) IS NULL OR e.primary_region_name LIKE :region || '%')
               AND (CAST(:regionCode AS varchar) IS NULL OR e.primary_region_code = :regionCode)
@@ -84,6 +85,7 @@ public interface DisasterEventRepository extends JpaRepository<DisasterEvent, Lo
             countQuery = """
             SELECT count(*) FROM disaster_events e
             WHERE e.alert_count >= 2
+              AND (CAST(:advisory AS boolean) IS NULL OR e.is_advisory = CAST(:advisory AS boolean))
               AND (CAST(:type AS varchar) IS NULL OR e.primary_disaster_type = :type)
               AND (CAST(:region AS varchar) IS NULL OR e.primary_region_name LIKE :region || '%')
               AND (CAST(:regionCode AS varchar) IS NULL OR e.primary_region_code = :regionCode)
@@ -104,6 +106,7 @@ public interface DisasterEventRepository extends JpaRepository<DisasterEvent, Lo
             @Param("startDate") LocalDateTime startDate,
             @Param("endDate") LocalDateTime endDate,
             @Param("keyword") String keyword,
+            @Param("advisory") Boolean advisory,
             Pageable pageable
     );
 
@@ -134,6 +137,7 @@ public interface DisasterEventRepository extends JpaRepository<DisasterEvent, Lo
             JOIN disaster_alert da ON da.disaster_alert_id = m.alert_id
             WHERE e.last_alert_at > :sinceTime
               AND e.is_broadcast = false
+              AND e.is_advisory = false
               AND da.embedding IS NOT NULL
               AND EXISTS (
                   SELECT 1 FROM disaster_alert_region dar
@@ -173,6 +177,7 @@ public interface DisasterEventRepository extends JpaRepository<DisasterEvent, Lo
             SELECT e.id
             FROM disaster_events e
             WHERE e.is_broadcast = false
+              AND e.is_advisory = false
               AND e.primary_disaster_type = :type
               AND e.last_alert_at > :sinceTime
               AND EXISTS (
@@ -185,6 +190,41 @@ public interface DisasterEventRepository extends JpaRepository<DisasterEvent, Lo
             LIMIT 1
             """, nativeQuery = true)
     Optional<Long> findRegionalTypeMergeTarget(
+            @Param("type") String type,
+            @Param("sigunguCodes") String[] sigunguCodes,
+            @Param("sinceTime") LocalDateTime sinceTime
+    );
+
+    /**
+     * 안내성 롤링 이벤트 머지 대상 검색 — 같은 유형 + 같은 시군구(footprint 교집합) + 윈도우 안의
+     * {@code is_advisory=true} 이벤트 중 가장 최근 1개. 산불 건조특보·소각금지·예방캠페인 등 안내 알림을
+     * 시군구별 "{시군구} 산불예방안내" 하나로 모은다.
+     *
+     * <p>{@link #findRegionalTypeMergeTarget}(사건, is_advisory=false)의 거울상 — 같은 시군구·유형·윈도우
+     * 키이되 안내성 이벤트만 대상이라, 안내성과 사건이 서로의 버킷에 섞이지 않는다. 같은 시군구의 연속
+     * 발령은 한 안내 이벤트로 롤링(윈도우 안이면 last_alert_at 이 계속 갱신돼 시즌 단위 1개로 수렴).
+     *
+     * @param type         새 알림 유형 (예: "산불")
+     * @param sigunguCodes 새 알림 시군구 코드(앞 5자) 배열 — footprint 교집합 키
+     * @param sinceTime    윈도우 하한
+     * @return 머지할 안내 이벤트 id, 없으면 empty(신규 안내 이벤트)
+     */
+    @Query(value = """
+            SELECT e.id
+            FROM disaster_events e
+            WHERE e.is_advisory = true
+              AND e.primary_disaster_type = :type
+              AND e.last_alert_at > :sinceTime
+              AND EXISTS (
+                  SELECT 1 FROM event_alert_mapping m
+                  JOIN disaster_alert_region dar ON dar.disaster_alert_id = m.alert_id
+                  WHERE m.event_id = e.id
+                    AND LEFT(dar.legal_district_code, 5) = ANY(CAST(:sigunguCodes AS varchar[]))
+              )
+            ORDER BY e.last_alert_at DESC
+            LIMIT 1
+            """, nativeQuery = true)
+    Optional<Long> findFireAdvisoryMergeTarget(
             @Param("type") String type,
             @Param("sigunguCodes") String[] sigunguCodes,
             @Param("sinceTime") LocalDateTime sinceTime
