@@ -18,6 +18,7 @@ public record EventDetailResponse(
         LocalDateTime firstAlertAt,
         LocalDateTime lastAlertAt,
         int alertCount,
+        boolean advisory,
         List<EventAlertItem> timeline,
         String translatedTitle,
         String language
@@ -39,6 +40,7 @@ public record EventDetailResponse(
                 e.getFirstAlertAt(),
                 e.getLastAlertAt(),
                 e.getAlertCount(),
+                e.isAdvisory(),
                 timeline,
                 translatedTitle,
                 language

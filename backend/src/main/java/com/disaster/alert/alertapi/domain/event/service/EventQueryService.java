@@ -76,7 +76,7 @@ public class EventQueryService {
         Page<DisasterEvent> page = disasterEventRepository.search(
                 req.getActive(), now,
                 req.getType(), req.getRegion(), req.getDistrictCode(),
-                start, end, req.getKeyword(),
+                start, end, req.getKeyword(), req.getAdvisory(),
                 pageOnly);
 
         Optional<SupportedLanguage> langOpt = SupportedLanguage.fromRequestParam(lang);
