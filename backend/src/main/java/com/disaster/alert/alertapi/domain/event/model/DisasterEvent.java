@@ -71,6 +71,14 @@ public class DisasterEvent {
     @Column(name = "is_broadcast", nullable = false)
     private boolean broadcast;
 
+    /**
+     * 안내성 이벤트 여부. 산불의 건조특보·소각금지·예방캠페인 등 실제 화재가 아닌 안내 알림을 모은
+     * 롤링 이벤트("{시군구} 산불예방안내"). true 면 사건 머지·후보 검색({@code findRegionalTypeMergeTarget},
+     * {@code findTopCandidates})에서 제외돼 안내성이 사건 버킷에 끼지 않는다. 프론트는 이 플래그로 필터/약화.
+     */
+    @Column(name = "is_advisory", nullable = false)
+    private boolean advisory;
+
     @CreatedDate
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
@@ -131,6 +139,35 @@ public class DisasterEvent {
                 .alertCount(1)
                 .cooldownHours(DisasterCooldown.hoursFor(disasterType))
                 .broadcast(broadcast)
+                .build();
+    }
+
+    /**
+     * 안내성 롤링 이벤트 생성용 팩토리 — 산불 건조특보·소각금지·예방캠페인 등 실제 화재가 아닌
+     * 안내 알림을 시군구별로 모은다. 제목 {@code "{지역명} {유형}예방안내"}, {@code is_advisory=true}.
+     *
+     * <p>{@link #createFromFirstAlert}(사건)와 달리 본문/임베딩을 제목에 안 쓴다 — 안내성은 같은
+     * 시군구의 반복 발령이라 본문이 제각각이고, 묶음 자체가 "이 동네 산불 예방안내 모음"이기 때문.
+     */
+    public static DisasterEvent createAdvisory(
+            String disasterType,
+            String regionCode,
+            String regionName,
+            LocalDateTime alertAt
+    ) {
+        String safeRegion = regionName == null ? "지역미상" : regionName;
+        String label = isInformativeType(disasterType) ? disasterType : "재난";
+        return DisasterEvent.builder()
+                .eventTitle(String.format("%s %s예방안내", safeRegion, label))
+                .primaryDisasterType(disasterType == null ? "UNKNOWN" : disasterType)
+                .primaryRegionCode(regionCode)
+                .primaryRegionName(safeRegion)
+                .firstAlertAt(alertAt)
+                .lastAlertAt(alertAt)
+                .alertCount(1)
+                .cooldownHours(DisasterCooldown.hoursFor(disasterType))
+                .broadcast(false)
+                .advisory(true)
                 .build();
     }
 

@@ -36,5 +36,11 @@ public enum MergeMethod {
      * 한 산불/호우 episode 가 본문 텍스트 차이(코사인&lt;0.85)로 수십 개 이벤트로 파편화되던 것을 차단.
      * 전국 단일인 {@link #GLOBAL_TYPE}(태풍)과 같은 철학이되 시군구 스코프(전국 blob 방지).
      */
-    REGIONAL_TYPE
+    REGIONAL_TYPE,
+    /**
+     * 안내성 머지 — 산불의 건조특보·소각금지·예방캠페인 등 실제 화재가 아닌 안내 알림을 시군구별
+     * 롤링 안내 이벤트("{시군구} 산불예방안내", is_advisory=true)에 모은다. {@link FireAlertClassifier}
+     * 로 사건(REGIONAL_TYPE)과 분리해, 안내성이 사건 버킷에 체이닝돼 시즌 blob을 만드는 것을 차단.
+     */
+    ADVISORY
 }
