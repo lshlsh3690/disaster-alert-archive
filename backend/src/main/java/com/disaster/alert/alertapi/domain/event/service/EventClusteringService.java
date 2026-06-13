@@ -5,6 +5,7 @@ import com.disaster.alert.alertapi.domain.disasteralert.model.DisasterAlertRegio
 import com.disaster.alert.alertapi.domain.disasteralert.repository.DisasterAlertRepository;
 import com.disaster.alert.alertapi.domain.event.model.DisasterEvent;
 import com.disaster.alert.alertapi.domain.event.model.EventAlertMapping;
+import com.disaster.alert.alertapi.domain.event.model.FireAlertClassifier;
 import com.disaster.alert.alertapi.domain.event.model.MergeMethod;
 import com.disaster.alert.alertapi.domain.event.model.MissingPersonIdentity;
 import com.disaster.alert.alertapi.domain.event.repository.AlertEmbeddingRepository;
@@ -112,10 +113,19 @@ public class EventClusteringService {
     @Value("${clustering.regional-types:산불:336,산사태:168,홍수:168}")
     private String regionalTypesCsv;
 
+    /**
+     * 안내성 분리 적용 유형(쉼표 구분) — 안내성(예방·캠페인)이 실사건과 독립적이고 시즌 내내 반복돼
+     * 사건 버킷을 blob 으로 만드는 유형만. 산불만 해당 — 산사태·홍수는 안내(조기경보)가 같은 호우
+     * episode 에 강결합이라 분리하면 타임라인이 깨진다(실데이터). regional-types 의 부분집합이어야 한다.
+     */
+    @Value("${clustering.advisory-split-types:산불}")
+    private String advisorySplitTypesCsv;
+
     private Set<String> accidentTypes;
     private Pattern animalPattern;
     private Set<String> globalTypes;
     private Map<String, Integer> regionalTypeWindows;
+    private Set<String> advisorySplitTypes;
 
     /**
      * 신규 알림에 대해 임베딩 생성 + 클러스터링 수행.
@@ -439,6 +449,16 @@ public class EventClusteringService {
         if (distinctSigunguCount(regionCodes) > maxRegionSpan) {
             return false;
         }
+
+        // 안내성 분리(산불): 건조특보·소각금지·예방캠페인 등 실제 화재가 아닌 안내 알림은 사건 머지에
+        //   태우지 않고 시군구별 롤링 안내 이벤트로 모은다. 안내성이 14일 윈도우로 시즌 내내 체이닝돼
+        //   사건 버킷을 blob(span 130일+)으로 만들고 소수 실사건을 오염시키던 것을 발생 지점에서 차단.
+        if (isAdvisorySplitType(alert.getDisasterType())
+                && FireAlertClassifier.isAdvisory(alert.getMessage(), alert.getEmergencyLevel())) {
+            clusterFireAdvisory(alert, regionCodes, windowHours);
+            return true;
+        }
+
         String[] sigungu = sigunguPrefixes(regionCodes);
         LocalDateTime since = alert.getCreatedAt().minusHours(windowHours);
         Optional<Long> target = disasterEventRepository.findRegionalTypeMergeTarget(
@@ -453,6 +473,43 @@ public class EventClusteringService {
                     alert.getId(), alert.getDisasterType(), windowHours);
         }
         return true;
+    }
+
+    /**
+     * 안내성 알림을 시군구별 롤링 안내 이벤트에 머지(없으면 신규). 같은 유형·같은 시군구·윈도우 안의
+     * {@code is_advisory=true} 이벤트만 대상이라 사건 버킷과 섞이지 않는다. 임베딩·LLM 안 봄.
+     */
+    private void clusterFireAdvisory(DisasterAlert alert, String[] regionCodes, int windowHours) {
+        String[] sigungu = sigunguPrefixes(regionCodes);
+        LocalDateTime since = alert.getCreatedAt().minusHours(windowHours);
+        Optional<Long> target = disasterEventRepository.findFireAdvisoryMergeTarget(
+                alert.getDisasterType(), sigungu, since);
+        if (target.isPresent()) {
+            mergeIntoExisting(target.get(), alert, null, MergeMethod.ADVISORY);
+            log.info("clusterNewAlert(안내성): alertId={} → event={} 시군구 안내 머지({}, window={}h)",
+                    alert.getId(), target.get(), alert.getDisasterType(), windowHours);
+        } else {
+            DisasterEvent event = DisasterEvent.createAdvisory(
+                    alert.getDisasterType(), regionCodes[0], extractFirstRegionName(alert), alert.getCreatedAt());
+            DisasterEvent saved = disasterEventRepository.save(event);
+            eventAlertMappingRepository.save(EventAlertMapping.of(saved.getId(), alert.getId(), 1, null, MergeMethod.SEED));
+            eventPublisher.publishEvent(new AlertClusteredEvent(saved.getId(), alert.getId()));
+            log.info("clusterNewAlert(안내성): alertId={} → 신규 안내 event={}({}, window={}h, title='{}')",
+                    alert.getId(), saved.getId(), alert.getDisasterType(), windowHours, saved.getEventTitle());
+        }
+    }
+
+    /** 안내성 분리 적용 유형(산불 등) 매칭. regionalTypesCsv 의 부분집합. */
+    private boolean isAdvisorySplitType(String type) {
+        if (type == null) {
+            return false;
+        }
+        if (advisorySplitTypes == null) {
+            advisorySplitTypes = Arrays.stream(advisorySplitTypesCsv.split(","))
+                    .map(String::trim).filter(s -> !s.isEmpty())
+                    .collect(Collectors.toSet());
+        }
+        return advisorySplitTypes.contains(type.trim());
     }
 
     /**
