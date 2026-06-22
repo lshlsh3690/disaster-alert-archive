@@ -397,6 +397,7 @@ public class EventClusteringService {
                         type, since);
         if (target.isPresent()) {
             mergeIntoExisting(target.get().getId(), alert, null, MergeMethod.GLOBAL_TYPE);
+            upgradeGlobalTitleIfNamed(target.get().getId(), type, alert.getMessage());
             log.info("clusterNewAlert(전국통합): alertId={} → event={} 유형 머지({})",
                     alert.getId(), target.get().getId(), type);
         } else {
@@ -417,6 +418,19 @@ public class EventClusteringService {
                     .collect(Collectors.toSet());
         }
         return globalTypes.contains(type.trim());
+    }
+
+    /**
+     * 전국 통합 태풍 이벤트 제목 승급 — 머지된 알림에 태풍명이 있고 이벤트 제목이 아직 기본("전국 태풍")
+     * 이면 "태풍 {이름}"으로 올린다. 큰 태풍 이벤트의 첫 알림이 "태풍 북상 예상"처럼 이름 없이 시작해도
+     * (예: 종다리) 이름을 가진 후속 알림에서 제목이 채워진다. 이미 이름이 붙었으면 갱신 쿼리가 no-op.
+     */
+    private void upgradeGlobalTitleIfNamed(Long eventId, String type, String message) {
+        String name = DisasterEvent.extractTyphoonName(type, message);
+        if (name != null) {
+            disasterEventRepository.updateTitleIfEquals(
+                    eventId, "태풍 " + name, DisasterEvent.genericGlobalTitle(type));
+        }
     }
 
     /**

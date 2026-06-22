@@ -273,6 +273,23 @@ public interface DisasterEventRepository extends JpaRepository<DisasterEvent, Lo
             """, nativeQuery = true)
     int incrementOnMerge(@Param("eventId") Long eventId, @Param("alertAt") LocalDateTime alertAt);
 
+    /**
+     * 제목 승급 — 현재 제목이 {@code ifTitle}(기본 제목)일 때만 {@code title}로 교체.
+     *
+     * <p>전국 통합 태풍 이벤트의 첫 알림에 태풍명이 없어 "전국 태풍"으로 생성된 뒤, 이름을 가진
+     * 후속 알림이 머지될 때 "태풍 종다리"로 올린다. 이미 이름이 붙었으면(기본 제목 아님) no-op이라
+     * 먼저 붙은 이름이 유지된다(한 윈도우에 두 태풍이 섞여도 덮어쓰지 않음).
+     */
+    @Modifying
+    @Query(value = """
+            UPDATE disaster_events
+            SET event_title = :title
+            WHERE id = :eventId AND event_title = :ifTitle
+            """, nativeQuery = true)
+    int updateTitleIfEquals(@Param("eventId") Long eventId,
+                            @Param("title") String title,
+                            @Param("ifTitle") String ifTitle);
+
     // ── cross-region LLM 병합 ─────────────────────────────────────
 
     // cross-region 후보 검색은 {@link #findTopCandidates}와 달리 지역 hard 필터(교집합)를 제거하되

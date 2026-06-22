@@ -10,6 +10,8 @@ import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
 import java.time.LocalDateTime;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * 재난 이벤트 — 시간 흐름에 따라 N개 재난문자가 누적된 사건 단위.
@@ -90,6 +92,49 @@ public class DisasterEvent {
     /** 본문 fallback 사용 시 잘라낼 최대 길이. */
     private static final int MESSAGE_PREVIEW_LEN = 30;
 
+    /** 태풍 유형 라벨 — 전국 통합 이벤트의 제목/이름 추출 게이트에 쓰는 상수. */
+    private static final String TYPHOON_TYPE = "태풍";
+
+    /**
+     * 태풍명 추출 — "제N호 태풍 종다리" / "태풍 「종다리」·(종다리)·'종다리'" 꼴에서 고유명만.
+     * 괄호·따옴표 없는 "태풍 북상", "태풍 예비특보" 같은 일반어는 이름이 아니라 잡지 않는다(따옴표/제N호 게이트).
+     */
+    private static final Pattern TYPHOON_NAME = Pattern.compile(
+            "제\\s*[0-9]+\\s*호\\s*태풍\\s*[\\[「『(‘'\"]?\\s*([가-힣]{2,4})"
+                    + "|태풍\\s*[\\[「『(‘'\"]\\s*([가-힣]{2,4})");
+
+    /**
+     * 태풍 알림 본문에서 태풍명을 뽑는다. 태풍 유형이 아니거나 신뢰 패턴이 없으면 {@code null}.
+     *
+     * <p>전국 통합(GLOBAL_TYPE) 태풍 이벤트가 전부 "전국 태풍"으로 동일해 목록에서 구분 불가라,
+     * 본문의 고유명(종다리·콩레이 등)으로 "태풍 {이름}" 제목을 만들기 위함. 첫 알림에 이름이 없을
+     * 수 있어({@code "태풍 북상 예상"}) 머지 시점 갱신과 함께 쓴다.
+     */
+    public static String extractTyphoonName(String disasterType, String message) {
+        if (!TYPHOON_TYPE.equals(disasterType) || message == null) {
+            return null;
+        }
+        Matcher m = TYPHOON_NAME.matcher(message);
+        if (!m.find()) {
+            return null;
+        }
+        String name = m.group(1) != null ? m.group(1) : m.group(2);
+        return trimTrailingParticle(name);
+    }
+
+    /** 4글자 이상에서 끝의 조사(의·은·는…)를 떼낸다 — "종다리의"→"종다리". 3글자 이름(콩레이)은 보존. */
+    private static String trimTrailingParticle(String s) {
+        if (s.length() >= 4 && "의은는이가을를과와에도로".indexOf(s.charAt(s.length() - 1)) >= 0) {
+            return s.substring(0, s.length() - 1);
+        }
+        return s;
+    }
+
+    /** 전국 통합 태풍 이벤트의 이름 없는 기본 제목("전국 태풍") — 머지 시 이름으로 승급할 대상 판별용. */
+    public static String genericGlobalTitle(String disasterType) {
+        return "전국 " + disasterType;
+    }
+
     /**
      * disaster_type 이 사건을 식별할 만큼 정보가 있는지.
      * null/blank/"기타" 류는 false — 제목 본문 fallback, broadcast 시도+유형 병합 제외에 사용.
@@ -121,13 +166,19 @@ public class DisasterEvent {
             boolean broadcast
     ) {
         String safeRegion = regionName == null ? "지역미상" : regionName;
-        boolean typeInformative = isInformativeType(disasterType);
 
-        // 유형 있으면 유형, '기타'면 본문에서 규칙으로 깔끔한 라벨 산출.
-        String titleMiddle = typeInformative ? disasterType : gitaTitleMiddle(message);
         // 날짜는 제목에 박지 않는다 — 생성 시점에 고정돼 갱신이 안 되기 때문.
         // 화면은 응답의 first_alert_at / last_alert_at(갱신됨)으로 날짜 라벨을 표시한다.
-        String title = String.format("%s %s", safeRegion, titleMiddle);
+        String title;
+        String typhoonName = extractTyphoonName(disasterType, message);
+        if (typhoonName != null) {
+            // 태풍은 고유명이 곧 식별자 — "태풍 종다리"(지역 무관). 첫 알림에 이름 없으면 머지 시 승급.
+            title = TYPHOON_TYPE + " " + typhoonName;
+        } else {
+            // 유형 있으면 유형, '기타'면 본문에서 규칙으로 깔끔한 라벨 산출.
+            String titleMiddle = isInformativeType(disasterType) ? disasterType : gitaTitleMiddle(message);
+            title = String.format("%s %s", safeRegion, titleMiddle);
+        }
 
         return DisasterEvent.builder()
                 .eventTitle(title)
