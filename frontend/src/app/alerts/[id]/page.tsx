@@ -8,6 +8,7 @@ import { useDeleteUserAlert } from "@/lib/mutations/useDeleteUserAlert";
 import { useAuthStore } from "@/store/authStore";
 import { useComments, useCreateComment, useDeleteComment, useInfiniteComments, useUpdateComment } from "@/lib/queries/useComments";
 import { useEffect, useRef, useState } from "react";
+import AlertRiskSection from "@/components/alerts/AlertRiskSection";
 
 export default function AlertDetailPage() {
   const params = useParams<{ id: string }>();
@@ -66,6 +67,8 @@ export default function AlertDetailPage() {
   return (
     <main className="p-3 sm:p-6 space-y-4">
       <h1 className="text-xl font-semibold">📨 재난 문자 상세</h1>
+      {/* 좌측 문자 상세(가변) / 우측 위험도 분석(340px 고정) — /alerts 목록 페이지와 동일 비율 */}
+      <div className={`grid grid-cols-1 gap-4 sm:gap-6 items-start ${!isUser ? "xl:grid-cols-[minmax(0,1fr)_340px]" : ""}`}>
       <div className="bg-white rounded-xl shadow p-4 space-y-2">
         <div className="text-sm text-gray-500">{new Date(data.createdAt).toLocaleString()}</div>
         {!isUser && (
@@ -122,6 +125,9 @@ export default function AlertDetailPage() {
             </button>
           </div>
         )}
+      </div>
+      {/* 위험도 분석 (공식 재난문자만 — 이벤트 클러스터링 기반) */}
+      {!isUser && <AlertRiskSection alertId={id} alertCreatedAt={offData?.createdAt} />}
       </div>
       <section className="bg-white rounded-xl shadow p-4 space-y-3">
         <h2 className="text-lg font-semibold">댓글</h2>
