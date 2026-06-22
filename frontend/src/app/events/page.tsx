@@ -1,6 +1,7 @@
 "use client";
 
-import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { ReadonlyURLSearchParams } from "next/navigation";
 import Link from "next/link";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -28,6 +29,27 @@ const ZSearch = z.object({
 });
 type SearchForm = z.infer<typeof ZSearch>;
 
+const EMPTY_FORM: SearchForm = {
+  sido: "",
+  sigungu: "",
+  type: "",
+  startDate: "",
+  endDate: "",
+  keyword: "",
+};
+
+/** URL 쿼리에서 적용된 검색 필터를 복원 — 상세 진입 후 뒤로 가기 시 상태 유지용. */
+function readFormFromParams(sp: ReadonlyURLSearchParams): SearchForm {
+  return {
+    sido: sp.get("sido") ?? "",
+    sigungu: sp.get("sigungu") ?? "",
+    type: sp.get("type") ?? "",
+    startDate: sp.get("startDate") ?? "",
+    endDate: sp.get("endDate") ?? "",
+    keyword: sp.get("keyword") ?? "",
+  };
+}
+
 export default function EventsPage() {
   return (
     <Suspense fallback={<main className="p-6">불러오는 중...</main>}>
@@ -48,18 +70,31 @@ function EventsPageInner() {
     if (a === "false") return "past";
     return "all";
   });
-  const [page, setPage] = useState(0);
-  const [formState, setFormState] = useState<SearchForm>({});
+  const [page, setPage] = useState(() => {
+    const p = Number.parseInt(searchParams.get("page") ?? "", 10);
+    return Number.isNaN(p) || p < 0 ? 0 : p;
+  });
+  const [formState, setFormState] = useState<SearchForm>(() =>
+    readFormFromParams(searchParams)
+  );
   const size = 10;
 
   const { register, handleSubmit, reset, watch, setValue } = useForm<SearchForm>({
     resolver: zodResolver(ZSearch),
-    defaultValues: {},
+    defaultValues: readFormFromParams(searchParams),
   });
 
   const watchedSido = watch("sido");
   const { data: sigunguList } = useSigungu(watchedSido || undefined, lang);
-  useEffect(() => { setValue("sigungu", ""); }, [watchedSido, setValue]);
+  // 시도 변경 시 시군구 초기화. 단 마운트 첫 렌더는 건너뛴다 — URL에서 복원한 시군구를 지우지 않기 위함.
+  const sidoFirstRender = useRef(true);
+  useEffect(() => {
+    if (sidoFirstRender.current) {
+      sidoFirstRender.current = false;
+      return;
+    }
+    setValue("sigungu", "");
+  }, [watchedSido, setValue]);
 
   const activeParam: boolean | undefined =
     tab === "active" ? true : tab === "past" ? false : undefined;
@@ -84,13 +119,25 @@ function EventsPageInner() {
 
   const { data, isLoading, isFetching } = useSearchEvents(params);
 
+  // 탭/페이지/필터 상태를 URL 쿼리에 동기화 — 상세 진입 후 뒤로 가기 시 같은 페이지·검색결과로 복원된다.
+  useEffect(() => {
+    const url = new URLSearchParams();
+    if (tab === "active") url.set("active", "true");
+    else if (tab === "past") url.set("active", "false");
+    if (page > 0) url.set("page", String(page));
+    if (formState.sido) url.set("sido", formState.sido);
+    if (formState.sigungu) url.set("sigungu", formState.sigungu);
+    if (formState.type) url.set("type", formState.type);
+    if (formState.startDate) url.set("startDate", formState.startDate);
+    if (formState.endDate) url.set("endDate", formState.endDate);
+    if (formState.keyword) url.set("keyword", formState.keyword);
+    const qs = url.toString();
+    router.replace(qs ? `/events?${qs}` : "/events", { scroll: false });
+  }, [tab, page, formState, router]);
+
   const handleTabChange = (next: ActiveTab) => {
     setTab(next);
     setPage(0);
-    const url = new URLSearchParams(searchParams.toString());
-    if (next === "all") url.delete("active");
-    else url.set("active", String(next === "active"));
-    router.replace(`/events?${url.toString()}`);
   };
 
   const onSubmit = useCallback((f: SearchForm) => {
@@ -99,8 +146,8 @@ function EventsPageInner() {
   }, []);
 
   const onReset = () => {
-    reset();
-    setFormState({});
+    reset(EMPTY_FORM);
+    setFormState(EMPTY_FORM);
     setPage(0);
   };
 
