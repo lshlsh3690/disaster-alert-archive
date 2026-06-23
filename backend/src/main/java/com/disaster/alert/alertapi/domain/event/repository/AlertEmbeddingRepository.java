@@ -9,7 +9,7 @@ import org.springframework.stereotype.Repository;
  *
  * <p>임베딩 컬럼은 JPA 엔티티({@code DisasterAlert})에 매핑하지 않는다. 이유:
  * <ul>
- *   <li>pgvector 의 {@code VECTOR(512)} 타입은 Hibernate 가 기본 인식 못 함 (별도 UserType 필요)</li>
+ *   <li>pgvector 의 {@code VECTOR(1536)} 타입은 Hibernate 가 기본 인식 못 함 (별도 UserType 필요)</li>
  *   <li>읽기는 native distance 쿼리({@link DisasterEventRepository}) 로만 발생</li>
  *   <li>쓰기는 이 클래스의 명시적 UPDATE 로만 발생</li>
  * </ul>

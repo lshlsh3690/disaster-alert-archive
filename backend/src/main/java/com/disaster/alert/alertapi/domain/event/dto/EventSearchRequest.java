@@ -19,6 +19,7 @@ import java.time.LocalDate;
  *   <li>{@code startDate}/{@code endDate} — 기간 <b>겹침(overlap)</b>: first_alert_at ≤ end AND last_alert_at ≥ start</li>
  *   <li>{@code keyword}   — {@code event_title} contains (본문 검색 아님)</li>
  *   <li>{@code active}    — null=전체, true=진행 중, false=지난 사건 (조회 시점 파생)</li>
+ *   <li>{@code advisory}  — null=전체(기존 클라 호환), false=사건만, true=안내성만. 산불 안내성 분리용.</li>
  * </ul>
  */
 @Data
@@ -33,4 +34,5 @@ public class EventSearchRequest {
     private LocalDate endDate;   // ISO 8601 (yyyy-MM-dd)
     private String keyword;
     private Boolean active;
+    private Boolean advisory;
 }

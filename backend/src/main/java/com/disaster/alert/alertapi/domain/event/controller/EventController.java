@@ -38,6 +38,7 @@ public class EventController {
      * @param startDate    기간 시작 (yyyy-MM-dd, overlap)
      * @param endDate      기간 끝 (yyyy-MM-dd, overlap)
      * @param keyword      제목 키워드 (event_title contains)
+     * @param advisory     null=전체(기존 호환), false=사건만, true=안내성만 (산불 예방안내 분리)
      */
     @GetMapping
     public ResponseEntity<Page<EventListResponse>> list(
@@ -48,6 +49,7 @@ public class EventController {
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
             @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) Boolean advisory,
             @RequestParam(defaultValue = "ko") String lang,
             Pageable pageable
     ) {
@@ -59,6 +61,7 @@ public class EventController {
                 .startDate(startDate)
                 .endDate(endDate)
                 .keyword(keyword)
+                .advisory(advisory)
                 .build();
         return ResponseEntity.ok(eventQueryService.list(req, pageable, lang));
     }
