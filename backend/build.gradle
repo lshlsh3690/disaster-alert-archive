@@ -42,7 +42,7 @@ dependencies {
     annotationProcessor 'jakarta.persistence:jakarta.persistence-api'
     annotationProcessor 'jakarta.annotation:jakarta.annotation-api'
 
-    // Spring AI — OpenAI Embedding (text-embedding-3-small, dimensions=512)
+    // Spring AI — OpenAI Embedding (text-embedding-3-small, dimensions=1536)
     // 컨테이너 추가 없음. 기존 Spring Boot 프로세스 안에서 라이브러리로 동작.
     implementation 'org.springframework.ai:spring-ai-starter-model-openai'
 

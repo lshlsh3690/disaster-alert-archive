@@ -110,7 +110,7 @@ spring.ai:
     embedding:
       options:
         model: text-embedding-3-small
-        dimensions: 512
+        dimensions: 1536
     # chat 모델 공용 — risk 모듈 LlmRiskProfiler(35종에 없는 신규 유형 프로파일) + 이벤트 cross-region 같은 사건 판정
     chat:
       options:

@@ -38,7 +38,7 @@ import java.util.stream.Collectors;
  *
  * <p>흐름 (새 알림 1건):
  * <ol>
- *   <li>OpenAI Embedding API → float[512] 벡터</li>
+ *   <li>OpenAI Embedding API → float[1536] 벡터</li>
  *   <li>disaster_alert.embedding UPDATE</li>
  *   <li>후보 이벤트 검색 (7일 윈도우 + 지역 교집합 + 코사인 최소)</li>
  *   <li>최소 거리 &le; (1 - threshold) → 기존 이벤트 머지. 아니면 신규 이벤트.</li>
