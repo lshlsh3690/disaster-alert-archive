@@ -10,6 +10,11 @@ import java.util.List;
 @Service
 public class FcmSendService {
 
+    // 웹푸시는 data-only 메시지로만 발송한다 (webpush.notification 페이로드를 넣지 않음).
+    // notification 페이로드가 있으면 Firebase JS SDK가 서비스워커에서 알림을 자동으로 한 번 더 표시하여,
+    // onBackgroundMessage가 띄우는 알림과 합쳐져 알림이 2번(두 번째는 제목·본문 없는 빈 알림) 표시된다.
+    // 실제 표시는 firebase-messaging-sw.js의 onBackgroundMessage에서 전담한다.
+
     // 단일 토큰에 FCM 발송
     public boolean sendToToken(String token, String title, String body,
                                String notificationType, String alertId) {
@@ -21,7 +26,6 @@ public class FcmSendService {
                     .putData("notificationType", notificationType)
                     .putData("alertId", alertId != null ? alertId : "")
                     .setAndroidConfig(buildAndroidConfig(notificationType))
-                    .setWebpushConfig(buildWebpushConfig(notificationType))
                     .build();
 
             String response = FirebaseMessaging.getInstance().send(message);
@@ -54,7 +58,6 @@ public class FcmSendService {
                     .putData("notificationType", notificationType)
                     .putData("alertId", alertId != null ? alertId : "")
                     .setAndroidConfig(buildAndroidConfig(notificationType))
-                    .setWebpushConfig(buildWebpushConfig(notificationType))
                     .build();
 
             BatchResponse response = FirebaseMessaging.getInstance().sendEachForMulticast(message);
@@ -91,20 +94,5 @@ public class FcmSendService {
             );
         }
         return builder.build();
-    }
-
-    // WebPush 설정
-    private WebpushConfig buildWebpushConfig(String notificationType) {
-        WebpushNotification.Builder notifBuilder = WebpushNotification.builder()
-                .setIcon("/icons/icon-192x192.png")
-                .setBadge("/icons/icon-72x72.png");
-
-        if ("ALARM".equals(notificationType)) {
-            notifBuilder.setRequireInteraction(true);
-        }
-
-        return WebpushConfig.builder()
-                .setNotification(notifBuilder.build())
-                .build();
     }
 }
