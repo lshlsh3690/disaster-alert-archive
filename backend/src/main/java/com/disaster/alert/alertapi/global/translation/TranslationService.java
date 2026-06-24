@@ -32,7 +32,7 @@ import java.util.stream.Collectors;
  *
  * <p><b>동작 모드</b>
  * <ul>
- *   <li>{@link #translateAndSaveAsync(Long)} — 스케줄러용 (기존). 영어로만 비동기 번역.</li>
+ *   <li>{@link #translateAndSaveAsync(Long)} — 스케줄러용. 지원 언어(EN/JA/ZH) 전체를 비동기 번역.</li>
  *   <li>{@link #ensureTranslated(Long, SupportedLanguage)} — 단건 lazy 번역. 상세 조회에서 사용.</li>
  *   <li>{@link #ensureTranslatedBatch(List, SupportedLanguage)} — 목록 lazy 번역. 검색/최신 목록에서 사용.</li>
  * </ul>
@@ -48,10 +48,12 @@ public class TranslationService {
     private final TranslationProperties properties;
 
     /**
-     * 스케줄러용 — 새 재난문자 저장 시 영어로 자동 번역 (비동기).
+     * 스케줄러용 — 새 재난문자 저장 시 지원하는 모든 언어로 자동 번역 (비동기).
      *
-     * <p>중/일은 사용자가 해당 언어로 조회할 때 lazy 번역하므로 여기서는 다루지 않는다.
-     * (DeepL 토큰 절감 목적)
+     * <p>지원 언어(영어/일본어/중국어) 전체를 미리 번역해 두어, 사용자가 어떤 언어로
+     * 조회하더라도 lazy 번역 대기 없이 즉시 캐시된 결과를 받도록 한다.
+     *
+     * <p>한 언어 번역이 실패해도(DeepL 일시 오류 등) 나머지 언어는 계속 진행한다.
      */
     @Async("translationExecutor")
     @Transactional
@@ -59,7 +61,19 @@ public class TranslationService {
         if (!properties.isEnabled()) {
             return;
         }
-        translateAndSaveInternal(alertId, SupportedLanguage.EN);
+        for (SupportedLanguage language : SupportedLanguage.values()) {
+            // 이미 번역되어 있으면 스킵 (PK 충돌 방지 + DeepL 토큰 절감)
+            if (translationRepository.findByIdAlertIdAndIdLanguageCode(alertId, language.getDbCode()).isPresent()) {
+                continue;
+            }
+            try {
+                translateAndSaveInternal(alertId, language);
+            } catch (Exception e) {
+                // 한 언어가 실패해도 나머지 언어는 계속 번역 진행
+                log.warn("스케줄러 번역 중 단건 실패 (스킵): alertId={}, lang={}, reason={}",
+                        alertId, language.getDbCode(), e.getMessage());
+            }
+        }
     }
 
     /**
