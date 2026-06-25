@@ -46,14 +46,33 @@ messaging.onBackgroundMessage(async (payload) => {
 
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
-  const url = event.notification.data?.url ?? "/";
+
+  // data.url은 상대경로(/alerts/{id})이므로 절대 URL로 변환한다.
+  // (openWindow와 기존 창 비교 모두 절대 URL이 필요)
+  const targetPath = event.notification.data?.url ?? "/";
+  const targetUrl = new URL(targetPath, self.location.origin).href;
 
   event.waitUntil(
-    clients.matchAll({ type: "window", includeUncontrolled: true }).then((clientList) => {
+    (async () => {
+      const clientList = await clients.matchAll({ type: "window", includeUncontrolled: true });
+
+      // 이미 열려 있는 앱/탭이 있으면 해당 상세 페이지로 이동시키고 포커스
       for (const client of clientList) {
-        if (client.url === url && "focus" in client) return client.focus();
+        if (!("focus" in client)) continue;
+        try {
+          if ("navigate" in client && client.url !== targetUrl) {
+            const navigated = await client.navigate(targetUrl);
+            return (navigated || client).focus();
+          }
+          return client.focus();
+        } catch (e) {
+          // navigate 실패 시 아래 openWindow로 폴백
+          break;
+        }
       }
-      if (clients.openWindow) return clients.openWindow(url);
-    }),
+
+      // 열린 창이 없으면 새 창(앱)으로 상세 페이지를 연다
+      if (clients.openWindow) return clients.openWindow(targetUrl);
+    })(),
   );
 });

@@ -79,14 +79,14 @@ public class AlertNotificationService {
             }
 
             // 게스트 토큰 발송
-            sendToGuestTokens(allCodesToSearch, title, body);
+            sendToGuestTokens(allCodesToSearch, alertId, title, body);
 
         } catch (Exception e) {
             log.error("알림 트리거 실패 - alertId: {}, error: {}", alertId, e.getMessage());
         }
     }
 
-    private void sendToGuestTokens(List<String> regionCodes, String title, String body) {
+    private void sendToGuestTokens(List<String> regionCodes, Long alertId, String title, String body) {
         try {
             List<String> tokens = guestFcmRegionRepository
                     .findAllByLegalDistrictCodeIn(regionCodes)
@@ -99,12 +99,14 @@ public class AlertNotificationService {
 
             log.info("게스트 알림 발송 대상: {}개 토큰", tokens.size());
 
+            // 알림 클릭 시 상세 페이지로 이동할 수 있도록 alertId를 함께 전달
+            String alertIdStr = String.valueOf(alertId);
             if (tokens.size() == 1) {
                 fcmSendService.sendToToken(tokens.get(0), title, body,
-                        NotificationType.PUSH.name(), null);
+                        NotificationType.PUSH.name(), alertIdStr);
             } else {
                 fcmSendService.sendToTokens(tokens, title, body,
-                        NotificationType.PUSH.name(), null);
+                        NotificationType.PUSH.name(), alertIdStr);
             }
         } catch (Exception e) {
             log.error("게스트 알림 발송 실패: {}", e.getMessage());
