@@ -80,7 +80,7 @@ jwt:
   prefix: Bearer
 
 oauth:
-  success-redirect: ${OAUTH_SUCCESS_REDIRECT:https://www.disaster-alert-archive.co.kr/dashboard}
+  success-redirect: ${OAUTH_SUCCESS_REDIRECT:https://www.disaster-alert-archive.co.kr/}
   google:
     clientId: ${GOOGLE_OAUTH_CLIENT_ID}
     clientSecret: ${GOOGLE_OAUTH_CLIENT_SECRET}

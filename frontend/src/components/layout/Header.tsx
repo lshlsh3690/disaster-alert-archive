@@ -35,7 +35,7 @@ export default function Header() {
   const t = useI18n();
 
   const menu = [
-    { name: t.nav.dashboard, href: "/dashboard" },
+    { name: t.nav.dashboard, href: "/" },
     { name: t.nav.alerts, href: "/alerts" },
     { name: t.nav.events, href: "/events" },
     { name: t.nav.stats, href: "/stats" },
