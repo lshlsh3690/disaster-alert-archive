@@ -11,7 +11,7 @@ public class OAuthProperties {
     private Provider google;
     private Provider kakao;
     private Provider naver;
-    private String successRedirect; // e.g. https://app.example.com/dashboard
+    private String successRedirect; // e.g. https://app.example.com/
 
     @Getter
     @Setter

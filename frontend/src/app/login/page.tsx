@@ -37,7 +37,7 @@ export default function LoginPage() {
   const { handleSubmit } = formMethods;
 
   const { mutate: login } = useLogin({
-    onSuccessCallback: () => router.push("/dashboard"),
+    onSuccessCallback: () => router.push("/"),
     onErrorCallback: (errorMessage) => setError(errorMessage),
   });
 

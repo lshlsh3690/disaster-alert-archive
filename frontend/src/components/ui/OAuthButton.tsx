@@ -14,7 +14,7 @@ export default function OAuthButton({
   }[provider];
 
   const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL;
-  const redirect = typeof window !== "undefined" ? window.location.origin + "/dashboard" : "";
+  const redirect = typeof window !== "undefined" ? window.location.origin + "/" : "";
   const loginUrl = `${apiBase}/api/v1/auth/oauth/${provider}/authorize${redirect ? `?redirect=${encodeURIComponent(redirect)}` : ""}`;
 
   const logo = {
