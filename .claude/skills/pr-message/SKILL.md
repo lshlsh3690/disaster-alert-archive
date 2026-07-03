@@ -12,7 +12,7 @@ allowed-tools: Bash, Read
 
 ## 무엇을 하는가
 1. `git log origin/develop..<current>`와 `git diff origin/develop...<current> --stat`로 변경 커밋과 파일 목록을 확인한다.
-2. 변경의 목적과 범위를 파악해 짧은 제목을 작성한다.
+2. 변경의 목적과 범위를 파악해 `type(scope): 한글 설명` 형식(Conventional Commits, commit-message 스킬과 동일 규칙)으로 짧은 제목을 작성한다.
 3. 본문은 Summary(불릿 목록)와 Test plan(체크리스트)로 구성한다.
 4. 초안을 제시하고, 사용자가 원하면 `gh pr create --base develop`으로 PR을 생성한다.
 
