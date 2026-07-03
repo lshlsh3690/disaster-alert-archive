@@ -1,0 +1,17 @@
+language: 'ko-KR'
+early_access: false
+reviews:
+  profile: 'chill'                # 리뷰 톤 (chill / assertive)
+  request_changes_workflow: false
+  high_level_summary: true        # PR 전체 요약(Walkthrough) 생성
+  poem: false                     # PR에 시 붙이는 기능 끄기
+  review_status: true
+  collapse_walkthrough: false
+  auto_review:
+    enabled: true
+    drafts: false
+    base_branches:
+      - main
+      - develop
+chat:
+  auto_reply: true
