@@ -16,20 +16,20 @@ export type AlertSearchRequest = {
   source?: "ALL" | "OFFICIAL" | "USER" | null;
 };
 
-export async function fetchLatestAlerts(limit = 5): Promise<LatestAlert[]> {
-  const res = await instance.get("/api/v1/alerts/latest", { params: { limit } });
+export async function fetchLatestAlerts(limit = 5, lang = "ko"): Promise<LatestAlert[]> {
+  const res = await instance.get("/api/v1/alerts/latest", { params: { limit, lang } });
   const data = z.array(ZLatestAlert).parse(res.data);
   return data;
 }
 
-export async function searchAlerts(params: AlertSearchRequest) {
-  const res = await instance.get("/api/v1/alerts/search?", { params });
+export async function searchAlerts(params: AlertSearchRequest, lang = "ko") {
+  const res = await instance.get("/api/v1/alerts/search", { params: { ...params, lang } });
   const data = ZPageMeta.parse(res.data);
   return data;
 }
 
-export async function searchCombinedAlerts(params: AlertSearchRequest & { source?: "ALL" | "OFFICIAL" | "USER" }) {
-  const res = await instance.get("/api/v1/alerts/search/combined", { params, headers: { "X-Auth-Required": "false" } });
+export async function searchCombinedAlerts(params: AlertSearchRequest & { source?: "ALL" | "OFFICIAL" | "USER" }, lang = "ko") {
+  const res = await instance.get("/api/v1/alerts/search/combined", { params: { ...params, lang }, headers: { "X-Auth-Required": "false" } });
   const data = ZPageMetaCombined.parse(res.data);
   return data;
 }
