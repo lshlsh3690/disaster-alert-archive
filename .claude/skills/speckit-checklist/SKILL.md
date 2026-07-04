@@ -11,6 +11,11 @@ disable-model-invocation: false
 ---
 
 
+## 출력 언어
+
+생성하는 체크리스트 문서는 한글로 작성한다. 코드 식별자, 파일 경로, 기술 용어는 원문
+(영문) 그대로 둔다.
+
 ## Checklist Purpose: "Unit Tests for English"
 
 **CRITICAL CONCEPT**: Checklists are **UNIT TESTS FOR REQUIREMENTS WRITING** - they validate the quality, clarity, and completeness of requirements in a given domain.
