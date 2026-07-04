@@ -23,7 +23,7 @@ export async function fetchLatestAlerts(limit = 5, lang = "ko"): Promise<LatestA
 }
 
 export async function searchAlerts(params: AlertSearchRequest, lang = "ko") {
-  const res = await instance.get("/api/v1/alerts/search?", { params: { ...params, lang } });
+  const res = await instance.get("/api/v1/alerts/search", { params: { ...params, lang } });
   const data = ZPageMeta.parse(res.data);
   return data;
 }

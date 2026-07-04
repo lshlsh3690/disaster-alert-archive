@@ -1,3 +1,5 @@
+
+
 const mockGet = jest.fn().mockResolvedValue({ data: [] });
 
 jest.mock("./axios", () => ({
@@ -25,7 +27,7 @@ describe("alertApi lang forwarding", () => {
     await searchAlerts({}, "ja").catch(() => {});
 
     expect(mockGet).toHaveBeenCalledWith(
-      "/api/v1/alerts/search?",
+      "/api/v1/alerts/search",
       expect.objectContaining({ params: expect.objectContaining({ lang: "ja" }) }),
     );
   });
