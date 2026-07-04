@@ -134,16 +134,16 @@ Given that feature description, do this:
          - No reasonable default exists
        - **LIMIT: Maximum 3 [NEEDS CLARIFICATION] markers total**
        - Prioritize clarifications by impact: scope > security/privacy > user experience > technical details
-    4. Fill User Scenarios & Testing section
+    4. Fill 사용자 시나리오 및 테스트 (User Scenarios & Testing) section
        If no clear user flow: ERROR "Cannot determine user scenarios"
-    5. Generate Functional Requirements
+    5. Generate 기능 요구사항 (Functional Requirements)
        Each requirement must be testable
-       Use reasonable defaults for unspecified details (document assumptions in Assumptions section)
-    6. Define Success Criteria
+       Use reasonable defaults for unspecified details (document assumptions in 가정 (Assumptions) section)
+    6. Define 성공 기준 (Success Criteria)
        Create measurable, technology-agnostic outcomes
        Include both quantitative metrics (time, performance, volume) and qualitative measures (user satisfaction, task completion)
        Each criterion must be verifiable without implementation details
-    7. Identify Key Entities (if data involved)
+    7. Identify 주요 엔티티 (Key Entities) (if data involved)
     8. Return: SUCCESS (spec ready for planning)
 
 6. Write the specification to SPEC_FILE using the template structure, replacing placeholders with concrete details derived from the feature description (arguments) while preserving section order and headings.
@@ -153,40 +153,40 @@ Given that feature description, do this:
    a. **Create Spec Quality Checklist**: Generate a checklist file at `SPECIFY_FEATURE_DIRECTORY/checklists/requirements.md` using the checklist template structure with these validation items:
 
       ```markdown
-      # Specification Quality Checklist: [FEATURE NAME]
+      # 명세 품질 체크리스트: [FEATURE NAME]
       
-      **Purpose**: Validate specification completeness and quality before proceeding to planning
-      **Created**: [DATE]
-      **Feature**: [Link to spec.md]
+      **목적**: planning 단계로 넘어가기 전 명세의 완결성과 품질을 검증
+      **생성일**: [DATE]
+      **기능**: [Link to spec.md]
       
-      ## Content Quality
+      ## 콘텐츠 품질
       
-      - [ ] No implementation details (languages, frameworks, APIs)
-      - [ ] Focused on user value and business needs
-      - [ ] Written for non-technical stakeholders
-      - [ ] All mandatory sections completed
+      - [ ] 구현 세부사항(언어, 프레임워크, API)이 없음
+      - [ ] 사용자 가치와 비즈니스 요구에 초점
+      - [ ] 비기술 이해관계자를 위해 작성됨
+      - [ ] 모든 필수 섹션이 작성됨
       
-      ## Requirement Completeness
+      ## 요구사항 완결성
       
-      - [ ] No [NEEDS CLARIFICATION] markers remain
-      - [ ] Requirements are testable and unambiguous
-      - [ ] Success criteria are measurable
-      - [ ] Success criteria are technology-agnostic (no implementation details)
-      - [ ] All acceptance scenarios are defined
-      - [ ] Edge cases are identified
-      - [ ] Scope is clearly bounded
-      - [ ] Dependencies and assumptions identified
+      - [ ] [NEEDS CLARIFICATION] 마커가 남아있지 않음
+      - [ ] 요구사항이 테스트 가능하고 명확함
+      - [ ] 성공 기준이 측정 가능함
+      - [ ] 성공 기준이 기술 구현과 무관함 (구현 세부사항 없음)
+      - [ ] 모든 인수 시나리오가 정의됨
+      - [ ] 예외 상황이 식별됨
+      - [ ] 범위가 명확히 한정됨
+      - [ ] 의존성과 가정이 식별됨
       
-      ## Feature Readiness
+      ## 기능 준비도
       
-      - [ ] All functional requirements have clear acceptance criteria
-      - [ ] User scenarios cover primary flows
-      - [ ] Feature meets measurable outcomes defined in Success Criteria
-      - [ ] No implementation details leak into specification
+      - [ ] 모든 기능 요구사항에 명확한 인수 기준이 있음
+      - [ ] 사용자 시나리오가 주요 흐름을 다룸
+      - [ ] 성공 기준에 정의된 측정 가능한 결과를 충족함
+      - [ ] 구현 세부사항이 명세에 섞여있지 않음
       
-      ## Notes
+      ## 참고
       
-      - Items marked incomplete require spec updates before `/speckit-clarify` or `/speckit-plan`
+      - 미완료 항목은 `/speckit-clarify` 또는 `/speckit-plan` 이전에 명세 수정이 필요함
       ```
 
    b. **Run Validation Check**: Review the spec against each checklist item:
@@ -303,7 +303,7 @@ Report completion to the user with:
 When creating this spec from a user prompt:
 
 1. **Make informed guesses**: Use context, industry standards, and common patterns to fill gaps
-2. **Document assumptions**: Record reasonable defaults in the Assumptions section
+2. **Document assumptions**: Record reasonable defaults in the 가정 (Assumptions) section
 3. **Limit clarifications**: Maximum 3 [NEEDS CLARIFICATION] markers - use only for critical decisions that:
    - Significantly impact feature scope or user experience
    - Have multiple reasonable interpretations with different implications
@@ -323,7 +323,7 @@ When creating this spec from a user prompt:
 - Authentication method: Standard session-based or OAuth2 for web apps
 - Integration patterns: Use project-appropriate patterns (REST/GraphQL for web services, function calls for libraries, CLI args for tools, etc.)
 
-### Success Criteria Guidelines
+### 성공 기준 (Success Criteria) Guidelines
 
 Success criteria must be:
 

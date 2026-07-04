@@ -67,13 +67,13 @@ You **MUST** consider the user input before proceeding (if not empty).
 2. **Load context**: Read FEATURE_SPEC and `.specify/memory/constitution.md`. Load IMPL_PLAN template (already copied).
 
 3. **Execute plan workflow**: Follow the structure in IMPL_PLAN template to:
-   - Fill Technical Context (mark unknowns as "NEEDS CLARIFICATION")
-   - Fill Constitution Check section from constitution
+   - Fill 기술 컨텍스트 (Technical Context) (mark unknowns as "NEEDS CLARIFICATION")
+   - Fill 헌법 검사 (Constitution Check) section from constitution
    - Evaluate gates (ERROR if violations unjustified)
    - Phase 0: Generate research.md (resolve all NEEDS CLARIFICATION)
    - Phase 1: Generate data-model.md, contracts/, quickstart.md
    - Phase 1: Update agent context by running the agent script
-   - Re-evaluate Constitution Check post-design
+   - Re-evaluate 헌법 검사 (Constitution Check) post-design
 
 ## Mandatory Post-Execution Hooks
 
@@ -118,7 +118,7 @@ Command ends after Phase 2 planning. Report branch, IMPL_PLAN path, and generate
 
 ### Phase 0: Outline & Research
 
-1. **Extract unknowns from Technical Context** above:
+1. **Extract unknowns from 기술 컨텍스트 (Technical Context)** above:
    - For each NEEDS CLARIFICATION → research task
    - For each dependency → best practices task
    - For each integration → patterns task
@@ -126,7 +126,7 @@ Command ends after Phase 2 planning. Report branch, IMPL_PLAN path, and generate
 2. **Generate and dispatch research agents**:
 
    ```text
-   For each unknown in Technical Context:
+   For each unknown in 기술 컨텍스트 (Technical Context):
      Task: "Research {unknown} for {feature context}"
    For each technology choice:
      Task: "Find best practices for {tech} in {domain}"
