@@ -14,6 +14,16 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { DISASTER_TYPES } from "@/ui/disasterType";
 import { METROS } from "@/ui/metros";
 import { useI18n } from "@/hooks/useI18n";
+import { disasterTypeChipStyle, disasterTypePalette } from "@/ui/disasterTypeColor";
+
+const LEVEL_BADGE: Record<string, { backgroundColor: string; color: string }> = {
+  안전안내: { backgroundColor: "var(--blue-soft)", color: "var(--blue)" },
+  긴급재난: { backgroundColor: "#fff1e3", color: "#c1670c" },
+  위급재난: { backgroundColor: "var(--coral-soft)", color: "#c0473b" },
+};
+function levelBadgeStyle(text?: string | null) {
+  return LEVEL_BADGE[text ?? ""] ?? { backgroundColor: "#eef1f5", color: "var(--text-muted)" };
+}
 
 
 const ZSearch = z.object({
@@ -214,207 +224,239 @@ function DisasterListPageInner() {
   }, [searchParams, router]);
 
   return (
-    <main className="p-3 sm:p-6 space-y-4 sm:space-y-6">
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-xl font-semibold">{t.alertList.title}</h1>
-          <p className="text-sm text-gray-500">
-            {t.alertList.description}
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <Link
-            href={`/stats${searchParams.toString() ? `?${searchParams.toString()}` : ""}`}
-            className="px-3 py-2 text-sm font-semibold rounded-lg border border-gray-200 bg-white text-gray-700 hover:border-blue-400 hover:text-blue-600 transition-colors"
-          >
-            📊 통계 보기
-          </Link>
-          <ReportButton />
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_340px] gap-4 sm:gap-6">
-        {/* 왼쪽: 검색 폼 + 목록 */}
-        <div className="flex flex-col min-w-0 gap-4 sm:gap-6">
-          <form
-            onSubmit={handleSubmit(onSubmit)}
-            className="bg-white rounded-xl shadow p-4 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3"
-          >
-            <select {...register("sido")} className="input">
-              <option value="">{t.alertList.filter.sido}</option>
-              {METROS.map((m) => (
-                <option key={m} value={m}>{t.metros[m]}</option>
-              ))}
-            </select>
-            <select {...register("sigungu")} className="input" disabled={!watchedSido}>
-              <option value="">{t.alertList.filter.sigungu}</option>
-              {/* 드롭다운 - value는 한국어 이름(검색용), 표시는 번역된 이름 */}
-              {sigunguList?.filter((s) => s.name !== "전체").map((s) => (
-                <option key={s.code} value={s.name}>
-                  {s.translatedName ?? s.name}
-                </option>
-              ))}
-            </select>
-            <div className="flex flex-col gap-1">
-              <label className="text-xs text-gray-500">{t.alertList.filter.startDate}</label>
-              <input {...register("startDate")} type="date" className="input" />
-            </div>
-            <div className="flex flex-col gap-1">
-              <label className="text-xs text-gray-500">{t.alertList.filter.endDate}</label>
-              <input {...register("endDate")} type="date" className="input" />
-            </div>
-            <select {...register("type")} className="input">
-              <option value="">{t.alertList.filter.type}</option>
-              {DISASTER_TYPES.map((type) => (
-                <option key={type} value={type}>{t.disasterTypes[type]}</option>
-              ))}
-            </select>
-            <select {...register("levelText")} className="input">
-              <option value="">{t.alertList.filter.level}</option>
-              {LEVEL_OPTIONS.map((o) => (
-                <option key={o.code} value={o.text}>{t.levels[o.text]}</option>
-              ))}
-            </select>
-            <select {...register("source")} className="input">
-              <option value="ALL">{t.alertList.filter.sourceAll}</option>
-              <option value="OFFICIAL">{t.alertList.filter.sourceOfficial}</option>
-              <option value="USER">{t.alertList.filter.sourceUser}</option>
-            </select>
-            <input {...register("keyword")} placeholder={t.alertList.filter.keyword} className="input col-span-full sm:col-span-2" />
-            <div className="col-span-full sm:col-span-2 md:col-span-4 flex justify-end gap-2">
-              <button type="button" onClick={onReset} className="px-3 py-2 rounded bg-gray-100">
-                {t.alertList.reset}
-              </button>
-              <button
-                type="submit"
-                className="px-3 py-2 rounded bg-blue-600 text-white disabled:opacity-60"
-                disabled={isFetching}
-              >
-                {isFetching ? t.alertList.searching : t.alertList.search}
-              </button>
-            </div>
-          </form>
-
-          {/* 목록 */}
-          <div id="list" className="bg-white rounded-xl shadow p-4 flex flex-col flex-1">
-            {isLoading ? (
-              <div className="text-sm text-gray-500">{t.loading}</div>
-            ) : (
-              <div className="flex flex-col flex-1">
-                <ul className="space-y-2">
-                  {(data?.content ?? []).map((a: Alert & { source?: "OFFICIAL" | "USER" }) => {
-                    const regionLabel = a.regionNames && a.regionNames.length > 0 ? a.regionNames.join(", ") : "-";
-                    const href = a.source === "USER" ? `/alerts/${a.id}?source=USER` : `/alerts/${a.id}?source=OFFICIAL`;
-                    return (
-                      <li key={a.id} className="border-b last:border-0 pb-2">
-                        <Link href={href} className="hover:underline block">
-                          <span className="text-gray-800 block truncate">
-                            [{regionLabel}] {new Date(a.createdAt).toLocaleString()} - {a.message}
-                          </span>
-                        </Link>
-                        <div className="text-xs text-gray-500">
-                          {a.disasterType ?? "-"} · {a.emergencyLevelText ?? "-"}
-                        </div>
-                      </li>
-                    );
-                  })}
-                </ul>
-                <div className="mt-auto pt-2 border-t flex items-center justify-between">
-                  <button
-                    className="px-3 py-1 rounded bg-gray-100 disabled:opacity-50"
-                    onClick={() => setPage((p) => Math.max(0, p - 1))}
-                    disabled={page === 0}
-                  >
-                    {t.alertList.prev}
-                  </button>
-                  <div className="text-sm text-gray-500">{data ? `${data.number + 1} / ${data.totalPages}` : "-"}</div>
-                  <button
-                    className="px-3 py-1 rounded bg-gray-100 disabled:opacity-50"
-                    onClick={() => setPage((p) => (data ? Math.min(data.totalPages - 1, p + 1) : p))}
-                    disabled={!data || data.number + 1 >= data.totalPages}
-                  >
-                    {t.alertList.next}
-                  </button>
-                </div>
-              </div>
-            )}
+    <main className="bg-[var(--canvas)] min-h-[calc(100vh-48px)]">
+      <div className="mx-auto max-w-7xl space-y-4 px-4 py-8 sm:px-6 sm:space-y-6">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h1 className="text-xl font-bold tracking-tight text-[var(--ink)]">{t.alertList.title}</h1>
+            <p className="mt-1 text-[13px] text-[var(--text-muted)]">{t.alertList.description}</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <Link
+              href={`/stats${searchParams.toString() ? `?${searchParams.toString()}` : ""}`}
+              className="rounded-[var(--radius-control)] border border-[var(--line)] bg-[var(--surface)] px-3 py-2 text-sm font-semibold text-[var(--text-body)] transition-colors hover:border-[var(--blue)] hover:text-[var(--blue)]"
+            >
+              📊 통계 보기
+            </Link>
+            <ReportButton />
           </div>
         </div>
 
-        {/* 오른쪽: 폴리곤 지도 + 통계 */}
-        <div className="w-full min-w-0 flex flex-col gap-4">
-          <KakaoPolygonMap params={mapParams} mapHeight="520px" showSidebar={false} externalSido={formState.sido || undefined} onSidoSelect={onMapSidoSelect} />
+        <div className="grid grid-cols-1 gap-4 sm:gap-6 xl:grid-cols-[minmax(0,1fr)_340px]">
+          {/* 왼쪽: 검색 폼 + 목록 */}
+          <div className="flex min-w-0 flex-col gap-4 sm:gap-6">
+            <form
+              onSubmit={handleSubmit(onSubmit)}
+              className="grid grid-cols-1 gap-3 rounded-[var(--radius-panel-card)] border border-[var(--line)] bg-[var(--surface)] p-4 shadow-[0_10px_30px_rgba(28,39,60,0.04)] sm:grid-cols-2 md:grid-cols-4"
+            >
+              <select {...register("sido")} className="input">
+                <option value="">{t.alertList.filter.sido}</option>
+                {METROS.map((m) => (
+                  <option key={m} value={m}>{t.metros[m]}</option>
+                ))}
+              </select>
+              <select {...register("sigungu")} className="input disabled:opacity-60" disabled={!watchedSido}>
+                <option value="">{t.alertList.filter.sigungu}</option>
+                {/* 드롭다운 - value는 한국어 이름(검색용), 표시는 번역된 이름 */}
+                {sigunguList?.filter((s) => s.name !== "전체").map((s) => (
+                  <option key={s.code} value={s.name}>
+                    {s.translatedName ?? s.name}
+                  </option>
+                ))}
+              </select>
+              <div className="flex flex-col gap-1">
+                <label className="text-xs text-[var(--text-muted)]">{t.alertList.filter.startDate}</label>
+                <input {...register("startDate")} type="date" className="input" />
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-xs text-[var(--text-muted)]">{t.alertList.filter.endDate}</label>
+                <input {...register("endDate")} type="date" className="input" />
+              </div>
+              <select {...register("type")} className="input">
+                <option value="">{t.alertList.filter.type}</option>
+                {DISASTER_TYPES.map((type) => (
+                  <option key={type} value={type}>{t.disasterTypes[type]}</option>
+                ))}
+              </select>
+              <select {...register("levelText")} className="input">
+                <option value="">{t.alertList.filter.level}</option>
+                {LEVEL_OPTIONS.map((o) => (
+                  <option key={o.code} value={o.text}>{t.levels[o.text]}</option>
+                ))}
+              </select>
+              <select {...register("source")} className="input">
+                <option value="ALL">{t.alertList.filter.sourceAll}</option>
+                <option value="OFFICIAL">{t.alertList.filter.sourceOfficial}</option>
+                <option value="USER">{t.alertList.filter.sourceUser}</option>
+              </select>
+              <input {...register("keyword")} placeholder={t.alertList.filter.keyword} className="input col-span-full sm:col-span-2" />
+              <div className="col-span-full flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={onReset}
+                  className="rounded-[var(--radius-control)] border border-[var(--line)] bg-[var(--surface)] px-3 py-2 text-sm text-[var(--text-body)] transition-colors hover:bg-[var(--blue-soft)]"
+                >
+                  {t.alertList.reset}
+                </button>
+                <button
+                  type="submit"
+                  className="rounded-[var(--radius-control)] bg-[var(--blue)] px-4 py-2 text-sm font-semibold text-white transition hover:brightness-95 disabled:opacity-60"
+                  disabled={isFetching}
+                >
+                  {isFetching ? t.alertList.searching : t.alertList.search}
+                </button>
+              </div>
+            </form>
 
-          {/* 재난 통계 요약 */}
-          <div className="bg-white rounded-xl shadow p-4 space-y-3">
-            <div className="space-y-2">
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-gray-500">총 발생 건수</span>
-                <span className="font-semibold">
-                  {filteredStats ? filteredStats.totalCount.toLocaleString("ko-KR") + "건" : "-"}
-                </span>
-              </div>
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-gray-500">최다 발생 지역</span>
-                <span className="font-semibold">
-                  {maxRegion ? `${maxRegion.region} (${maxRegion.count.toLocaleString("ko-KR")}건)` : "-"}
-                </span>
-              </div>
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-gray-500">최다 재난 유형</span>
-                <span className="font-semibold">
-                  {topType ? `${topType.type} (${topType.count.toLocaleString("ko-KR")}건)` : "-"}
-                </span>
-              </div>
-            </div>
-
-            {/* 재난 유형 분포 */}
-            <div className="pt-2 border-t">
-              <h3 className="text-sm font-semibold text-gray-700 mb-2">
-                재난 유형 분포{formState.sido ? ` · ${formState.sido}` : " · 전국"}
-              </h3>
-              {typeDistribution.length === 0 ? (
-                <p className="text-xs text-gray-400 text-center py-2">데이터 없음</p>
+            {/* 목록 */}
+            <div id="list" className="flex flex-1 flex-col rounded-[var(--radius-panel-card)] border border-[var(--line)] bg-[var(--surface)] p-2 shadow-[0_10px_30px_rgba(28,39,60,0.04)]">
+              {isLoading ? (
+                <div className="p-4 text-[13px] text-[var(--text-muted)]">{t.loading}</div>
+              ) : !(data?.content ?? []).length ? (
+                <div className="p-8 text-center text-[13px] text-[var(--text-muted)]">{t.alertList.noData}</div>
               ) : (
-                <ul className="space-y-1.5">
-                  {typeDistribution.map(({ type, count, pct }, i) => (
-                    <li key={type}>
-                      <div className="flex justify-between text-xs mb-0.5">
-                        <span className="text-gray-600 truncate">{type}</span>
-                        <span className="text-gray-500 shrink-0 ml-2">{pct}% ({count.toLocaleString("ko-KR")}건)</span>
-                      </div>
-                      <div className="h-1.5 w-full bg-gray-100 rounded-full overflow-hidden">
-                        <div
-                          className={`h-full rounded-full ${["bg-red-500", "bg-orange-400", "bg-yellow-400", "bg-blue-500", "bg-purple-500"][i]}`}
-                          style={{ width: `${pct}%` }}
-                        />
-                      </div>
-                    </li>
-                  ))}
-                </ul>
+                <>
+                  <ul>
+                    {(data?.content ?? []).map((a: Alert & { source?: "OFFICIAL" | "USER" }) => {
+                      const regionLabel = a.regionNames && a.regionNames.length > 0 ? a.regionNames.join(", ") : "-";
+                      const href = a.source === "USER" ? `/alerts/${a.id}?source=USER` : `/alerts/${a.id}?source=OFFICIAL`;
+                      return (
+                        <li key={a.id} className="border-b border-[var(--line)] last:border-0">
+                          <Link href={href} className="group relative block py-3 pl-5 pr-2 transition-colors hover:bg-[var(--blue-soft)]">
+                            <span className="absolute left-2 top-[18px] h-1.5 w-1.5 rounded-sm bg-[var(--coral)]" aria-hidden="true" />
+                            <div className="flex items-baseline justify-between gap-3">
+                              <span className="truncate text-[13px] font-semibold text-[var(--ink)]">{regionLabel}</span>
+                              <time className="shrink-0 text-[11px] text-[var(--text-subtle)]">{new Date(a.createdAt).toLocaleString()}</time>
+                            </div>
+                            <p className="mt-1 line-clamp-2 text-[13px] leading-relaxed text-[var(--text-body)] transition-colors group-hover:text-[var(--blue)]">
+                              {a.message}
+                            </p>
+                            <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                              {a.disasterType && (
+                                <span style={disasterTypeChipStyle(a.disasterType)} className="rounded-[var(--radius-pill)] px-2 py-0.5 text-[11px] font-medium">
+                                  {t.disasterTypes[a.disasterType as keyof typeof t.disasterTypes] ?? a.disasterType}
+                                </span>
+                              )}
+                              {a.emergencyLevelText && (
+                                <span style={levelBadgeStyle(a.emergencyLevelText)} className="rounded-[var(--radius-pill)] px-2 py-0.5 text-[11px] font-medium">
+                                  {t.levels[a.emergencyLevelText as keyof typeof t.levels] ?? a.emergencyLevelText}
+                                </span>
+                              )}
+                              {a.source === "USER" && (
+                                <span className="rounded-[var(--radius-pill)] bg-[#eef1f5] px-2 py-0.5 text-[11px] font-medium text-[var(--text-muted)]">
+                                  {t.alertList.filter.sourceUser}
+                                </span>
+                              )}
+                            </div>
+                          </Link>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                  <div className="mt-auto flex items-center justify-between border-t border-[var(--line)] px-2 pt-3">
+                    <button
+                      className="rounded-[var(--radius-control)] border border-[var(--line)] bg-[var(--surface)] px-3 py-1.5 text-sm text-[var(--text-body)] transition-colors hover:bg-[var(--blue-soft)] disabled:opacity-50 disabled:hover:bg-[var(--surface)]"
+                      onClick={() => setPage((p) => Math.max(0, p - 1))}
+                      disabled={page === 0}
+                    >
+                      {t.alertList.prev}
+                    </button>
+                    <div className="text-sm text-[var(--text-muted)]">{data ? `${data.number + 1} / ${data.totalPages}` : "-"}</div>
+                    <button
+                      className="rounded-[var(--radius-control)] border border-[var(--line)] bg-[var(--surface)] px-3 py-1.5 text-sm text-[var(--text-body)] transition-colors hover:bg-[var(--blue-soft)] disabled:opacity-50 disabled:hover:bg-[var(--surface)]"
+                      onClick={() => setPage((p) => (data ? Math.min(data.totalPages - 1, p + 1) : p))}
+                      disabled={!data || data.number + 1 >= data.totalPages}
+                    >
+                      {t.alertList.next}
+                    </button>
+                  </div>
+                </>
               )}
             </div>
+          </div>
 
-            {/* 재난 경보 단계별 건수 */}
-            <div className="pt-2 border-t">
-              <h3 className="text-sm font-semibold text-gray-700 mb-2">
-                재난 경보 단계{formState.sido ? ` · ${formState.sido}` : " · 전국"}
-              </h3>
-              <div className="grid grid-cols-3 gap-2">
-                {[
-                  { code: "LEVEL_1", text: "안전안내", color: "bg-blue-50 text-blue-700 border-blue-200" },
-                  { code: "LEVEL_2", text: "긴급재난", color: "bg-orange-50 text-orange-700 border-orange-200" },
-                  { code: "LEVEL_3", text: "위급재난", color: "bg-red-50 text-red-700 border-red-200" },
-                ].map(({ code, text, color }) => {
-                  const count = filteredStats?.levelStats
-                    ?.find((l) => l.level === code)?.count ?? 0;
-                  return (
-                    <div key={text} className={`flex flex-col items-center rounded border py-1.5 gap-0.5 ${color}`}>
-                      <span className="text-xs font-medium">{text}</span>
-                      <span className="text-sm font-bold">{count.toLocaleString("ko-KR")}건</span>
-                    </div>
-                  );
-                })}
+          {/* 오른쪽: 폴리곤 지도 + 통계 */}
+          <div className="flex w-full min-w-0 flex-col gap-4">
+            <div className="overflow-hidden rounded-[var(--radius-panel-card)] border border-[var(--line)] bg-[var(--surface)] shadow-[0_10px_30px_rgba(28,39,60,0.04)]">
+              <KakaoPolygonMap params={mapParams} mapHeight="520px" showSidebar={false} externalSido={formState.sido || undefined} onSidoSelect={onMapSidoSelect} />
+            </div>
+
+            {/* 재난 통계 요약 */}
+            <div className="space-y-3 rounded-[var(--radius-panel-card)] border border-[var(--line)] bg-[var(--surface)] p-4 shadow-[0_10px_30px_rgba(28,39,60,0.04)]">
+              <div className="space-y-2">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-[var(--text-muted)]">{t.alertList.totalCount}</span>
+                  <span className="font-semibold text-[var(--ink)]">
+                    {filteredStats ? filteredStats.totalCount.toLocaleString("ko-KR") + t.alertList.countUnit : "-"}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-[var(--text-muted)]">{t.alertList.topRegion}</span>
+                  <span className="font-semibold text-[var(--ink)]">
+                    {maxRegion ? `${t.metros[maxRegion.region as keyof typeof t.metros] ?? maxRegion.region} (${maxRegion.count.toLocaleString("ko-KR")}${t.alertList.countUnit})` : "-"}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-[var(--text-muted)]">{t.alertList.topType}</span>
+                  <span className="font-semibold text-[var(--ink)]">
+                    {topType ? `${t.disasterTypes[topType.type as keyof typeof t.disasterTypes] ?? topType.type} (${topType.count.toLocaleString("ko-KR")}${t.alertList.countUnit})` : "-"}
+                  </span>
+                </div>
+              </div>
+
+              {/* 재난 유형 분포 */}
+              <div className="border-t border-[var(--line)] pt-2">
+                <h3 className="mb-2 text-sm font-semibold text-[var(--text-body)]">
+                  {t.alertList.typeDistribution}{formState.sido ? ` · ${t.metros[formState.sido as keyof typeof t.metros] ?? formState.sido}` : ` · ${t.alertList.nationwide}`}
+                </h3>
+                {typeDistribution.length === 0 ? (
+                  <p className="py-2 text-center text-xs text-[var(--text-subtle)]">{t.alertList.noData}</p>
+                ) : (
+                  <ul className="space-y-1.5">
+                    {typeDistribution.map(({ type, count, pct }) => (
+                      <li key={type}>
+                        <div className="mb-0.5 flex justify-between text-xs">
+                          <span className="truncate text-[var(--text-body)]">{t.disasterTypes[type as keyof typeof t.disasterTypes] ?? type}</span>
+                          <span className="ml-2 shrink-0 text-[var(--text-muted)]">{pct}% ({count.toLocaleString("ko-KR")}{t.alertList.countUnit})</span>
+                        </div>
+                        <div className="h-1.5 w-full overflow-hidden rounded-full bg-[#eef1f5]">
+                          <div
+                            className="h-full rounded-full"
+                            style={{ width: `${pct}%`, backgroundColor: disasterTypePalette(type).text }}
+                          />
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+
+              {/* 재난 경보 단계별 건수 */}
+              <div className="border-t border-[var(--line)] pt-2">
+                <h3 className="mb-2 text-sm font-semibold text-[var(--text-body)]">
+                  {t.alertList.alertLevel}{formState.sido ? ` · ${t.metros[formState.sido as keyof typeof t.metros] ?? formState.sido}` : ` · ${t.alertList.nationwide}`}
+                </h3>
+                <div className="grid grid-cols-3 gap-2">
+                  {[
+                    { code: "LEVEL_1", key: "안전안내" },
+                    { code: "LEVEL_2", key: "긴급재난" },
+                    { code: "LEVEL_3", key: "위급재난" },
+                  ].map((lvl) => {
+                    const count = filteredStats?.levelStats?.find((l) => l.level === lvl.code)?.count ?? 0;
+                    return (
+                      <div
+                        key={lvl.code}
+                        style={levelBadgeStyle(lvl.key)}
+                        className="flex flex-col items-center gap-0.5 rounded-[var(--radius-compact)] py-1.5"
+                      >
+                        <span className="flex min-h-[2rem] items-center justify-center text-center text-xs font-medium leading-tight">
+                          {t.levels[lvl.key as keyof typeof t.levels]}
+                        </span>
+                        <span className="text-sm font-bold">{count.toLocaleString("ko-KR")}{t.alertList.countUnit}</span>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             </div>
           </div>

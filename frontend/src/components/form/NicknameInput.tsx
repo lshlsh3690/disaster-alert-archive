@@ -58,7 +58,7 @@ export default function NicknameInput<T extends FieldValues>({ formMethods }: Ni
         type="text"
         {...formMethods.register("nickname" as Path<T>)}
         placeholder="닉네임"
-        className="w-full border rounded px-3 py-2"
+        className="input"
       />
 
       <InputStatusMessage

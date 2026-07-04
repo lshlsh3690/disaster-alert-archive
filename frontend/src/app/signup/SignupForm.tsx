@@ -79,22 +79,12 @@ export default function SignupForm() {
       </CountdownProvider>
       <PasswordInputGroup<SignupFormValues> formMethods={formMethods} showVerificationUI />
       <NicknameInput<SignupFormValues> formMethods={formMethods} />
-      <Button
-        className="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700 transition"
-        type="submit"
-        isLoading={isSignupPending}
-        fullWidth
-        disabled={isSignupPending}
-      >
-        {isSignupPending ? "회원가입 중..." : "회원가입"}
+      <Button type="submit" isLoading={isSignupPending} fullWidth disabled={isSignupPending}>
+        회원가입
       </Button>
-      <button
-        type="button"
-        onClick={() => router.back()}
-        className="w-full bg-gray-100 text-gray-700 py-2 rounded hover:bg-gray-200 transition"
-      >
+      <Button type="button" variant="secondary" fullWidth onClick={() => router.back()}>
         취소
-      </button>
+      </Button>
     </form>
   );
 }

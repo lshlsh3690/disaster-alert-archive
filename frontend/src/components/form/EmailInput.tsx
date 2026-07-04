@@ -93,7 +93,7 @@ export default function EmailInput<T extends FieldValues>({ formMethods, showVer
           type="email"
           {...formMethods.register("email" as Path<T>)}
           placeholder="이메일"
-          className="flex-1 border rounded px-3 py-2"
+          className="input flex-1"
         />
         {showVerificationUI && (
           <Button type="button" onClick={handleSendVerification} isLoading={isEmailCodeSending}>

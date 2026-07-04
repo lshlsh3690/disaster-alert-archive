@@ -1,50 +1,48 @@
-// app/(dashboard)/LatestAlertsSection.tsx  ← 경로는 편한 곳에
 "use client";
 
 import Link from "next/link";
-import { useQuery } from "@tanstack/react-query";
-import instance from "@/api/axios";
-import { fetchLatestAlerts } from "@/api/alertApi";
+import { useLatestAlerts } from "@/lib/queries/useAlerts";
+import { useI18n } from "@/hooks/useI18n";
+import { useLanguageStore } from "@/store/languageStore";
 import { LatestAlert } from "@/types/alerts";
 
+const LANG_LOCALE: Record<string, string> = { ko: "ko-KR", en: "en-US", zh: "zh-CN", ja: "ja-JP" };
 
-export default function LatestAlertsSection({limit = 5}: { limit?: number }) {
-  const { data, isLoading, isError } = useQuery({
-    queryKey: ["latest-alerts", limit],
-    queryFn: () => fetchLatestAlerts(limit),
-    staleTime: 60_000, // 1분 동안 캐시 유지
-  });
+export default function LatestAlertsSection({ limit = 5 }: { limit?: number }) {
+  const t = useI18n();
+  const language = useLanguageStore((state) => state.language);
+  const { data, isLoading, isError } = useLatestAlerts(limit);
+
+  function formatKST(iso: string) {
+    return new Date(iso).toLocaleString(LANG_LOCALE[language] ?? "ko-KR", {
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  }
+
+  if (isLoading) return <p className="feed-state">{t.loading}</p>;
+  if (isError) return <p className="feed-state feed-state--error">{t.dashboard.loadError}</p>;
+  if (!data || data.length === 0) return <p className="feed-state">{t.dashboard.noAlerts}</p>;
 
   return (
-    <div className="bg-white rounded-xl p-4 shadow">
-      {isLoading && <p className="text-sm text-gray-500">불러오는 중...</p>}
-      {isError && <p className="text-sm text-red-500">불러오기 실패</p>}
-
-      <ul className="text-sm text-gray-700 space-y-1">
-        {data?.map((a: LatestAlert) => (
-          <li key={a.id}>
-            <Link href={`/alerts/${a.id}`} className="hover:underline">
-              📍 [{a.topRegion ?? "지역미상"}] {formatKST(a.createdAt)}
-              {a.disasterType ? ` - ${a.disasterType}` : ""} • {a.message}
-            </Link>
-          </li>
-        ))}
-
-        {!isLoading && !isError && (!data || data.length === 0) && (
-          <li className="text-gray-500">최근 재난 문자가 없습니다.</li>
-        )}
-      </ul>
-    </div>
+    <ul>
+      {data.map((a: LatestAlert) => (
+        <li key={a.id}>
+          <Link href={`/alerts/${a.id}`} className="feed-item">
+            <div className="feed-item__head">
+              <span className="feed-item__region">{a.topRegion ?? t.dashboard.unknownRegion}</span>
+              <time className="feed-item__time">{formatKST(a.createdAt)}</time>
+            </div>
+            <p className="feed-item__msg">
+              {a.disasterType && <span className="feed-item__type">{a.disasterType}</span>}
+              {a.message}
+            </p>
+          </Link>
+        </li>
+      ))}
+    </ul>
   );
-}
-
-function formatKST(iso: string) {
-  const d = new Date(iso);
-  return d.toLocaleString("ko-KR", {
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
 }

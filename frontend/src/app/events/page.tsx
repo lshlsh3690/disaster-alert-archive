@@ -9,9 +9,10 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useSearchEvents } from "@/lib/queries/useEvents";
 import { useSigungu } from "@/lib/queries/useAlerts";
+import { fetchSigungu } from "@/api/alertApi";
 import { DISASTER_TYPES } from "@/ui/disasterType";
 import { METROS } from "@/ui/metros";
-import { disasterTypeChipClass } from "@/ui/disasterTypeChip";
+import { disasterTypeChipStyle } from "@/ui/disasterTypeColor";
 import { formatEventPeriod } from "@/utils/eventDate";
 import { useI18n } from "@/hooks/useI18n";
 import { useLanguageStore } from "@/store/languageStore";
@@ -151,178 +152,241 @@ function EventsPageInner() {
     setPage(0);
   };
 
+  const splitRegion = (name?: string | null) => {
+    const parts = (name ?? "").trim().split(/\s+/);
+    return { sido: parts[0] || "", sigungu: parts.slice(1).join(" ") };
+  };
+
+  // 칩 필터는 누적하지 않고 해당 조건만 단독 적용
+  const filterByType = (type?: string | null) => {
+    if (!type) return;
+    const next = { ...EMPTY_FORM, type };
+    reset(next);
+    setFormState(next);
+    setPage(0);
+  };
+  const filterByRegion = (e: Event) => {
+    const { sido, sigungu } = splitRegion(e.primaryRegionName);
+    if (!sido) return;
+    sidoFirstRender.current = true; // 시도 변경 시 시군구 자동 초기화 1회 건너뜀
+    const next = { ...EMPTY_FORM, sido, sigungu };
+    reset(next);
+    setFormState(next);
+    setPage(0);
+  };
+
+  // 지역명 번역: 시도는 t.metros, 시군구는 /districts/sigungu 응답으로 매핑
+  const [sigunguTransBySido, setSigunguTransBySido] = useState<Record<string, Map<string, string>>>({});
+  const ensureSigunguTrans = useCallback(
+    async (sido: string) => {
+      if (lang === "ko" || !sido || sigunguTransBySido[sido]) return;
+      try {
+        const list = await fetchSigungu(sido, lang);
+        const map = new Map<string, string>();
+        (list ?? []).forEach((s) => { if (s.translatedName) map.set(s.name, s.translatedName); });
+        setSigunguTransBySido((prev) => ({ ...prev, [sido]: map }));
+      } catch { /* 번역 실패 시 원문 유지 */ }
+    },
+    [lang, sigunguTransBySido]
+  );
+  useEffect(() => {
+    if (lang === "ko") return;
+    const sidos = new Set(
+      (data?.content ?? []).map((e) => splitRegion(e.primaryRegionName).sido).filter(Boolean)
+    );
+    sidos.forEach(ensureSigunguTrans);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data, lang]);
+  const regionDisplay = (e: Event) => {
+    const name = e.primaryRegionName;
+    if (!name) return "";
+    if (lang === "ko") return name;
+    const { sido, sigungu } = splitRegion(name);
+    const tSido = t.metros?.[sido as keyof typeof t.metros] ?? sido;
+    if (!sigungu) return tSido;
+    const tSigungu = sigunguTransBySido[sido]?.get(sigungu) ?? sigungu;
+    return `${tSido} ${tSigungu}`;
+  };
+
   const totalPages = data?.totalPages ?? 0;
 
   return (
-    <main className="p-4 sm:p-6 space-y-4 max-w-4xl mx-auto">
-      <div>
-        <h1 className="text-xl font-bold">{t.events.title}</h1>
-        <p className="text-sm text-gray-500 mt-1">{t.events.description}</p>
-      </div>
-
-      {/* 탭 */}
-      <div className="flex gap-1 border-b">
-        {(["active", "past", "all"] as ActiveTab[]).map((tabKey) => {
-          const label =
-            tabKey === "active"
-              ? t.events.tabActive
-              : tabKey === "past"
-              ? t.events.tabPast
-              : t.events.tabAll;
-          return (
-            <button
-              key={tabKey}
-              onClick={() => handleTabChange(tabKey)}
-              className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
-                tab === tabKey
-                  ? "border-blue-500 text-blue-600"
-                  : "border-transparent text-gray-500 hover:text-gray-700"
-              }`}
-            >
-              {label}
-            </button>
-          );
-        })}
-      </div>
-
-      {/* 필터 */}
-      <form
-        onSubmit={handleSubmit(onSubmit)}
-        className="bg-white rounded-xl shadow p-4 grid grid-cols-2 sm:grid-cols-3 gap-3"
-      >
-        <select {...register("sido")} className="border rounded px-2 py-1 text-sm col-span-1">
-          <option value="">{t.events.filter.sido}</option>
-          {METROS.map((m) => (
-            <option key={m} value={m}>{m}</option>
-          ))}
-        </select>
-
-        <select
-          {...register("sigungu")}
-          className="border rounded px-2 py-1 text-sm col-span-1"
-          disabled={!watchedSido}
-        >
-          <option value="">{t.events.filter.sigungu}</option>
-          {sigunguList?.map((s) => (
-            <option key={s.code} value={s.name}>
-              {s.translatedName ?? s.name}
-            </option>
-          ))}
-        </select>
-
-        <select {...register("type")} className="border rounded px-2 py-1 text-sm col-span-1">
-          <option value="">{t.events.filter.type}</option>
-          {DISASTER_TYPES.map((dt) => (
-            <option key={dt} value={dt}>{dt}</option>
-          ))}
-        </select>
-
-        <input
-          type="date"
-          {...register("startDate")}
-          className="border rounded px-2 py-1 text-sm col-span-1"
-          placeholder={t.events.filter.startDate}
-        />
-        <input
-          type="date"
-          {...register("endDate")}
-          className="border rounded px-2 py-1 text-sm col-span-1"
-          placeholder={t.events.filter.endDate}
-        />
-        <input
-          type="text"
-          {...register("keyword")}
-          className="border rounded px-2 py-1 text-sm col-span-1"
-          placeholder={t.events.filter.keyword}
-        />
-
-        <div className="col-span-2 sm:col-span-3 flex gap-2 justify-end">
-          <button
-            type="button"
-            onClick={onReset}
-            className="px-3 py-1 text-sm border rounded text-gray-600"
-          >
-            {t.alertList.reset}
-          </button>
-          <button
-            type="submit"
-            className="px-4 py-1 text-sm bg-blue-600 text-white rounded"
-            disabled={isFetching}
-          >
-            {isFetching ? t.alertList.searching : t.alertList.search}
-          </button>
+    <main className="bg-[var(--canvas)] min-h-[calc(100vh-48px)]">
+      <div className="mx-auto max-w-4xl space-y-4 px-4 py-8 sm:px-6">
+        <div>
+          <h1 className="text-xl font-bold tracking-tight text-[var(--ink)]">{t.events.title}</h1>
+          <p className="mt-1 text-[13px] text-[var(--text-muted)]">{t.events.description}</p>
         </div>
-      </form>
 
-      {/* 목록 */}
-      {isLoading ? (
-        <div className="text-sm text-gray-500 py-8 text-center">{t.loading}</div>
-      ) : !data?.content.length ? (
-        <div className="text-sm text-gray-500 py-8 text-center">{t.events.empty}</div>
-      ) : (
-        <ul className="space-y-3">
-          {data.content.map((e: Event) => (
-            <li key={e.id}>
-              <Link
-                href={`/events/${e.id}`}
-                className="block bg-white rounded-xl shadow p-4 hover:shadow-md transition-shadow"
+        {/* 탭 */}
+        <div className="flex gap-1 border-b border-[var(--line)]">
+          {(["active", "past", "all"] as ActiveTab[]).map((tabKey) => {
+            const label =
+              tabKey === "active"
+                ? t.events.tabActive
+                : tabKey === "past"
+                ? t.events.tabPast
+                : t.events.tabAll;
+            return (
+              <button
+                key={tabKey}
+                onClick={() => handleTabChange(tabKey)}
+                className={`-mb-px border-b-2 px-4 py-2 text-sm font-medium transition-colors ${
+                  tab === tabKey
+                    ? "border-[var(--blue)] text-[var(--blue)]"
+                    : "border-transparent text-[var(--text-muted)] hover:text-[var(--text-body)]"
+                }`}
               >
-                <div className="flex items-start justify-between gap-2">
-                  <h2 className="font-semibold text-gray-900 leading-snug flex-1">
-                    {e.translatedTitle ?? e.eventTitle}
-                  </h2>
-                  <span
-                    className={`shrink-0 text-xs font-medium px-2 py-0.5 rounded-full ${
-                      e.active
-                        ? "bg-red-100 text-red-600"
-                        : "bg-gray-100 text-gray-500"
-                    }`}
-                  >
-                    {e.active ? t.events.badgeActive : t.events.badgePast}
-                  </span>
-                </div>
-                <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-gray-500">
-                  {e.primaryDisasterType && (
-                    <span
-                      className={`px-2 py-0.5 rounded-full font-medium ${disasterTypeChipClass(e.primaryDisasterType)}`}
-                    >
-                      {e.primaryDisasterType}
-                    </span>
-                  )}
-                  <span>{formatEventPeriod(e.firstAlertAt, e.lastAlertAt)}</span>
-                  {e.primaryRegionName && <span>{e.primaryRegionName}</span>}
-                  <span>
-                    {t.events.relatedCount} {e.alertCount}건
-                  </span>
-                </div>
-              </Link>
-            </li>
-          ))}
-        </ul>
-      )}
-
-      {/* 페이지네이션 */}
-      {totalPages > 1 && (
-        <div className="flex justify-center items-center gap-2 pt-2">
-          <button
-            onClick={() => setPage((p) => Math.max(0, p - 1))}
-            disabled={page === 0}
-            className="px-3 py-1 text-sm border rounded disabled:opacity-40"
-          >
-            {t.alertList.prev}
-          </button>
-          <span className="text-sm text-gray-600">
-            {page + 1} / {totalPages}
-          </span>
-          <button
-            onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
-            disabled={page >= totalPages - 1}
-            className="px-3 py-1 text-sm border rounded disabled:opacity-40"
-          >
-            {t.alertList.next}
-          </button>
+                {label}
+              </button>
+            );
+          })}
         </div>
-      )}
+
+        {/* 필터 */}
+        <form
+          onSubmit={handleSubmit(onSubmit)}
+          className="grid grid-cols-2 gap-3 rounded-[var(--radius-panel-card)] border border-[var(--line)] bg-[var(--surface)] p-4 shadow-[0_10px_30px_rgba(28,39,60,0.04)] sm:grid-cols-3"
+        >
+          <select {...register("sido")} className="input">
+            <option value="">{t.events.filter.sido}</option>
+            {METROS.map((m) => (
+              <option key={m} value={m}>{t.metros[m as keyof typeof t.metros] ?? m}</option>
+            ))}
+          </select>
+
+          <select {...register("sigungu")} className="input disabled:opacity-60" disabled={!watchedSido}>
+            <option value="">{t.events.filter.sigungu}</option>
+            {sigunguList?.map((s) => (
+              <option key={s.code} value={s.name}>
+                {s.translatedName ?? s.name}
+              </option>
+            ))}
+          </select>
+
+          <select {...register("type")} className="input">
+            <option value="">{t.events.filter.type}</option>
+            {DISASTER_TYPES.map((dt) => (
+              <option key={dt} value={dt}>{t.disasterTypes[dt as keyof typeof t.disasterTypes] ?? dt}</option>
+            ))}
+          </select>
+
+          <label className="flex flex-col gap-1">
+            <span className="text-xs text-[var(--text-muted)]">{t.events.filter.startDate}</span>
+            <input type="date" {...register("startDate")} className="input" />
+          </label>
+          <label className="flex flex-col gap-1">
+            <span className="text-xs text-[var(--text-muted)]">{t.events.filter.endDate}</span>
+            <input type="date" {...register("endDate")} className="input" />
+          </label>
+          <input type="text" {...register("keyword")} className="input self-end" placeholder={t.events.filter.keyword} />
+
+          <div className="col-span-2 flex justify-end gap-2 sm:col-span-3">
+            <button
+              type="button"
+              onClick={onReset}
+              className="rounded-[var(--radius-control)] border border-[var(--line)] bg-[var(--surface)] px-3 py-2 text-sm text-[var(--text-body)] transition-colors hover:bg-[var(--blue-soft)]"
+            >
+              {t.alertList.reset}
+            </button>
+            <button
+              type="submit"
+              className="rounded-[var(--radius-control)] bg-[var(--blue)] px-4 py-2 text-sm font-semibold text-white transition hover:brightness-95 disabled:opacity-60"
+              disabled={isFetching}
+            >
+              {isFetching ? t.alertList.searching : t.alertList.search}
+            </button>
+          </div>
+        </form>
+
+        {/* 목록 */}
+        {isLoading ? (
+          <div className="py-8 text-center text-[13px] text-[var(--text-muted)]">{t.loading}</div>
+        ) : !data?.content.length ? (
+          <div className="py-8 text-center text-[13px] text-[var(--text-muted)]">{t.events.empty}</div>
+        ) : (
+          <ul className="space-y-3">
+            {data.content.map((e: Event) => (
+              <li key={e.id}>
+                <Link
+                  href={`/events/${e.id}`}
+                  className="block rounded-[var(--radius-panel-card)] border border-[var(--line)] bg-[var(--surface)] p-4 shadow-[0_10px_30px_rgba(28,39,60,0.04)] transition-shadow hover:shadow-[0_12px_28px_rgba(28,39,60,0.08)]"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <h2 className="flex-1 font-semibold leading-snug text-[var(--ink)]">
+                      {e.translatedTitle ?? e.eventTitle}
+                    </h2>
+                    <span
+                      className={`shrink-0 rounded-[var(--radius-pill)] px-2 py-0.5 text-xs font-medium ${
+                        e.active ? "bg-[var(--coral-soft)] text-[#c0473b]" : "bg-[#eef1f5] text-[var(--text-muted)]"
+                      }`}
+                    >
+                      {e.active ? t.events.badgeActive : t.events.badgePast}
+                    </span>
+                  </div>
+                  <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
+                    {e.primaryDisasterType && (
+                      <button
+                        type="button"
+                        onClick={(evt) => { evt.preventDefault(); evt.stopPropagation(); filterByType(e.primaryDisasterType); }}
+                        title={t.events.filterByType}
+                        style={disasterTypeChipStyle(e.primaryDisasterType)}
+                        className="cursor-pointer rounded-[var(--radius-pill)] px-2 py-0.5 font-medium transition hover:brightness-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--blue)]"
+                      >
+                        {t.disasterTypes[e.primaryDisasterType as keyof typeof t.disasterTypes] ?? e.primaryDisasterType}
+                      </button>
+                    )}
+                    {e.primaryRegionName && (
+                      <button
+                        type="button"
+                        onClick={(evt) => { evt.preventDefault(); evt.stopPropagation(); filterByRegion(e); }}
+                        title={t.events.filterByRegion}
+                        className="inline-flex cursor-pointer items-center gap-1 rounded-[var(--radius-pill)] bg-[#eef1f5] px-2 py-0.5 font-medium text-[var(--text-muted)] transition hover:bg-[#e4e8ee] hover:text-[var(--text-body)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--blue-soft)]"
+                      >
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                          <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0z" />
+                          <circle cx="12" cy="10" r="3" />
+                        </svg>
+                        {regionDisplay(e)}
+                      </button>
+                    )}
+                    <span className="inline-flex items-center gap-1 rounded-[var(--radius-pill)] bg-[#eef1f5] px-2 py-0.5 font-medium text-[var(--text-muted)]">
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                        <path d="M4 4h16v12H7l-3 3V4z" />
+                      </svg>
+                      {t.events.relatedCount} {e.alertCount}{t.alertList.countUnit}
+                    </span>
+                    <span className="text-[var(--text-subtle)]">{formatEventPeriod(e.firstAlertAt, e.lastAlertAt)}</span>
+                  </div>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        )}
+
+        {/* 페이지네이션 */}
+        {totalPages > 1 && (
+          <div className="flex items-center justify-center gap-2 pt-2">
+            <button
+              onClick={() => setPage((p) => Math.max(0, p - 1))}
+              disabled={page === 0}
+              className="rounded-[var(--radius-control)] border border-[var(--line)] bg-[var(--surface)] px-3 py-1.5 text-sm text-[var(--text-body)] transition-colors hover:bg-[var(--blue-soft)] disabled:opacity-40 disabled:hover:bg-[var(--surface)]"
+            >
+              {t.alertList.prev}
+            </button>
+            <span className="px-3 py-1 text-sm text-[var(--text-muted)]">
+              {page + 1} / {totalPages}
+            </span>
+            <button
+              onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
+              disabled={page >= totalPages - 1}
+              className="rounded-[var(--radius-control)] border border-[var(--line)] bg-[var(--surface)] px-3 py-1.5 text-sm text-[var(--text-body)] transition-colors hover:bg-[var(--blue-soft)] disabled:opacity-40 disabled:hover:bg-[var(--surface)]"
+            >
+              {t.alertList.next}
+            </button>
+          </div>
+        )}
+      </div>
     </main>
   );
 }
