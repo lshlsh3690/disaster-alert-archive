@@ -3,26 +3,26 @@ import { useQuery, keepPreviousData } from "@tanstack/react-query";
 import { fetchLatestAlerts, searchAlerts, fetchAlert, fetchStats, type AlertSearchRequest, fetchLatestAlertsBySido, fetchSigunguStats, searchCombinedAlerts, fetchDashboardSummary, fetchSigungu, fetchDailyStats, fetchHourlyStats, fetchMonthlyTypeStats, fetchDailyTypeStats, fetchWeatherCorrelation, fetchWeatherByType, fetchWeatherByRegion, fetchAlertWeather, fetchWeatherHourlyCorrelation, fetchWeatherHourlyByType, fetchWeatherHourlyByRegion } from "@/api/alertApi";
 import { fetchUserAlert, fetchUserAlerts } from "@/api/userAlertApi";
 
-export function useLatestAlerts(limit = 5) {
+export function useLatestAlerts(limit = 5, lang = "ko") {
   return useQuery({
-    queryKey: ["latest-alerts", limit],
-    queryFn: () => fetchLatestAlerts(limit),
+    queryKey: ["latest-alerts", limit, lang],
+    queryFn: () => fetchLatestAlerts(limit, lang),
     staleTime: 60_000,
   });
 }
 
-export function useSearchAlerts(params: AlertSearchRequest) {
+export function useSearchAlerts(params: AlertSearchRequest, lang = "ko") {
   return useQuery({
-    queryKey: ["alerts", params],
-    queryFn: () => searchAlerts(params),
+    queryKey: ["alerts", params, lang],
+    queryFn: () => searchAlerts(params, lang),
     placeholderData: keepPreviousData,
   });
 }
 
-export function useSearchCombinedAlerts(params: AlertSearchRequest & { source?: "ALL" | "OFFICIAL" | "USER" }) {
+export function useSearchCombinedAlerts(params: AlertSearchRequest & { source?: "ALL" | "OFFICIAL" | "USER" }, lang = "ko") {
   return useQuery({
-    queryKey: ["alerts-combined", params],
-    queryFn: () => searchCombinedAlerts(params),
+    queryKey: ["alerts-combined", params, lang],
+    queryFn: () => searchCombinedAlerts(params, lang),
     placeholderData: keepPreviousData,
   });
 }

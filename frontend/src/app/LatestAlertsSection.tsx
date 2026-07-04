@@ -11,7 +11,7 @@ const LANG_LOCALE: Record<string, string> = { ko: "ko-KR", en: "en-US", zh: "zh-
 export default function LatestAlertsSection({ limit = 5 }: { limit?: number }) {
   const t = useI18n();
   const language = useLanguageStore((state) => state.language);
-  const { data, isLoading, isError } = useLatestAlerts(limit);
+  const { data, isLoading, isError } = useLatestAlerts(limit, language);
 
   function formatKST(iso: string) {
     return new Date(iso).toLocaleString(LANG_LOCALE[language] ?? "ko-KR", {
