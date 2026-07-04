@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { FieldValues, Path, UseFormReturn } from "react-hook-form";
 import InputStatusMessage from "../ui/InputStatusMessage";
 import useSignupStore from "@/store/signupStore";
@@ -17,6 +18,7 @@ export default function PasswordInput<T extends FieldValues>({
   const value = watch(name);
   const isPasswordMatched = useSignupStore((s) => s.isPasswordMatched);
   const error = formState.errors[name];
+  const [showPassword, setShowPassword] = useState(false);
 
   const labels: Record<string, string> = {
     password: "비밀번호",
@@ -32,12 +34,34 @@ export default function PasswordInput<T extends FieldValues>({
 
   return (
     <div className="space-y-2">
-      <input
-        type="password"
-        placeholder={labels[name] ?? "입력"}
-        {...register(name)}
-        className="w-full border rounded px-3 py-2"
-      />
+      <div className="relative">
+        <input
+          type={showPassword ? "text" : "password"}
+          placeholder={labels[name] ?? "입력"}
+          {...register(name)}
+          className="input pr-10"
+        />
+        <button
+          type="button"
+          className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-[var(--text-subtle)] transition-colors hover:text-[var(--text-body)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--blue-soft)]"
+          aria-label={showPassword ? "비밀번호 숨기기" : "비밀번호 표시"}
+          onClick={() => setShowPassword((prev) => !prev)}
+        >
+          {showPassword ? (
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M9.88 9.88a3 3 0 0 0 4.24 4.24" />
+              <path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68" />
+              <path d="M6.61 6.61A13.5 13.5 0 0 0 2 12s3 7 10 7a9.7 9.7 0 0 0 5.39-1.61" />
+              <line x1="2" y1="2" x2="22" y2="22" />
+            </svg>
+          ) : (
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z" />
+              <circle cx="12" cy="12" r="3" />
+            </svg>
+          )}
+        </button>
+      </div>
       {showVerificationUI && (
         <InputStatusMessage
           name={name}

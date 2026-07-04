@@ -25,12 +25,12 @@ export default function InputStatusMessage<T extends FieldValues>({
     <p
       className={`text-sm mt-1 ${
         error || isError
-          ? "text-red-500"
+          ? "text-[var(--coral)]"
           : isValid
-          ? "text-green-600"
+          ? "text-[var(--success)]"
           : isPending
-          ? "text-blue-500"
-          : "text-gray-500"
+          ? "text-[var(--blue)]"
+          : "text-[var(--text-muted)]"
       }`}
     >
       {error?.message?.toString() ?? message}

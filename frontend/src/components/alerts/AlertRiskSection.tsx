@@ -1,7 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useRef, useCallback } from "react";
 import { useAlertRisk, useRegionRisk, useRegionRiskHistory } from "@/lib/queries/useRisk";
 import { fetchGeoJsonCached } from "@/lib/geojsonCache";
 import { normalizeScore, scoreToGrade, aggregateBySigungu, type ImpactGrade } from "@/lib/riskScore";
@@ -23,7 +23,8 @@ const GRADE_BOX = [
   "bg-orange-50 text-orange-700 border-orange-200",
   "bg-red-50 text-red-700 border-red-200",
 ] as const;
-const GRADE_TEXT = ["text-green-700", "text-yellow-700", "text-orange-700", "text-red-700"] as const;
+const GRADE_HEX = ["#22a45d", "#e0a400", "#ea7a3b", "#dc4d3f"] as const;
+const GRADE_SOFT = ["#e8f5ec", "#fbf3dd", "#fdeee3", "#fdeceb"] as const;
 
 /**
  * 지역 코드 → 지역명 (지도와 같은 geojson 캐시 재사용 → 추가 다운로드 없음).
@@ -60,31 +61,134 @@ function useRegionNames(lang: string) {
   return names;
 }
 
-/** 0~1 위험도 시계열 → 인라인 SVG 스파크라인 (recharts 청크 없이 가볍게). */
-function TrendSparkline({ points }: { points: RiskHistoryPoint[] }) {
-  const W = 100, H = 32, PAD = 2;
-  const xy = points.map((p, i) => {
-    const x = points.length === 1 ? W / 2 : PAD + (i / (points.length - 1)) * (W - PAD * 2);
-    const y = H - PAD - p.riskScore * (H - PAD * 2);
-    return [x, y] as const;
-  });
+const SPARK = { W: 100, H: 32, PAD: 2 };
+
+/** 0~1 위험도 시계열 → 인라인 SVG 스파크라인 (호버 시 크로스헤어 + 변화율 툴팁). */
+function TrendSparkline({
+  points,
+  trendLabel,
+  vsStartLabel,
+}: {
+  points: RiskHistoryPoint[];
+  trendLabel: string;
+  vsStartLabel: string;
+}) {
+  const { W, H, PAD } = SPARK;
+  const trendRef = useRef<HTMLDivElement>(null);
+  const [hoverIdx, setHoverIdx] = useState<number | null>(null);
+
+  const xy = useMemo(
+    () =>
+      points.map((p, i) => {
+        const x = points.length === 1 ? W / 2 : PAD + (i / (points.length - 1)) * (W - PAD * 2);
+        const y = H - PAD - p.riskScore * (H - PAD * 2);
+        return [x, y] as const;
+      }),
+    [points]
+  );
   const line = xy.map(([x, y]) => `${x},${y}`).join(" ");
   const last = xy[xy.length - 1];
-  // 끝점 점은 HTML 요소로 분리 — SVG 의 non-uniform stretch(preserveAspectRatio="none")에
-  // 끌려가면 원이 타원으로 찌그러지므로, % 좌표로 올려 진짜 원을 유지한다.
   const dotLeft = (last[0] / W) * 100;
   const dotTop = (last[1] / H) * 100;
+
+  const onMove = useCallback(
+    (e: React.MouseEvent<HTMLDivElement>) => {
+      if (!points.length || !trendRef.current) return;
+      const rect = trendRef.current.getBoundingClientRect();
+      const ratio = Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width));
+      setHoverIdx(Math.round(ratio * (points.length - 1)));
+    },
+    [points]
+  );
+
+  const trendHover = useMemo(() => {
+    const i = hoverIdx;
+    if (i == null || !points[i]) return null;
+    const n = points.length;
+    const pct = Math.round(points[i].riskScore * 100);
+    const firstPct = Math.round(points[0].riskScore * 100);
+    const x = n === 1 ? W / 2 : PAD + (i / (n - 1)) * (W - PAD * 2);
+    const y = H - PAD - points[i].riskScore * (H - PAD * 2);
+    return {
+      pct,
+      fromStart: pct - firstPct,
+      leftPct: (x / W) * 100,
+      topPct: (y / H) * 100,
+    };
+  }, [hoverIdx, points]);
+
+  const trendColor = trendHover
+    ? trendHover.fromStart > 0
+      ? "var(--coral)"
+      : trendHover.fromStart < 0
+      ? "var(--success)"
+      : "var(--text-muted)"
+    : undefined;
+
   return (
-    <div className="relative w-full h-10">
-      <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" className="w-full h-full">
-        <polygon points={`${PAD},${H - PAD} ${line} ${last[0]},${H - PAD}`} fill="#3b82f6" fillOpacity={0.1} />
-        <polyline points={line} fill="none" stroke="#3b82f6" strokeWidth={1.5} vectorEffect="non-scaling-stroke" />
-      </svg>
-      <span
-        className="absolute h-1.5 w-1.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-blue-600"
-        style={{ left: `${dotLeft}%`, top: `${dotTop}%` }}
-      />
-    </div>
+    <>
+      <div className="mb-1 flex items-center justify-between text-xs">
+        <span className="text-[var(--text-muted)]">{trendLabel}</span>
+        {trendHover && (
+          <span className="font-semibold tabular-nums" style={{ color: trendColor }}>
+            {trendHover.pct}% · {vsStartLabel} {trendHover.fromStart > 0 ? "+" : ""}
+            {trendHover.fromStart}%p
+          </span>
+        )}
+      </div>
+      <div
+        ref={trendRef}
+        className="relative h-12 w-full cursor-crosshair"
+        onMouseMove={onMove}
+        onMouseLeave={() => setHoverIdx(null)}
+      >
+        <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" className="h-full w-full">
+          <polygon points={`${PAD},${H - PAD} ${line} ${last[0]},${H - PAD}`} fill="var(--blue)" fillOpacity={0.1} />
+          <polyline points={line} fill="none" stroke="var(--blue)" strokeWidth={1.5} vectorEffect="non-scaling-stroke" />
+          {trendHover && (
+            <line
+              x1={(trendHover.leftPct / 100) * W}
+              y1={0}
+              x2={(trendHover.leftPct / 100) * W}
+              y2={H}
+              stroke="var(--text-subtle)"
+              strokeWidth={1}
+              strokeDasharray="2 2"
+              vectorEffect="non-scaling-stroke"
+            />
+          )}
+        </svg>
+        {!trendHover && (
+          <span
+            className="absolute h-1.5 w-1.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-[var(--blue)]"
+            style={{ left: `${dotLeft}%`, top: `${dotTop}%` }}
+          />
+        )}
+        {trendHover && (
+          <>
+            <span
+              className="absolute h-2 w-2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-[var(--blue)] ring-2 ring-white"
+              style={{ left: `${trendHover.leftPct}%`, top: `${trendHover.topPct}%` }}
+            />
+            <div
+              className="absolute z-10 flex flex-col gap-px whitespace-nowrap rounded-[var(--radius-compact)] border border-[var(--line)] bg-[var(--surface)] px-2.5 py-1 text-[11px] shadow-[0_8px_22px_rgba(28,39,60,0.16)]"
+              style={{
+                left: `${trendHover.leftPct}%`,
+                top: 0,
+                transform: "translate(-50%, calc(-100% - 6px))",
+                pointerEvents: "none",
+              }}
+            >
+              <b className="text-[13px] font-extrabold text-[var(--ink)]">{trendHover.pct}%</b>
+              <span style={{ color: trendColor }}>
+                {vsStartLabel} {trendHover.fromStart > 0 ? "+" : ""}
+                {trendHover.fromStart}%p
+              </span>
+            </div>
+          </>
+        )}
+      </div>
+    </>
   );
 }
 
@@ -137,8 +241,8 @@ export default function AlertRiskSection({ alertId, alertCreatedAt }: Props) {
     : currentPct < 25 ? 0 : currentPct < 50 ? 1 : currentPct < 75 ? 2 : 3;
 
   return (
-    <section className="bg-white rounded-xl shadow p-4 space-y-3">
-      <h2 className="text-lg font-semibold">{t.risk.title}</h2>
+    <section className="space-y-3 rounded-[var(--radius-panel-card)] border border-[var(--line)] bg-[var(--surface)] p-4 shadow-[0_10px_30px_rgba(28,39,60,0.04)]">
+      <h2 className="text-lg font-semibold text-[var(--ink)]">{t.risk.title}</h2>
 
       {/* 로딩 */}
       {isLoading && (
@@ -181,53 +285,68 @@ export default function AlertRiskSection({ alertId, alertCreatedAt }: Props) {
 
           {stats && (
             <div className="space-y-3">
-              {/* 요약 수치 */}
-              <div className="space-y-2">
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-gray-500">{t.risk.disasterType}</span>
-                  <span className="font-semibold">{data.disasterType ?? "-"}</span>
+              {/* 요약 스탯 타일 */}
+              <div className="grid grid-cols-2 gap-2">
+                <div className="rounded-[var(--radius-card)] border border-[var(--line)] bg-[var(--canvas)] px-3 py-2">
+                  <div className="text-[11px] text-[var(--text-muted)]">{t.risk.disasterType}</div>
+                  <div className="mt-0.5 truncate text-sm font-semibold text-[var(--ink)]">
+                    {t.disasterTypes[data.disasterType as keyof typeof t.disasterTypes] ?? data.disasterType ?? "-"}
+                  </div>
                 </div>
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-gray-500">{t.risk.maxRisk}</span>
-                  <span className={`font-semibold ${GRADE_TEXT[stats.issuedGrade]}`}>
+                <div className="rounded-[var(--radius-card)] border border-[var(--line)] bg-[var(--canvas)] px-3 py-2">
+                  <div className="text-[11px] text-[var(--text-muted)]">{t.risk.maxRisk}</div>
+                  <div className="mt-0.5 text-sm font-semibold" style={{ color: GRADE_HEX[stats.issuedGrade] }}>
                     {stats.issuedPct}% · {t.risk.map.grade[stats.issuedGrade]}
-                  </span>
+                  </div>
                 </div>
               </div>
 
-              {/* 최고 위험 지역의 현재(감쇠·확산 반영) 위험도 + 7일 추이 */}
+              {/* 최고 위험 지역의 현재(감쇠·확산 반영) 위험도 게이지 + 추이 */}
               {currentPct !== null && currentGrade !== null && topCode && (
-                <div className="pt-2 border-t">
-                  <h3 className="text-sm font-semibold text-gray-700 mb-2">
-                    {t.risk.currentRisk} · {regionNames?.get(topCode) ?? topCode}
-                  </h3>
-                  <div className={`flex items-center justify-between rounded border px-3 py-2 ${GRADE_BOX[currentGrade]}`}>
-                    <span className="text-xl font-bold">{currentPct}%</span>
-                    <div className="text-right">
-                      <div className="text-xs font-semibold">{t.risk.map.grade[currentGrade]}</div>
-                      {regionRisk?.updatedAt && (
-                        <div className="text-[10px] opacity-70">
-                          {t.risk.updated} {new Date(regionRisk.updatedAt).toLocaleString()}
-                        </div>
-                      )}
-                    </div>
+                <div className="border-t border-[var(--line)] pt-3">
+                  <div className="mb-2 flex items-baseline justify-between gap-2">
+                    <h3 className="truncate text-sm font-semibold text-[var(--text-body)]">
+                      {t.risk.currentRisk} · {regionNames?.get(topCode) ?? topCode}
+                    </h3>
+                    <span
+                      className="shrink-0 rounded-[var(--radius-pill)] px-2 py-0.5 text-[11px] font-semibold"
+                      style={{ backgroundColor: GRADE_SOFT[currentGrade], color: GRADE_HEX[currentGrade] }}
+                    >
+                      {t.risk.map.grade[currentGrade]}
+                    </span>
                   </div>
-                  <div className="mt-2">
-                    <div className="flex justify-between text-xs mb-0.5">
-                      <span className="text-gray-500">{t.risk.trend}</span>
+                  <div className="flex items-end gap-0.5">
+                    <span className="text-3xl font-bold leading-none" style={{ color: GRADE_HEX[currentGrade] }}>
+                      {currentPct}
+                    </span>
+                    <span className="mb-0.5 text-base font-semibold" style={{ color: GRADE_HEX[currentGrade] }}>
+                      %
+                    </span>
+                  </div>
+                  <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-[#eef1f5]">
+                    <div
+                      className="h-full rounded-full transition-[width] duration-300"
+                      style={{ width: `${currentPct}%`, backgroundColor: GRADE_HEX[currentGrade] }}
+                    />
+                  </div>
+                  {regionRisk?.updatedAt && (
+                    <div className="mt-1 text-[10px] text-[var(--text-subtle)]">
+                      {t.risk.updated} {new Date(regionRisk.updatedAt).toLocaleString()}
                     </div>
+                  )}
+                  <div className="mt-2">
                     {riskHistory && riskHistory.length > 0 ? (
-                      <TrendSparkline points={riskHistory} />
+                      <TrendSparkline points={riskHistory} trendLabel={t.risk.trend} vsStartLabel={t.risk.vsStart} />
                     ) : (
-                      <p className="text-xs text-gray-400 text-center py-2">{t.risk.noData}</p>
+                      <p className="py-2 text-center text-xs text-[var(--text-subtle)]">{t.risk.noData}</p>
                     )}
                   </div>
                 </div>
               )}
 
               {/* 영향 지역 목록 (동일 등급이라 순위 없이 나열) */}
-              <div className="pt-2 border-t">
-                <h3 className="text-sm font-semibold text-gray-700 mb-2">
+              <div className="pt-2 border-t border-[var(--line)]">
+                <h3 className="text-sm font-semibold text-[var(--text-body)] mb-2">
                   {t.risk.affectedRegions} · {stats.regionCount}
                 </h3>
                 <div className="flex flex-wrap gap-1.5">

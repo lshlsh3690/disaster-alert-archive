@@ -24,10 +24,10 @@ import { WeatherCorrelationScatter, WeatherOverlayChart, WeatherByTypeChart, Wea
 
 function GranularityToggle({ value, onChange }: { value: "daily" | "hourly"; onChange: (v: "daily" | "hourly") => void }) {
   return (
-    <div className="flex border border-gray-200 rounded overflow-hidden self-start">
+    <div className="flex border border-[var(--line)] rounded overflow-hidden self-start">
       {(["daily", "hourly"] as const).map(g => (
         <button key={g} onClick={() => onChange(g)}
-          className={`px-2 py-0.5 text-[11px] font-medium transition-colors ${value === g ? "bg-blue-600 text-white" : "text-gray-400 hover:bg-gray-50"}`}>
+          className={`px-2 py-0.5 text-[11px] font-medium transition-colors ${value === g ? "bg-[var(--blue)] text-white" : "text-[var(--text-subtle)] hover:bg-[var(--canvas)]"}`}>
           {g === "daily" ? "일별" : "시간별"}
         </button>
       ))}
@@ -210,18 +210,18 @@ export function WidgetCard({ widget, lib, onVariantChange, onRemove, titleOverri
   };
 
   return (
-    <div ref={cardRef} className={`bg-white rounded-xl shadow flex flex-col${highlighted ? " widget-added" : ""}`} style={{ gridColumn: `span ${widget.span}`, minHeight: 240 }}>
-      <div className="flex items-center justify-between px-3.5 py-2.5 border-b border-gray-100">
+    <div ref={cardRef} className={`bg-[var(--surface)] rounded-xl shadow flex flex-col${highlighted ? " widget-added" : ""}`} style={{ gridColumn: `span ${widget.span}`, minHeight: 240 }}>
+      <div className="flex items-center justify-between px-3.5 py-2.5 border-b border-[var(--line)]">
         <div className="flex items-center gap-1.5">
           {dragHandleListeners && (
             <span {...dragHandleListeners}
-              className="cursor-grab active:cursor-grabbing text-gray-300 hover:text-gray-400 select-none px-0.5"
+              className="cursor-grab active:cursor-grabbing text-gray-300 hover:text-[var(--text-subtle)] select-none px-0.5"
               title="드래그하여 순서 변경">
               ⠿
             </span>
           )}
           <span className="text-sm">{lib.icon}</span>
-          <h3 className="text-sm font-bold text-gray-800">{titleOverride ?? lib.title}</h3>
+          <h3 className="text-sm font-bold text-[var(--ink)]">{titleOverride ?? lib.title}</h3>
           {lib.sample && (
             <span className="text-xs font-semibold text-amber-600 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded">샘플</span>
           )}
@@ -229,7 +229,7 @@ export function WidgetCard({ widget, lib, onVariantChange, onRemove, titleOverri
             <button
               onMouseEnter={() => setHelpOpen(true)}
               onMouseLeave={() => setHelpOpen(false)}
-              className="w-4 h-4 rounded-full border border-gray-300 text-gray-400 text-[10px] font-bold leading-none flex items-center justify-center hover:border-blue-400 hover:text-blue-500 transition-colors"
+              className="w-4 h-4 rounded-full border border-[var(--line)] text-[var(--text-subtle)] text-[10px] font-bold leading-none flex items-center justify-center hover:border-[var(--blue)] hover:text-blue-500 transition-colors"
             >
               ?
             </button>
@@ -245,10 +245,10 @@ export function WidgetCard({ widget, lib, onVariantChange, onRemove, titleOverri
             // 현재 선택된 변형 키 (없으면 라이브러리 첫 번째 변형)
             const cur = widget.variant ?? lib.variants![0].key;
             return (
-              <div className="flex border border-gray-200 rounded overflow-hidden">
+              <div className="flex border border-[var(--line)] rounded overflow-hidden">
                 {lib.variants!.map(v => (
                   <button key={v.key} onClick={() => onVariantChange(widget.id, v.key)}
-                    className={`px-1.5 py-0.5 text-[11px] font-medium transition-colors ${cur === v.key ? "bg-blue-600 text-white" : "text-gray-400 hover:bg-gray-50"}`}>
+                    className={`px-1.5 py-0.5 text-[11px] font-medium transition-colors ${cur === v.key ? "bg-[var(--blue)] text-white" : "text-[var(--text-subtle)] hover:bg-[var(--canvas)]"}`}>
                     {v.label}
                   </button>
                 ))}
@@ -256,7 +256,7 @@ export function WidgetCard({ widget, lib, onVariantChange, onRemove, titleOverri
             );
           })()}
           <button onClick={handleDownloadPng} title="PNG 다운로드"
-            className="px-1.5 py-0.5 text-xs border border-gray-200 text-gray-400 rounded hover:border-green-400 hover:text-green-600 transition-colors">
+            className="px-1.5 py-0.5 text-xs border border-[var(--line)] text-[var(--text-subtle)] rounded hover:border-green-400 hover:text-green-600 transition-colors">
             ⬇
           </button>
           <button onClick={() => onRemove(widget.id)} title="위젯 삭제"

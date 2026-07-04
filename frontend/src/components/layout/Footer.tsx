@@ -5,7 +5,7 @@ import { useI18n } from "@/hooks/useI18n";
 export default function Footer() {
   const t = useI18n();
   return (
-    <footer className="bg-gray-100 p-4 text-center text-sm">
+    <footer className="bg-[var(--surface)] border-t border-[var(--line)] px-4 py-5 text-center text-[13px] leading-relaxed text-[var(--text-muted)]">
       {t.footer}
     </footer>
   );

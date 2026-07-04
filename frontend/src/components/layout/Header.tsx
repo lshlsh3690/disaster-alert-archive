@@ -42,6 +42,13 @@ export default function Header() {
     { name: t.nav.community, href: "/community" },
   ];
 
+  const isActive = (href: string) => {
+    const matches = (h: string) => pathname === h || pathname.startsWith(h + "/");
+    if (!matches(href)) return false;
+    const hasMoreSpecific = menu.some((m) => m.href.length > href.length && matches(m.href));
+    return !hasMoreSpecific;
+  };
+
   const handleLangChange = (lang: LangCode) => {
     setLanguage(lang);
     // 로그인 상태면 추후 DB 저장 API 호출 추가
@@ -73,77 +80,88 @@ export default function Header() {
   }, []);
 
   return (
-    <header className="bg-white shadow px-4 sm:px-6 py-3">
+    <header className="bg-[var(--surface)] border-b border-[var(--line)] px-4 sm:px-6 py-3">
       <div className="flex items-center justify-between">
-        <Link href="/" className="text-xl font-bold text-blue-500">
-          {t.appName}
-        </Link>
+        {/* 왼쪽: 로고 + 언어 선택 */}
+        <div className="flex items-center gap-3">
+          <Link href="/" className="flex items-center gap-2">
+            <span className="text-xl font-bold text-[var(--blue)] tracking-tight">{t.appName}</span>
+          </Link>
+          <select
+            value={language}
+            onChange={(e) => handleLangChange(e.target.value as LangCode)}
+            className="text-sm border border-[var(--line)] rounded-[var(--radius-control)] px-2 py-1.5 text-[var(--text-body)] bg-[var(--surface)] cursor-pointer hover:border-[var(--blue)] focus:outline-none focus:border-[var(--blue)] focus:ring-2 focus:ring-[var(--blue-soft)]"
+          >
+            {LANGUAGES.map(({ code, label }) => (
+              <option key={code} value={code}>{label}</option>
+            ))}
+          </select>
+        </div>
 
         {/* 데스크톱 네비게이션 */}
-        <nav className="hidden md:flex items-center gap-4 text-sm text-gray-700">
+        <nav className="hidden md:flex items-center gap-1 text-sm">
           {menu.map(({ name, href }) => (
             <Link
               key={href}
               href={href}
-              className={`hover:text-blue-600 ${pathname.startsWith(href) ? "font-bold text-blue-600" : ""}`}
+              className={`px-3 py-2 rounded-[var(--radius-control)] transition-colors hover:text-[var(--blue)] hover:bg-[var(--blue-soft)] ${
+                isActive(href) ? "font-semibold text-[var(--blue)] bg-[var(--blue-soft)]" : "text-[var(--text-body)]"
+              }`}
             >
               {name}
             </Link>
           ))}
-          <div className="flex items-center gap-1">
-            <span className="text-sm text-gray-500">{t.dashboard.langLabel}:</span>
-            <select
-              value={language}
-              onChange={(e) => handleLangChange(e.target.value as LangCode)}
-              className="text-sm border border-gray-300 rounded px-2 py-1 text-gray-700 bg-white cursor-pointer hover:border-blue-400 focus:outline-none focus:border-blue-500"
-            >
-              {LANGUAGES.map(({ code, label }) => (
-                <option key={code} value={code}>{label}</option>
-              ))}
-            </select>
-          </div>
+
+          <span className="mx-1 h-5 w-px bg-[var(--line)]" aria-hidden="true"></span>
+
           {isLoggedIn ? (
-            <div className="flex items-center gap-3">
-              <Link href="/user/settings/regions" className="text-sm text-gray-600 hover:text-blue-600 hover:underline">
+            <>
+              <Link
+                href="/user/settings/regions"
+                className="px-3 py-2 rounded-[var(--radius-control)] text-[var(--text-muted)] transition-colors hover:text-[var(--blue)] hover:bg-[var(--blue-soft)]"
+              >
                 {t.nav.favoriteRegions}
               </Link>
               <div className="relative" ref={dropdownRef}>
-              <button
-                onClick={() => setOpen((prev) => !prev)}
-                className="text-sm font-medium text-blue-600 hover:underline"
-              >
-                {nickname ?? t.nav.user} ▾
-              </button>
-              {open && (
-                <div className="absolute right-0 mt-2 w-40 bg-white border rounded shadow text-sm z-50">
-                  <Link href="/notifications" className="block px-4 py-2 hover:bg-gray-50" onClick={() => setOpen(false)}>
-                    알림 이력
-                  </Link>
-                  <Link href="/user/settings" className="block px-4 py-2 hover:bg-gray-50" onClick={() => setOpen(false)}>
-                    {t.nav.settings}
-                  </Link>
-                  <button onClick={handleLogout} className="w-full text-left px-4 py-2 hover:bg-gray-50 text-red-500">
-                    {t.nav.logout}
-                  </button>
-                </div>
-              )}
+                <button
+                  onClick={() => setOpen((prev) => !prev)}
+                  className="px-3 py-2 rounded-[var(--radius-control)] font-medium text-[var(--blue)] transition-colors hover:bg-[var(--blue-soft)]"
+                >
+                  {nickname ?? t.nav.user} ▾
+                </button>
+                {open && (
+                  <div className="absolute right-0 mt-2 w-44 bg-[var(--surface)] border border-[var(--line)] rounded-[var(--radius-compact)] shadow-[0_10px_30px_rgba(28,39,60,0.08)] text-sm z-50 overflow-hidden">
+                    <Link href="/notifications" className="block px-4 py-2.5 text-[var(--text-body)] hover:bg-[var(--blue-soft)] hover:text-[var(--blue)]" onClick={() => setOpen(false)}>
+                      알림 이력
+                    </Link>
+                    <Link href="/user/settings" className="block px-4 py-2.5 text-[var(--text-body)] hover:bg-[var(--blue-soft)] hover:text-[var(--blue)]" onClick={() => setOpen(false)}>
+                      {t.nav.settings}
+                    </Link>
+                    <button onClick={handleLogout} className="w-full text-left px-4 py-2.5 text-[var(--coral)] hover:bg-[var(--coral-soft)]">
+                      {t.nav.logout}
+                    </button>
+                  </div>
+                )}
               </div>
-            </div>
+            </>
           ) : (
-            <div className="flex items-center gap-3">
-              <Link href="/user/settings/regions" className="text-sm text-gray-600 hover:text-blue-600 hover:underline">
+            <>
+              <Link
+                href="/user/settings/regions"
+                className="px-3 py-2 rounded-[var(--radius-control)] text-[var(--text-muted)] transition-colors hover:text-[var(--blue)] hover:bg-[var(--blue-soft)]"
+              >
                 {t.nav.favoriteRegions}
               </Link>
-              <Link href="/login" className="text-blue-600 hover:underline font-medium">
+              <Link href="/login" className="px-3 py-2 rounded-[var(--radius-control)] font-medium text-[var(--blue)] transition-colors hover:bg-[var(--blue-soft)]">
                 {t.nav.login}
               </Link>
-            </div>
+            </>
           )}
         </nav>
 
         {/* 모바일 햄버거 버튼 */}
         <button
-          className="md:hidden p-2 rounded text-gray-600 hover:bg-gray-100"
+          className="md:hidden p-2 rounded-[var(--radius-control)] text-[var(--text-muted)] hover:bg-[var(--blue-soft)] hover:text-[var(--blue)]"
           onClick={() => setMobileMenuOpen((prev) => !prev)}
           aria-label="메뉴 열기"
         >
@@ -161,23 +179,25 @@ export default function Header() {
 
       {/* 모바일 드롭다운 메뉴 */}
       {mobileMenuOpen && (
-        <nav className="md:hidden mt-3 pb-2 border-t pt-3 space-y-1 text-sm text-gray-700">
+        <nav className="md:hidden mt-3 pb-2 border-t border-[var(--line)] pt-3 space-y-1 text-sm">
           {menu.map(({ name, href }) => (
             <Link
               key={href}
               href={href}
-              className={`block px-2 py-2 rounded hover:bg-gray-50 hover:text-blue-600 ${pathname.startsWith(href) ? "font-bold text-blue-600" : ""}`}
+              className={`block px-3 py-2.5 rounded-[var(--radius-control)] hover:bg-[var(--blue-soft)] hover:text-[var(--blue)] ${
+                isActive(href) ? "font-semibold text-[var(--blue)] bg-[var(--blue-soft)]" : "text-[var(--text-body)]"
+              }`}
               onClick={() => setMobileMenuOpen(false)}
             >
               {name}
             </Link>
           ))}
-          <div className="flex items-center gap-2 px-2 py-2">
-            <span className="text-gray-500">{t.dashboard.langLabel}:</span>
+          <div className="flex items-center gap-2 px-3 py-2.5">
+            <span className="text-[var(--text-muted)]">{t.dashboard.langLabel}:</span>
             <select
               value={language}
               onChange={(e) => handleLangChange(e.target.value as LangCode)}
-              className="text-sm border border-gray-300 rounded px-2 py-1 text-gray-700 bg-white"
+              className="text-sm border border-[var(--line)] rounded-[var(--radius-control)] px-2 py-1 text-[var(--text-body)] bg-[var(--surface)]"
             >
               {LANGUAGES.map(({ code, label }) => (
                 <option key={code} value={code}>{label}</option>
@@ -186,28 +206,28 @@ export default function Header() {
           </div>
           {isLoggedIn ? (
             <>
-              <Link href="/notifications" className="block px-2 py-2 rounded hover:bg-gray-50" onClick={() => setMobileMenuOpen(false)}>
+              <Link href="/notifications" className="block px-3 py-2.5 rounded-[var(--radius-control)] text-[var(--text-body)] hover:bg-[var(--blue-soft)] hover:text-[var(--blue)]" onClick={() => setMobileMenuOpen(false)}>
                 알림 이력
               </Link>
-              <Link href="/user/settings/regions" className="block px-2 py-2 rounded hover:bg-gray-50" onClick={() => setMobileMenuOpen(false)}>
+              <Link href="/user/settings/regions" className="block px-3 py-2.5 rounded-[var(--radius-control)] text-[var(--text-body)] hover:bg-[var(--blue-soft)] hover:text-[var(--blue)]" onClick={() => setMobileMenuOpen(false)}>
                 {t.nav.favoriteRegions}
               </Link>
-              <Link href="/user/settings" className="block px-2 py-2 rounded hover:bg-gray-50" onClick={() => setMobileMenuOpen(false)}>
+              <Link href="/user/settings" className="block px-3 py-2.5 rounded-[var(--radius-control)] text-[var(--text-body)] hover:bg-[var(--blue-soft)] hover:text-[var(--blue)]" onClick={() => setMobileMenuOpen(false)}>
                 {t.nav.settings}
               </Link>
               <button
                 onClick={() => { handleLogout(); setMobileMenuOpen(false); }}
-                className="block w-full text-left px-2 py-2 rounded hover:bg-gray-50 text-red-500"
+                className="block w-full text-left px-3 py-2.5 rounded-[var(--radius-control)] text-[var(--coral)] hover:bg-[var(--coral-soft)]"
               >
                 {t.nav.logout}
               </button>
             </>
           ) : (
             <>
-              <Link href="/user/settings/regions" className="block px-2 py-2 rounded hover:bg-gray-50" onClick={() => setMobileMenuOpen(false)}>
+              <Link href="/user/settings/regions" className="block px-3 py-2.5 rounded-[var(--radius-control)] text-[var(--text-body)] hover:bg-[var(--blue-soft)] hover:text-[var(--blue)]" onClick={() => setMobileMenuOpen(false)}>
                 {t.nav.favoriteRegions}
               </Link>
-              <Link href="/login" className="block px-2 py-2 rounded hover:bg-gray-50 text-blue-600 font-medium" onClick={() => setMobileMenuOpen(false)}>
+              <Link href="/login" className="block px-3 py-2.5 rounded-[var(--radius-control)] text-[var(--blue)] font-medium hover:bg-[var(--blue-soft)]" onClick={() => setMobileMenuOpen(false)}>
                 {t.nav.login}
               </Link>
             </>

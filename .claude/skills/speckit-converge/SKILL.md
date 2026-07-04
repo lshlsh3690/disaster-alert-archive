@@ -10,6 +10,11 @@ disable-model-invocation: false
 ---
 
 
+## 출력 언어
+
+tasks.md에 추가하는 후속 작업 항목과 요약은 한글로 작성한다. 코드 식별자, 파일 경로,
+기술 용어는 원문(영문) 그대로 둔다.
+
 ## User Input
 
 ```text

@@ -3,6 +3,29 @@
 :root {
   --background: #ffffff;
   --foreground: #171717;
+
+  /* Design System tokens (Vue 레퍼런스 이식, see src/styles/globals.css of the Vue project) */
+  --ink: #172033;
+  --text-body: #354053;
+  --text-muted: #687386;
+  --text-subtle: #838d9f;
+  --canvas: #eef2f7;
+  --panel: rgba(248, 249, 251, 0.94);
+  --surface: #ffffff;
+  --line: #e7eaf0;
+  --blue: #3867e8;
+  --blue-soft: #edf2ff;
+  --coral: #ef7668;
+  --coral-soft: #fff0ed;
+  --success: #31a866;
+  --success-soft: #eaf7ef;
+
+  --radius-control: 9px;
+  --radius-compact: 11px;
+  --radius-card: 16px;
+  --radius-panel-card: 18px;
+  --radius-floating-panel: 24px;
+  --radius-pill: 999px;
 }
 
 @theme inline {
@@ -15,6 +38,26 @@
 html {
   /* OS 기반 다크모드 영향 제거: 전역 라이트 고정 */
   color-scheme: light;
+}
+
+@layer components {
+  .input {
+    width: 100%;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-control);
+    background: var(--surface);
+    padding: 0.5rem 0.75rem;
+    font-size: 15px;
+    color: var(--text-body);
+  }
+  .input::placeholder {
+    color: var(--text-subtle);
+  }
+  .input:focus {
+    outline: none;
+    border-color: var(--blue);
+    box-shadow: 0 0 0 2px var(--blue-soft);
+  }
 }
 
 

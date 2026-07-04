@@ -11,6 +11,11 @@ disable-model-invocation: false
 ---
 
 
+## 출력 언어
+
+`.specify/memory/constitution.md`와 Sync Impact Report는 한글로 작성한다. 코드 식별자,
+파일 경로, 기술 용어는 원문(영문) 그대로 둔다.
+
 ## User Input
 
 ```text

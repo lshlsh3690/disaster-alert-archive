@@ -14,40 +14,52 @@ import Link from "next/link";
 
 // ─── KPI 카드 ─────────────────────────────────────────────────────────────────
 
+const VARIANT_STYLE = {
+  coral: { border: "var(--coral)", iconBg: "var(--coral-soft)", iconColor: "var(--coral)" },
+  blue: { border: "var(--blue)", iconBg: "var(--blue-soft)", iconColor: "var(--blue)" },
+  purple: { border: "#8069d9", iconBg: "#f1effb", iconColor: "#6d57c6" },
+  green: { border: "var(--success)", iconBg: "var(--success-soft)", iconColor: "var(--success)" },
+} as const;
+
 /**
  * KpiBox
  *
  * 아이콘 + 레이블 + 큰 숫자 + 부가 설명으로 구성된 단순 정보 카드입니다.
  * 총 발생 건수, 일 평균, 최다 유형, 최다 지역을 각각 하나씩 표시합니다.
  *
- * @param icon  - 이모지 아이콘 (예: "📨")
- * @param label - 카드 제목 (예: "총 발생 건수")
- * @param value - 강조 표시할 주요 값 (예: "1,234건")
- * @param sub   - 보조 설명 텍스트 (예: "최근 30일 기준")
+ * @param icon    - 이모지 아이콘 (예: "📨")
+ * @param label   - 카드 제목 (예: "총 발생 건수")
+ * @param value   - 강조 표시할 주요 값 (예: "1,234건")
+ * @param sub     - 보조 설명 텍스트 (예: "최근 30일 기준")
+ * @param variant - 카드 색상 계열 (coral/blue/purple/green)
  */
 export function KpiBox({
   icon,
   label,
   value,
   sub,
+  variant = "blue",
 }: {
   icon: string;
   label: string;
   value: string;
   sub: string;
+  variant?: keyof typeof VARIANT_STYLE;
 }) {
+  const v = VARIANT_STYLE[variant];
   return (
-    <div className="bg-white rounded-xl shadow p-4">
-      <div className="flex items-center gap-2 mb-1.5">
-        <span className="text-lg">{icon}</span>
-        <span className="text-xs text-gray-500 font-medium">{label}</span>
+    <article className="stats-kpi" style={{ borderTop: `3px solid ${v.border}` }}>
+      <div className="flex items-start gap-3">
+        <span className="stats-kpi-icon" style={{ background: v.iconBg, color: v.iconColor }}>
+          {icon}
+        </span>
+        <div className="min-w-0">
+          <p className="stats-kpi-label">{label}</p>
+          <p className="stats-kpi-value truncate">{value}</p>
+          <p className="stats-kpi-meta">{sub}</p>
+        </div>
       </div>
-      {/* tracking-tight: 글자 간격을 좁혀 숫자가 더 선명하게 보입니다 */}
-      <div className="text-2xl font-bold text-gray-900 tracking-tight leading-tight">
-        {value}
-      </div>
-      <div className="text-xs text-gray-400 mt-1">{sub}</div>
-    </div>
+    </article>
   );
 }
 
@@ -119,14 +131,14 @@ export function FilterBanner({
   // 필터가 없으면 전체 데이터 안내
   if (tags.length === 0) {
     return (
-      <div className="bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm text-gray-500">
+      <div className="bg-[var(--canvas)] border border-[var(--line)] rounded-[var(--radius-card)] px-4 py-3 text-sm text-[var(--text-muted)]">
         전체 데이터를 보여주고 있어요.{" "}
         {onFilterOpen ? (
-          <button onClick={onFilterOpen} className="text-blue-600 font-semibold hover:underline">
+          <button onClick={onFilterOpen} className="text-[var(--blue)] font-semibold hover:underline">
             필터 설정 →
           </button>
         ) : (
-          <Link href="/alerts" className="text-blue-600 font-semibold hover:underline">
+          <Link href="/alerts" className="text-[var(--blue)] font-semibold hover:underline">
             재난문자 페이지에서 필터링 →
           </Link>
         )}
@@ -135,9 +147,9 @@ export function FilterBanner({
   }
 
   return (
-    <div className="bg-white border-l-4 border-blue-500 rounded-xl shadow px-4 py-2.5 flex items-center gap-2 flex-wrap">
+    <div className="bg-[var(--surface)] border-l-4 border-[var(--blue)] rounded-[var(--radius-card)] shadow-[0_10px_30px_rgba(28,39,60,0.04)] px-4 py-2.5 flex items-center gap-2 flex-wrap">
       {/* 필터 적용 중 레이블 */}
-      <span className="text-xs font-bold text-gray-800">
+      <span className="text-xs font-bold text-[var(--ink)]">
         {/* 인라인 SVG 깔때기 아이콘 */}
         <svg className="inline mr-1" style={{ verticalAlign: "-2px" }}
           width="13" height="13" viewBox="0 0 14 14" fill="none">
@@ -149,8 +161,7 @@ export function FilterBanner({
 
       {/* 필터 태그들 */}
       {tags.map((t, i) => (
-        <span key={i}
-          className="px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 text-xs font-semibold">
+        <span key={i} className="stats-chip">
           {t.label}
         </span>
       ))}
@@ -159,11 +170,11 @@ export function FilterBanner({
       <span className="flex-1" />
 
       {onFilterOpen ? (
-        <button onClick={onFilterOpen} className="text-xs text-blue-600 font-semibold hover:underline">
+        <button onClick={onFilterOpen} className="text-xs text-[var(--blue)] font-semibold hover:underline">
           ✎ 필터 변경
         </button>
       ) : (
-        <Link href={alertsHref} className="text-xs text-blue-600 font-semibold hover:underline">
+        <Link href={alertsHref} className="text-xs text-[var(--blue)] font-semibold hover:underline">
           ↗ 필터 변경
         </Link>
       )}

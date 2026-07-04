@@ -60,6 +60,7 @@ import { WIDGET_LIBRARY, DEFAULT_LAYOUT } from "./_constants";
 import { WidgetCard, WidgetContent } from "./_WidgetCard";
 import { WidgetLibrary } from "./_WidgetLibrary";
 import { KpiBox, FilterBanner } from "./_KpiCards";
+import "./stats.css";
 
 // ─── CSV 다운로드 ─────────────────────────────────────────────────────────────
 
@@ -590,20 +591,20 @@ function StatsPageInner() {
       <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h1 className="text-xl font-semibold">재난 통계</h1>
-          <p className="text-sm text-gray-500">재난문자 페이지에서 필터링한 데이터를 다양한 차트로 분석합니다.</p>
+          <p className="text-sm text-[var(--text-muted)]">재난문자 페이지에서 필터링한 데이터를 다양한 차트로 분석합니다.</p>
         </div>
         <div className="flex gap-2 shrink-0 items-center flex-wrap justify-end">
           {/* 필터 토글 버튼 */}
           <button onClick={openFilter}
-            className={`px-3 py-2 text-sm font-semibold rounded-lg border transition-colors flex items-center gap-1 ${hasActiveFilter ? "border-blue-400 bg-blue-50 text-blue-700" : "border-gray-200 bg-white text-gray-700 hover:border-blue-300 hover:text-blue-600"}`}>
+            className={`px-3 py-2 text-sm font-semibold rounded-lg border transition-colors flex items-center gap-1 ${hasActiveFilter ? "border-[var(--blue)] bg-[var(--blue-soft)] text-[var(--blue)]" : "border-[var(--line)] bg-[var(--surface)] text-[var(--text-body)] hover:border-blue-300 hover:text-[var(--blue)]"}`}>
             🔍 필터{hasActiveFilter ? " ●" : ""}
           </button>
           {/* 프리셋 탭 */}
-          <div className="flex border border-gray-200 rounded-lg overflow-hidden">
+          <div className="flex border border-[var(--line)] rounded-lg overflow-hidden">
             {([1, 2, 3] as const).map(p => (
               <div key={p}
                 className={`flex items-center gap-1.5 px-3 py-2 text-sm font-semibold transition-colors cursor-pointer
-                  ${activePreset === p ? "bg-blue-600 text-white" : "text-gray-500 hover:bg-gray-50"}`}
+                  ${activePreset === p ? "bg-[var(--blue)] text-white" : "text-[var(--text-muted)] hover:bg-[var(--canvas)]"}`}
                 onClick={() => switchPreset(p)}>
                 {editingPreset === p ? (
                   <input
@@ -647,11 +648,11 @@ function StatsPageInner() {
               weatherStats, weatherTypeStats, weatherRegionStats,
               weatherHourlyStats, weatherHourlyTypeStats, weatherHourlyRegionStats, isShortPeriod });
             downloadCsv(`재난통계_${new Date().toISOString().slice(0, 10)}.csv`, csv);
-          }} className="px-3 py-2 text-sm font-semibold rounded-lg border border-gray-200 bg-white text-gray-700 hover:border-green-400 hover:text-green-600 transition-colors flex items-center gap-1">
+          }} className="px-3 py-2 text-sm font-semibold rounded-lg border border-[var(--line)] bg-[var(--surface)] text-[var(--text-body)] hover:border-green-400 hover:text-green-600 transition-colors flex items-center gap-1">
             ⬇ CSV
           </button>
           <button onClick={() => setDrawerOpen(true)}
-            className="px-3 py-2 text-sm font-semibold rounded-lg bg-blue-600 text-white flex items-center gap-1">
+            className="px-3 py-2 text-sm font-semibold rounded-lg bg-[var(--blue)] text-white flex items-center gap-1">
             <span className="text-base leading-none">+</span> 위젯
           </button>
         </div>
@@ -659,23 +660,23 @@ function StatsPageInner() {
 
       {/* 접히는 필터 패널 */}
       {filterOpen && (
-        <div className="bg-white border border-gray-200 rounded-xl shadow-sm px-4 py-4 space-y-3">
+        <div className="bg-[var(--surface)] border border-[var(--line)] rounded-xl shadow-sm px-4 py-4 space-y-3">
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
             {/* 시·도 */}
             <div className="flex flex-col gap-1">
-              <label className="text-xs font-semibold text-gray-500">시·도</label>
+              <label className="text-xs font-semibold text-[var(--text-muted)]">시·도</label>
               <select value={localFilter.sido} onChange={e => setLocalSido(e.target.value)}
-                className="border border-gray-200 rounded-lg px-2 py-1.5 text-sm text-gray-800 focus:outline-none focus:border-blue-400">
+                className="border border-[var(--line)] rounded-lg px-2 py-1.5 text-sm text-[var(--ink)] focus:outline-none focus:border-[var(--blue)]">
                 <option value="">전체</option>
                 {METROS.map(m => <option key={m} value={m}>{m}</option>)}
               </select>
             </div>
             {/* 시·군·구 */}
             <div className="flex flex-col gap-1">
-              <label className="text-xs font-semibold text-gray-500">시·군·구</label>
+              <label className="text-xs font-semibold text-[var(--text-muted)]">시·군·구</label>
               <select value={localFilter.sigungu} onChange={e => setLocalFilter(f => ({ ...f, sigungu: e.target.value }))}
                 disabled={!localFilter.sido}
-                className="border border-gray-200 rounded-lg px-2 py-1.5 text-sm text-gray-800 focus:outline-none focus:border-blue-400 disabled:bg-gray-50 disabled:text-gray-400">
+                className="border border-[var(--line)] rounded-lg px-2 py-1.5 text-sm text-[var(--ink)] focus:outline-none focus:border-[var(--blue)] disabled:bg-[var(--canvas)] disabled:text-[var(--text-subtle)]">
                 <option value="">전체</option>
                 {sigunguList?.filter(s => s.name !== "전체").map(s => (
                   <option key={s.code} value={s.name}>{s.name}</option>
@@ -684,18 +685,18 @@ function StatsPageInner() {
             </div>
             {/* 재난 유형 */}
             <div className="flex flex-col gap-1">
-              <label className="text-xs font-semibold text-gray-500">재난 유형</label>
+              <label className="text-xs font-semibold text-[var(--text-muted)]">재난 유형</label>
               <select value={localFilter.type} onChange={e => setLocalFilter(f => ({ ...f, type: e.target.value }))}
-                className="border border-gray-200 rounded-lg px-2 py-1.5 text-sm text-gray-800 focus:outline-none focus:border-blue-400">
+                className="border border-[var(--line)] rounded-lg px-2 py-1.5 text-sm text-[var(--ink)] focus:outline-none focus:border-[var(--blue)]">
                 <option value="">전체</option>
                 {DISASTER_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
               </select>
             </div>
             {/* 경보 단계 */}
             <div className="flex flex-col gap-1">
-              <label className="text-xs font-semibold text-gray-500">경보 단계</label>
+              <label className="text-xs font-semibold text-[var(--text-muted)]">경보 단계</label>
               <select value={localFilter.levelText} onChange={e => setLocalFilter(f => ({ ...f, levelText: e.target.value }))}
-                className="border border-gray-200 rounded-lg px-2 py-1.5 text-sm text-gray-800 focus:outline-none focus:border-blue-400">
+                className="border border-[var(--line)] rounded-lg px-2 py-1.5 text-sm text-[var(--ink)] focus:outline-none focus:border-[var(--blue)]">
                 <option value="">전체</option>
                 <option value="안전안내문자">안전안내</option>
                 <option value="긴급재난문자">긴급재난</option>
@@ -706,22 +707,22 @@ function StatsPageInner() {
 
           {/* 기간 선택 */}
           <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-semibold text-gray-500">기간</label>
+            <label className="text-xs font-semibold text-[var(--text-muted)]">기간</label>
             <div className="flex flex-wrap items-center gap-2">
               <input type="date" value={localFilter.startDate} onChange={e => setLocalFilter(f => ({ ...f, startDate: e.target.value }))}
-                className="border border-gray-200 rounded-lg px-2 py-1.5 text-sm text-gray-800 focus:outline-none focus:border-blue-400" />
-              <span className="text-gray-400 text-sm">~</span>
+                className="border border-[var(--line)] rounded-lg px-2 py-1.5 text-sm text-[var(--ink)] focus:outline-none focus:border-[var(--blue)]" />
+              <span className="text-[var(--text-subtle)] text-sm">~</span>
               <input type="date" value={localFilter.endDate} onChange={e => setLocalFilter(f => ({ ...f, endDate: e.target.value }))}
-                className="border border-gray-200 rounded-lg px-2 py-1.5 text-sm text-gray-800 focus:outline-none focus:border-blue-400" />
+                className="border border-[var(--line)] rounded-lg px-2 py-1.5 text-sm text-[var(--ink)] focus:outline-none focus:border-[var(--blue)]" />
               <div className="flex gap-1">
                 {([7, 30, 90] as const).map(d => (
                   <button key={d} onClick={() => setQuickDate(d)}
-                    className="px-2.5 py-1.5 text-xs font-semibold border border-gray-200 rounded-lg text-gray-600 hover:border-blue-400 hover:text-blue-600 transition-colors">
+                    className="px-2.5 py-1.5 text-xs font-semibold border border-[var(--line)] rounded-lg text-[var(--text-body)] hover:border-[var(--blue)] hover:text-[var(--blue)] transition-colors">
                     {d}일
                   </button>
                 ))}
                 <button onClick={() => setQuickDate("year")}
-                  className="px-2.5 py-1.5 text-xs font-semibold border border-gray-200 rounded-lg text-gray-600 hover:border-blue-400 hover:text-blue-600 transition-colors">
+                  className="px-2.5 py-1.5 text-xs font-semibold border border-[var(--line)] rounded-lg text-[var(--text-body)] hover:border-[var(--blue)] hover:text-[var(--blue)] transition-colors">
                   올해
                 </button>
               </div>
@@ -731,17 +732,17 @@ function StatsPageInner() {
           {/* 액션 버튼 */}
           <div className="flex justify-end gap-2 pt-1">
             <button onClick={() => setFilterOpen(false)}
-              className="px-4 py-1.5 text-sm font-semibold border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50 transition-colors">
+              className="px-4 py-1.5 text-sm font-semibold border border-[var(--line)] rounded-lg text-[var(--text-body)] hover:bg-[var(--canvas)] transition-colors">
               취소
             </button>
             <button onClick={() => {
               setLocalFilter({ sido: "", sigungu: "", startDate: "", endDate: "", type: "", levelText: "" });
             }}
-              className="px-4 py-1.5 text-sm font-semibold border border-gray-200 rounded-lg text-gray-500 hover:bg-gray-50 transition-colors">
+              className="px-4 py-1.5 text-sm font-semibold border border-[var(--line)] rounded-lg text-[var(--text-muted)] hover:bg-[var(--canvas)] transition-colors">
               초기화
             </button>
             <button onClick={applyFilter}
-              className="px-4 py-1.5 text-sm font-semibold rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-colors">
+              className="px-4 py-1.5 text-sm font-semibold rounded-lg bg-[var(--blue)] text-white hover:brightness-95 transition-colors">
               적용
             </button>
           </div>
@@ -753,32 +754,32 @@ function StatsPageInner() {
         type={type} levelText={levelText} keyword={keyword} source={source} onFilterOpen={openFilter} />
 
       {/* KPI */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <KpiBox icon="📨" label="총 발생 건수"  value={`${totalCount.toLocaleString("ko-KR")}건`} sub="필터 적용 결과" />
-        <KpiBox icon="📅" label="일 평균"        value={`${dailyAvg}건`}
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <KpiBox variant="coral" icon="📨" label="총 발생 건수" value={`${totalCount.toLocaleString("ko-KR")}건`} sub="필터 적용 결과" />
+        <KpiBox variant="blue" icon="📅" label="일 평균" value={`${dailyAvg}건`}
           sub={startDate && endDate ? `${periodDays}일 기준` : "최근 30일 기준"} />
-        <KpiBox icon="🌧" label="최다 유형"       value={topType?.type ?? "-"}
+        <KpiBox variant="purple" icon="🌧" label="최다 유형" value={topType?.type ?? "-"}
           sub={topType ? `${topType.count.toLocaleString("ko-KR")}건 · ${Math.round((topType.count / (totalCount || 1)) * 100)}%` : "-"} />
-        <KpiBox icon="📍" label="최다 지역"       value={topRegion?.region ?? "-"}
+        <KpiBox variant="green" icon="📍" label="최다 지역" value={topRegion?.region ?? "-"}
           sub={topRegion ? `${topRegion.count.toLocaleString("ko-KR")}건` : "-"} />
       </div>
 
       {/* 데이터 요약 테이블: 접기/펼치기 */}
-      <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+      <div className="bg-[var(--surface)] border border-[var(--line)] rounded-xl shadow-sm overflow-hidden">
         <button
           onClick={() => setTableOpen(o => !o)}
-          className="w-full flex items-center justify-between px-4 py-3 text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-colors">
+          className="w-full flex items-center justify-between px-4 py-3 text-sm font-semibold text-[var(--text-body)] hover:bg-[var(--canvas)] transition-colors">
           <span>📋 데이터 요약</span>
-          <span className="text-gray-400 text-xs">{tableOpen ? "▲ 접기" : "▼ 펼치기"}</span>
+          <span className="text-[var(--text-subtle)] text-xs">{tableOpen ? "▲ 접기" : "▼ 펼치기"}</span>
         </button>
 
         {tableOpen && (
-          <div className="border-t border-gray-100">
+          <div className="border-t border-[var(--line)]">
             {/* 탭 */}
-            <div className="flex border-b border-gray-100 px-4 gap-4">
+            <div className="flex border-b border-[var(--line)] px-4 gap-4">
               {([ ["type", "유형별"], ["region", "지역별"], ["level", "경보단계"], ["quarter", "분기별"], ["daily", "일별"] ] as const).map(([key, label]) => (
                 <button key={key} onClick={() => setTableTab(key)}
-                  className={`py-2 text-xs font-semibold border-b-2 transition-colors ${tableTab === key ? "border-blue-500 text-blue-600" : "border-transparent text-gray-400 hover:text-gray-600"}`}>
+                  className={`py-2 text-xs font-semibold border-b-2 transition-colors ${tableTab === key ? "border-[var(--blue)] text-[var(--blue)]" : "border-transparent text-[var(--text-subtle)] hover:text-[var(--text-body)]"}`}>
                   {label}
                 </button>
               ))}
@@ -787,21 +788,21 @@ function StatsPageInner() {
             <div className="overflow-x-auto">
               {tableTab === "type" && (
                 <table className="w-full text-xs">
-                  <thead className="bg-gray-50"><tr>
-                    <th className="px-4 py-2 text-left font-semibold text-gray-500 w-8">순위</th>
-                    <th className="px-4 py-2 text-left font-semibold text-gray-500">유형</th>
-                    <th className="px-4 py-2 text-right font-semibold text-gray-500">건수</th>
-                    <th className="px-4 py-2 text-right font-semibold text-gray-500">비율</th>
+                  <thead className="bg-[var(--canvas)]"><tr>
+                    <th className="px-4 py-2 text-left font-semibold text-[var(--text-muted)] w-8">순위</th>
+                    <th className="px-4 py-2 text-left font-semibold text-[var(--text-muted)]">유형</th>
+                    <th className="px-4 py-2 text-right font-semibold text-[var(--text-muted)]">건수</th>
+                    <th className="px-4 py-2 text-right font-semibold text-[var(--text-muted)]">비율</th>
                   </tr></thead>
                   <tbody className="divide-y divide-gray-50">
                     {typeStats.length === 0
-                      ? <tr><td colSpan={4} className="px-4 py-6 text-center text-gray-400">데이터 없음</td></tr>
+                      ? <tr><td colSpan={4} className="px-4 py-6 text-center text-[var(--text-subtle)]">데이터 없음</td></tr>
                       : typeStats.map((d, i) => (
-                        <tr key={i} className="hover:bg-gray-50">
-                          <td className="px-4 py-2 text-gray-400">{i + 1}</td>
-                          <td className="px-4 py-2 text-gray-700">{d.type ?? "기타"}</td>
-                          <td className="px-4 py-2 text-right font-semibold text-gray-900">{d.count.toLocaleString("ko-KR")}</td>
-                          <td className="px-4 py-2 text-right text-gray-500">{Math.round((d.count / (totalCount || 1)) * 100)}%</td>
+                        <tr key={i} className="hover:bg-[var(--canvas)]">
+                          <td className="px-4 py-2 text-[var(--text-subtle)]">{i + 1}</td>
+                          <td className="px-4 py-2 text-[var(--text-body)]">{d.type ?? "기타"}</td>
+                          <td className="px-4 py-2 text-right font-semibold text-[var(--ink)]">{d.count.toLocaleString("ko-KR")}</td>
+                          <td className="px-4 py-2 text-right text-[var(--text-muted)]">{Math.round((d.count / (totalCount || 1)) * 100)}%</td>
                         </tr>
                     ))}
                   </tbody>
@@ -810,23 +811,23 @@ function StatsPageInner() {
 
               {tableTab === "region" && (
                 <table className="w-full text-xs">
-                  <thead className="bg-gray-50"><tr>
-                    <th className="px-4 py-2 text-left font-semibold text-gray-500 w-8">순위</th>
-                    <th className="px-4 py-2 text-left font-semibold text-gray-500">지역</th>
-                    <th className="px-4 py-2 text-right font-semibold text-gray-500">건수</th>
-                    <th className="px-4 py-2 text-right font-semibold text-gray-500">비율</th>
+                  <thead className="bg-[var(--canvas)]"><tr>
+                    <th className="px-4 py-2 text-left font-semibold text-[var(--text-muted)] w-8">순위</th>
+                    <th className="px-4 py-2 text-left font-semibold text-[var(--text-muted)]">지역</th>
+                    <th className="px-4 py-2 text-right font-semibold text-[var(--text-muted)]">건수</th>
+                    <th className="px-4 py-2 text-right font-semibold text-[var(--text-muted)]">비율</th>
                   </tr></thead>
                   <tbody className="divide-y divide-gray-50">
                     {regionStats.length === 0
-                      ? <tr><td colSpan={4} className="px-4 py-6 text-center text-gray-400">데이터 없음</td></tr>
+                      ? <tr><td colSpan={4} className="px-4 py-6 text-center text-[var(--text-subtle)]">데이터 없음</td></tr>
                       : regionStats.map((d, i) => {
                         const regionTotal = regionStats.reduce((s, r) => s + r.count, 0) || 1;
                         return (
-                          <tr key={i} className="hover:bg-gray-50">
-                            <td className="px-4 py-2 text-gray-400">{i + 1}</td>
-                            <td className="px-4 py-2 text-gray-700">{d.region}</td>
-                            <td className="px-4 py-2 text-right font-semibold text-gray-900">{d.count.toLocaleString("ko-KR")}</td>
-                            <td className="px-4 py-2 text-right text-gray-500">{Math.round((d.count / regionTotal) * 100)}%</td>
+                          <tr key={i} className="hover:bg-[var(--canvas)]">
+                            <td className="px-4 py-2 text-[var(--text-subtle)]">{i + 1}</td>
+                            <td className="px-4 py-2 text-[var(--text-body)]">{d.region}</td>
+                            <td className="px-4 py-2 text-right font-semibold text-[var(--ink)]">{d.count.toLocaleString("ko-KR")}</td>
+                            <td className="px-4 py-2 text-right text-[var(--text-muted)]">{Math.round((d.count / regionTotal) * 100)}%</td>
                           </tr>
                         );
                       })}
@@ -839,19 +840,19 @@ function StatsPageInner() {
                 const levelTotal = levelStats.reduce((s, d) => s + d.count, 0) || 1;
                 return (
                   <table className="w-full text-xs">
-                    <thead className="bg-gray-50"><tr>
-                      <th className="px-4 py-2 text-left font-semibold text-gray-500">경보단계</th>
-                      <th className="px-4 py-2 text-right font-semibold text-gray-500">건수</th>
-                      <th className="px-4 py-2 text-right font-semibold text-gray-500">비율</th>
+                    <thead className="bg-[var(--canvas)]"><tr>
+                      <th className="px-4 py-2 text-left font-semibold text-[var(--text-muted)]">경보단계</th>
+                      <th className="px-4 py-2 text-right font-semibold text-[var(--text-muted)]">건수</th>
+                      <th className="px-4 py-2 text-right font-semibold text-[var(--text-muted)]">비율</th>
                     </tr></thead>
                     <tbody className="divide-y divide-gray-50">
                       {levelStats.length === 0
-                        ? <tr><td colSpan={3} className="px-4 py-6 text-center text-gray-400">데이터 없음</td></tr>
+                        ? <tr><td colSpan={3} className="px-4 py-6 text-center text-[var(--text-subtle)]">데이터 없음</td></tr>
                         : levelStats.map((d, i) => (
-                          <tr key={i} className="hover:bg-gray-50">
-                            <td className="px-4 py-2 text-gray-700">{d.level ? (LEVEL_NAMES[d.level] ?? d.level) : "기타"}</td>
-                            <td className="px-4 py-2 text-right font-semibold text-gray-900">{d.count.toLocaleString("ko-KR")}</td>
-                            <td className="px-4 py-2 text-right text-gray-500">{Math.round((d.count / levelTotal) * 100)}%</td>
+                          <tr key={i} className="hover:bg-[var(--canvas)]">
+                            <td className="px-4 py-2 text-[var(--text-body)]">{d.level ? (LEVEL_NAMES[d.level] ?? d.level) : "기타"}</td>
+                            <td className="px-4 py-2 text-right font-semibold text-[var(--ink)]">{d.count.toLocaleString("ko-KR")}</td>
+                            <td className="px-4 py-2 text-right text-[var(--text-muted)]">{Math.round((d.count / levelTotal) * 100)}%</td>
                           </tr>
                       ))}
                     </tbody>
@@ -863,19 +864,19 @@ function StatsPageInner() {
                 const quarterTotal = quarterStats.reduce((s, d) => s + d.count, 0) || 1;
                 return (
                   <table className="w-full text-xs">
-                    <thead className="bg-gray-50"><tr>
-                      <th className="px-4 py-2 text-left font-semibold text-gray-500">분기</th>
-                      <th className="px-4 py-2 text-right font-semibold text-gray-500">건수</th>
-                      <th className="px-4 py-2 text-right font-semibold text-gray-500">비율</th>
+                    <thead className="bg-[var(--canvas)]"><tr>
+                      <th className="px-4 py-2 text-left font-semibold text-[var(--text-muted)]">분기</th>
+                      <th className="px-4 py-2 text-right font-semibold text-[var(--text-muted)]">건수</th>
+                      <th className="px-4 py-2 text-right font-semibold text-[var(--text-muted)]">비율</th>
                     </tr></thead>
                     <tbody className="divide-y divide-gray-50">
                       {quarterStats.length === 0
-                        ? <tr><td colSpan={3} className="px-4 py-6 text-center text-gray-400">데이터 없음</td></tr>
+                        ? <tr><td colSpan={3} className="px-4 py-6 text-center text-[var(--text-subtle)]">데이터 없음</td></tr>
                         : quarterStats.map((d, i) => (
-                          <tr key={i} className="hover:bg-gray-50">
-                            <td className="px-4 py-2 text-gray-700">{d.quarter}</td>
-                            <td className="px-4 py-2 text-right font-semibold text-gray-900">{d.count.toLocaleString("ko-KR")}</td>
-                            <td className="px-4 py-2 text-right text-gray-500">{Math.round((d.count / quarterTotal) * 100)}%</td>
+                          <tr key={i} className="hover:bg-[var(--canvas)]">
+                            <td className="px-4 py-2 text-[var(--text-body)]">{d.quarter}</td>
+                            <td className="px-4 py-2 text-right font-semibold text-[var(--ink)]">{d.count.toLocaleString("ko-KR")}</td>
+                            <td className="px-4 py-2 text-right text-[var(--text-muted)]">{Math.round((d.count / quarterTotal) * 100)}%</td>
                           </tr>
                       ))}
                     </tbody>
@@ -885,17 +886,17 @@ function StatsPageInner() {
 
               {tableTab === "daily" && (
                 <table className="w-full text-xs">
-                  <thead className="bg-gray-50"><tr>
-                    <th className="px-4 py-2 text-left font-semibold text-gray-500">날짜</th>
-                    <th className="px-4 py-2 text-right font-semibold text-gray-500">건수</th>
+                  <thead className="bg-[var(--canvas)]"><tr>
+                    <th className="px-4 py-2 text-left font-semibold text-[var(--text-muted)]">날짜</th>
+                    <th className="px-4 py-2 text-right font-semibold text-[var(--text-muted)]">건수</th>
                   </tr></thead>
                   <tbody className="divide-y divide-gray-50">
                     {dailyStats.length === 0
-                      ? <tr><td colSpan={2} className="px-4 py-6 text-center text-gray-400">데이터 없음</td></tr>
+                      ? <tr><td colSpan={2} className="px-4 py-6 text-center text-[var(--text-subtle)]">데이터 없음</td></tr>
                       : dailyStats.map((d, i) => (
-                        <tr key={i} className="hover:bg-gray-50">
-                          <td className="px-4 py-2 text-gray-700">{d.date}</td>
-                          <td className="px-4 py-2 text-right font-semibold text-gray-900">{d.count.toLocaleString("ko-KR")}</td>
+                        <tr key={i} className="hover:bg-[var(--canvas)]">
+                          <td className="px-4 py-2 text-[var(--text-body)]">{d.date}</td>
+                          <td className="px-4 py-2 text-right font-semibold text-[var(--ink)]">{d.count.toLocaleString("ko-KR")}</td>
                         </tr>
                     ))}
                   </tbody>
@@ -915,7 +916,7 @@ function StatsPageInner() {
             <button onClick={() => setCrossFilter({})}
               className="text-violet-400 hover:text-violet-700 font-bold leading-none ml-1">×</button>
           </div>
-          <span className="text-xs text-gray-400">다른 유형 클릭 시 전환 · × 로 해제</span>
+          <span className="text-xs text-[var(--text-subtle)]">다른 유형 클릭 시 전환 · × 로 해제</span>
         </div>
       )}
 
@@ -966,7 +967,7 @@ function StatsPageInner() {
       </DndContext>
 
       {/* 안내 */}
-      <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 text-xs text-blue-800 leading-relaxed">
+      <div className="bg-[var(--blue-soft)] border border-blue-200 rounded-xl px-4 py-3 text-xs text-blue-800 leading-relaxed">
         💡 이 통계는 <b>재난문자 검색 결과</b>와 연동됩니다. 지역·기간·유형을 검색하면 그 결과가 모든 차트에 반영돼요.
         <b> + 위젯</b> 버튼으로 원하는 차트를 추가·제거하고, 헤더 토글로 차트 유형도 전환할 수 있습니다.
         <Link href="/alerts" className="ml-2 underline font-semibold">재난문자 검색 페이지 →</Link>

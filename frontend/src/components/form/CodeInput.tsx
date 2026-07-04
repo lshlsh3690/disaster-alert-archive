@@ -79,8 +79,7 @@ export default function CodeInput<T extends FieldValues>({ formMethods }: CodeIn
           placeholder="인증 코드"
           {...formMethods.register("verificationCode" as Path<T>)}
           disabled={isEmailVerified}
-          className={`w-full border rounded px-3 py-2 
-    ${isEmailVerified ? "bg-gray-100 text-gray-500" : "bg-white"}`}
+          className={`input ${isEmailVerified ? "bg-[#f1f3f6] text-[var(--text-subtle)]" : ""}`}
         />
 
         <Button type="button" onClick={handleVerifyCode} isLoading={isCodeVerifying} disabled={isEmailVerified}>
