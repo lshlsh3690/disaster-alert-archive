@@ -83,8 +83,8 @@ You **MUST** consider the user input before proceeding (if not empty).
 
 4. **Generate tasks.md**: Read the tasks template from TASKS_TEMPLATE (from the JSON output above) and use it as structure. If TASKS_TEMPLATE is empty, fall back to `.specify/templates/tasks-template.md`. Fill with:
    - Correct feature name from plan.md
-   - Phase 1: Setup tasks (project initialization)
-   - Phase 2: Foundational tasks (blocking prerequisites for all user stories)
+   - Phase 1: 설정 (Setup) tasks (project initialization)
+   - Phase 2: 기반 작업 (Foundational) tasks (blocking prerequisites for all user stories)
    - Phase 3+: One phase per user story (in priority order from spec.md)
    - Each phase includes: story goal, independent test criteria, tests (if requested), implementation tasks
    - Final Phase: Polish & cross-cutting concerns
@@ -183,7 +183,7 @@ Every task MUST strictly follow this format:
 
 ### Task Organization
 
-1. **From User Stories (spec.md)** - PRIMARY ORGANIZATION:
+1. **From 사용자 스토리 (User Stories) (spec.md)** - PRIMARY ORGANIZATION:
    - Each user story (P1, P2, P3...) gets its own phase
    - Map all related components to their story:
      - Models needed for that story
@@ -208,12 +208,12 @@ Every task MUST strictly follow this format:
 
 ### Phase Structure
 
-- **Phase 1**: Setup (project initialization)
-- **Phase 2**: Foundational (blocking prerequisites - MUST complete before user stories)
-- **Phase 3+**: User Stories in priority order (P1, P2, P3...)
+- **Phase 1**: 설정 (Setup) (project initialization)
+- **Phase 2**: 기반 작업 (Foundational) (blocking prerequisites - MUST complete before user stories)
+- **Phase 3+**: 사용자 스토리 (User Stories) in priority order (P1, P2, P3...)
   - Within each story: Tests (if requested) → Models → Services → Endpoints → Integration
   - Each phase should be a complete, independently testable increment
-- **Final Phase**: Polish & Cross-Cutting Concerns
+- **Final Phase**: 마무리 및 전반 공통 사항 (Polish & Cross-Cutting Concerns)
 
 ## Done When
 

@@ -81,7 +81,7 @@ of the code relative to the feature's artifacts — no git, no branch comparison
 ## Operating Constraints
 
 **APPEND-ONLY, NEVER REWRITE**: The command's **only** write is appending a new
-`## Phase N: Convergence` section to `tasks.md`. It MUST NOT:
+`## Phase N: 정합화 (Convergence)` section to `tasks.md`. It MUST NOT:
 
 - modify `spec.md` or `plan.md` in any way;
 - rewrite, renumber, reorder, or delete any existing task (including tasks from a prior
@@ -118,11 +118,11 @@ Load only the minimal necessary context from each artifact:
 
 **From spec.md:**
 
-- Functional Requirements (FR-###)
-- Success Criteria (SC-###) — include only items requiring buildable work; exclude
+- 기능 요구사항 (Functional Requirements) (FR-###)
+- 성공 기준 (Success Criteria) (SC-###) — include only items requiring buildable work; exclude
   post-launch outcome metrics and business KPIs
-- User Stories and their Acceptance Scenarios
-- Edge Cases (if present)
+- 사용자 스토리 (User Stories) and their 인수 시나리오 (Acceptance Scenarios)
+- 예외 상황 (Edge Cases) (if present)
 
 **From plan.md:**
 
@@ -189,7 +189,7 @@ severity, and a short human-readable description with the evidence (the file/are
 
 Before appending anything, output a compact, severity-graded summary (no file writes yet):
 
-## Convergence Findings
+## 정합화 결과 (Convergence Findings)
 
 | ID | Gap Type | Severity | Source | Evidence | Remaining Work |
 |----|----------|----------|--------|----------|----------------|
