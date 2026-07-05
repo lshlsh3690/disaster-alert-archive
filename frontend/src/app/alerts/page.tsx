@@ -320,7 +320,14 @@ function DisasterListPageInner() {
                 <>
                   <ul>
                     {(data?.content ?? []).map((a: Alert & { source?: "OFFICIAL" | "USER" }) => {
-                      const regionLabel = a.regionNames && a.regionNames.length > 0 ? a.regionNames.join(", ") : "-";
+                      const translated = language !== "ko";
+                      const translatedRegionNames = translated ? a.translatedRegionNames : null;
+                      const regionLabel = translatedRegionNames && translatedRegionNames.length > 0
+                        ? translatedRegionNames.join(", ")
+                        : a.regionNames && a.regionNames.length > 0 ? a.regionNames.join(", ") : "-";
+                      const message = (translated && a.translatedMessage) || a.message;
+                      const disasterTypeLabel = (translated && a.translatedDisasterType)
+                        || (t.disasterTypes[a.disasterType as keyof typeof t.disasterTypes] ?? a.disasterType);
                       const href = a.source === "USER" ? `/alerts/${a.id}?source=USER` : `/alerts/${a.id}?source=OFFICIAL`;
                       return (
                         <li key={a.id} className="border-b border-[var(--line)] last:border-0">
@@ -331,12 +338,12 @@ function DisasterListPageInner() {
                               <time className="shrink-0 text-[11px] text-[var(--text-subtle)]">{new Date(a.createdAt).toLocaleString()}</time>
                             </div>
                             <p className="mt-1 line-clamp-2 text-[13px] leading-relaxed text-[var(--text-body)] transition-colors group-hover:text-[var(--blue)]">
-                              {a.message}
+                              {message}
                             </p>
                             <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
                               {a.disasterType && (
                                 <span style={disasterTypeChipStyle(a.disasterType)} className="rounded-[var(--radius-pill)] px-2 py-0.5 text-[11px] font-medium">
-                                  {t.disasterTypes[a.disasterType as keyof typeof t.disasterTypes] ?? a.disasterType}
+                                  {disasterTypeLabel}
                                 </span>
                               )}
                               {a.emergencyLevelText && (

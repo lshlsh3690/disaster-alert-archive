@@ -4,7 +4,7 @@ import com.disaster.alert.alertapi.domain.openapi.service.OpenApiTokenService;
 import com.disaster.alert.alertapi.global.security.jwt.JwtAuthenticationFilter;
 import com.disaster.alert.alertapi.global.security.openapi.OpenApiTokenAuthenticationFilter;
 import jakarta.servlet.http.HttpServletResponse;
-import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
@@ -22,7 +22,6 @@ import org.springframework.web.cors.CorsConfigurationSource;
  * 따라서 기존 일반 서비스 보안 체인과 분리해 각 경로의 인증 책임을 명확히 했다.
  */
 @Configuration
-@RequiredArgsConstructor
 public class OpenApiSecurityConfig {
     /** 서비스키 관리 API에서 로그인 사용자를 인증하기 위한 기존 JWT 필터. */
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
@@ -32,6 +31,22 @@ public class OpenApiSecurityConfig {
 
     /** 기존 SecurityConfig와 동일한 CORS 정책을 재사용한다. */
     private final CorsConfigurationSource corsConfigurationSource;
+
+    /**
+     * {@code HandlerMappingIntrospector}(mvcHandlerMappingIntrospector) 도 CorsConfigurationSource를
+     * 구현하고 있어 타입만으로는 후보가 2개가 된다 — Lombok의 {@code @RequiredArgsConstructor}는
+     * 필드의 {@code @Qualifier}를 생성자 파라미터로 복사해주지 않으므로, 생성자를 직접 작성해
+     * 파라미터에 명시적으로 붙여 모호성을 없앤다.
+     */
+    public OpenApiSecurityConfig(
+            JwtAuthenticationFilter jwtAuthenticationFilter,
+            OpenApiTokenService openApiTokenService,
+            @Qualifier("corsConfigurationSource") CorsConfigurationSource corsConfigurationSource
+    ) {
+        this.jwtAuthenticationFilter = jwtAuthenticationFilter;
+        this.openApiTokenService = openApiTokenService;
+        this.corsConfigurationSource = corsConfigurationSource;
+    }
 
     /**
      * OpenAPI 서비스키 인증 필터 빈.

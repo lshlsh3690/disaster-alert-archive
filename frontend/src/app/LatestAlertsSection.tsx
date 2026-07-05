@@ -29,20 +29,26 @@ export default function LatestAlertsSection({ limit = 5 }: { limit?: number }) {
 
   return (
     <ul>
-      {data.map((a: LatestAlert) => (
-        <li key={a.id}>
-          <Link href={`/alerts/${a.id}`} className="feed-item">
-            <div className="feed-item__head">
-              <span className="feed-item__region">{a.topRegion ?? t.dashboard.unknownRegion}</span>
-              <time className="feed-item__time">{formatKST(a.createdAt)}</time>
-            </div>
-            <p className="feed-item__msg">
-              {a.disasterType && <span className="feed-item__type">{a.disasterType}</span>}
-              {a.message}
-            </p>
-          </Link>
-        </li>
-      ))}
+      {data.map((a: LatestAlert) => {
+        const translated = language !== "ko";
+        const region = (translated && a.translatedTopRegion) || a.topRegion || t.dashboard.unknownRegion;
+        const message = (translated && a.translatedMessage) || a.message;
+        const disasterType = (translated && a.translatedDisasterType) || a.disasterType;
+        return (
+          <li key={a.id}>
+            <Link href={`/alerts/${a.id}`} className="feed-item">
+              <div className="feed-item__head">
+                <span className="feed-item__region">{region}</span>
+                <time className="feed-item__time">{formatKST(a.createdAt)}</time>
+              </div>
+              <p className="feed-item__msg">
+                {disasterType && <span className="feed-item__type">{disasterType}</span>}
+                {message}
+              </p>
+            </Link>
+          </li>
+        );
+      })}
     </ul>
   );
 }
