@@ -26,8 +26,7 @@ type DangerLevel = 0 | 1 | 2 | 3 | 4;
 
 interface WeatherData {
   temp: number;
-  desc: string;
-  icon: string;
+  weatherCode: number;
   wind: number;
   humidity: number;
 }
@@ -93,7 +92,7 @@ function parseWeatherCode(code: number, w: WeatherLabels): { desc: string; icon:
   return { desc: w.thunderstorm, icon: "⛈️" };
 }
 
-async function fetchWeather(lat: number, lng: number, w: WeatherLabels): Promise<WeatherData> {
+async function fetchWeather(lat: number, lng: number): Promise<WeatherData> {
   const url =
     `https://api.open-meteo.com/v1/forecast` +
     `?latitude=${lat.toFixed(4)}&longitude=${lng.toFixed(4)}` +
@@ -101,13 +100,11 @@ async function fetchWeather(lat: number, lng: number, w: WeatherLabels): Promise
     `&timezone=Asia%2FSeoul`;
   const data = await fetch(url).then((r) => r.json());
   const c = data.current;
-  const { desc, icon } = parseWeatherCode(c.weather_code, w);
   return {
     temp: Math.round(c.temperature_2m),
+    weatherCode: c.weather_code,
     wind: Math.round(c.wind_speed_10m * 10) / 10,
     humidity: c.relative_humidity_2m,
-    desc,
-    icon,
   };
 }
 
@@ -177,7 +174,13 @@ export default function KakaoPolygonMap({ params = {}, mapHeight = "500px", show
   const [sigunguInfo,  setSigunguInfo]  = useState<{ name: string; danger: DangerLevel; count: number }[]>([]);
   const [weather,      setWeather]      = useState<WeatherData | null>(null);
   const [weatherLoad,  setWeatherLoad]  = useState(false);
-  const [status,       setStatus]       = useState<string>(t.weatherMap.mapLoading);
+  // 상태 메시지: 이미 번역된 문자열이 아니라 "어떤 상태인지"만 저장한다.
+  // (렌더마다 t로 새로 포맷팅해야 언어 전환 시 즉시 갱신됨 — setStatus는 대부분
+  //  useEffect(deps: []) 안에서 최초 1회만 호출되므로 문자열을 직접 저장하면
+  //  마운트 시점 언어에 고정되어 이후 언어를 바꿔도 갱신되지 않는 문제가 있었음)
+  const [statusKind, setStatusKind] = useState<
+    { type: "loading" | "clickHint" | "loadFailed" } | { type: "sidoSummary"; sido: string; count: number }
+  >({ type: "loading" });
   const [mapReady,     setMapReady]     = useState(false);
   const [hoverInfo,    setHoverInfo]    = useState<{ name: string; count: number; danger: DangerLevel; l1: number; l2: number; l3: number } | null>(null);
   const [mousePos,     setMousePos]     = useState<{ x: number; y: number } | null>(null);
@@ -387,7 +390,7 @@ export default function KakaoPolygonMap({ params = {}, mapHeight = "500px", show
     });
 
     zoomToKorea();
-    setStatus(t.weatherMap.clickHint);
+    setStatusKind({ type: "clickHint" });
   }
 
   function drawSigunguOf(sido: SidoFeature) {
@@ -470,7 +473,7 @@ export default function KakaoPolygonMap({ params = {}, mapHeight = "500px", show
     const zoomLevel = SIDO_ZOOM[sido.properties.CTP_KOR_NM] ?? 10;
     map.setCenter(new kakao.maps.LatLng(lat, lng));
     map.setLevel(zoomLevel);
-    setStatus(formatMessage(t.weatherMap.sidoSummary, { sido: t.metros[sido.properties.CTP_KOR_NM as keyof typeof t.metros] ?? sido.properties.CTP_KOR_NM, count: list.length }));
+    setStatusKind({ type: "sidoSummary", sido: sido.properties.CTP_KOR_NM, count: list.length });
   }
 
   /* ── 날씨 fetch ── */
@@ -479,7 +482,7 @@ export default function KakaoPolygonMap({ params = {}, mapHeight = "500px", show
     const [lat, lng] = largestRingCenter(selectedSido.geometry);
     setWeatherLoad(true);
     setWeather(null);
-    fetchWeather(lat, lng, t.weatherMap.weather)
+    fetchWeather(lat, lng)
       .then(setWeather)
       .catch(() => setWeather(null))
       .finally(() => setWeatherLoad(false));
@@ -545,7 +548,7 @@ export default function KakaoPolygonMap({ params = {}, mapHeight = "500px", show
       kakao.maps.event.addListener(map, "zoom_changed", scheduleHatchRender);
       drawSido();
       setMapReady(true);
-    }).catch(() => setStatus(t.weatherMap.mapLoadFailed));
+    }).catch(() => setStatusKind({ type: "loadFailed" }));
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -582,6 +585,14 @@ export default function KakaoPolygonMap({ params = {}, mapHeight = "500px", show
   const maxDanger   = sigunguInfo.reduce<number>((m, s) => Math.max(m, s.danger), 0) as DangerLevel;
   const totalCount  = sigunguInfo.reduce((sum, s) => sum + s.count, 0);
 
+  // statusKind → 현재 언어(t) 기준으로 매 렌더마다 새로 포맷팅
+  const statusText =
+    statusKind.type === "clickHint" ? t.weatherMap.clickHint
+    : statusKind.type === "loadFailed" ? t.weatherMap.mapLoadFailed
+    : statusKind.type === "sidoSummary"
+      ? formatMessage(t.weatherMap.sidoSummary, { sido: t.metros[statusKind.sido as keyof typeof t.metros] ?? statusKind.sido, count: statusKind.count })
+      : t.weatherMap.mapLoading;
+
   /* ── Render ── */
   return (
     <div className="flex gap-3 bg-white rounded-xl shadow overflow-hidden" style={{ height: mapHeight }}>
@@ -596,7 +607,7 @@ export default function KakaoPolygonMap({ params = {}, mapHeight = "500px", show
               {t.weatherMap.backToAll}
             </button>
           )}
-          <span className="text-xs text-gray-400">{status}</span>
+          <span className="text-xs text-gray-400">{statusText}</span>
         </div>
         <div
           className="flex-1 min-h-0 relative rounded-lg border border-gray-200 overflow-hidden"
@@ -732,19 +743,22 @@ export default function KakaoPolygonMap({ params = {}, mapHeight = "500px", show
             <div className="rounded-lg border border-gray-200 p-3 bg-white">
               <p className="text-xs font-semibold text-gray-500 mb-2">{t.weatherMap.weatherInfoTitle}</p>
               {weatherLoad && <p className="text-xs text-gray-400">{t.loading}</p>}
-              {!weatherLoad && weather && (
-                <>
-                  <div className="flex items-center gap-2">
-                    <span className="text-2xl">{weather.icon}</span>
-                    <span className="text-2xl font-bold text-gray-800">{weather.temp}°C</span>
-                  </div>
-                  <p className="text-sm text-gray-600 mt-0.5">{weather.desc}</p>
-                  <div className="flex gap-3 mt-1 text-xs text-gray-500">
-                    <span>💨 {weather.wind}m/s</span>
-                    <span>💧 {weather.humidity}%</span>
-                  </div>
-                </>
-              )}
+              {!weatherLoad && weather && (() => {
+                const { desc, icon } = parseWeatherCode(weather.weatherCode, t.weatherMap.weather);
+                return (
+                  <>
+                    <div className="flex items-center gap-2">
+                      <span className="text-2xl">{icon}</span>
+                      <span className="text-2xl font-bold text-gray-800">{weather.temp}°C</span>
+                    </div>
+                    <p className="text-sm text-gray-600 mt-0.5">{desc}</p>
+                    <div className="flex gap-3 mt-1 text-xs text-gray-500">
+                      <span>💨 {weather.wind}m/s</span>
+                      <span>💧 {weather.humidity}%</span>
+                    </div>
+                  </>
+                );
+              })()}
               {!weatherLoad && !weather && (
                 <p className="text-xs text-gray-400">{t.weatherMap.noWeatherData}</p>
               )}
