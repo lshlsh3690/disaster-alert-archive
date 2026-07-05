@@ -2,13 +2,19 @@
 
 import { useMemo, useRef, useState, useEffect, useCallback, useId } from "react";
 import { useRouter } from "next/navigation";
-import { KOREA_VIEWBOX, KOREA_SIDO, SidoRegion } from "./koreaSido.data";
+import { KOREA_SIDO, SidoRegion } from "./koreaSido.data";
 import { useI18n } from "@/hooks/useI18n";
 import { useSidoStats } from "@/lib/queries/useAlerts";
 import { groupToMetros, Metro } from "@/ui/metros";
 import styles from "./KoreaMap25D.module.css";
 
 const skRegions = KOREA_SIDO.filter((r) => r.kind === "sk");
+
+// koreaSido.data.ts의 원본 viewBox("0 0 760 714")는 경상북도 폴리곤에 딸린 울릉도/독도 조각
+// (x≈630~642)까지 감싸느라 오른쪽에 불필요하게 넓은 여백을 두고 있어, 육지 전체가 왼쪽으로
+// 쏠려 보인다. 좌표 데이터(자동 생성, 수정 금지)는 그대로 두고 뷰포트만 육지 기준으로 좁혀서
+// 중앙 정렬한다 (울릉도/독도는 그대로 우측 가장자리에 표시됨).
+const MAP_VIEWBOX = "0 0 682 714";
 
 const COLOR_LOW = "#fdeae6"; // 1건
 const COLOR_HIGH = "#ef9d92"; // 최다
@@ -190,12 +196,12 @@ export default function KoreaMap25D({
   const boxStyle = { left: `${lineEnd.x}px`, top: `${lineEnd.y}px` };
 
   return (
-    <div className={styles.koreaMap}>
-      <div ref={containerRef} className={styles.canvas} style={{ height }}>
+    <div className={`${styles.koreaMap} korea-map`}>
+      <div ref={containerRef} className={`${styles.canvas} korea-map__canvas`} style={{ height }}>
         <svg
           ref={svgRef}
-          viewBox={KOREA_VIEWBOX}
-          className={styles.svg}
+          viewBox={MAP_VIEWBOX}
+          className={`${styles.svg} korea-map__svg`}
           role="img"
           aria-label="지역별 오늘 재난문자 지도"
           onMouseLeave={onLeave}
@@ -296,7 +302,7 @@ export default function KoreaMap25D({
       </div>
 
       {/* 범례: 구간별 색상 */}
-      <div className={styles.legend}>
+      <div className={`${styles.legend} legend`}>
         <span className={styles.legendItem}>
           <i className={styles.legendSq} style={{ background: COLOR_ZERO }} />0{mapUnit}
         </span>
