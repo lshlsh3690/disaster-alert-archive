@@ -13,8 +13,10 @@ import Button from "@/components/ui/Button";
 import NicknameInput from "@/components/form/NicknameInput";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { SignupFormData, SignupFormValues, signup } from "@/types/signup";
+import { useI18n } from "@/hooks/useI18n";
 
 export default function SignupForm() {
+  const t = useI18n();
   const router = useRouter();
   const formMethods = useForm<SignupFormValues>({
     resolver: zodResolver(signup),
@@ -38,7 +40,7 @@ export default function SignupForm() {
   const { mutate, isPending: isSignupPending } = useSignup({
     setError,
     onSuccessCallback: () => {
-      alert("회원가입이 완료되었습니다.");
+      alert(t.signup.completed);
       router.push("/login");
     },
     onErrorCallback: (errorMessage) => {
@@ -50,7 +52,7 @@ export default function SignupForm() {
     const { isCodeSended } = useSignupStore.getState();
 
     if (isCodeSended && !values.verificationCode) {
-      setError("verificationCode", { message: "인증 코드를 입력하세요." });
+      setError("verificationCode", { message: t.signup.verificationCodeRequired });
       return;
     }
 
@@ -80,10 +82,10 @@ export default function SignupForm() {
       <PasswordInputGroup<SignupFormValues> formMethods={formMethods} showVerificationUI />
       <NicknameInput<SignupFormValues> formMethods={formMethods} />
       <Button type="submit" isLoading={isSignupPending} fullWidth disabled={isSignupPending}>
-        회원가입
+        {t.signup.title}
       </Button>
       <Button type="button" variant="secondary" fullWidth onClick={() => router.back()}>
-        취소
+        {t.signup.cancel}
       </Button>
     </form>
   );

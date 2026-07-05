@@ -6,6 +6,7 @@ import { useMutation } from "@tanstack/react-query";
 import { AxiosError } from "axios";
 import { SuccessResponse } from "@/types/SuccessResponse";
 import { getMyInfo } from "@/api/memberApi";
+import { useI18n } from "@/hooks/useI18n";
 
 interface LoginFormData {
   email: string;
@@ -24,6 +25,7 @@ export default function useLogin(options: {
   onSuccessCallback?: () => void;
   onErrorCallback: (errorMessage: string) => void;
 }) {
+  const t = useI18n();
   return useMutation<SuccessResponse<LoginResponseBody>, AxiosError, LoginFormData>({
     mutationFn: async ({ email, password }) => {
       return await loginApi(email, password);
@@ -38,7 +40,7 @@ export default function useLogin(options: {
       console.error("로그인 실패:", error);
       const errorResponse = parseErrorResponse(error.response?.data);
       if (!errorResponse) {
-        options.onErrorCallback("알 수 없는 오류가 발생했습니다.");
+        options.onErrorCallback(t.login.unknownError);
         return;
       }
 

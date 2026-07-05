@@ -7,6 +7,7 @@ import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useUserAlert } from "@/lib/queries/useAlerts";
 import { LEVEL_OPTIONS } from "@/ui/level";
+import { useI18n } from "@/hooks/useI18n";
 
 const DISASTER_TYPES = [
   "호우",
@@ -33,6 +34,7 @@ const ZEdit = z.object({
 type EditForm = z.infer<typeof ZEdit>;
 
 export default function AlertEditPage() {
+  const t = useI18n();
   const params = useParams<{ id: string }>();
   const router = useRouter();
   const id = Number(params.id);
@@ -70,49 +72,49 @@ export default function AlertEditPage() {
     router.push(`/alerts/${id}?source=USER`);
   };
 
-  if (isLoading) return <main className="p-6">불러오는 중...</main>;
+  if (isLoading) return <main className="p-6">{t.alertReport.loading}</main>;
 
   return (
     <main className="p-6 space-y-4">
-      <h1 className="text-xl font-semibold">✏️ 사용자 제보 수정</h1>
+      <h1 className="text-xl font-semibold">{t.alertReport.editTitle}</h1>
       <form onSubmit={handleSubmit(onSubmit)} className="bg-white rounded-xl shadow p-4 space-y-3">
         <div>
-          <label className="block text-sm font-medium mb-1">제목</label>
-          <input {...register("title")} placeholder="제목" className="input w-full" />
+          <label className="block text-sm font-medium mb-1">{t.alertReport.titleLabel}</label>
+          <input {...register("title")} placeholder={t.alertReport.titleLabel} className="input w-full" />
         </div>
         <div>
-          <label className="block text-sm font-medium mb-1">내용</label>
-          <textarea {...register("message")} placeholder="내용" className="input w-full h-32" />
+          <label className="block text-sm font-medium mb-1">{t.alertReport.contentLabel}</label>
+          <textarea {...register("message")} placeholder={t.alertReport.contentLabel} className="input w-full h-32" />
         </div>
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="block text-sm font-medium mb-1">유형</label>
+            <label className="block text-sm font-medium mb-1">{t.alertReport.typeLabel}</label>
             <select {...register("disasterType")} className="input" defaultValue={(data)?.disasterType ?? ""}>
-              <option value="">선택</option>
-              {DISASTER_TYPES.map((t) => (
-                <option key={t} value={t}>{t}</option>
+              <option value="">{t.alertReport.select}</option>
+              {DISASTER_TYPES.map((type) => (
+                <option key={type} value={type}>{t.disasterTypes[type as keyof typeof t.disasterTypes] ?? type}</option>
               ))}
             </select>
           </div>
           <div>
-            <label className="block text-sm font-medium mb-1">레벨</label>
+            <label className="block text-sm font-medium mb-1">{t.alertReport.levelLabel}</label>
             <select {...register("disasterLevel")} className="input" defaultValue={(data)?.emergencyLevel ?? ""}>
               {LEVEL_OPTIONS.map((o) => (
-                <option key={o.code} value={o.code}>{o.text}</option>
+                <option key={o.code} value={o.code}>{t.levels[o.text as keyof typeof t.levels] ?? o.text}</option>
               ))}
             </select>
           </div>
           <div className="col-span-2">
-            <label className="block text-sm font-medium mb-1">발생 시각</label>
+            <label className="block text-sm font-medium mb-1">{t.alertReport.occurredAtLabel}</label>
             <input {...register("occurredAt")} type="datetime-local" className="input w-full" />
           </div>
         </div>
         <div className="flex gap-2 justify-end">
           <button type="button" className="px-3 py-2 rounded bg-gray-100" onClick={() => router.back()}>
-            취소
+            {t.alertReport.cancel}
           </button>
           <button type="submit" className="px-3 py-2 rounded bg-blue-600 text-white">
-            저장
+            {t.alertReport.save}
           </button>
         </div>
       </form>

@@ -4,6 +4,12 @@ import { useEffect, useRef, useState } from "react";
 import { loadKakaoMapSdk } from "@/lib/kakaoMapLoader";
 import { useSigunguStats } from "@/lib/queries/useAlerts";
 import type { AlertSearchRequest } from "@/api/alertApi";
+import { useI18n } from "@/hooks/useI18n";
+import { useLanguageStore } from "@/store/languageStore";
+import { formatMessage } from "@/utils/formatMessage";
+
+const LANG_LOCALE: Record<string, string> = { ko: "ko-KR", en: "en-US", zh: "zh-CN", ja: "ja-JP" };
+type WeatherLabels = ReturnType<typeof useI18n>["weatherMap"]["weather"];
 
 interface SidoFeature {
   type: "Feature";
@@ -26,7 +32,6 @@ interface WeatherData {
   humidity: number;
 }
 
-const DANGER_LABEL  = ["없음", "관심", "주의", "경계", "심각"] as const;
 const DANGER_BG     = ["#eff6ff", "#f0fdf4", "#fefce8", "#fff7ed", "#fef2f2"] as const;
 const DANGER_TEXT   = ["#1d4ed8", "#15803d", "#a16207", "#c2410c", "#b91c1c"] as const;
 const DANGER_BORDER = ["#bfdbfe", "#bbf7d0", "#fef08a", "#fdba74", "#fca5a5"] as const;
@@ -75,20 +80,20 @@ function countToLevel(count: number, maxCount: number): DangerLevel {
   return 4;
 }
 
-function parseWeatherCode(code: number): { desc: string; icon: string } {
-  if (code === 0)   return { desc: "맑음",     icon: "☀️" };
-  if (code <= 2)    return { desc: "구름 조금", icon: "🌤️" };
-  if (code <= 3)    return { desc: "흐림",     icon: "☁️" };
-  if (code <= 48)   return { desc: "안개",     icon: "🌫️" };
-  if (code <= 57)   return { desc: "이슬비",   icon: "🌦️" };
-  if (code <= 67)   return { desc: "비",       icon: "🌧️" };
-  if (code <= 77)   return { desc: "눈",       icon: "❄️" };
-  if (code <= 82)   return { desc: "소나기",   icon: "🌦️" };
-  if (code <= 94)   return { desc: "우박",     icon: "🌨️" };
-  return { desc: "뇌우", icon: "⛈️" };
+function parseWeatherCode(code: number, w: WeatherLabels): { desc: string; icon: string } {
+  if (code === 0)   return { desc: w.clear,      icon: "☀️" };
+  if (code <= 2)    return { desc: w.fewClouds,  icon: "🌤️" };
+  if (code <= 3)    return { desc: w.cloudy,     icon: "☁️" };
+  if (code <= 48)   return { desc: w.fog,        icon: "🌫️" };
+  if (code <= 57)   return { desc: w.drizzle,    icon: "🌦️" };
+  if (code <= 67)   return { desc: w.rain,       icon: "🌧️" };
+  if (code <= 77)   return { desc: w.snow,       icon: "❄️" };
+  if (code <= 82)   return { desc: w.showers,    icon: "🌦️" };
+  if (code <= 94)   return { desc: w.hail,       icon: "🌨️" };
+  return { desc: w.thunderstorm, icon: "⛈️" };
 }
 
-async function fetchWeather(lat: number, lng: number): Promise<WeatherData> {
+async function fetchWeather(lat: number, lng: number, w: WeatherLabels): Promise<WeatherData> {
   const url =
     `https://api.open-meteo.com/v1/forecast` +
     `?latitude=${lat.toFixed(4)}&longitude=${lng.toFixed(4)}` +
@@ -96,7 +101,7 @@ async function fetchWeather(lat: number, lng: number): Promise<WeatherData> {
     `&timezone=Asia%2FSeoul`;
   const data = await fetch(url).then((r) => r.json());
   const c = data.current;
-  const { desc, icon } = parseWeatherCode(c.weather_code);
+  const { desc, icon } = parseWeatherCode(c.weather_code, w);
   return {
     temp: Math.round(c.temperature_2m),
     wind: Math.round(c.wind_speed_10m * 10) / 10,
@@ -143,6 +148,9 @@ interface Props {
 }
 
 export default function KakaoPolygonMap({ params = {}, mapHeight = "500px", showSidebar = true, externalSido, onSidoSelect }: Props) {
+  const t = useI18n();
+  const locale = LANG_LOCALE[useLanguageStore((s) => s.language)] ?? "ko-KR";
+  const DANGER_LABEL = t.weatherMap.dangerLabels;
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef       = useRef<any>(null);
   const kakaoRef     = useRef<any>(null);
@@ -169,7 +177,7 @@ export default function KakaoPolygonMap({ params = {}, mapHeight = "500px", show
   const [sigunguInfo,  setSigunguInfo]  = useState<{ name: string; danger: DangerLevel; count: number }[]>([]);
   const [weather,      setWeather]      = useState<WeatherData | null>(null);
   const [weatherLoad,  setWeatherLoad]  = useState(false);
-  const [status,       setStatus]       = useState("지도 로딩 중...");
+  const [status,       setStatus]       = useState<string>(t.weatherMap.mapLoading);
   const [mapReady,     setMapReady]     = useState(false);
   const [hoverInfo,    setHoverInfo]    = useState<{ name: string; count: number; danger: DangerLevel; l1: number; l2: number; l3: number } | null>(null);
   const [mousePos,     setMousePos]     = useState<{ x: number; y: number } | null>(null);
@@ -379,7 +387,7 @@ export default function KakaoPolygonMap({ params = {}, mapHeight = "500px", show
     });
 
     zoomToKorea();
-    setStatus("시/도를 클릭하면 시/군/구별 재난 발생 현황을 확인할 수 있습니다");
+    setStatus(t.weatherMap.clickHint);
   }
 
   function drawSigunguOf(sido: SidoFeature) {
@@ -462,7 +470,7 @@ export default function KakaoPolygonMap({ params = {}, mapHeight = "500px", show
     const zoomLevel = SIDO_ZOOM[sido.properties.CTP_KOR_NM] ?? 10;
     map.setCenter(new kakao.maps.LatLng(lat, lng));
     map.setLevel(zoomLevel);
-    setStatus(`${sido.properties.CTP_KOR_NM} — ${list.length}개 시군구`);
+    setStatus(formatMessage(t.weatherMap.sidoSummary, { sido: t.metros[sido.properties.CTP_KOR_NM as keyof typeof t.metros] ?? sido.properties.CTP_KOR_NM, count: list.length }));
   }
 
   /* ── 날씨 fetch ── */
@@ -471,7 +479,7 @@ export default function KakaoPolygonMap({ params = {}, mapHeight = "500px", show
     const [lat, lng] = largestRingCenter(selectedSido.geometry);
     setWeatherLoad(true);
     setWeather(null);
-    fetchWeather(lat, lng)
+    fetchWeather(lat, lng, t.weatherMap.weather)
       .then(setWeather)
       .catch(() => setWeather(null))
       .finally(() => setWeatherLoad(false));
@@ -537,7 +545,7 @@ export default function KakaoPolygonMap({ params = {}, mapHeight = "500px", show
       kakao.maps.event.addListener(map, "zoom_changed", scheduleHatchRender);
       drawSido();
       setMapReady(true);
-    }).catch(() => setStatus("지도 로드 실패"));
+    }).catch(() => setStatus(t.weatherMap.mapLoadFailed));
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -585,7 +593,7 @@ export default function KakaoPolygonMap({ params = {}, mapHeight = "500px", show
               onClick={() => { setSelectedSido(null); onSidoSelect?.(null); }}
               className="px-3 py-1 rounded text-sm font-medium bg-gray-100 hover:bg-gray-200 border border-gray-300"
             >
-              ← 전체 보기
+              {t.weatherMap.backToAll}
             </button>
           )}
           <span className="text-xs text-gray-400">{status}</span>
@@ -618,19 +626,19 @@ export default function KakaoPolygonMap({ params = {}, mapHeight = "500px", show
             >
               <div style={{ fontWeight: 700, color: "#111827", fontSize: "13px", marginBottom: "4px" }}>{hoverInfo.name}</div>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "12px", paddingBottom: "4px", borderBottom: "1px solid #f3f4f6" }}>
-                <span style={{ fontSize: "11px", color: "#6b7280" }}>총 발생</span>
-                <span style={{ fontSize: "12px", fontWeight: 700, color: DANGER_TEXT[hoverInfo.danger] }}>{hoverInfo.count.toLocaleString("ko-KR")}건</span>
+                <span style={{ fontSize: "11px", color: "#6b7280" }}>{t.statsPage.totalAlerts}</span>
+                <span style={{ fontSize: "12px", fontWeight: 700, color: DANGER_TEXT[hoverInfo.danger] }}>{hoverInfo.count.toLocaleString(locale)}{t.statsPage.countUnit}</span>
               </div>
               {(
                 [
-                  { label: "안전안내", val: hoverInfo.l1, color: "#1d4ed8" },
-                  { label: "긴급재난", val: hoverInfo.l2, color: "#c2410c" },
-                  { label: "위급재난", val: hoverInfo.l3, color: "#b91c1c" },
+                  { label: t.levels.안전안내, val: hoverInfo.l1, color: "#1d4ed8" },
+                  { label: t.levels.긴급재난, val: hoverInfo.l2, color: "#c2410c" },
+                  { label: t.levels.위급재난, val: hoverInfo.l3, color: "#b91c1c" },
                 ] as const
               ).map(({ label, val, color }) => (
                 <div key={label} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "12px", marginTop: "2px" }}>
                   <span style={{ fontSize: "11px", color }}>{label}</span>
-                  <span style={{ fontSize: "11px", fontWeight: 600, color: "#374151" }}>{val.toLocaleString("ko-KR")}건</span>
+                  <span style={{ fontSize: "11px", fontWeight: 600, color: "#374151" }}>{val.toLocaleString(locale)}{t.statsPage.countUnit}</span>
                 </div>
               ))}
             </div>
@@ -644,7 +652,7 @@ export default function KakaoPolygonMap({ params = {}, mapHeight = "500px", show
         {/* 시도 목록 (전국 뷰) */}
         {!selectedSido && (
           <>
-            <p className="text-xs font-semibold text-gray-400">시 · 도</p>
+            <p className="text-xs font-semibold text-gray-400">{t.weatherMap.sidoListTitle}</p>
             {sidoList.map((sido) => {
               const cd    = sido.properties.CTPRVN_CD;
               const isHov = hoveredCd === cd;
@@ -661,7 +669,7 @@ export default function KakaoPolygonMap({ params = {}, mapHeight = "500px", show
                       : "bg-white text-gray-700 border-gray-200 hover:bg-blue-50",
                   ].join(" ")}
                 >
-                  {sido.properties.CTP_KOR_NM}
+                  {t.metros[sido.properties.CTP_KOR_NM as keyof typeof t.metros] ?? sido.properties.CTP_KOR_NM}
                 </button>
               );
             })}
@@ -672,8 +680,8 @@ export default function KakaoPolygonMap({ params = {}, mapHeight = "500px", show
         {selectedSido && (
           <div className="flex flex-col gap-3">
             <div>
-              <p className="text-xs text-gray-400">선택 지역</p>
-              <p className="text-base font-bold text-gray-800">{selectedSido.properties.CTP_KOR_NM}</p>
+              <p className="text-xs text-gray-400">{t.weatherMap.selectedRegion}</p>
+              <p className="text-base font-bold text-gray-800">{t.metros[selectedSido.properties.CTP_KOR_NM as keyof typeof t.metros] ?? selectedSido.properties.CTP_KOR_NM}</p>
             </div>
 
             {/* 종합 현황 */}
@@ -681,11 +689,11 @@ export default function KakaoPolygonMap({ params = {}, mapHeight = "500px", show
               className="rounded-lg border p-3"
               style={{ background: DANGER_BG[maxDanger], borderColor: DANGER_BORDER[maxDanger] }}
             >
-              <p className="text-xs font-semibold text-gray-500 mb-1">종합 위험도</p>
+              <p className="text-xs font-semibold text-gray-500 mb-1">{t.weatherMap.overallDanger}</p>
               <p className="text-xl font-bold" style={{ color: DANGER_TEXT[maxDanger] }}>
                 {DANGER_LABEL[maxDanger]}
               </p>
-              <p className="text-xs text-gray-500 mt-0.5">총 {totalCount.toLocaleString("ko-KR")}건</p>
+              <p className="text-xs text-gray-500 mt-0.5">{formatMessage(t.weatherMap.totalCountLabel, { count: totalCount.toLocaleString(locale) })}</p>
               <div className="flex gap-0.5 mt-2">
                 {DANGER_LABEL.map((_, lv) => (
                   <div
@@ -699,9 +707,9 @@ export default function KakaoPolygonMap({ params = {}, mapHeight = "500px", show
 
             {/* 시군구 발생 현황 */}
             <div className="rounded-lg border border-gray-200 p-3 bg-white">
-              <p className="text-xs font-semibold text-gray-500 mb-2">시군구 현황</p>
+              <p className="text-xs font-semibold text-gray-500 mb-2">{t.weatherMap.districtStatusTitle}</p>
               {sigunguStatsQuery.isLoading && (
-                <p className="text-xs text-gray-400">불러오는 중...</p>
+                <p className="text-xs text-gray-400">{t.loading}</p>
               )}
               <div className="flex flex-col gap-1">
                 {DANGER_LABEL.map((label, lv) =>
@@ -713,7 +721,7 @@ export default function KakaoPolygonMap({ params = {}, mapHeight = "500px", show
                       >
                         {label}
                       </span>
-                      <span className="text-xs text-gray-600">{dangerCount[lv]}개</span>
+                      <span className="text-xs text-gray-600">{dangerCount[lv]}{t.weatherMap.districtUnit}</span>
                     </div>
                   ) : null
                 )}
@@ -722,8 +730,8 @@ export default function KakaoPolygonMap({ params = {}, mapHeight = "500px", show
 
             {/* 날씨 정보 */}
             <div className="rounded-lg border border-gray-200 p-3 bg-white">
-              <p className="text-xs font-semibold text-gray-500 mb-2">날씨 정보</p>
-              {weatherLoad && <p className="text-xs text-gray-400">불러오는 중...</p>}
+              <p className="text-xs font-semibold text-gray-500 mb-2">{t.weatherMap.weatherInfoTitle}</p>
+              {weatherLoad && <p className="text-xs text-gray-400">{t.loading}</p>}
               {!weatherLoad && weather && (
                 <>
                   <div className="flex items-center gap-2">
@@ -738,13 +746,13 @@ export default function KakaoPolygonMap({ params = {}, mapHeight = "500px", show
                 </>
               )}
               {!weatherLoad && !weather && (
-                <p className="text-xs text-gray-400">날씨 정보 없음</p>
+                <p className="text-xs text-gray-400">{t.weatherMap.noWeatherData}</p>
               )}
             </div>
 
             {/* 위험도 범례 */}
             <div className="rounded-lg border border-gray-200 p-3 bg-white">
-              <p className="text-xs font-semibold text-gray-500 mb-2">위험도 범례</p>
+              <p className="text-xs font-semibold text-gray-500 mb-2">{t.weatherMap.dangerLegendTitle}</p>
               <div className="flex flex-col gap-1">
                 {DANGER_LABEL.map((label, lv) => (
                   <div key={lv} className="flex items-center gap-2">

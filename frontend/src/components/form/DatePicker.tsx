@@ -35,9 +35,22 @@ interface DatePickerProps {
   placeholder?: string;
   className?: string;
   id?: string;
+  clearLabel?: string;
+  prevMonthLabel?: string;
+  nextMonthLabel?: string;
 }
 
-export default function DatePicker({ value, onChange, locale = "ko-KR", placeholder, className, id }: DatePickerProps) {
+export default function DatePicker({
+  value,
+  onChange,
+  locale = "ko-KR",
+  placeholder,
+  className,
+  id,
+  clearLabel = "지우기",
+  prevMonthLabel = "이전 달",
+  nextMonthLabel = "다음 달",
+}: DatePickerProps) {
   const [open, setOpen] = useState(false);
   const selected = useMemo(() => toDateOnly(value), [value]);
   const [viewMonth, setViewMonth] = useState(() => selected ?? new Date());
@@ -126,7 +139,7 @@ export default function DatePicker({ value, onChange, locale = "ko-KR", placehol
               type="button"
               onClick={() => setViewMonth((m) => new Date(m.getFullYear(), m.getMonth() - 1, 1))}
               className="rounded-[var(--radius-control)] p-1 text-[var(--text-muted)] hover:bg-[var(--blue-soft)] hover:text-[var(--blue)]"
-              aria-label="이전 달"
+              aria-label={prevMonthLabel}
             >
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 18l-6-6 6-6" /></svg>
             </button>
@@ -135,7 +148,7 @@ export default function DatePicker({ value, onChange, locale = "ko-KR", placehol
               type="button"
               onClick={() => setViewMonth((m) => new Date(m.getFullYear(), m.getMonth() + 1, 1))}
               className="rounded-[var(--radius-control)] p-1 text-[var(--text-muted)] hover:bg-[var(--blue-soft)] hover:text-[var(--blue)]"
-              aria-label="다음 달"
+              aria-label={nextMonthLabel}
             >
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18l6-6-6-6" /></svg>
             </button>
@@ -174,7 +187,7 @@ export default function DatePicker({ value, onChange, locale = "ko-KR", placehol
               onClick={() => { onChange(""); setOpen(false); }}
               className="mt-2 w-full rounded-[var(--radius-control)] border border-[var(--line)] py-1 text-xs text-[var(--text-muted)] hover:bg-[var(--blue-soft)]"
             >
-              지우기
+              {clearLabel}
             </button>
           )}
         </div>

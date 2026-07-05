@@ -282,7 +282,7 @@ function EventsPageInner() {
               name="startDate"
               control={control}
               render={({ field }) => (
-                <DatePicker value={field.value ?? ""} onChange={field.onChange} locale={LANG_LOCALE[lang] ?? "ko-KR"} />
+                <DatePicker value={field.value ?? ""} onChange={field.onChange} locale={LANG_LOCALE[lang] ?? "ko-KR"} clearLabel={t.datePicker.clear} prevMonthLabel={t.datePicker.prevMonth} nextMonthLabel={t.datePicker.nextMonth} />
               )}
             />
           </div>
@@ -292,7 +292,7 @@ function EventsPageInner() {
               name="endDate"
               control={control}
               render={({ field }) => (
-                <DatePicker value={field.value ?? ""} onChange={field.onChange} locale={LANG_LOCALE[lang] ?? "ko-KR"} />
+                <DatePicker value={field.value ?? ""} onChange={field.onChange} locale={LANG_LOCALE[lang] ?? "ko-KR"} clearLabel={t.datePicker.clear} prevMonthLabel={t.datePicker.prevMonth} nextMonthLabel={t.datePicker.nextMonth} />
               )}
             />
           </div>
