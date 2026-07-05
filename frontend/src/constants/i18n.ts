@@ -52,6 +52,7 @@ export const i18n = {
       nationwide: "전국",
       noData: "데이터 없음",
       countUnit: "건",
+      viewStats: "통계 보기",
       filter: {
         sido: "시/도(전체)",
         sigungu: "시/군/구(전체)",
@@ -269,6 +270,7 @@ export const i18n = {
       nationwide: "Nationwide",
       noData: "No data",
       countUnit: "",
+      viewStats: "View Stats",
       filter: {
         sido: "Province (All)",
         sigungu: "City/District (All)",
@@ -483,6 +485,7 @@ export const i18n = {
       nationwide: "全国",
       noData: "データなし",
       countUnit: "件",
+      viewStats: "統計を見る",
       filter: {
         sido: "都道府県（全て）",
         sigungu: "市区町村（全て）",
@@ -697,6 +700,7 @@ export const i18n = {
       nationwide: "全国",
       noData: "暂无数据",
       countUnit: "件",
+      viewStats: "查看统计",
       filter: {
         sido: "省/市（全部）",
         sigungu: "市/区（全部）",

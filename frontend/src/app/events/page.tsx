@@ -3,7 +3,8 @@
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ReadonlyURLSearchParams } from "next/navigation";
 import Link from "next/link";
-import { useForm } from "react-hook-form";
+import { Controller, useForm } from "react-hook-form";
+import DatePicker from "@/components/form/DatePicker";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -84,7 +85,7 @@ function EventsPageInner() {
   );
   const size = 10;
 
-  const { register, handleSubmit, reset, watch, setValue } = useForm<SearchForm>({
+  const { register, handleSubmit, reset, watch, setValue, control } = useForm<SearchForm>({
     resolver: zodResolver(ZSearch),
     defaultValues: readFormFromParams(searchParams),
   });
@@ -275,14 +276,26 @@ function EventsPageInner() {
             ))}
           </select>
 
-          <label className="flex flex-col gap-1">
+          <div className="flex flex-col gap-1">
             <span className="text-xs text-[var(--text-muted)]">{t.events.filter.startDate}</span>
-            <input type="date" {...register("startDate")} lang={LANG_LOCALE[lang] ?? "ko-KR"} className="input" />
-          </label>
-          <label className="flex flex-col gap-1">
+            <Controller
+              name="startDate"
+              control={control}
+              render={({ field }) => (
+                <DatePicker value={field.value ?? ""} onChange={field.onChange} locale={LANG_LOCALE[lang] ?? "ko-KR"} />
+              )}
+            />
+          </div>
+          <div className="flex flex-col gap-1">
             <span className="text-xs text-[var(--text-muted)]">{t.events.filter.endDate}</span>
-            <input type="date" {...register("endDate")} lang={LANG_LOCALE[lang] ?? "ko-KR"} className="input" />
-          </label>
+            <Controller
+              name="endDate"
+              control={control}
+              render={({ field }) => (
+                <DatePicker value={field.value ?? ""} onChange={field.onChange} locale={LANG_LOCALE[lang] ?? "ko-KR"} />
+              )}
+            />
+          </div>
           <input type="text" {...register("keyword")} className="input self-end" placeholder={t.events.filter.keyword} />
 
           <div className="col-span-2 flex justify-end gap-2 sm:col-span-3">

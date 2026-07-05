@@ -8,7 +8,8 @@ import { LEVEL_OPTIONS, levelTextToCode } from "@/ui/level";
 import { zodResolver } from "@hookform/resolvers/zod";
 import Link from "next/link";
 import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
-import { useForm } from "react-hook-form";
+import { Controller, useForm } from "react-hook-form";
+import DatePicker from "@/components/form/DatePicker";
 import { z } from "zod";
 import { useRouter, useSearchParams } from "next/navigation";
 import { DISASTER_TYPES } from "@/ui/disasterType";
@@ -62,7 +63,7 @@ function DisasterListPageInner() {
 
 
 
-  const { register, handleSubmit, reset, watch, setValue } = useForm<SearchForm>({
+  const { register, handleSubmit, reset, watch, setValue, control } = useForm<SearchForm>({
     resolver: zodResolver(ZSearch),
     defaultValues: {},
   });
@@ -242,7 +243,7 @@ function DisasterListPageInner() {
               href={`/stats${searchParams.toString() ? `?${searchParams.toString()}` : ""}`}
               className="rounded-[var(--radius-control)] border border-[var(--line)] bg-[var(--surface)] px-3 py-2 text-sm font-semibold text-[var(--text-body)] transition-colors hover:border-[var(--blue)] hover:text-[var(--blue)]"
             >
-              📊 통계 보기
+              📊 {t.alertList.viewStats}
             </Link>
             <ReportButton />
           </div>
@@ -278,11 +279,23 @@ function DisasterListPageInner() {
               </div>
               <div className="flex flex-col gap-1">
                 <label className="text-xs text-[var(--text-muted)]">{t.alertList.filter.startDate}</label>
-                <input {...register("startDate")} type="date" lang={LANG_LOCALE[language] ?? "ko-KR"} className="input" />
+                <Controller
+                  name="startDate"
+                  control={control}
+                  render={({ field }) => (
+                    <DatePicker value={field.value ?? ""} onChange={field.onChange} locale={LANG_LOCALE[language] ?? "ko-KR"} />
+                  )}
+                />
               </div>
               <div className="flex flex-col gap-1">
                 <label className="text-xs text-[var(--text-muted)]">{t.alertList.filter.endDate}</label>
-                <input {...register("endDate")} type="date" lang={LANG_LOCALE[language] ?? "ko-KR"} className="input" />
+                <Controller
+                  name="endDate"
+                  control={control}
+                  render={({ field }) => (
+                    <DatePicker value={field.value ?? ""} onChange={field.onChange} locale={LANG_LOCALE[language] ?? "ko-KR"} />
+                  )}
+                />
               </div>
               <div className="flex flex-col gap-1">
                 <label className="text-xs text-[var(--text-muted)]">{t.alertList.filter.type}</label>
