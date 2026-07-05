@@ -85,6 +85,8 @@ export default function Header() {
         {/* 왼쪽: 로고 + 언어 선택 */}
         <div className="flex items-center gap-3">
           <Link href="/" className="flex items-center gap-2">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/icons/apple-icon-180.png" alt="logo" className="w-8 h-8 rounded-full" />
             <span className="text-xl font-bold text-[var(--blue)] tracking-tight">{t.appName}</span>
           </Link>
           <select
