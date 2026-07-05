@@ -5,6 +5,10 @@ import { useCreateUserAlert } from "@/lib/mutations/useCreateUserAlert";
 import { LEVEL_OPTIONS } from "@/ui/level";
 import { useRouter } from "next/navigation";
 import { useI18n } from "@/hooks/useI18n";
+import { useLanguageStore } from "@/store/languageStore";
+import DatePicker from "@/components/form/DatePicker";
+
+const LANG_LOCALE: Record<string, string> = { ko: "ko-KR", en: "en-US", zh: "zh-CN", ja: "ja-JP" };
 
 const DISASTER_TYPES = [
   "호우",
@@ -30,6 +34,7 @@ type JusoItem = {
 
 export default function RegisterAlertsPage() {
   const t = useI18n();
+  const locale = LANG_LOCALE[useLanguageStore((s) => s.language)] ?? "ko-KR";
   const router = useRouter();
   const { mutate, isPending, isError, error } = useCreateUserAlert();
 
@@ -193,7 +198,15 @@ export default function RegisterAlertsPage() {
 
         <div>
           <label className="block text-sm font-medium mb-1">{t.alertReport.occurDateLabel}</label>
-          <input className="input w-full" type="date" value={occurDate} onChange={(e) => setOccurDate(e.target.value)} />
+          <DatePicker
+            value={occurDate}
+            onChange={setOccurDate}
+            locale={locale}
+            className="input w-full"
+            clearLabel={t.datePicker.clear}
+            prevMonthLabel={t.datePicker.prevMonth}
+            nextMonthLabel={t.datePicker.nextMonth}
+          />
         </div>
 
         <div>
