@@ -18,6 +18,8 @@ export const i18n = {
       settings: "설정",
       user: "사용자",
       favoriteRegions: "관심지역",
+      notificationHistory: "알림 이력",
+      openMenu: "메뉴 열기",
     },
 
     // 홈
@@ -541,6 +543,8 @@ export const i18n = {
       settings: "Settings",
       user: "User",
       favoriteRegions: "Favorite Regions",
+      notificationHistory: "Notification History",
+      openMenu: "Open menu",
     },
 
     home: {
@@ -988,6 +992,8 @@ export const i18n = {
       settings: "設定",
       user: "ユーザー",
       favoriteRegions: "関心地域",
+      notificationHistory: "通知履歴",
+      openMenu: "メニューを開く",
     },
 
     home: {
@@ -1435,6 +1441,8 @@ export const i18n = {
       settings: "设置",
       user: "用户",
       favoriteRegions: "关注地区",
+      notificationHistory: "通知记录",
+      openMenu: "打开菜单",
     },
 
     home: {

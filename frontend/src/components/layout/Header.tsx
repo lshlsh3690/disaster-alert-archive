@@ -134,7 +134,7 @@ export default function Header() {
                 {open && (
                   <div className="absolute right-0 mt-2 w-44 bg-[var(--surface)] border border-[var(--line)] rounded-[var(--radius-compact)] shadow-[0_10px_30px_rgba(28,39,60,0.08)] text-sm z-50 overflow-hidden">
                     <Link href="/notifications" className="block px-4 py-2.5 text-[var(--text-body)] hover:bg-[var(--blue-soft)] hover:text-[var(--blue)]" onClick={() => setOpen(false)}>
-                      알림 이력
+                      {t.nav.notificationHistory}
                     </Link>
                     <Link href="/user/settings" className="block px-4 py-2.5 text-[var(--text-body)] hover:bg-[var(--blue-soft)] hover:text-[var(--blue)]" onClick={() => setOpen(false)}>
                       {t.nav.settings}
@@ -165,7 +165,7 @@ export default function Header() {
         <button
           className="md:hidden p-2 rounded-[var(--radius-control)] text-[var(--text-muted)] hover:bg-[var(--blue-soft)] hover:text-[var(--blue)]"
           onClick={() => setMobileMenuOpen((prev) => !prev)}
-          aria-label="메뉴 열기"
+          aria-label={t.nav.openMenu}
         >
           {mobileMenuOpen ? (
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -209,7 +209,7 @@ export default function Header() {
           {isLoggedIn ? (
             <>
               <Link href="/notifications" className="block px-3 py-2.5 rounded-[var(--radius-control)] text-[var(--text-body)] hover:bg-[var(--blue-soft)] hover:text-[var(--blue)]" onClick={() => setMobileMenuOpen(false)}>
-                알림 이력
+                {t.nav.notificationHistory}
               </Link>
               <Link href="/user/settings/regions" className="block px-3 py-2.5 rounded-[var(--radius-control)] text-[var(--text-body)] hover:bg-[var(--blue-soft)] hover:text-[var(--blue)]" onClick={() => setMobileMenuOpen(false)}>
                 {t.nav.favoriteRegions}
