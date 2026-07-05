@@ -5,23 +5,19 @@ import com.disaster.alert.alertapi.domain.auth.dto.ReissueResponse;
 import com.disaster.alert.alertapi.domain.member.dto.*;
 import com.disaster.alert.alertapi.domain.member.service.MemberService;
 import com.disaster.alert.alertapi.global.redis.RedisService;
-import io.github.cdimascio.dotenv.Dotenv;
+import com.disaster.alert.alertapi.global.testsupport.IntegrationTest;
 import lombok.extern.slf4j.Slf4j;
-import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.*;
 
-@SpringBootTest
+@IntegrationTest
 @Slf4j
-@ActiveProfiles("test")
 class AuthServiceTest {
     @Autowired
     private AuthService authService;
@@ -30,27 +26,6 @@ class AuthServiceTest {
     private RedisService redisService;
     @Autowired
     private MemberService memberService;
-
-    @BeforeAll
-    static void loadEnv() {
-        Dotenv dotenv = Dotenv.configure()
-                .filename(".env.test") // 해당 이름으로 명시
-                .ignoreIfMissing()     // 없으면 무시
-                .load();
-
-        // 필요한 항목들 주입
-        System.setProperty("DB_HOST", dotenv.get("DB_HOST"));
-        System.setProperty("DB_PORT", dotenv.get("DB_PORT"));
-        System.setProperty("POSTGRES_DB", dotenv.get("POSTGRES_DB"));
-        System.setProperty("POSTGRES_USER", dotenv.get("POSTGRES_USER"));
-        System.setProperty("POSTGRES_PASSWORD", dotenv.get("POSTGRES_PASSWORD"));
-        System.setProperty("REDIS_HOST", dotenv.get("REDIS_HOST"));
-        System.setProperty("REDIS_PORT", dotenv.get("REDIS_PORT"));
-        System.setProperty("GMAIL_USERNAME", dotenv.get("GMAIL_USERNAME"));
-        System.setProperty("GMAIL_PASSWORD", dotenv.get("GMAIL_PASSWORD"));
-        System.setProperty("JWT_SECRET", dotenv.get("JWT_SECRET"));
-        System.setProperty("DISASTER_ALERT_SERVICE_KEY", dotenv.get("DISASTER_ALERT_SERVICE_KEY"));
-    }
 
     @Test
     @Transactional
