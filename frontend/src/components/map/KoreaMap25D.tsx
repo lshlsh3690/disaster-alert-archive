@@ -185,8 +185,8 @@ export default function KoreaMap25D({
   }, []);
 
   const localName = (ko: string) => t.metros?.[ko as keyof typeof t.metros] ?? ko;
-  const mapLabel = "오늘의 재난문자";
-  const mapUnit = "건";
+  const mapLabel = t.dashboard.todayAlerts;
+  const mapUnit = t.dashboard.count;
   const boxStyle = { left: `${lineEnd.x}px`, top: `${lineEnd.y}px` };
 
   return (
