@@ -72,6 +72,10 @@ export const ZLatestAlert = z.object({
   createdAt: z.string(),
   topRegion: z.string().optional(),     // 서버에서 대표 지역명 내려주면 사용
   disasterType: z.string().nullable().optional(),
+  translatedMessage: z.string().nullable().optional(),
+  translatedDisasterType: z.string().nullable().optional(),
+  translatedTopRegion: z.string().nullable().optional(),
+  language: z.string().nullable().optional(),
 });
 export type LatestAlert = z.infer<typeof ZLatestAlert>;
 
