@@ -32,9 +32,13 @@ import {
   ResponsiveContainer,         // 부모 크기에 맞춘 자동 리사이즈
 } from "recharts";
 import type { DailyStat, HourlyStat, MonthlyTypeStat } from "@/types/alerts";
-import { STACKED_COLORS, CHART_COLORS, DOW_TO_IDX, WEEKDAYS } from "./_constants";
+import { STACKED_COLORS, CHART_COLORS, DOW_TO_IDX, getWeekdays } from "./_constants";
 import { EmptyChart } from "./_charts";
 import { VerticalBar } from "./_DistributionCharts";
+import { useI18n } from "@/hooks/useI18n";
+import { useLanguageStore } from "@/store/languageStore";
+
+const LANG_LOCALE: Record<string, string> = { ko: "ko-KR", en: "en-US", zh: "zh-CN", ja: "ja-JP" };
 
 // ─── 공통 툴팁 스타일 ─────────────────────────────────────────────────────────
 
@@ -75,6 +79,8 @@ type TTProps = {
  *       (그라디언트 면적 채우기를 위해)
  */
 export function LineChart({ data }: { data: DailyStat[] }) {
+  const t = useI18n();
+  const locale = LANG_LOCALE[useLanguageStore((s) => s.language)] ?? "ko-KR";
   if (data.length === 0) return <EmptyChart />;
 
   // 평균 건수: 모든 값을 더해서 개수로 나눕니다
@@ -91,7 +97,7 @@ export function LineChart({ data }: { data: DailyStat[] }) {
     return (
       <div style={TT_BOX}>
         <p style={TT_LABEL}>{label}</p>
-        <p style={TT_VALUE}>{(payload[0].value ?? 0).toLocaleString("ko-KR")}건</p>
+        <p style={TT_VALUE}>{(payload[0].value ?? 0).toLocaleString(locale)}{t.statsPage.countUnit}</p>
       </div>
     );
   };
@@ -165,6 +171,8 @@ export function LineChart({ data }: { data: DailyStat[] }) {
  * @param data - { date: "YYYY-MM-DD", count: number }[] 배열
  */
 export function DailyBar({ data }: { data: DailyStat[] }) {
+  const t = useI18n();
+  const locale = LANG_LOCALE[useLanguageStore((s) => s.language)] ?? "ko-KR";
   if (data.length === 0) return <EmptyChart />;
 
   const labelStride = Math.max(1, Math.floor(data.length / 6));
@@ -174,7 +182,7 @@ export function DailyBar({ data }: { data: DailyStat[] }) {
     return (
       <div style={TT_BOX}>
         <p style={TT_LABEL}>{label}</p>
-        <p style={TT_VALUE}>{(payload[0].value ?? 0).toLocaleString("ko-KR")}건</p>
+        <p style={TT_VALUE}>{(payload[0].value ?? 0).toLocaleString(locale)}{t.statsPage.countUnit}</p>
       </div>
     );
   };
@@ -215,6 +223,9 @@ export function DailyBar({ data }: { data: DailyStat[] }) {
  *              dayOfWeek은 PostgreSQL EXTRACT(DOW) 기준: 0=일요일, 1=월요일 ... 6=토요일
  */
 export function Heatmap({ data }: { data: HourlyStat[] }) {
+  const t = useI18n();
+  const locale = LANG_LOCALE[useLanguageStore((s) => s.language)] ?? "ko-KR";
+  const weekdays = getWeekdays(t);
   // tooltip: 현재 마우스가 올라간 셀의 위치·값 정보
   const [tooltip, setTooltip] = useState<{
     di: number; hi: number; v: number; x: number; y: number
@@ -251,7 +262,7 @@ export function Heatmap({ data }: { data: HourlyStat[] }) {
               display: "flex", alignItems: "center",
               justifyContent: "flex-end", paddingRight: 4,
             }}>
-              {WEEKDAYS[di]}
+              {weekdays[di]}
             </div>
 
             {/* 시간대별 셀 */}
@@ -291,19 +302,19 @@ export function Heatmap({ data }: { data: HourlyStat[] }) {
           className="absolute z-10 bg-gray-800 text-white text-xs rounded px-2 py-1.5 shadow-lg pointer-events-none whitespace-nowrap -translate-x-1/2 -translate-y-full"
           style={{ left: tooltip.x, top: tooltip.y - 6 }}
         >
-          <div className="font-semibold">{WEEKDAYS[tooltip.di]} {tooltip.hi}시</div>
-          <div className="text-gray-300">{tooltip.v.toLocaleString("ko-KR")}건</div>
+          <div className="font-semibold">{weekdays[tooltip.di]} {tooltip.hi}{t.statsPage.hourSuffix}</div>
+          <div className="text-gray-300">{tooltip.v.toLocaleString(locale)}{t.statsPage.countUnit}</div>
         </div>
       )}
 
       {/* 색상 범례: 적음 → 많음 */}
       <div className="flex items-center gap-1.5 text-xs text-gray-400 mt-1 flex-wrap">
-        <span>적음</span>
+        <span>{t.statsPage.low}</span>
         {[0.15, 0.3, 0.5, 0.7, 0.9].map(o => (
           <span key={o} className="w-4 h-2.5 rounded-sm inline-block"
             style={{ background: `rgba(37,99,235,${o})` }} />
         ))}
-        <span>많음</span>
+        <span>{t.statsPage.high}</span>
       </div>
     </div>
   );
@@ -320,14 +331,16 @@ export function Heatmap({ data }: { data: HourlyStat[] }) {
  * @param data - useHourlyStats()가 반환하는 HourlyStat[] 그대로 넘기면 됩니다
  */
 export function DayOfWeekBar({ data }: { data: HourlyStat[] }) {
+  const t = useI18n();
+  const weekdays = getWeekdays(t);
   // agg: { 요일번호: 총건수 } 형태로 집계
   const agg: Record<number, number> = {};
   data.forEach(({ dayOfWeek, count }) => {
     agg[dayOfWeek] = (agg[dayOfWeek] ?? 0) + count;
   });
 
-  // WEEKDAYS 순서(월~일)에 맞게 배열로 변환
-  const bars = WEEKDAYS.map((label, di) => {
+  // weekdays 순서(월~일)에 맞게 배열로 변환
+  const bars = weekdays.map((label, di) => {
     const dow = Number(
       Object.entries(DOW_TO_IDX).find(([, idx]) => idx === di)?.[0] ?? -1
     );
@@ -356,6 +369,7 @@ export function DayOfWeekBar({ data }: { data: HourlyStat[] }) {
  * @param data - useHourlyStats()가 반환하는 HourlyStat[] 그대로 넘기면 됩니다
  */
 export function HourBar({ data }: { data: HourlyStat[] }) {
+  const t = useI18n();
   const agg: Record<number, number> = {};
   data.forEach(({ hour, count }) => {
     agg[hour] = (agg[hour] ?? 0) + count;
@@ -363,7 +377,7 @@ export function HourBar({ data }: { data: HourlyStat[] }) {
 
   // 0시 ~ 23시 24개 막대
   const bars = Array.from({ length: 24 }, (_, h) => ({
-    label: `${h}시`,
+    label: `${h}${t.statsPage.hourSuffix}`,
     count: agg[h] ?? 0,
   }));
 
@@ -399,6 +413,7 @@ export function StackedArea({
   data: MonthlyTypeStat[];
   types: string[];
 }) {
+  const t = useI18n();
   if (data.length === 0 || types.length === 0) return <EmptyChart />;
 
   const isDaily = data.length > 0 && data[0].month.length === 10;
@@ -451,7 +466,7 @@ export function StackedArea({
           (i % Math.max(1, Math.floor(n / 5)) === 0 || i === n - 1) && (
             <text key={m} x={xs(i)} y={h - padB + 13}
               textAnchor="middle" fontSize="9" fill="#9ca3af">
-              {m.length === 10 ? m.slice(5) : `${parseInt(m.slice(5))}월`}
+              {m.length === 10 ? m.slice(5) : `${parseInt(m.slice(5))}${t.statsPage.monthSuffix}`}
             </text>
           )
         )}
@@ -489,18 +504,19 @@ export function StackedBar({
   data: MonthlyTypeStat[];
   types: string[];
 }) {
+  const t = useI18n();
   const isDaily = data.length > 0 && data[0].month.length === 10;
   const months = [...new Set(data.map(d => d.month))].sort().slice(isDaily ? -60 : -12);
   if (months.length === 0) return <EmptyChart />;
 
   const monthData = months.map(m => {
-    const segments = types.map((t, i) => ({
-      type: t,
+    const segments = types.map((type, i) => ({
+      type,
       color: STACKED_COLORS[i % STACKED_COLORS.length],
-      count: data.find(d => d.month === m && d.type === t)?.count ?? 0,
+      count: data.find(d => d.month === m && d.type === type)?.count ?? 0,
     }));
     return {
-      label: m.length === 10 ? m.slice(5) : `${parseInt(m.slice(5))}월`,
+      label: m.length === 10 ? m.slice(5) : `${parseInt(m.slice(5))}${t.statsPage.monthSuffix}`,
       total: segments.reduce((s, g) => s + g.count, 0),
       segments,
     };
@@ -523,7 +539,7 @@ export function StackedBar({
               {/* flex-col-reverse: 아래 유형부터 쌓입니다 */}
               {m.segments.map((seg, j) => seg.count > 0 && (
                 <div key={j}
-                  title={`${seg.type}: ${seg.count}건`}
+                  title={`${seg.type}: ${seg.count}${t.statsPage.countUnit}`}
                   style={{
                     // 이 세그먼트 높이 = 이 유형 건수 / 이 달 전체 건수 비율
                     height: `${(seg.count / (m.total || 1)) * 100}%`,
@@ -581,6 +597,8 @@ export function CompareBars({
   lastYearData: DailyStat[];
   currentYear: number;
 }) {
+  const t = useI18n();
+  const locale = LANG_LOCALE[useLanguageStore((s) => s.language)] ?? "ko-KR";
   // 일별 데이터를 월별로 합산합니다: "2024-07-15" → "07" 키로 그룹핑
   const agg = (data: DailyStat[]) => {
     const m: Record<string, number> = {};
@@ -596,7 +614,7 @@ export function CompareBars({
   const currentMonth = new Date().getMonth() + 1;
   const months = Array.from({ length: 12 }, (_, i) => {
     const key = String(i + 1).padStart(2, "0"); // "01" ~ "12"
-    return { label: `${i + 1}월`, ty: ty[key] ?? 0, ly: ly[key] ?? 0, monthNum: i + 1 };
+    return { label: `${i + 1}${t.statsPage.monthSuffix}`, ty: ty[key] ?? 0, ly: ly[key] ?? 0, monthNum: i + 1 };
   }).filter(m => m.ty > 0 || m.ly > 0);
 
   if (months.length === 0) return <EmptyChart />;
@@ -621,13 +639,13 @@ export function CompareBars({
         <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 2 }}>
           <span style={{ width: 8, height: 8, borderRadius: 2, background: "#cbd5e1", display: "inline-block", flexShrink: 0 }} />
           <span style={{ color: "#fff", fontSize: 11 }}>
-            {currentYear - 1}: {lyVal.toLocaleString("ko-KR")}건
+            {currentYear - 1}: {lyVal.toLocaleString(locale)}{t.statsPage.countUnit}
           </span>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: diff !== null ? 4 : 0 }}>
           <span style={{ width: 8, height: 8, borderRadius: 2, background: "#2563eb", display: "inline-block", flexShrink: 0 }} />
           <span style={{ color: "#fff", fontSize: 11 }}>
-            {currentYear}: {tyVal.toLocaleString("ko-KR")}건
+            {currentYear}: {tyVal.toLocaleString(locale)}{t.statsPage.countUnit}
           </span>
         </div>
         {diff !== null && (
@@ -700,6 +718,8 @@ export function CompareLines({
   lastYearData: DailyStat[];
   currentYear: number;
 }) {
+  const t = useI18n();
+  const locale = LANG_LOCALE[useLanguageStore((s) => s.language)] ?? "ko-KR";
   const agg = (data: DailyStat[]) => {
     const m: Record<string, number> = {};
     data.forEach(d => {
@@ -714,7 +734,7 @@ export function CompareLines({
   const currentMonth = new Date().getMonth() + 1;
   const months = Array.from({ length: 12 }, (_, i) => {
     const key = String(i + 1).padStart(2, "0");
-    return { label: `${i + 1}월`, ty: ty[key] ?? 0, ly: ly[key] ?? 0, monthNum: i + 1 };
+    return { label: `${i + 1}${t.statsPage.monthSuffix}`, ty: ty[key] ?? 0, ly: ly[key] ?? 0, monthNum: i + 1 };
   }).filter(m => m.ty > 0 || m.ly > 0);
 
   if (months.length === 0) return <EmptyChart />;
@@ -738,13 +758,13 @@ export function CompareLines({
         <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 2 }}>
           <span style={{ width: 8, height: 8, borderRadius: 2, background: "#cbd5e1", display: "inline-block", flexShrink: 0 }} />
           <span style={{ color: "#fff", fontSize: 11 }}>
-            {currentYear - 1}: {lyVal.toLocaleString("ko-KR")}건
+            {currentYear - 1}: {lyVal.toLocaleString(locale)}{t.statsPage.countUnit}
           </span>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: diff !== null ? 4 : 0 }}>
           <span style={{ width: 8, height: 8, borderRadius: 2, background: "#2563eb", display: "inline-block", flexShrink: 0 }} />
           <span style={{ color: "#fff", fontSize: 11 }}>
-            {currentYear}: {tyVal.toLocaleString("ko-KR")}건
+            {currentYear}: {tyVal.toLocaleString(locale)}{t.statsPage.countUnit}
           </span>
         </div>
         {diff !== null && (

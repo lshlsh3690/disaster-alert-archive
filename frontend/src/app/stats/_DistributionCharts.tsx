@@ -19,9 +19,14 @@ import {
   Tooltip,                   // 마우스 호버 시 나타나는 팝업
   ResponsiveContainer,       // 부모 크기에 맞춰 차트를 자동 리사이즈
 } from "recharts";
-import { TYPE_COLORS, BAR_COLORS, CHART_COLORS, LEVEL_META } from "./_constants";
+import { TYPE_COLORS, BAR_COLORS, CHART_COLORS, getLevelMeta } from "./_constants";
 import type { LevelStat, RegionStat } from "./_constants";
 import { EmptyChart } from "./_charts";
+import { useI18n } from "@/hooks/useI18n";
+import { useLanguageStore } from "@/store/languageStore";
+import { formatMessage } from "@/utils/formatMessage";
+
+const LANG_LOCALE: Record<string, string> = { ko: "ko-KR", en: "en-US", zh: "zh-CN", ja: "ja-JP" };
 
 // ─── 공통 툴팁 스타일 ────────────────────────────────────────────────────────
 //
@@ -76,12 +81,16 @@ export function DonutChart({
   total,
   onTypeClick,
   selectedType,
+  labelFormatter,
 }: {
   data: { type: string | null; count: number }[];
   total: number;
   onTypeClick?: (type: string) => void;
   selectedType?: string;
+  labelFormatter?: (label: string) => string;
 }) {
+  const t = useI18n();
+  const locale = LANG_LOCALE[useLanguageStore((s) => s.language)] ?? "ko-KR";
   const r = 38;              // 원 반지름 (px 기준, SVG viewBox 100x100 내)
   const c = 2 * Math.PI * r; // 원의 전체 둘레 길이
   let acc = 0;               // 누적 각도 (이전 조각들의 합)
@@ -117,21 +126,22 @@ export function DonutChart({
         })}
 
         {/* 중앙 텍스트: 총 건수 */}
-        <text x="50" y="47" textAnchor="middle" fontSize="8" fill="#6b7280">총</text>
+        <text x="50" y="47" textAnchor="middle" fontSize="8" fill="#6b7280">{t.statsPage.total}</text>
         <text x="50" y="60" textAnchor="middle" fontSize="13" fontWeight="700" fill="#111827">
-          {total.toLocaleString("ko-KR")}
+          {total.toLocaleString(locale)}
         </text>
       </svg>
 
       {/* 범례 목록 — onTypeClick이 있으면 클릭 가능, selectedType이 있으면 해당 항목 외 흐리게 */}
       <ul className="flex-1 space-y-1.5">
         {data.map((d, i) => {
-          const label = d.type ?? "기타";
-          const isSelected = selectedType === label;
+          const key = d.type ?? t.statsPage.other;
+          const label = labelFormatter ? labelFormatter(key) : key;
+          const isSelected = selectedType === key;
           const isDimmed = !!selectedType && !isSelected;
           return (
             <li key={d.type ?? i}
-              onClick={() => onTypeClick?.(label)}
+              onClick={() => onTypeClick?.(key)}
               className={`flex items-center gap-2 text-xs rounded px-1 -mx-1 transition-opacity
                 ${onTypeClick ? "cursor-pointer hover:bg-gray-50" : ""}
                 ${isDimmed ? "opacity-30" : ""}`}>
@@ -140,7 +150,7 @@ export function DonutChart({
               <span className="flex-1 text-gray-700 truncate">{label}</span>
               <span className="text-gray-400">{Math.round((d.count / total) * 100)}%</span>
               <span className="font-semibold text-gray-900 min-w-[36px] text-right">
-                {d.count.toLocaleString("ko-KR")}
+                {d.count.toLocaleString(locale)}
               </span>
             </li>
           );
@@ -160,17 +170,20 @@ export function DonutChart({
  *
  * @param data - { region: 지역명, count: 건수 }[] 배열
  */
-export function HorizontalBar({ data, onBarClick }: { data: RegionStat[]; onBarClick?: (label: string) => void }) {
+export function HorizontalBar({ data, onBarClick, labelFormatter }: { data: RegionStat[]; onBarClick?: (label: string) => void; labelFormatter?: (label: string) => string }) {
+  const t = useI18n();
+  const locale = LANG_LOCALE[useLanguageStore((s) => s.language)] ?? "ko-KR";
   if (data.length === 0) return <EmptyChart />;
 
   // 커스텀 툴팁: 마우스를 올렸을 때 지역명과 건수를 보여줍니다
   const TooltipContent = ({ active, payload }: TTProps) => {
     if (!active || !payload?.length) return null;
+    const region = payload[0].payload?.region as unknown as string | undefined;
     return (
       <div style={TT_BOX}>
         {/* payload[0].payload는 해당 막대의 원본 데이터 객체입니다 */}
-        <p style={TT_LABEL}>{payload[0].payload?.region}</p>
-        <p style={TT_VALUE}>{(payload[0].value ?? 0).toLocaleString("ko-KR")}건</p>
+        <p style={TT_LABEL}>{region ? (labelFormatter ? labelFormatter(region) : region) : ""}</p>
+        <p style={TT_VALUE}>{(payload[0].value ?? 0).toLocaleString(locale)}{t.statsPage.countUnit}</p>
       </div>
     );
   };
@@ -183,8 +196,9 @@ export function HorizontalBar({ data, onBarClick }: { data: RegionStat[]; onBarC
           {/* type="number": 가로 축이 숫자 눈금 */}
           <XAxis type="number" hide />
           {/* type="category": 세로 축이 텍스트(지역명) */}
-          <YAxis type="category" dataKey="region" width={80} axisLine={false} tickLine={false}
-            tick={{ fontSize: 11, fill: "#374151" }} />
+          {/* interval={0}: 번역된 라벨이 길어져도 Recharts가 겹침 방지를 위해 임의로 건너뛰지 않고 전부 표시 */}
+          <YAxis type="category" dataKey="region" width={80} axisLine={false} tickLine={false} interval={0}
+            tick={{ fontSize: 11, fill: "#374151" }} tickFormatter={labelFormatter} />
           <Tooltip content={<TooltipContent />} cursor={{ fill: "#f3f4f6" }} />
           <Bar dataKey="count" radius={[0, 3, 3, 0]} barSize={14} isAnimationActive={false}
             cursor={onBarClick ? "pointer" : "default"}
@@ -214,10 +228,14 @@ export function HorizontalBar({ data, onBarClick }: { data: RegionStat[]; onBarC
 export function VerticalBar({
   data,
   onBarClick,
+  labelFormatter,
 }: {
   data: { label: string; count: number; color?: string }[];
   onBarClick?: (label: string) => void;
+  labelFormatter?: (label: string) => string;
 }) {
+  const t = useI18n();
+  const locale = LANG_LOCALE[useLanguageStore((s) => s.language)] ?? "ko-KR";
   if (data.length === 0) return <EmptyChart />;
 
   // 가장 값이 큰 인덱스를 찾아서 빨간색으로 강조합니다
@@ -227,8 +245,8 @@ export function VerticalBar({
     if (!active || !payload?.length) return null;
     return (
       <div style={TT_BOX}>
-        <p style={TT_LABEL}>{label}</p>
-        <p style={TT_VALUE}>{(payload[0].value ?? 0).toLocaleString("ko-KR")}건</p>
+        <p style={TT_LABEL}>{label ? (labelFormatter ? labelFormatter(label) : label) : ""}</p>
+        <p style={TT_VALUE}>{(payload[0].value ?? 0).toLocaleString(locale)}{t.statsPage.countUnit}</p>
       </div>
     );
   };
@@ -237,8 +255,8 @@ export function VerticalBar({
     <div className="flex-1 min-h-0" style={{ height: "100%" }}>
       <ResponsiveContainer width="100%" height="100%">
         <BarChart data={data} margin={{ top: 4, right: 4, bottom: 4, left: 4 }}>
-          <XAxis dataKey="label" axisLine={false} tickLine={false}
-            tick={{ fontSize: 10, fill: "#9ca3af" }} />
+          <XAxis dataKey="label" axisLine={false} tickLine={false} interval={0}
+            tick={{ fontSize: 10, fill: "#9ca3af" }} tickFormatter={labelFormatter} />
           <YAxis axisLine={false} tickLine={false}
             tick={{ fontSize: 10, fill: "#9ca3af" }} width={32} />
           <Tooltip content={<TooltipContent />} cursor={{ fill: "#f3f4f6" }} />
@@ -269,9 +287,12 @@ export function VerticalBar({
  *              LEVEL_META(_constants.ts)에서 각 단계의 색상·텍스트를 가져옵니다.
  */
 export function LevelsCard({ data }: { data: LevelStat[] }) {
+  const t = useI18n();
+  const locale = LANG_LOCALE[useLanguageStore((s) => s.language)] ?? "ko-KR";
+  const levelMeta = getLevelMeta(t);
   // LEVEL_1, LEVEL_2, LEVEL_3 순서를 고정하고 데이터가 없으면 count=0으로 채웁니다
   const levels = ["LEVEL_1", "LEVEL_2", "LEVEL_3"].map(code => {
-    const meta = LEVEL_META[code];
+    const meta = levelMeta[code];
     const count = data.find(d => d.level === code)?.count ?? 0;
     return { code, ...meta, count };
   });
@@ -288,7 +309,7 @@ export function LevelsCard({ data }: { data: LevelStat[] }) {
             className={`flex-1 text-center rounded-lg border py-2.5 ${l.bg} ${l.border}`}>
             <div className={`text-xs font-semibold mb-1 ${l.textCls}`}>{l.text}</div>
             <div className={`text-xl font-extrabold ${l.textCls}`}>
-              {l.count.toLocaleString("ko-KR")}
+              {l.count.toLocaleString(locale)}
             </div>
             <div className="text-xs text-gray-400">
               {Math.round((l.count / total) * 100)}%
@@ -305,8 +326,7 @@ export function LevelsCard({ data }: { data: LevelStat[] }) {
       </div>
 
       <p className="text-xs text-gray-500 leading-relaxed">
-        총 <b className="text-gray-900">{total.toLocaleString("ko-KR")}건</b> 중
-        위급재난이 <b className="text-red-600">{urgentPct}%</b>를 차지합니다.
+        {formatMessage(t.statsPage.urgentSummary, { total: total.toLocaleString(locale), percent: urgentPct })}
       </p>
     </div>
   );

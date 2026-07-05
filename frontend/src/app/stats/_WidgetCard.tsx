@@ -19,16 +19,18 @@ import { EmptyChart, LoadingChart } from "./_charts";
 import { DonutChart, HorizontalBar, VerticalBar, LevelsCard } from "./_DistributionCharts";
 import { LineChart, DailyBar, Heatmap, DayOfWeekBar, HourBar, CompareBars, CompareLines } from "./_TimeCharts";
 import { WeatherCorrelationScatter, WeatherOverlayChart, WeatherByTypeChart, WeatherByRegionChart } from "./_WeatherCharts";
+import { useI18n } from "@/hooks/useI18n";
 
 // ─── 일별/시간별 토글 ────────────────────────────────────────────────────────
 
 function GranularityToggle({ value, onChange }: { value: "daily" | "hourly"; onChange: (v: "daily" | "hourly") => void }) {
+  const t = useI18n();
   return (
     <div className="flex border border-[var(--line)] rounded overflow-hidden self-start">
       {(["daily", "hourly"] as const).map(g => (
         <button key={g} onClick={() => onChange(g)}
           className={`px-2 py-0.5 text-[11px] font-medium transition-colors ${value === g ? "bg-[var(--blue)] text-white" : "text-[var(--text-subtle)] hover:bg-[var(--canvas)]"}`}>
-          {g === "daily" ? "일별" : "시간별"}
+          {g === "daily" ? t.statsPage.granularityDaily : t.statsPage.granularityHourly}
         </button>
       ))}
     </div>
@@ -66,6 +68,7 @@ export function WidgetContent({ kind, variant, typeStats, regionStats, levelStat
   onTypeClick?: (type: string) => void;
   selectedType?: string;
 }) {
+  const t = useI18n();
   // 날씨 위젯의 일별/시간별 전환 상태 (isShortPeriod일 때만 토글 표시)
   const [granularity, setGranularity] = useState<"daily" | "hourly">("daily");
 
@@ -73,40 +76,43 @@ export function WidgetContent({ kind, variant, typeStats, regionStats, levelStat
   // 전체 유형 건수 합계 (도넛·비율 계산에 사용)
   const typeTotal = typeStats.reduce((s, d) => s + d.count, 0);
   // 가로/세로 막대에 넘길 형태로 변환한 상위 8개 유형 데이터
-  const typeAsBar = typeStats.slice(0, 8).map(d => ({ label: d.type ?? "기타", count: d.count }));
+  const typeAsBar = typeStats.slice(0, 8).map(d => ({ label: d.type ?? t.statsPage.other, count: d.count }));
   // 세로 막대/도넛에 넘길 형태로 변환한 지역 데이터 (scrollableRegion이면 전체, 아니면 상위 8개)
   const regionAsVBar = (scrollableRegion ? regionStats : regionStats.slice(0, 8)).map(d => ({ label: d.region, count: d.count }));
-  // 경보 단계 코드를 한글 이름으로 변환하는 맵
-  const LEVEL_NAMES: Record<string, string> = { LEVEL_1: "안전안내", LEVEL_2: "긴급재난", LEVEL_3: "위급재난" };
-  // 막대 차트에 넘길 형태로 변환한 단계 데이터 (코드 → 한글 이름)
-  const levelAsBar = levelStats.map(d => ({ label: d.level ? (LEVEL_NAMES[d.level] ?? d.level) : "기타", count: d.count }));
+  // 경보 단계 코드를 번역된 이름으로 변환하는 맵
+  const LEVEL_NAMES = t.statsPage.levels;
+  // 막대 차트에 넘길 형태로 변환한 단계 데이터 (코드 → 번역된 이름)
+  const levelAsBar = levelStats.map(d => ({ label: d.level ? (LEVEL_NAMES[d.level as keyof typeof LEVEL_NAMES] ?? d.level) : t.statsPage.other, count: d.count }));
   // 도넛 차트에 넘길 형태로 변환한 단계 데이터
-  const levelForDonut = levelStats.map(d => ({ type: d.level ? (LEVEL_NAMES[d.level] ?? d.level) : "기타", count: d.count }));
+  const levelForDonut = levelStats.map(d => ({ type: d.level ? (LEVEL_NAMES[d.level as keyof typeof LEVEL_NAMES] ?? d.level) : t.statsPage.other, count: d.count }));
   // 전체 경보 단계 건수 합계
   const levelTotal = levelStats.reduce((s, d) => s + d.count, 0);
   // 누적 차트에 표시할 상위 4개 유형 이름
-  const topTypes = typeStats.slice(0, 4).map(d => d.type ?? "기타");
+  const topTypes = typeStats.slice(0, 4).map(d => d.type ?? t.statsPage.other);
 
   // 시간별 날씨 데이터를 사용할지 여부 (기간 ≤7일 && 사용자가 시간별 선택)
   const isHourly = isShortPeriod && granularity === "hourly";
+  // 재난 유형/지역 코드를 번역된 이름으로 변환 (매칭용 원본 값은 그대로 유지하고 표시만 번역)
+  const translateType = (type: string) => t.disasterTypes[type as keyof typeof t.disasterTypes] ?? type;
+  const translateRegion = (region: string) => t.metros[region as keyof typeof t.metros] ?? region;
 
   switch (kind) {
     case "donut":
       if (typeTotal === 0) return <EmptyChart />;
-      if (variant === "hbar") return <HorizontalBar data={typeAsBar.map(d => ({ region: d.label, count: d.count }))} onBarClick={onTypeClick} />;
-      if (variant === "vbar") return <VerticalBar data={typeAsBar} onBarClick={onTypeClick} />;
-      return <DonutChart data={typeStats.slice(0, 6)} total={typeTotal} onTypeClick={onTypeClick} selectedType={selectedType} />;
+      if (variant === "hbar") return <HorizontalBar data={typeAsBar.map(d => ({ region: d.label, count: d.count }))} onBarClick={onTypeClick} labelFormatter={translateType} />;
+      if (variant === "vbar") return <VerticalBar data={typeAsBar} onBarClick={onTypeClick} labelFormatter={translateType} />;
+      return <DonutChart data={typeStats.slice(0, 6)} total={typeTotal} onTypeClick={onTypeClick} selectedType={selectedType} labelFormatter={translateType} />;
 
     case "hbar": {
       if (regionStats.length === 0) return <EmptyChart />;
-      if (variant === "vbar") return <VerticalBar data={regionAsVBar} />;
+      if (variant === "vbar") return <VerticalBar data={regionAsVBar} labelFormatter={translateRegion} />;
       if (variant === "donut") {
         const top8 = regionStats.slice(0, 8);
         const total = top8.reduce((s, d) => s + d.count, 0);
-        return <DonutChart data={top8.map(d => ({ type: d.region, count: d.count }))} total={total} />;
+        return <DonutChart data={top8.map(d => ({ type: d.region, count: d.count }))} total={total} labelFormatter={translateRegion} />;
       }
-      if (scrollableRegion) return <div className="overflow-y-auto flex-1" style={{ maxHeight: 320 }}><HorizontalBar data={regionStats} /></div>;
-      return <HorizontalBar data={regionStats.slice(0, 8)} />;
+      if (scrollableRegion) return <div className="overflow-y-auto flex-1" style={{ maxHeight: 320 }}><HorizontalBar data={regionStats} labelFormatter={translateRegion} /></div>;
+      return <HorizontalBar data={regionStats.slice(0, 8)} labelFormatter={translateRegion} />;
     }
 
     case "levels":
@@ -133,9 +139,9 @@ export function WidgetContent({ kind, variant, typeStats, regionStats, levelStat
       })).filter(d => d.count > 0);
       const typeAggTotal = typeAgg.reduce((s, d) => s + d.count, 0);
       if (typeAggTotal === 0) return <EmptyChart />;
-      if (variant === "donut") return <DonutChart data={typeAgg} total={typeAggTotal} onTypeClick={onTypeClick} selectedType={selectedType} />;
-      if (variant === "hbar") return <HorizontalBar data={typeAgg.map(d => ({ region: d.type, count: d.count }))} onBarClick={onTypeClick} />;
-      return <VerticalBar data={typeAgg.map(d => ({ label: d.type, count: d.count }))} onBarClick={onTypeClick} />;
+      if (variant === "donut") return <DonutChart data={typeAgg} total={typeAggTotal} onTypeClick={onTypeClick} selectedType={selectedType} labelFormatter={translateType} />;
+      if (variant === "hbar") return <HorizontalBar data={typeAgg.map(d => ({ region: d.type, count: d.count }))} onBarClick={onTypeClick} labelFormatter={translateType} />;
+      return <VerticalBar data={typeAgg.map(d => ({ label: d.type, count: d.count }))} onBarClick={onTypeClick} labelFormatter={translateType} />;
     }
 
     case "compare":
@@ -186,6 +192,7 @@ export function WidgetCard({ widget, lib, onVariantChange, onRemove, titleOverri
   dragHandleListeners?: Record<string, unknown>;
   children: React.ReactNode;
 }) {
+  const t = useI18n();
   // PNG 다운로드 시 html-to-image로 캡처할 카드 DOM 참조
   const cardRef = useRef<HTMLDivElement>(null);
   // ? 버튼 hover 시 도움말 툴팁 표시 여부
@@ -216,19 +223,17 @@ export function WidgetCard({ widget, lib, onVariantChange, onRemove, titleOverri
           {dragHandleListeners && (
             <span {...dragHandleListeners}
               className="cursor-grab active:cursor-grabbing text-gray-300 hover:text-[var(--text-subtle)] select-none px-0.5"
-              title="드래그하여 순서 변경">
+              title={t.statsPage.dragWidget}>
               ⠿
             </span>
           )}
           <span className="text-sm">{lib.icon}</span>
           <h3 className="text-sm font-bold text-[var(--ink)]">{titleOverride ?? lib.title}</h3>
-          {lib.sample && (
-            <span className="text-xs font-semibold text-amber-600 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded">샘플</span>
-          )}
           <div className="relative">
             <button
               onMouseEnter={() => setHelpOpen(true)}
               onMouseLeave={() => setHelpOpen(false)}
+              title={t.statsPage.widgetHelp}
               className="w-4 h-4 rounded-full border border-[var(--line)] text-[var(--text-subtle)] text-[10px] font-bold leading-none flex items-center justify-center hover:border-[var(--blue)] hover:text-blue-500 transition-colors"
             >
               ?
@@ -255,11 +260,11 @@ export function WidgetCard({ widget, lib, onVariantChange, onRemove, titleOverri
               </div>
             );
           })()}
-          <button onClick={handleDownloadPng} title="PNG 다운로드"
+          <button onClick={handleDownloadPng} title={t.statsPage.downloadPng}
             className="px-1.5 py-0.5 text-xs border border-[var(--line)] text-[var(--text-subtle)] rounded hover:border-green-400 hover:text-green-600 transition-colors">
             ⬇
           </button>
-          <button onClick={() => onRemove(widget.id)} title="위젯 삭제"
+          <button onClick={() => onRemove(widget.id)} title={t.statsPage.removeWidget}
             className="w-5 h-5 flex items-center justify-center text-gray-300 rounded hover:bg-red-50 hover:text-red-500 transition-colors">
             ✕
           </button>
