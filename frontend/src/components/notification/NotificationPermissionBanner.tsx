@@ -4,8 +4,10 @@ import { useState } from "react";
 import { useNotificationPermission } from "@/hooks/useNotificationPermission";
 import { useAuthStore } from "@/store/authStore";
 import { useGuestFavoriteRegionsStore } from "@/store/guestFavoriteRegionsStore";
+import { useI18n } from "@/hooks/useI18n";
 
 export default function NotificationPermissionBanner() {
+  const t = useI18n();
   const user = useAuthStore((state) => state.user);
   const guestRegions = useGuestFavoriteRegionsStore((s) => s.regions);
   const { permission, isLoading, requestPermission } = useNotificationPermission();
@@ -23,8 +25,8 @@ export default function NotificationPermissionBanner() {
         <span className="text-xl">🔔</span>
         <p className="text-sm font-medium">
           {isLoggedIn
-            ? "재난문자 알림을 받으시겠어요?"
-            : "관심지역 재난문자를 바로 받으시겠어요?"}
+            ? t.notificationBanner.askLoggedIn
+            : t.notificationBanner.askGuest}
         </p>
       </div>
       <div className="flex items-center gap-2 shrink-0">
@@ -33,9 +35,9 @@ export default function NotificationPermissionBanner() {
           disabled={isLoading}
           className="bg-white text-blue-600 text-sm font-semibold px-3 py-1.5 rounded-lg"
         >
-          {isLoading ? "처리중..." : "허용"}
+          {isLoading ? t.notificationBanner.processing : t.notificationBanner.allow}
         </button>
-        <button className="text-white/70 hover:text-white text-sm" onClick={() => setDismissed(true)} aria-label="닫기">
+        <button className="text-white/70 hover:text-white text-sm" onClick={() => setDismissed(true)} aria-label={t.notificationBanner.close}>
           ✕
         </button>
       </div>

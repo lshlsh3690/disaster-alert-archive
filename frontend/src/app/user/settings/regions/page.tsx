@@ -13,6 +13,7 @@ import { useSigungu } from "@/lib/queries/useAlerts";
 import { useI18n } from "@/hooks/useI18n";
 import { METROS } from "@/ui/metros";
 import type { MemberFavoriteRegion } from "@/types/memberFavoriteRegion";
+import { formatMessage } from "@/utils/formatMessage";
 
 const MAX_REGIONS = 5;
 
@@ -62,7 +63,7 @@ export default function FavoriteRegionsPage() {
     const found = sigunguList.find((s) => (s.code ?? "") === code);
     if (!found) return code;
     return found.name === "전체"
-      ? `${selectedSido} 전체`
+      ? `${selectedSido} ${t.userRegions.all}`
       : (found.translatedName ?? found.name);
   };
 
@@ -84,22 +85,22 @@ export default function FavoriteRegionsPage() {
 
   const handleAdd = () => {
     if (!selectedSigunguCode) {
-      setErrorMsg("지역을 선택해주세요.");
+      setErrorMsg(t.userRegions.selectRegionError);
       return;
     }
     if (regions.some((region) => region.legalDistrictCode === selectedSigunguCode)) {
-      setErrorMsg("이미 등록된 지역입니다.");
+      setErrorMsg(t.userRegions.alreadyRegisteredError);
       return;
     }
     if (regions.length >= MAX_REGIONS) {
-      setErrorMsg(`관심지역은 최대 ${MAX_REGIONS}개까지 등록할 수 있습니다.`);
+      setErrorMsg(formatMessage(t.userRegions.maxReachedError, { max: MAX_REGIONS }));
       return;
     }
     addMutation.mutate(selectedSigunguCode);
   };
 
   const handleDelete = (code: string) => {
-    if (!confirm("이 관심지역을 삭제하시겠습니까?")) return;
+    if (!confirm(t.userRegions.deleteConfirm)) return;
     deleteMutation.mutate(code);
   };
 
@@ -121,9 +122,9 @@ export default function FavoriteRegionsPage() {
     <main className="bg-[var(--canvas)] min-h-[calc(100vh-48px)]">
       <div className="mx-auto max-w-6xl px-4 py-8 space-y-5">
       <header>
-        <h1 className="text-2xl font-bold tracking-tight text-[var(--ink)]">관심지역 설정</h1>
+        <h1 className="text-2xl font-bold tracking-tight text-[var(--ink)]">{t.userRegions.title}</h1>
         <p className="mt-1 text-[13px] text-[var(--text-muted)]">
-          최대 {MAX_REGIONS}개의 관심지역을 등록하고 재난문자 알림을 받을 수 있습니다.
+          {formatMessage(t.userRegions.description, { max: MAX_REGIONS })}
         </p>
       </header>
 
@@ -136,13 +137,13 @@ export default function FavoriteRegionsPage() {
             <line x1="12" y1="8" x2="12.01" y2="8" />
           </svg>
           <div>
-            <p className="font-semibold text-[var(--ink)]">비로그인 상태입니다.</p>
+            <p className="font-semibold text-[var(--ink)]">{t.userRegions.guestBannerTitle}</p>
             <p className="mt-0.5 text-[var(--text-muted)]">
-              관심지역은 이 기기의 브라우저에 임시 저장됩니다.{" "}
+              {t.userRegions.guestBannerBody1}{" "}
               <Link href="/login" className="font-semibold text-[var(--blue)] hover:underline">
-                로그인
+                {t.userRegions.guestBannerLogin}
               </Link>
-              하시면 서버에 영구 저장되며 다른 기기에서도 사용할 수 있습니다.
+              {t.userRegions.guestBannerBody2}
             </p>
           </div>
         </div>
@@ -158,7 +159,7 @@ export default function FavoriteRegionsPage() {
         {/* 왼쪽: 등록된 관심지역 */}
         <section className="rounded-[var(--radius-panel-card)] border border-[var(--line)] bg-[var(--surface)] p-6 shadow-[0_10px_30px_rgba(28,39,60,0.04)]">
           <div className="mb-4 flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-[var(--ink)]">등록된 관심지역</h2>
+            <h2 className="text-lg font-semibold text-[var(--ink)]">{t.userRegions.registeredTitle}</h2>
             <span className="text-[13px] text-[var(--text-muted)]">
               {regions.length} / {MAX_REGIONS}
             </span>
@@ -168,7 +169,7 @@ export default function FavoriteRegionsPage() {
             <div className="text-[13px] text-[var(--text-muted)]">{t.loading}</div>
           ) : regions.length === 0 ? (
             <div className="py-8 text-center text-[13px] text-[var(--text-muted)]">
-              아직 등록된 관심지역이 없습니다.
+              {t.userRegions.registeredEmpty}
             </div>
           ) : (
             <ul className="space-y-2">
@@ -191,7 +192,7 @@ export default function FavoriteRegionsPage() {
                     disabled={deleteMutation.isPending}
                     className="mr-3 shrink-0 rounded-[var(--radius-control)] border border-[var(--coral)] bg-[var(--coral)] px-3 py-1 text-sm font-semibold text-white transition hover:brightness-95 disabled:opacity-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--coral-soft)] focus-visible:ring-offset-1"
                   >
-                    삭제
+                    {t.userRegions.delete}
                   </button>
                 </li>
               ))}
@@ -201,11 +202,11 @@ export default function FavoriteRegionsPage() {
 
         {/* 오른쪽: 지역 추가 */}
         <section className="space-y-4 rounded-[var(--radius-panel-card)] border border-[var(--line)] bg-[var(--surface)] p-6 shadow-[0_10px_30px_rgba(28,39,60,0.04)]">
-          <h2 className="text-lg font-semibold text-[var(--ink)]">지역 추가</h2>
+          <h2 className="text-lg font-semibold text-[var(--ink)]">{t.userRegions.addTitle}</h2>
 
           <div className="space-y-3">
             <div>
-              <label className="mb-1 block text-[13px] text-[var(--text-muted)]">시/도</label>
+              <label className="mb-1 block text-[13px] text-[var(--text-muted)]">{t.userRegions.sidoLabel}</label>
               <select
                 value={selectedSido}
                 onChange={(e) => {
@@ -214,7 +215,7 @@ export default function FavoriteRegionsPage() {
                 }}
                 className="input"
               >
-                <option value="">시/도를 선택하세요</option>
+                <option value="">{t.userRegions.sidoPlaceholder}</option>
                 {METROS.map((m) => (
                   <option key={m} value={m}>
                     {t.metros[m]}
@@ -224,7 +225,7 @@ export default function FavoriteRegionsPage() {
             </div>
 
             <div>
-              <label className="mb-1 block text-[13px] text-[var(--text-muted)]">시/군/구</label>
+              <label className="mb-1 block text-[13px] text-[var(--text-muted)]">{t.userRegions.sigunguLabel}</label>
               <select
                 value={selectedSigunguCode}
                 onChange={(e) => setSelectedSigunguCode(e.target.value)}
@@ -233,15 +234,15 @@ export default function FavoriteRegionsPage() {
               >
                 <option value="">
                   {!selectedSido
-                    ? "먼저 시/도를 선택하세요"
+                    ? t.userRegions.sigunguPlaceholderNoSido
                     : sigunguLoading
                       ? t.loading
-                      : "시/군/구 또는 전체를 선택하세요"}
+                      : t.userRegions.sigunguPlaceholder}
                 </option>
                 {sigunguList.map((s) => (
                   <option key={s.code ?? s.name} value={s.code ?? ""}>
                     {s.name === "전체"
-                      ? `${t.metros[selectedSido as keyof typeof t.metros] ?? selectedSido} 전체`
+                      ? `${t.metros[selectedSido as keyof typeof t.metros] ?? selectedSido} ${t.userRegions.all}`
                       : s.translatedName ?? s.name}
                   </option>
                 ))}
@@ -257,12 +258,12 @@ export default function FavoriteRegionsPage() {
               }
               className="h-11 w-full rounded-[var(--radius-control)] bg-[var(--blue)] text-sm font-semibold text-white transition hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[var(--blue)]"
             >
-              {addMutation.isPending ? "추가 중..." : "+ 관심지역 추가"}
+              {addMutation.isPending ? t.userRegions.adding : t.userRegions.addButton}
             </button>
           </div>
 
           <p className="rounded-[var(--radius-card)] bg-[var(--blue-soft)] p-3 text-[13px] text-[var(--blue)]">
-            시/도 전체 또는 시/군/구 단위로 등록할 수 있습니다. 시/군/구 목록에서 &quot;{selectedSido || "시/도"} 전체&quot;를 선택하면 해당 시/도 전체 알림을 받게 됩니다.
+            {formatMessage(t.userRegions.addHint, { sido: selectedSido ? (t.metros[selectedSido as keyof typeof t.metros] ?? selectedSido) : t.userRegions.sidoLabel })}
           </p>
         </section>
       </div>

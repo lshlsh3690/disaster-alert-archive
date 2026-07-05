@@ -8,12 +8,15 @@ import Button from "../ui/Button";
 import { useCountdownContext } from "@/context/useCountdownContext";
 import { useEmailCodeVerify } from "@/lib/mutations/useEmailCodeVerify";
 import InputStatusMessage from "../ui/InputStatusMessage";
+import { useI18n } from "@/hooks/useI18n";
+import { formatMessage } from "@/utils/formatMessage";
 
 interface CodeInputProps<T extends FieldValues> {
   formMethods: UseFormReturn<T>;
 }
 
 export default function CodeInput<T extends FieldValues>({ formMethods }: CodeInputProps<T>) {
+  const t = useI18n();
   const { control, trigger, setError, clearErrors } = formMethods;
   const isCodeSended = useSignupStore((s) => s.isCodeSended);
   const isEmailVerified = useSignupStore((s) => s.isEmailVerified);
@@ -29,7 +32,7 @@ export default function CodeInput<T extends FieldValues>({ formMethods }: CodeIn
   const { mutate, isPending: isCodeVerifying } = useEmailCodeVerify({
     onSuccessCallback: () => {
       setIsEmailVerified(true);
-      alert("인증 코드가 확인되었습니다.");
+      alert(t.form.codeVerified);
       clearErrors("verificationCode" as Path<T>);
     },
     onErrorCallback: (errorMessage) => {
@@ -46,12 +49,12 @@ export default function CodeInput<T extends FieldValues>({ formMethods }: CodeIn
 
     console.log("isCodeSended ", isCodeSended);
     if (!isCodeSended) {
-      setError("verificationCode" as Path<T>, { message: "인증 코드를 먼저 요청하세요." });
+      setError("verificationCode" as Path<T>, { message: t.form.codeRequestFirst });
       return;
     }
 
     if (isEmailCodeTimeout) {
-      setError("verificationCode" as Path<T>, { message: "인증 시간이 만료되었습니다. 코드를 다시 요청하세요." });
+      setError("verificationCode" as Path<T>, { message: t.form.codeExpired });
       return;
     }
     mutate({
@@ -76,14 +79,14 @@ export default function CodeInput<T extends FieldValues>({ formMethods }: CodeIn
       <div className="flex gap-2">
         <input
           type="text"
-          placeholder="인증 코드"
+          placeholder={t.form.codePlaceholder}
           {...formMethods.register("verificationCode" as Path<T>)}
           disabled={isEmailVerified}
           className={`input ${isEmailVerified ? "bg-[#f1f3f6] text-[var(--text-subtle)]" : ""}`}
         />
 
         <Button type="button" onClick={handleVerifyCode} isLoading={isCodeVerifying} disabled={isEmailVerified}>
-          인증 확인
+          {t.form.codeVerify}
         </Button>
       </div>
 
@@ -95,12 +98,12 @@ export default function CodeInput<T extends FieldValues>({ formMethods }: CodeIn
         isPending={isCodeVerifying}
         message={
           isEmailVerified
-            ? "이메일인증이 완료되었습니다."
+            ? t.form.codeEmailVerified
             : isEmailCodeTimeout
-            ? "인증 시간이 만료되었습니다. 코드를 다시 요청하세요."
+            ? t.form.codeExpired
             : secondsLeft > 0
-            ? `인증 코드를 입력하세요. 남은 시간 : ${formatted}`
-            : "이메일을 입력하고 코드를 요청하세요."
+            ? formatMessage(t.form.codeTimeRemaining, { time: formatted })
+            : t.form.emailPrompt
         }
       />
     </div>

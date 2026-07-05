@@ -1,18 +1,11 @@
 "use client";
 
-const PROVIDERS = {
-  google: {
-    label: "Google 계정으로 로그인",
-    className: "bg-white text-[#1f1f1f] border border-[#747775] hover:bg-[#f7f8f8]",
-  },
-  kakao: {
-    label: "카카오 계정으로 로그인",
-    className: "bg-[#FEE500] text-[rgba(0,0,0,0.85)] hover:brightness-[0.97]",
-  },
-  naver: {
-    label: "네이버 계정으로 로그인",
-    className: "bg-[#03C75A] text-white hover:brightness-[0.95]",
-  },
+import { useI18n } from "@/hooks/useI18n";
+
+const PROVIDER_STYLE = {
+  google: "bg-white text-[#1f1f1f] border border-[#747775] hover:bg-[#f7f8f8]",
+  kakao: "bg-[#FEE500] text-[rgba(0,0,0,0.85)] hover:brightness-[0.97]",
+  naver: "bg-[#03C75A] text-white hover:brightness-[0.95]",
 } as const;
 
 export default function OAuthButton({
@@ -20,7 +13,8 @@ export default function OAuthButton({
 }: {
   provider: "google" | "kakao" | "naver";
 }) {
-  const cfg = PROVIDERS[provider];
+  const t = useI18n();
+  const cfg = { label: t.oauth[provider], className: PROVIDER_STYLE[provider] };
 
   const handleOAuth = () => {
     const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL || "";

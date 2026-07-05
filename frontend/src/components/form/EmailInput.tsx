@@ -5,6 +5,7 @@ import Button from "@/components/ui/Button";
 import { useSendEmailVerificationCode } from "@/lib/mutations/useSendEmailVerificationCode";
 import InputStatusMessage from "../ui/InputStatusMessage";
 import { useOptionalCountdownContext } from "@/context/useCountdownContext";
+import { useI18n } from "@/hooks/useI18n";
 
 interface EmailInputProps<T extends FieldValues> {
   formMethods: UseFormReturn<T>;
@@ -14,6 +15,7 @@ interface EmailInputProps<T extends FieldValues> {
 }
 
 export default function EmailInput<T extends FieldValues>({ formMethods, showVerificationUI }: EmailInputProps<T>) {
+  const t = useI18n();
   const { control, trigger, setError, clearErrors } = formMethods;
   const isEmailVerified = useSignupStore((state) => state.isEmailVerified);
   const isCodeSended = useSignupStore((state) => state.isCodeSended);
@@ -84,7 +86,7 @@ export default function EmailInput<T extends FieldValues>({ formMethods, showVer
 
   const statusMessage =
     emailCodeData?.message ??
-    (isEmailVerified ? "" : isCodeSended ? "인증 코드를 전송했습니다." : "이메일을 입력하고 코드를 요청하세요.");
+    (isEmailVerified ? "" : isCodeSended ? t.form.emailCodeSent : t.form.emailPrompt);
 
   return (
     <div className="space-y-2">
@@ -92,12 +94,12 @@ export default function EmailInput<T extends FieldValues>({ formMethods, showVer
         <input
           type="email"
           {...formMethods.register("email" as Path<T>)}
-          placeholder="이메일"
+          placeholder={t.form.emailPlaceholder}
           className="input flex-1"
         />
         {showVerificationUI && (
           <Button type="button" onClick={handleSendVerification} isLoading={isEmailCodeSending}>
-            인증 코드 받기
+            {t.form.requestCode}
           </Button>
         )}
       </div>

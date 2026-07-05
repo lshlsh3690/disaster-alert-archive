@@ -731,9 +731,9 @@ function StatsPageInner() {
           <div className="flex flex-col gap-1.5">
             <label className="text-xs font-semibold text-[var(--text-muted)]">{t.statsPage.period}</label>
             <div className="flex flex-wrap items-center gap-2">
-              <DatePicker value={localFilter.startDate} onChange={v => setLocalFilter(f => ({ ...f, startDate: v }))} locale={locale} className="border border-[var(--line)] rounded-lg px-2 py-1.5 text-sm text-[var(--ink)] focus:outline-none focus:border-[var(--blue)]" />
+              <DatePicker value={localFilter.startDate} onChange={v => setLocalFilter(f => ({ ...f, startDate: v }))} locale={locale} clearLabel={t.datePicker.clear} prevMonthLabel={t.datePicker.prevMonth} nextMonthLabel={t.datePicker.nextMonth} className="border border-[var(--line)] rounded-lg px-2 py-1.5 text-sm text-[var(--ink)] focus:outline-none focus:border-[var(--blue)]" />
               <span className="text-[var(--text-subtle)] text-sm">~</span>
-              <DatePicker value={localFilter.endDate} onChange={v => setLocalFilter(f => ({ ...f, endDate: v }))} locale={locale} className="border border-[var(--line)] rounded-lg px-2 py-1.5 text-sm text-[var(--ink)] focus:outline-none focus:border-[var(--blue)]" />
+              <DatePicker value={localFilter.endDate} onChange={v => setLocalFilter(f => ({ ...f, endDate: v }))} locale={locale} clearLabel={t.datePicker.clear} prevMonthLabel={t.datePicker.prevMonth} nextMonthLabel={t.datePicker.nextMonth} className="border border-[var(--line)] rounded-lg px-2 py-1.5 text-sm text-[var(--ink)] focus:outline-none focus:border-[var(--blue)]" />
               <div className="flex gap-1">
                 {([7, 30, 90] as const).map(d => (
                   <button key={d} onClick={() => setQuickDate(d)}

@@ -5,8 +5,10 @@ import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuthStore } from "@/store/authStore";
 import NotificationSettings from "@/components/notification/NotificationSettings";
+import { useI18n } from "@/hooks/useI18n";
 
 export default function AccountSettingsPage() {
+  const t = useI18n();
   const router = useRouter();
   const user = useAuthStore((s) => s.user);
 
@@ -20,15 +22,15 @@ export default function AccountSettingsPage() {
     <main className="bg-[var(--canvas)] min-h-[calc(100vh-48px)]">
       <div className="mx-auto max-w-3xl px-4 py-8 space-y-5">
         <header>
-          <h1 className="text-2xl font-bold text-[var(--ink)] tracking-tight">계정 설정</h1>
-          <p className="mt-1 text-[13px] text-[var(--text-muted)]">계정 정보를 확인하고 관리합니다.</p>
+          <h1 className="text-2xl font-bold text-[var(--ink)] tracking-tight">{t.userSettings.title}</h1>
+          <p className="mt-1 text-[13px] text-[var(--text-muted)]">{t.userSettings.description}</p>
         </header>
 
         {/* 프로필 정보 */}
         <section className="space-y-3 rounded-[var(--radius-panel-card)] border border-[var(--line)] bg-[var(--surface)] p-6 shadow-[0_10px_30px_rgba(28,39,60,0.04)]">
-          <h2 className="text-lg font-semibold text-[var(--ink)]">프로필 정보</h2>
-          <InfoRow label="이메일" value={user.email ?? "-"} />
-          <InfoRow label="닉네임" value={user.nickname ?? "-"} />
+          <h2 className="text-lg font-semibold text-[var(--ink)]">{t.userSettings.profileInfo}</h2>
+          <InfoRow label={t.userSettings.email} value={user.email ?? "-"} />
+          <InfoRow label={t.userSettings.nickname} value={user.nickname ?? "-"} />
         </section>
 
         {/* 알림 설정 */}
@@ -38,22 +40,22 @@ export default function AccountSettingsPage() {
 
         {/* 계정 관리 */}
         <section className="space-y-3 rounded-[var(--radius-panel-card)] border border-[var(--line)] bg-[var(--surface)] p-6 shadow-[0_10px_30px_rgba(28,39,60,0.04)]">
-          <h2 className="text-lg font-semibold text-[var(--ink)]">계정 관리</h2>
+          <h2 className="text-lg font-semibold text-[var(--ink)]">{t.userSettings.accountManagement}</h2>
           <button
             type="button"
             className="w-full rounded-[var(--radius-card)] border border-[var(--line)] px-4 py-3 text-left transition-colors hover:bg-[var(--blue-soft)] hover:border-[var(--blue)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--blue-soft)]"
-            onClick={() => alert("비밀번호 변경 기능은 준비 중입니다.")}
+            onClick={() => alert(t.userSettings.changePasswordComingSoon)}
           >
-            <div className="font-medium text-[var(--ink)]">비밀번호 변경</div>
-            <div className="mt-1 text-xs text-[var(--text-muted)]">계정 비밀번호를 변경합니다.</div>
+            <div className="font-medium text-[var(--ink)]">{t.userSettings.changePassword}</div>
+            <div className="mt-1 text-xs text-[var(--text-muted)]">{t.userSettings.changePasswordDesc}</div>
           </button>
           <button
             type="button"
             className="w-full rounded-[var(--radius-card)] border border-[#f3c7c1] px-4 py-3 text-left transition-colors hover:bg-[var(--coral-soft)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--coral-soft)]"
-            onClick={() => alert("회원 탈퇴 기능은 준비 중입니다.")}
+            onClick={() => alert(t.userSettings.deleteAccountComingSoon)}
           >
-            <div className="font-medium text-[var(--coral)]">회원 탈퇴</div>
-            <div className="mt-1 text-xs text-[var(--text-muted)]">계정과 모든 데이터를 삭제합니다.</div>
+            <div className="font-medium text-[var(--coral)]">{t.userSettings.deleteAccount}</div>
+            <div className="mt-1 text-xs text-[var(--text-muted)]">{t.userSettings.deleteAccountDesc}</div>
           </button>
         </section>
       </div>

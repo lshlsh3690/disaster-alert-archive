@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import { FieldValues, Path, UseFormReturn, useWatch } from "react-hook-form";
 import useSignupStore from "@/store/signupStore";
 import InputStatusMessage from "../ui/InputStatusMessage";
+import { useI18n } from "@/hooks/useI18n";
 
 interface NicknameInputProps<T extends FieldValues> {
   formMethods: UseFormReturn<T>;
@@ -12,6 +13,7 @@ interface NicknameInputProps<T extends FieldValues> {
 }
 
 export default function NicknameInput<T extends FieldValues>({ formMethods }: NicknameInputProps<T>) {
+  const t = useI18n();
   const {
     control,
     setError,
@@ -57,7 +59,7 @@ export default function NicknameInput<T extends FieldValues>({ formMethods }: Ni
       <input
         type="text"
         {...formMethods.register("nickname" as Path<T>)}
-        placeholder="닉네임"
+        placeholder={t.form.nicknamePlaceholder}
         className="input"
       />
 
@@ -66,7 +68,7 @@ export default function NicknameInput<T extends FieldValues>({ formMethods }: Ni
         formMethods={formMethods}
         isPending={isPending}
         isValid={showSuccess}
-        message={showSuccess ? "유효한 닉네임입니다." : "닉네임을 입력하세요."}
+        message={showSuccess ? t.form.nicknameValid : t.form.nicknamePrompt}
       />
     </div>
   );

@@ -283,7 +283,7 @@ function DisasterListPageInner() {
                   name="startDate"
                   control={control}
                   render={({ field }) => (
-                    <DatePicker value={field.value ?? ""} onChange={field.onChange} locale={LANG_LOCALE[language] ?? "ko-KR"} />
+                    <DatePicker value={field.value ?? ""} onChange={field.onChange} locale={LANG_LOCALE[language] ?? "ko-KR"} clearLabel={t.datePicker.clear} prevMonthLabel={t.datePicker.prevMonth} nextMonthLabel={t.datePicker.nextMonth} />
                   )}
                 />
               </div>
@@ -293,7 +293,7 @@ function DisasterListPageInner() {
                   name="endDate"
                   control={control}
                   render={({ field }) => (
-                    <DatePicker value={field.value ?? ""} onChange={field.onChange} locale={LANG_LOCALE[language] ?? "ko-KR"} />
+                    <DatePicker value={field.value ?? ""} onChange={field.onChange} locale={LANG_LOCALE[language] ?? "ko-KR"} clearLabel={t.datePicker.clear} prevMonthLabel={t.datePicker.prevMonth} nextMonthLabel={t.datePicker.nextMonth} />
                   )}
                 />
               </div>

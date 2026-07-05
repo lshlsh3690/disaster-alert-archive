@@ -4,6 +4,11 @@ import React, { useState } from "react";
 import { useCreateUserAlert } from "@/lib/mutations/useCreateUserAlert";
 import { LEVEL_OPTIONS } from "@/ui/level";
 import { useRouter } from "next/navigation";
+import { useI18n } from "@/hooks/useI18n";
+import { useLanguageStore } from "@/store/languageStore";
+import DatePicker from "@/components/form/DatePicker";
+
+const LANG_LOCALE: Record<string, string> = { ko: "ko-KR", en: "en-US", zh: "zh-CN", ja: "ja-JP" };
 
 const DISASTER_TYPES = [
   "호우",
@@ -28,6 +33,8 @@ type JusoItem = {
 };
 
 export default function RegisterAlertsPage() {
+  const t = useI18n();
+  const locale = LANG_LOCALE[useLanguageStore((s) => s.language)] ?? "ko-KR";
   const router = useRouter();
   const { mutate, isPending, isError, error } = useCreateUserAlert();
 
@@ -50,11 +57,11 @@ export default function RegisterAlertsPage() {
   const onSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!occurDate || !occurTime) {
-      alert("발생 일자와 시간을 입력하세요.");
+      alert(t.alertReport.dateTimeRequired);
       return;
     }
     if (!selectedRegionCode || !selectedRegionName) {
-      alert("주소 검색에서 지역을 선택하세요.");
+      alert(t.alertReport.regionRequired);
       return;
     }
 
@@ -70,7 +77,7 @@ export default function RegisterAlertsPage() {
       },
       {
         onSuccess: () => {
-          alert("제보가 등록되었습니다.");
+          alert(t.alertReport.submitSuccess);
           router.back();
         },
       }
@@ -80,11 +87,11 @@ export default function RegisterAlertsPage() {
   const searchJuso = async () => {
     const key = process.env.NEXT_PUBLIC_JUSO_API_KEY;
     if (!key) {
-      setAddrError("주소 API 키가 없습니다. NEXT_PUBLIC_JUSO_API_KEY를 설정하세요.");
+      setAddrError(t.alertReport.addrApiKeyMissing);
       return;
     }
     if (!addrQuery || addrQuery.trim().length < 2) {
-      setAddrError("주소를 두 글자 이상 입력하세요.");
+      setAddrError(t.alertReport.addrTooShort);
       return;
     }
     try {
@@ -145,7 +152,7 @@ export default function RegisterAlertsPage() {
 
       setAddrResults(items);
     } catch (e) {
-      setAddrError("주소 검색 중 오류가 발생했습니다. " + String(e));
+      setAddrError(`${t.alertReport.addrSearchError} ${String(e)}`);
     } finally {
       setAddrLoading(false);
     }
@@ -154,93 +161,101 @@ export default function RegisterAlertsPage() {
   return (
     <main className="p-6 space-y-6">
       <div>
-        <h1 className="text-xl font-semibold">재난 제보 등록</h1>
-        <p className="text-sm text-gray-500">필수 정보 입력 후 제출하세요.</p>
+        <h1 className="text-xl font-semibold">{t.alertReport.createTitle}</h1>
+        <p className="text-sm text-gray-500">{t.alertReport.createDesc}</p>
       </div>
 
       <form onSubmit={onSubmit} className="bg-white rounded-xl shadow p-4 grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="md:col-span-2">
-          <label className="block text-sm font-medium mb-1">제목</label>
-          <input className="input w-full" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="제목을 입력하세요" />
+          <label className="block text-sm font-medium mb-1">{t.alertReport.titleLabel}</label>
+          <input className="input w-full" value={title} onChange={(e) => setTitle(e.target.value)} placeholder={t.alertReport.titlePlaceholder} />
         </div>
 
         <div className="md:col-span-2">
-          <label className="block text-sm font-medium mb-1">메시지</label>
-          <textarea className="input w-full min-h-28" value={message} onChange={(e) => setMessage(e.target.value)} placeholder="전문/요지를 입력하세요" />
+          <label className="block text-sm font-medium mb-1">{t.alertReport.messageLabel}</label>
+          <textarea className="input w-full min-h-28" value={message} onChange={(e) => setMessage(e.target.value)} placeholder={t.alertReport.messagePlaceholder} />
         </div>
 
         <div>
-          <label className="block text-sm font-medium mb-1">DISASTER TYPE</label>
+          <label className="block text-sm font-medium mb-1">{t.alertReport.typeLabel}</label>
           <select className="input w-full" value={disasterType} onChange={(e) => setDisasterType(e.target.value)}>
-            <option value="">선택 안 함</option>
-            {DISASTER_TYPES.map((t) => (
-              <option key={t} value={t}>{t}</option>
+            <option value="">{t.alertReport.notSelected}</option>
+            {DISASTER_TYPES.map((type) => (
+              <option key={type} value={type}>{t.disasterTypes[type as keyof typeof t.disasterTypes] ?? type}</option>
             ))}
           </select>
         </div>
 
         <div>
-          <label className="block text-sm font-medium mb-1">DISASTER LEVEL</label>
+          <label className="block text-sm font-medium mb-1">{t.alertReport.levelLabel}</label>
           <select className="input w-full" value={disasterLevel} onChange={(e) => setDisasterLevel(e.target.value)}>
-            <option value="">선택 안 함</option>
+            <option value="">{t.alertReport.notSelected}</option>
             {LEVEL_OPTIONS.map((o) => (
-              <option key={o.code} value={o.code}>{o.text}</option>
+              <option key={o.code} value={o.code}>{t.levels[o.text as keyof typeof t.levels] ?? o.text}</option>
             ))}
           </select>
         </div>
 
         <div>
-          <label className="block text-sm font-medium mb-1">발생 일자</label>
-          <input className="input w-full" type="date" value={occurDate} onChange={(e) => setOccurDate(e.target.value)} />
+          <label className="block text-sm font-medium mb-1">{t.alertReport.occurDateLabel}</label>
+          <DatePicker
+            value={occurDate}
+            onChange={setOccurDate}
+            locale={locale}
+            className="input w-full"
+            clearLabel={t.datePicker.clear}
+            prevMonthLabel={t.datePicker.prevMonth}
+            nextMonthLabel={t.datePicker.nextMonth}
+          />
         </div>
 
         <div>
-          <label className="block text-sm font-medium mb-1">발생 시간 (24시간)</label>
+          <label className="block text-sm font-medium mb-1">{t.alertReport.occurTimeLabel}</label>
           <input className="input w-full" type="time" step={60} value={occurTime} onChange={(e) => setOccurTime(e.target.value)} />
         </div>
 
         <div className="md:col-span-2">
-          <label className="block text-sm font-medium mb-1">지역 선택 (주소 검색)</label>
+          <label className="block text-sm font-medium mb-1">{t.alertReport.regionSelectLabel}</label>
           <div className="flex gap-2">
             <input
               className="input w-full"
               readOnly
-              value={selectedRegionName ? `${selectedRegionName} (${selectedRegionCode})` : "주소를 선택하세요"}
+              value={selectedRegionName ? `${selectedRegionName} (${selectedRegionCode})` : t.alertReport.regionPlaceholder}
               onClick={() => setIsAddrModalOpen(true)}
             />
-            <button type="button" className="px-3 py-2 rounded bg-gray-100" onClick={() => setIsAddrModalOpen(true)}>검색</button>
+            <button type="button" className="px-3 py-2 rounded bg-gray-100" onClick={() => setIsAddrModalOpen(true)}>{t.alertReport.search}</button>
             {selectedRegionName && (
-              <button type="button" className="px-3 py-2 rounded bg-gray-100" onClick={() => { setSelectedRegionName(""); setSelectedRegionCode(""); }}>초기화</button>
+              <button type="button" className="px-3 py-2 rounded bg-gray-100" onClick={() => { setSelectedRegionName(""); setSelectedRegionCode(""); }}>{t.alertReport.reset}</button>
             )}
           </div>
-          <p className="text-xs text-gray-500 mt-1">클릭하여 주소 검색 창을 열고, 한 개의 주소를 선택하세요.</p>
+          <p className="text-xs text-gray-500 mt-1">{t.alertReport.regionHint}</p>
         </div>
 
         <div className="md:col-span-2 flex justify-end gap-2">
-          <button type="submit" className="px-4 py-2 rounded bg-blue-600 text-white disabled:opacity-60" disabled={isPending}>등록</button>
+          <button type="submit" className="px-4 py-2 rounded bg-blue-600 text-white disabled:opacity-60" disabled={isPending}>{t.alertReport.submit}</button>
         </div>
       </form>
 
-      {isPending && <div>제출 중...</div>}
+      {isPending && <div>{t.alertReport.submitting}</div>}
       {isError && <pre className="text-red-600">{String(error)}</pre>}
 
       {/* 주소 검색 모달 */}
       <Modal open={isAddrModalOpen} onClose={() => setIsAddrModalOpen(false)}>
         <div className="space-y-3">
-          <h3 className="text-lg font-semibold">주소 검색</h3>
+          <h3 className="text-lg font-semibold">{t.alertReport.addrModalTitle}</h3>
           <div className="flex gap-2">
             <input
               className="input w-full"
               value={addrQuery}
               onChange={(e) => setAddrQuery(e.target.value)}
-              placeholder="예: 서울특별시 종로구 신교동"
+              placeholder={t.alertReport.addrPlaceholderExample}
             />
             <button type="button" className="px-3 py-2 rounded bg-blue-600 text-white" onClick={searchJuso}>
-              검색
+              {t.alertReport.search}
             </button>
           </div>
 
-          {addrLoading && <div className="text-sm text-gray-500">검색 중...</div>}
+          {addrLoading && <div className="text-sm text-gray-500">{t.alertReport.addrSearching}</div>}
           {addrError && <div className="text-sm text-red-600">{addrError}</div>}
 
           {!addrLoading && addrResults.length > 0 && (
@@ -249,7 +264,7 @@ export default function RegisterAlertsPage() {
                 <li key={`${r.code}-${r.name}`} className="py-2 flex items-center justify-between gap-3">
                   <div>
                     <div className="text-sm text-gray-800">{r.name}</div>
-                    <div className="text-xs text-gray-500">법정동코드: {r.code}</div>
+                    <div className="text-xs text-gray-500">{t.alertReport.districtCodeLabel}: {r.code}</div>
                   </div>
                   <button
                     type="button"
@@ -260,14 +275,14 @@ export default function RegisterAlertsPage() {
                       setIsAddrModalOpen(false);
                     }}
                   >
-                    선택
+                    {t.alertReport.select}
                   </button>
                 </li>
               ))}
             </ul>
           )}
           {!addrLoading && addrResults.length === 0 && !addrError && (
-            <div className="text-sm text-gray-500">검색 결과가 없습니다.</div>
+            <div className="text-sm text-gray-500">{t.alertReport.addrNoResults}</div>
           )}
         </div>
       </Modal>
@@ -277,12 +292,13 @@ export default function RegisterAlertsPage() {
 
 // 간단한 모달 컴포넌트
 function Modal({ open, onClose, children }: { open: boolean; onClose: () => void; children: React.ReactNode }) {
+  const t = useI18n();
   if (!open) return null;
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
       <div className="bg-white rounded-xl shadow w-full max-w-2xl p-4">
         <div className="flex justify-end">
-          <button className="px-2 py-1 text-sm" onClick={onClose}>닫기</button>
+          <button className="px-2 py-1 text-sm" onClick={onClose}>{t.alertReport.close}</button>
         </div>
         {children}
       </div>

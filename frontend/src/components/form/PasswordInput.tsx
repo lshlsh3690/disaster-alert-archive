@@ -2,6 +2,7 @@ import { useState } from "react";
 import { FieldValues, Path, UseFormReturn } from "react-hook-form";
 import InputStatusMessage from "../ui/InputStatusMessage";
 import useSignupStore from "@/store/signupStore";
+import { useI18n } from "@/hooks/useI18n";
 
 interface PasswordInput<T extends FieldValues> {
   formMethods: UseFormReturn<T>;
@@ -14,6 +15,7 @@ export default function PasswordInput<T extends FieldValues>({
   name,
   showVerificationUI,
 }: PasswordInput<T>) {
+  const t = useI18n();
   const { register, watch, formState } = formMethods;
   const value = watch(name);
   const isPasswordMatched = useSignupStore((s) => s.isPasswordMatched);
@@ -21,13 +23,13 @@ export default function PasswordInput<T extends FieldValues>({
   const [showPassword, setShowPassword] = useState(false);
 
   const labels: Record<string, string> = {
-    password: "비밀번호",
-    confirmPassword: "비밀번호 확인",
+    password: t.form.passwordLabel,
+    confirmPassword: t.form.confirmPasswordLabel,
   };
 
   const message: Record<string, string> = {
-    password: "비밀번호를 입력하세요.",
-    confirmPassword: "비밀번호 확인을 입력하세요.",
+    password: t.form.passwordRequired,
+    confirmPassword: t.form.confirmPasswordRequired,
   };
 
   const hasValue = value.trim().length > 0;
@@ -37,14 +39,14 @@ export default function PasswordInput<T extends FieldValues>({
       <div className="relative">
         <input
           type={showPassword ? "text" : "password"}
-          placeholder={labels[name] ?? "입력"}
+          placeholder={labels[name] ?? t.form.passwordPlaceholderDefault}
           {...register(name)}
           className="input pr-10"
         />
         <button
           type="button"
           className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-[var(--text-subtle)] transition-colors hover:text-[var(--text-body)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--blue-soft)]"
-          aria-label={showPassword ? "비밀번호 숨기기" : "비밀번호 표시"}
+          aria-label={showPassword ? t.form.hidePassword : t.form.showPassword}
           onClick={() => setShowPassword((prev) => !prev)}
         >
           {showPassword ? (
@@ -69,9 +71,9 @@ export default function PasswordInput<T extends FieldValues>({
           isValid={hasValue && isPasswordMatched}
           message={
             hasValue && isPasswordMatched
-              ? "비밀번호가 일치합니다."
+              ? t.form.passwordMatch
               : hasValue && !isPasswordMatched && !error
-              ? "유효한 비밀번호입니다."
+              ? t.form.passwordValid
               : message[name]
           }
         />

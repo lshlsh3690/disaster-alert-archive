@@ -3,30 +3,18 @@
 
 import { useState, useEffect } from "react";
 import { useNotificationPermission } from "@/hooks/useNotificationPermission";
+import { useI18n } from "@/hooks/useI18n";
 
 type NotificationType = "NONE" | "PUSH" | "ALARM";
 
-const NOTIFICATION_OPTIONS: {
-  type: NotificationType;
-  label: string;
-  description: string;
-}[] = [
-  {
-    type: "NONE",
-    label: "알림 없음",
-    description: "재난문자를 받아도 알림이 표시되지 않습니다.",
-  },
-  {
-    type: "PUSH",
-    label: "푸시 알림",
-    description: "상단 배너로 재난문자 알림이 표시됩니다.",
-  },
-  {
-    type: "ALARM",
-    label: "시스템 알람",
-    description: "소리와 진동으로 즉시 알림이 표시됩니다.",
-  },
-];
+function useNotificationOptions(): { type: NotificationType; label: string; description: string }[] {
+  const t = useI18n();
+  return [
+    { type: "NONE", label: t.notificationSettings.none.label, description: t.notificationSettings.none.description },
+    { type: "PUSH", label: t.notificationSettings.push.label, description: t.notificationSettings.push.description },
+    { type: "ALARM", label: t.notificationSettings.alarm.label, description: t.notificationSettings.alarm.description },
+  ];
+}
 
 function NotificationTypeIcon({ type }: { type: NotificationType }) {
   if (type === "NONE") {
@@ -58,10 +46,13 @@ function NotificationTypeIcon({ type }: { type: NotificationType }) {
 }
 
 export default function NotificationSettings() {
+  const t = useI18n();
+  const NOTIFICATION_OPTIONS = useNotificationOptions();
   const { permission, isLoading, requestPermission } = useNotificationPermission();
   const [selectedType, setSelectedType] = useState<NotificationType>("PUSH");
   const [isSaving, setIsSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState("");
+  const [saveStatus, setSaveStatus] = useState<"success" | "error" | null>(null);
 
   // 현재 설정 불러오기
   useEffect(() => {
@@ -87,7 +78,8 @@ export default function NotificationSettings() {
     if (type !== "NONE" && permission !== "granted") {
       const granted = await requestPermission();
       if (!granted) {
-        setSaveMessage("알림 권한이 거부되었습니다. 브라우저 설정에서 허용해주세요.");
+        setSaveStatus("error");
+        setSaveMessage(t.notificationSettings.permissionDenied);
         return;
       }
     }
@@ -103,12 +95,14 @@ export default function NotificationSettings() {
 
       if (res.ok) {
         setSelectedType(type);
-        setSaveMessage("알림 설정이 저장되었습니다.");
+        setSaveStatus("success");
+        setSaveMessage(t.notificationSettings.saveSuccess);
         setTimeout(() => setSaveMessage(""), 3000);
       }
     } catch (error) {
       console.error("알림 설정 저장 실패:", error);
-      setSaveMessage("저장에 실패했습니다. 다시 시도해주세요.");
+      setSaveStatus("error");
+      setSaveMessage(t.notificationSettings.saveError);
     } finally {
       setIsSaving(false);
     }
@@ -116,18 +110,18 @@ export default function NotificationSettings() {
 
   return (
     <div className="space-y-4">
-      <h2 className="text-lg font-semibold text-[var(--ink)]">알림 설정</h2>
+      <h2 className="text-lg font-semibold text-[var(--ink)]">{t.notificationSettings.title}</h2>
 
       {/* 권한 상태 배너 */}
       {permission === "denied" && (
         <p className="rounded-[var(--radius-compact)] border border-[#f3c7c1] bg-[var(--coral-soft)] px-3 py-2.5 text-[13px] text-[#b4453a]">
-          알림 권한이 차단되어 있습니다. 브라우저 설정에서 알림을 허용해주세요.
+          {t.notificationSettings.permissionBlocked}
         </p>
       )}
 
       {permission === "default" && (
         <p className="rounded-[var(--radius-compact)] border border-[#cfe0fb] bg-[var(--blue-soft)] px-3 py-2.5 text-[13px] text-[var(--blue)]">
-          푸시 알림을 받으려면 알림 권한을 허용해주세요.
+          {t.notificationSettings.permissionPrompt}
         </p>
       )}
 
@@ -159,7 +153,7 @@ export default function NotificationSettings() {
                   <span className="font-medium text-[var(--ink)]">{option.label}</span>
                   {isSelected && (
                     <span className="rounded-[var(--radius-pill)] bg-[var(--blue)] px-2 py-0.5 text-[11px] font-semibold text-white">
-                      현재 설정
+                      {t.notificationSettings.currentSetting}
                     </span>
                   )}
                 </span>
@@ -174,7 +168,7 @@ export default function NotificationSettings() {
       {saveMessage && (
         <p
           className={`text-center text-[13px] ${
-            saveMessage.includes("실패") || saveMessage.includes("거부") ? "text-[var(--coral)]" : "text-[var(--success)]"
+            saveStatus === "error" ? "text-[var(--coral)]" : "text-[var(--success)]"
           }`}
         >
           {saveMessage}
