@@ -373,7 +373,7 @@ function EventsPageInner() {
                       </svg>
                       {t.events.relatedCount} {e.alertCount}{t.alertList.countUnit}
                     </span>
-                    <span className="text-[var(--text-subtle)]">{formatEventPeriod(e.firstAlertAt, e.lastAlertAt)}</span>
+                    <span className="text-[var(--text-subtle)]">{formatEventPeriod(e.firstAlertAt, e.lastAlertAt, t.events)}</span>
                   </div>
                 </Link>
               </li>

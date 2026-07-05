@@ -86,7 +86,7 @@ export default function EventDetailPage() {
   if (!data) return <main className="py-8 text-center text-[13px] text-[var(--text-muted)]">{t.events.notFound}</main>;
 
   const title = data.translatedTitle ?? data.eventTitle;
-  const period = formatEventPeriod(data.firstAlertAt, data.lastAlertAt);
+  const period = formatEventPeriod(data.firstAlertAt, data.lastAlertAt, t.events);
 
   return (
     <main className="bg-[var(--canvas)] min-h-[calc(100vh-48px)]">
