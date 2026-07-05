@@ -17,6 +17,10 @@ import { useI18n } from "@/hooks/useI18n";
 import { useLanguageStore } from "@/store/languageStore";
 import { disasterTypeChipStyle, disasterTypePalette } from "@/ui/disasterTypeColor";
 
+// <input type="date">의 표시 포맷은 JS 텍스트가 아니라 브라우저가 lang 속성을 보고 렌더링하므로
+// 언어 전환 시 실제로 반영되도록 명시적으로 넘겨준다.
+const LANG_LOCALE: Record<string, string> = { ko: "ko-KR", en: "en-US", zh: "zh-CN", ja: "ja-JP" };
+
 const LEVEL_BADGE: Record<string, { backgroundColor: string; color: string }> = {
   안전안내: { backgroundColor: "var(--blue-soft)", color: "var(--blue)" },
   긴급재난: { backgroundColor: "#fff1e3", color: "#c1670c" },
@@ -251,47 +255,65 @@ function DisasterListPageInner() {
               onSubmit={handleSubmit(onSubmit)}
               className="grid grid-cols-1 gap-3 rounded-[var(--radius-panel-card)] border border-[var(--line)] bg-[var(--surface)] p-4 shadow-[0_10px_30px_rgba(28,39,60,0.04)] sm:grid-cols-2 md:grid-cols-4"
             >
-              <select {...register("sido")} className="input">
-                <option value="">{t.alertList.filter.sido}</option>
-                {METROS.map((m) => (
-                  <option key={m} value={m}>{t.metros[m]}</option>
-                ))}
-              </select>
-              <select {...register("sigungu")} className="input disabled:opacity-60" disabled={!watchedSido}>
-                <option value="">{t.alertList.filter.sigungu}</option>
-                {/* 드롭다운 - value는 한국어 이름(검색용), 표시는 번역된 이름 */}
-                {sigunguList?.filter((s) => s.name !== "전체").map((s) => (
-                  <option key={s.code} value={s.name}>
-                    {s.translatedName ?? s.name}
-                  </option>
-                ))}
-              </select>
+              <div className="flex flex-col gap-1">
+                <label className="text-xs text-[var(--text-muted)]">{t.alertList.filter.sido}</label>
+                <select {...register("sido")} className="input">
+                  <option value="">{t.alertList.filter.sido}</option>
+                  {METROS.map((m) => (
+                    <option key={m} value={m}>{t.metros[m]}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-xs text-[var(--text-muted)]">{t.alertList.filter.sigungu}</label>
+                <select {...register("sigungu")} className="input disabled:opacity-60" disabled={!watchedSido}>
+                  <option value="">{t.alertList.filter.sigungu}</option>
+                  {/* 드롭다운 - value는 한국어 이름(검색용), 표시는 번역된 이름 */}
+                  {sigunguList?.filter((s) => s.name !== "전체").map((s) => (
+                    <option key={s.code} value={s.name}>
+                      {s.translatedName ?? s.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
               <div className="flex flex-col gap-1">
                 <label className="text-xs text-[var(--text-muted)]">{t.alertList.filter.startDate}</label>
-                <input {...register("startDate")} type="date" className="input" />
+                <input {...register("startDate")} type="date" lang={LANG_LOCALE[language] ?? "ko-KR"} className="input" />
               </div>
               <div className="flex flex-col gap-1">
                 <label className="text-xs text-[var(--text-muted)]">{t.alertList.filter.endDate}</label>
-                <input {...register("endDate")} type="date" className="input" />
+                <input {...register("endDate")} type="date" lang={LANG_LOCALE[language] ?? "ko-KR"} className="input" />
               </div>
-              <select {...register("type")} className="input">
-                <option value="">{t.alertList.filter.type}</option>
-                {DISASTER_TYPES.map((type) => (
-                  <option key={type} value={type}>{t.disasterTypes[type]}</option>
-                ))}
-              </select>
-              <select {...register("levelText")} className="input">
-                <option value="">{t.alertList.filter.level}</option>
-                {LEVEL_OPTIONS.map((o) => (
-                  <option key={o.code} value={o.text}>{t.levels[o.text]}</option>
-                ))}
-              </select>
-              <select {...register("source")} className="input">
-                <option value="ALL">{t.alertList.filter.sourceAll}</option>
-                <option value="OFFICIAL">{t.alertList.filter.sourceOfficial}</option>
-                <option value="USER">{t.alertList.filter.sourceUser}</option>
-              </select>
-              <input {...register("keyword")} placeholder={t.alertList.filter.keyword} className="input col-span-full sm:col-span-2" />
+              <div className="flex flex-col gap-1">
+                <label className="text-xs text-[var(--text-muted)]">{t.alertList.filter.type}</label>
+                <select {...register("type")} className="input">
+                  <option value="">{t.alertList.filter.type}</option>
+                  {DISASTER_TYPES.map((type) => (
+                    <option key={type} value={type}>{t.disasterTypes[type]}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-xs text-[var(--text-muted)]">{t.alertList.filter.level}</label>
+                <select {...register("levelText")} className="input">
+                  <option value="">{t.alertList.filter.level}</option>
+                  {LEVEL_OPTIONS.map((o) => (
+                    <option key={o.code} value={o.text}>{t.levels[o.text]}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-xs text-[var(--text-muted)]">{t.alertList.filter.sourceAll}</label>
+                <select {...register("source")} className="input">
+                  <option value="ALL">{t.alertList.filter.sourceAll}</option>
+                  <option value="OFFICIAL">{t.alertList.filter.sourceOfficial}</option>
+                  <option value="USER">{t.alertList.filter.sourceUser}</option>
+                </select>
+              </div>
+              <div className="flex flex-col gap-1 col-span-full sm:col-span-2">
+                <label className="text-xs text-[var(--text-muted)]">{t.alertList.filter.keyword}</label>
+                <input {...register("keyword")} placeholder={t.alertList.filter.keyword} className="input" />
+              </div>
               <div className="col-span-full flex justify-end gap-2">
                 <button
                   type="button"

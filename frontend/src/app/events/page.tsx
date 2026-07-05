@@ -20,6 +20,10 @@ import type { Event } from "@/types/events";
 
 type ActiveTab = "active" | "past" | "all";
 
+// <input type="date">의 표시 포맷은 JS 텍스트가 아니라 브라우저가 lang 속성을 보고 렌더링하므로
+// 언어 전환 시 실제로 반영되도록 명시적으로 넘겨준다.
+const LANG_LOCALE: Record<string, string> = { ko: "ko-KR", en: "en-US", zh: "zh-CN", ja: "ja-JP" };
+
 const ZSearch = z.object({
   sido: z.string().optional(),
   sigungu: z.string().optional(),
@@ -273,11 +277,11 @@ function EventsPageInner() {
 
           <label className="flex flex-col gap-1">
             <span className="text-xs text-[var(--text-muted)]">{t.events.filter.startDate}</span>
-            <input type="date" {...register("startDate")} className="input" />
+            <input type="date" {...register("startDate")} lang={LANG_LOCALE[lang] ?? "ko-KR"} className="input" />
           </label>
           <label className="flex flex-col gap-1">
             <span className="text-xs text-[var(--text-muted)]">{t.events.filter.endDate}</span>
-            <input type="date" {...register("endDate")} className="input" />
+            <input type="date" {...register("endDate")} lang={LANG_LOCALE[lang] ?? "ko-KR"} className="input" />
           </label>
           <input type="text" {...register("keyword")} className="input self-end" placeholder={t.events.filter.keyword} />
 
