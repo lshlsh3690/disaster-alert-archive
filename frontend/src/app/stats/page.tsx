@@ -56,15 +56,24 @@ import { levelTextToCode } from "@/ui/level";
 import { METROS } from "@/ui/metros";
 import { DISASTER_TYPES } from "@/ui/disasterType";
 import type { TypeStat, LevelStat, RegionStat, LibItem, WidgetItem } from "./_constants";
-import { WIDGET_LIBRARY, DEFAULT_LAYOUT } from "./_constants";
+import { getWidgetLibrary, DEFAULT_LAYOUT } from "./_constants";
 import { WidgetCard, WidgetContent } from "./_WidgetCard";
 import { WidgetLibrary } from "./_WidgetLibrary";
 import { KpiBox, FilterBanner } from "./_KpiCards";
+import { useI18n } from "@/hooks/useI18n";
+import { useLanguageStore } from "@/store/languageStore";
+import { formatMessage } from "@/utils/formatMessage";
+import DatePicker from "@/components/form/DatePicker";
 import "./stats.css";
+
+const LANG_LOCALE: Record<string, string> = { ko: "ko-KR", en: "en-US", zh: "zh-CN", ja: "ja-JP" };
+type T = ReturnType<typeof useI18n>;
 
 // ─── CSV 다운로드 ─────────────────────────────────────────────────────────────
 
 function buildCsv(opts: {
+  t: T;
+  locale: string;
   filters: Record<string, string>;
   totalCount: number;
   dailyAvg: number;
@@ -83,112 +92,117 @@ function buildCsv(opts: {
   weatherHourlyRegionStats: WeatherRegionStat[];
   isShortPeriod: boolean;
 }): string {
-  const { filters, totalCount, dailyAvg, topType, topRegion, typeStats, regionStats, levelStats, dailyStats, quarterStats,
+  const { t, locale, filters, totalCount, dailyAvg, topType, topRegion, typeStats, regionStats, levelStats, dailyStats, quarterStats,
     weatherStats, weatherTypeStats, weatherRegionStats,
     weatherHourlyStats, weatherHourlyTypeStats, weatherHourlyRegionStats, isShortPeriod } = opts;
+  const csv = t.statsPage.csv;
+  const translateType = (type: string) => t.disasterTypes[type as keyof typeof t.disasterTypes] ?? type;
+  const translateRegion = (region: string) => t.metros[region as keyof typeof t.metros] ?? region;
   const rows: string[] = [];
   const row = (...cols: (string | number)[]) => rows.push(cols.map(c => `"${String(c).replace(/"/g, '""')}"`).join(","));
   const blank = () => rows.push("");
   const section = (title: string) => { blank(); row(title); };
 
-  row("재난 통계 데이터");
-  row(`다운로드 시각: ${new Date().toLocaleString("ko-KR")}`);
+  row(csv.title);
+  row(`${csv.downloadedAt}: ${new Date().toLocaleString(locale)}`);
 
-  section("## 필터 조건");
-  row("항목", "값");
+  section(`## ${csv.filterConditions}`);
+  row(csv.item, csv.value);
   Object.entries(filters).forEach(([k, v]) => row(k, v || "-"));
 
-  section("## KPI 요약");
-  row("항목", "값");
-  row("총 발생 건수", `${totalCount}건`);
-  row("일 평균 (최근 30일)", `${dailyAvg}건`);
-  row("최다 유형", topType?.type ?? "-");
-  row("최다 지역", topRegion?.region ?? "-");
+  section(`## ${csv.kpiSummary}`);
+  row(csv.item, csv.value);
+  row(t.statsPage.totalAlerts, `${totalCount}${t.statsPage.countUnit}`);
+  row(`${t.statsPage.dailyAverage} (${t.statsPage.recentThirtyDays})`, `${dailyAvg}${t.statsPage.countUnit}`);
+  row(t.statsPage.topType, topType?.type ? translateType(topType.type) : "-");
+  row(t.statsPage.topRegion, topRegion?.region ? translateRegion(topRegion.region) : "-");
 
   if (typeStats.length > 0) {
-    section("## 재난 유형 분포");
-    row("순위", "유형", "건수", "비율");
+    section(`## ${csv.typeDistribution}`);
+    row(t.statsPage.rank, t.statsPage.type, t.statsPage.count, t.statsPage.share);
     typeStats.forEach((d, i) =>
-      row(i + 1, d.type ?? "기타", d.count, `${Math.round((d.count / (totalCount || 1)) * 100)}%`)
+      row(i + 1, d.type ? translateType(d.type) : t.statsPage.other, d.count, `${Math.round((d.count / (totalCount || 1)) * 100)}%`)
     );
   }
 
   if (regionStats.length > 0) {
-    section("## 지역별 발생 건수");
-    row("순위", "지역", "건수");
-    regionStats.forEach((d, i) => row(i + 1, d.region, d.count));
+    section(`## ${csv.regionDistribution}`);
+    row(t.statsPage.rank, t.statsPage.region, t.statsPage.count);
+    regionStats.forEach((d, i) => row(i + 1, translateRegion(d.region), d.count));
   }
 
   if (levelStats.length > 0) {
-    const levelNames: Record<string, string> = { LEVEL_1: "안전안내", LEVEL_2: "긴급재난", LEVEL_3: "위급재난" };
     const levelTotal = levelStats.reduce((s, d) => s + d.count, 0) || 1;
-    section("## 경보 단계 분포");
-    row("단계", "건수", "비율");
+    section(`## ${csv.levelDistribution}`);
+    row(t.statsPage.level, t.statsPage.count, t.statsPage.share);
     levelStats.forEach(d =>
-      row(d.level ? (levelNames[d.level] ?? d.level) : "기타", d.count, `${Math.round((d.count / levelTotal) * 100)}%`)
+      row(d.level ? (t.statsPage.levels[d.level as keyof typeof t.statsPage.levels] ?? d.level) : t.statsPage.other, d.count, `${Math.round((d.count / levelTotal) * 100)}%`)
     );
   }
 
   if (quarterStats.length > 0) {
     const quarterTotal = quarterStats.reduce((s, d) => s + d.count, 0) || 1;
-    section("## 분기별 발생 건수");
-    row("분기", "건수", "비율");
+    section(`## ${t.statsPage.tableTabs.quarter}`);
+    row(t.statsPage.quarter, t.statsPage.count, t.statsPage.share);
     quarterStats.forEach(d => row(d.quarter, d.count, `${Math.round((d.count / quarterTotal) * 100)}%`));
   }
 
   if (dailyStats.length > 0) {
-    section("## 일별 발생 추이");
-    row("날짜", "건수");
+    section(`## ${csv.dailyTrend}`);
+    row(t.statsPage.date, t.statsPage.count);
     dailyStats.forEach(d => row(d.date, d.count));
   }
 
   const fmt = (v: number | null | undefined) => v == null ? "-" : String(v);
+  const weatherCols = [t.statsPage.date, t.statsPage.totalAlerts, `${t.statsPage.averageTemperature}`, `min(℃)`, `max(℃)`, `precip(mm)`, `wind(m/s)`, t.statsPage.topType];
+  const weatherTypeCols = [t.statsPage.date, t.statsPage.type, t.statsPage.count, t.statsPage.averageTemperature, `min(℃)`, `max(℃)`, `precip(mm)`];
+  const weatherRegionCols = [t.statsPage.date, t.statsPage.region, t.statsPage.count, t.statsPage.averageTemperature, `min(℃)`, `max(℃)`, `precip(mm)`];
 
   if (weatherStats.length > 0) {
-    section("## 일별 날씨-재난 상관관계");
-    row("날짜", "재난건수", "평균기온(℃)", "최저기온(℃)", "최고기온(℃)", "최대강수량(mm)", "평균풍속(m/s)", "주요재난유형");
+    section(`## ${t.statsPage.widgets.weatherCorrelation.title}`);
+    row(...weatherCols);
     weatherStats.forEach(d =>
-      row(d.date, d.count, fmt(d.avgTemp), fmt(d.minTemp), fmt(d.maxTemp), fmt(d.maxPrecip), fmt(d.avgWindSpeed), d.primaryType ?? "-")
+      row(d.date, d.count, fmt(d.avgTemp), fmt(d.minTemp), fmt(d.maxTemp), fmt(d.maxPrecip), fmt(d.avgWindSpeed), d.primaryType ? translateType(d.primaryType) : "-")
     );
   }
 
   if (weatherTypeStats.length > 0) {
-    section("## 재난유형별 날씨");
-    row("날짜", "재난유형", "건수", "평균기온(℃)", "최저기온(℃)", "최고기온(℃)", "최대강수량(mm)");
+    section(`## ${t.statsPage.widgets.weatherCorrelation.title} · ${t.statsPage.variants.byType}`);
+    row(...weatherTypeCols);
     weatherTypeStats.forEach(d =>
-      row(d.date, d.type ?? "기타", d.count, fmt(d.avgTemp), fmt(d.minTemp), fmt(d.maxTemp), fmt(d.maxPrecip))
+      row(d.date, d.type ? translateType(d.type) : t.statsPage.other, d.count, fmt(d.avgTemp), fmt(d.minTemp), fmt(d.maxTemp), fmt(d.maxPrecip))
     );
   }
 
   if (weatherRegionStats.length > 0) {
-    section("## 지역별 날씨");
-    row("날짜", "지역", "건수", "평균기온(℃)", "최저기온(℃)", "최고기온(℃)", "최대강수량(mm)");
+    section(`## ${t.statsPage.widgets.weatherCorrelation.title} · ${t.statsPage.variants.byRegion}`);
+    row(...weatherRegionCols);
     weatherRegionStats.forEach(d =>
-      row(d.date, d.region, d.count, fmt(d.avgTemp), fmt(d.minTemp), fmt(d.maxTemp), fmt(d.maxPrecip))
+      row(d.date, translateRegion(d.region), d.count, fmt(d.avgTemp), fmt(d.minTemp), fmt(d.maxTemp), fmt(d.maxPrecip))
     );
   }
 
   if (isShortPeriod && weatherHourlyStats.length > 0) {
-    section("## 시간별 날씨-재난 상관관계");
-    row("일시", "재난건수", "평균기온(℃)", "최저기온(℃)", "최고기온(℃)", "최대강수량(mm)", "평균풍속(m/s)", "주요재난유형");
+    section(`## ${t.statsPage.widgets.weatherCorrelation.title} (${t.statsPage.variants.hour})`);
+    row(...weatherCols);
     weatherHourlyStats.forEach(d =>
-      row(d.date, d.count, fmt(d.avgTemp), fmt(d.minTemp), fmt(d.maxTemp), fmt(d.maxPrecip), fmt(d.avgWindSpeed), d.primaryType ?? "-")
+      row(d.date, d.count, fmt(d.avgTemp), fmt(d.minTemp), fmt(d.maxTemp), fmt(d.maxPrecip), fmt(d.avgWindSpeed), d.primaryType ? translateType(d.primaryType) : "-")
     );
   }
 
   if (isShortPeriod && weatherHourlyTypeStats.length > 0) {
-    section("## 시간별 재난유형별 날씨");
-    row("일시", "재난유형", "건수", "평균기온(℃)", "최저기온(℃)", "최고기온(℃)", "최대강수량(mm)");
+    section(`## ${t.statsPage.widgets.weatherCorrelation.title} · ${t.statsPage.variants.byType} (${t.statsPage.variants.hour})`);
+    row(...weatherTypeCols);
     weatherHourlyTypeStats.forEach(d =>
-      row(d.date, d.type ?? "기타", d.count, fmt(d.avgTemp), fmt(d.minTemp), fmt(d.maxTemp), fmt(d.maxPrecip))
+      row(d.date, d.type ? translateType(d.type) : t.statsPage.other, d.count, fmt(d.avgTemp), fmt(d.minTemp), fmt(d.maxTemp), fmt(d.maxPrecip))
     );
   }
 
   if (isShortPeriod && weatherHourlyRegionStats.length > 0) {
-    section("## 시간별 지역별 날씨");
-    row("일시", "지역", "건수", "평균기온(℃)", "최저기온(℃)", "최고기온(℃)", "최대강수량(mm)");
+    section(`## ${t.statsPage.widgets.weatherCorrelation.title} · ${t.statsPage.variants.byRegion} (${t.statsPage.variants.hour})`);
+    row(...weatherRegionCols);
     weatherHourlyRegionStats.forEach(d =>
-      row(d.date, d.region, d.count, fmt(d.avgTemp), fmt(d.minTemp), fmt(d.maxTemp), fmt(d.maxPrecip))
+      row(d.date, translateRegion(d.region), d.count, fmt(d.avgTemp), fmt(d.minTemp), fmt(d.maxTemp), fmt(d.maxPrecip))
     );
   }
 
@@ -238,14 +252,18 @@ function SortableWidgetCard({ id, span, children, ...cardProps }: {
 // ─── 메인 ────────────────────────────────────────────────────────────────────
 
 export default function StatsPage() {
+  const t = useI18n();
   return (
-    <Suspense fallback={<main className="p-6">불러오는 중...</main>}>
+    <Suspense fallback={<main className="p-6">{t.statsPage.loading}</main>}>
       <StatsPageInner />
     </Suspense>
   );
 }
 
 function StatsPageInner() {
+  const t = useI18n();
+  const locale = LANG_LOCALE[useLanguageStore((s) => s.language)] ?? "ko-KR";
+  const widgetLibrary = useMemo(() => getWidgetLibrary(t), [t]);
   const searchParams = useSearchParams();
   const router = useRouter();
   // 현재 경로(/stats). router.push에 절대 경로를 넘기기 위함
@@ -378,7 +396,11 @@ function StatsPageInner() {
   // 현재 프리셋의 위젯 배치 배열 (localStorage에서 복원)
   const [layout, setLayout] = useState<WidgetItem[]>(DEFAULT_LAYOUT);
   // 프리셋별 사용자 지정 이름 (기본값 "프리셋 1~3")
-  const [presetNames, setPresetNames] = useState<Record<1 | 2 | 3, string>>({ 1: "프리셋 1", 2: "프리셋 2", 3: "프리셋 3" });
+  const [presetNames, setPresetNames] = useState<Record<1 | 2 | 3, string>>({
+    1: formatMessage(t.statsPage.presetName, { number: 1 }),
+    2: formatMessage(t.statsPage.presetName, { number: 2 }),
+    3: formatMessage(t.statsPage.presetName, { number: 3 }),
+  });
   // 현재 이름 편집 중인 프리셋 번호 (null이면 편집 안 함)
   const [editingPreset, setEditingPreset] = useState<1 | 2 | 3 | null>(null);
   const [editingName, setEditingName] = useState("");
@@ -412,14 +434,14 @@ function StatsPageInner() {
 
   const commitPresetName = useCallback(() => {
     if (editingPreset === null) return;
-    const name = editingName.trim() || `프리셋 ${editingPreset}`;
+    const name = editingName.trim() || formatMessage(t.statsPage.presetName, { number: editingPreset });
     setPresetNames(prev => {
       const next = { ...prev, [editingPreset]: name };
       try { localStorage.setItem("stats-preset-names", JSON.stringify(next)); } catch {}
       return next;
     });
     setEditingPreset(null);
-  }, [editingPreset, editingName]);
+  }, [editingPreset, editingName, t]);
 
   const switchPreset = useCallback((p: 1 | 2 | 3) => {
     if (p === activePreset) return;
@@ -492,7 +514,7 @@ function StatsPageInner() {
   // sido 선택 여부에 따라 시군구/시도 레벨 결정 (WeatherByRegion API 파라미터)
   const regionLevel = sido ? "sigungu" : "sido";
   // 날씨 지역 차트 제목용 레이블
-  const regionLabel = sido ? "시/군/구별" : "시/도별";
+  const regionLabel = sido ? t.statsPage.byDistrict : t.statsPage.byProvince;
   const { data: weatherTypeRaw,   isLoading: loadingWeatherType   } = useWeatherByType(effectiveParams, hasWeather);
   const { data: weatherRegionRaw, isLoading: loadingWeatherRegion } = useWeatherByRegion(effectiveParams, regionLevel, hasWeather);
   // 재난 유형별/지역별 날씨 데이터 null-coalesce
@@ -590,14 +612,14 @@ function StatsPageInner() {
       {/* 페이지 헤더 */}
       <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h1 className="text-xl font-semibold">재난 통계</h1>
-          <p className="text-sm text-[var(--text-muted)]">재난문자 페이지에서 필터링한 데이터를 다양한 차트로 분석합니다.</p>
+          <h1 className="text-xl font-semibold">{t.statsPage.title}</h1>
+          <p className="text-sm text-[var(--text-muted)]">{t.statsPage.description}</p>
         </div>
         <div className="flex gap-2 shrink-0 items-center flex-wrap justify-end">
           {/* 필터 토글 버튼 */}
           <button onClick={openFilter}
             className={`px-3 py-2 text-sm font-semibold rounded-lg border transition-colors flex items-center gap-1 ${hasActiveFilter ? "border-[var(--blue)] bg-[var(--blue-soft)] text-[var(--blue)]" : "border-[var(--line)] bg-[var(--surface)] text-[var(--text-body)] hover:border-blue-300 hover:text-[var(--blue)]"}`}>
-            🔍 필터{hasActiveFilter ? " ●" : ""}
+            🔍 {t.statsPage.filter}{hasActiveFilter ? " ●" : ""}
           </button>
           {/* 프리셋 탭 */}
           <div className="flex border border-[var(--line)] rounded-lg overflow-hidden">
@@ -624,7 +646,7 @@ function StatsPageInner() {
                       <span
                         onClick={e => { e.stopPropagation(); setEditingPreset(p); setEditingName(presetNames[p]); }}
                         className="text-blue-200 hover:text-white text-xs leading-none"
-                        title="이름 변경">
+                        title={t.statsPage.editPresetName}>
                         ✏️
                       </span>
                     )}
@@ -635,25 +657,25 @@ function StatsPageInner() {
           </div>
           <button onClick={() => {
             const filters: Record<string, string> = {
-              "시·도": sido ?? "전체",
-              "시·군·구": sigungu ?? "전체",
-              "시작일": startDate ?? "전체",
-              "종료일": endDate ?? "전체",
-              "재난 유형": type ?? "전체",
-              "경보 단계": levelText ?? "전체",
-              "키워드": keyword ?? "-",
-              "출처": source ?? "ALL",
+              [t.statsPage.province]: sido ?? t.statsPage.all,
+              [t.statsPage.district]: sigungu ?? t.statsPage.all,
+              [t.statsPage.startDate]: startDate ?? t.statsPage.all,
+              [t.statsPage.endDate]: endDate ?? t.statsPage.all,
+              [t.statsPage.disasterType]: type ?? t.statsPage.all,
+              [t.statsPage.alertLevel]: levelText ?? t.statsPage.all,
+              키워드: keyword ?? "-",
+              출처: source ?? "ALL",
             };
-            const csv = buildCsv({ filters, totalCount, dailyAvg, topType, topRegion, typeStats, regionStats, levelStats, dailyStats, quarterStats,
+            const csv = buildCsv({ t, locale, filters, totalCount, dailyAvg, topType, topRegion, typeStats, regionStats, levelStats, dailyStats, quarterStats,
               weatherStats, weatherTypeStats, weatherRegionStats,
               weatherHourlyStats, weatherHourlyTypeStats, weatherHourlyRegionStats, isShortPeriod });
-            downloadCsv(`재난통계_${new Date().toISOString().slice(0, 10)}.csv`, csv);
+            downloadCsv(`${t.statsPage.csv.fileName}_${new Date().toISOString().slice(0, 10)}.csv`, csv);
           }} className="px-3 py-2 text-sm font-semibold rounded-lg border border-[var(--line)] bg-[var(--surface)] text-[var(--text-body)] hover:border-green-400 hover:text-green-600 transition-colors flex items-center gap-1">
-            ⬇ CSV
+            ⬇ {t.statsPage.exportCsv}
           </button>
           <button onClick={() => setDrawerOpen(true)}
             className="px-3 py-2 text-sm font-semibold rounded-lg bg-[var(--blue)] text-white flex items-center gap-1">
-            <span className="text-base leading-none">+</span> 위젯
+            <span className="text-base leading-none">+</span> {t.statsPage.manageWidgets}
           </button>
         </div>
       </div>
@@ -664,66 +686,64 @@ function StatsPageInner() {
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
             {/* 시·도 */}
             <div className="flex flex-col gap-1">
-              <label className="text-xs font-semibold text-[var(--text-muted)]">시·도</label>
+              <label className="text-xs font-semibold text-[var(--text-muted)]">{t.statsPage.province}</label>
               <select value={localFilter.sido} onChange={e => setLocalSido(e.target.value)}
                 className="border border-[var(--line)] rounded-lg px-2 py-1.5 text-sm text-[var(--ink)] focus:outline-none focus:border-[var(--blue)]">
-                <option value="">전체</option>
-                {METROS.map(m => <option key={m} value={m}>{m}</option>)}
+                <option value="">{t.statsPage.all}</option>
+                {METROS.map(m => <option key={m} value={m}>{t.metros[m as keyof typeof t.metros] ?? m}</option>)}
               </select>
             </div>
             {/* 시·군·구 */}
             <div className="flex flex-col gap-1">
-              <label className="text-xs font-semibold text-[var(--text-muted)]">시·군·구</label>
+              <label className="text-xs font-semibold text-[var(--text-muted)]">{t.statsPage.district}</label>
               <select value={localFilter.sigungu} onChange={e => setLocalFilter(f => ({ ...f, sigungu: e.target.value }))}
                 disabled={!localFilter.sido}
                 className="border border-[var(--line)] rounded-lg px-2 py-1.5 text-sm text-[var(--ink)] focus:outline-none focus:border-[var(--blue)] disabled:bg-[var(--canvas)] disabled:text-[var(--text-subtle)]">
-                <option value="">전체</option>
+                <option value="">{t.statsPage.all}</option>
                 {sigunguList?.filter(s => s.name !== "전체").map(s => (
-                  <option key={s.code} value={s.name}>{s.name}</option>
+                  <option key={s.code} value={s.name}>{s.translatedName ?? s.name}</option>
                 ))}
               </select>
             </div>
             {/* 재난 유형 */}
             <div className="flex flex-col gap-1">
-              <label className="text-xs font-semibold text-[var(--text-muted)]">재난 유형</label>
+              <label className="text-xs font-semibold text-[var(--text-muted)]">{t.statsPage.disasterType}</label>
               <select value={localFilter.type} onChange={e => setLocalFilter(f => ({ ...f, type: e.target.value }))}
                 className="border border-[var(--line)] rounded-lg px-2 py-1.5 text-sm text-[var(--ink)] focus:outline-none focus:border-[var(--blue)]">
-                <option value="">전체</option>
-                {DISASTER_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                <option value="">{t.statsPage.all}</option>
+                {DISASTER_TYPES.map(dt => <option key={dt} value={dt}>{t.disasterTypes[dt as keyof typeof t.disasterTypes] ?? dt}</option>)}
               </select>
             </div>
             {/* 경보 단계 */}
             <div className="flex flex-col gap-1">
-              <label className="text-xs font-semibold text-[var(--text-muted)]">경보 단계</label>
+              <label className="text-xs font-semibold text-[var(--text-muted)]">{t.statsPage.alertLevel}</label>
               <select value={localFilter.levelText} onChange={e => setLocalFilter(f => ({ ...f, levelText: e.target.value }))}
                 className="border border-[var(--line)] rounded-lg px-2 py-1.5 text-sm text-[var(--ink)] focus:outline-none focus:border-[var(--blue)]">
-                <option value="">전체</option>
-                <option value="안전안내문자">안전안내</option>
-                <option value="긴급재난문자">긴급재난</option>
-                <option value="위급재난문자">위급재난</option>
+                <option value="">{t.statsPage.all}</option>
+                <option value="안전안내문자">{t.statsPage.levels.LEVEL_1}</option>
+                <option value="긴급재난문자">{t.statsPage.levels.LEVEL_2}</option>
+                <option value="위급재난문자">{t.statsPage.levels.LEVEL_3}</option>
               </select>
             </div>
           </div>
 
           {/* 기간 선택 */}
           <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-semibold text-[var(--text-muted)]">기간</label>
+            <label className="text-xs font-semibold text-[var(--text-muted)]">{t.statsPage.period}</label>
             <div className="flex flex-wrap items-center gap-2">
-              <input type="date" value={localFilter.startDate} onChange={e => setLocalFilter(f => ({ ...f, startDate: e.target.value }))}
-                className="border border-[var(--line)] rounded-lg px-2 py-1.5 text-sm text-[var(--ink)] focus:outline-none focus:border-[var(--blue)]" />
+              <DatePicker value={localFilter.startDate} onChange={v => setLocalFilter(f => ({ ...f, startDate: v }))} locale={locale} className="border border-[var(--line)] rounded-lg px-2 py-1.5 text-sm text-[var(--ink)] focus:outline-none focus:border-[var(--blue)]" />
               <span className="text-[var(--text-subtle)] text-sm">~</span>
-              <input type="date" value={localFilter.endDate} onChange={e => setLocalFilter(f => ({ ...f, endDate: e.target.value }))}
-                className="border border-[var(--line)] rounded-lg px-2 py-1.5 text-sm text-[var(--ink)] focus:outline-none focus:border-[var(--blue)]" />
+              <DatePicker value={localFilter.endDate} onChange={v => setLocalFilter(f => ({ ...f, endDate: v }))} locale={locale} className="border border-[var(--line)] rounded-lg px-2 py-1.5 text-sm text-[var(--ink)] focus:outline-none focus:border-[var(--blue)]" />
               <div className="flex gap-1">
                 {([7, 30, 90] as const).map(d => (
                   <button key={d} onClick={() => setQuickDate(d)}
                     className="px-2.5 py-1.5 text-xs font-semibold border border-[var(--line)] rounded-lg text-[var(--text-body)] hover:border-[var(--blue)] hover:text-[var(--blue)] transition-colors">
-                    {d}일
+                    {formatMessage(t.statsPage.lastDays, { days: d })}
                   </button>
                 ))}
                 <button onClick={() => setQuickDate("year")}
                   className="px-2.5 py-1.5 text-xs font-semibold border border-[var(--line)] rounded-lg text-[var(--text-body)] hover:border-[var(--blue)] hover:text-[var(--blue)] transition-colors">
-                  올해
+                  {t.statsPage.thisYear}
                 </button>
               </div>
             </div>
@@ -733,17 +753,17 @@ function StatsPageInner() {
           <div className="flex justify-end gap-2 pt-1">
             <button onClick={() => setFilterOpen(false)}
               className="px-4 py-1.5 text-sm font-semibold border border-[var(--line)] rounded-lg text-[var(--text-body)] hover:bg-[var(--canvas)] transition-colors">
-              취소
+              {t.statsPage.cancel}
             </button>
             <button onClick={() => {
               setLocalFilter({ sido: "", sigungu: "", startDate: "", endDate: "", type: "", levelText: "" });
             }}
               className="px-4 py-1.5 text-sm font-semibold border border-[var(--line)] rounded-lg text-[var(--text-muted)] hover:bg-[var(--canvas)] transition-colors">
-              초기화
+              {t.statsPage.reset}
             </button>
             <button onClick={applyFilter}
               className="px-4 py-1.5 text-sm font-semibold rounded-lg bg-[var(--blue)] text-white hover:brightness-95 transition-colors">
-              적용
+              {t.statsPage.apply}
             </button>
           </div>
         </div>
@@ -755,13 +775,13 @@ function StatsPageInner() {
 
       {/* KPI */}
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <KpiBox variant="coral" icon="📨" label="총 발생 건수" value={`${totalCount.toLocaleString("ko-KR")}건`} sub="필터 적용 결과" />
-        <KpiBox variant="blue" icon="📅" label="일 평균" value={`${dailyAvg}건`}
-          sub={startDate && endDate ? `${periodDays}일 기준` : "최근 30일 기준"} />
-        <KpiBox variant="purple" icon="🌧" label="최다 유형" value={topType?.type ?? "-"}
-          sub={topType ? `${topType.count.toLocaleString("ko-KR")}건 · ${Math.round((topType.count / (totalCount || 1)) * 100)}%` : "-"} />
-        <KpiBox variant="green" icon="📍" label="최다 지역" value={topRegion?.region ?? "-"}
-          sub={topRegion ? `${topRegion.count.toLocaleString("ko-KR")}건` : "-"} />
+        <KpiBox variant="coral" icon="📨" label={t.statsPage.totalAlerts} value={`${totalCount.toLocaleString(locale)}${t.statsPage.countUnit}`} sub={t.statsPage.filteredResult} />
+        <KpiBox variant="blue" icon="📅" label={t.statsPage.dailyAverage} value={`${dailyAvg}${t.statsPage.countUnit}`}
+          sub={startDate && endDate ? formatMessage(t.statsPage.dayBasis, { days: periodDays }) : t.statsPage.recentThirtyDays} />
+        <KpiBox variant="purple" icon="🌧" label={t.statsPage.topType} value={topType?.type ? (t.disasterTypes[topType.type as keyof typeof t.disasterTypes] ?? topType.type) : "-"}
+          sub={topType ? `${topType.count.toLocaleString(locale)}${t.statsPage.countUnit} · ${Math.round((topType.count / (totalCount || 1)) * 100)}%` : "-"} />
+        <KpiBox variant="green" icon="📍" label={t.statsPage.topRegion} value={topRegion?.region ? (t.metros[topRegion.region as keyof typeof t.metros] ?? topRegion.region) : "-"}
+          sub={topRegion ? `${topRegion.count.toLocaleString(locale)}${t.statsPage.countUnit}` : "-"} />
       </div>
 
       {/* 데이터 요약 테이블: 접기/펼치기 */}
@@ -769,15 +789,15 @@ function StatsPageInner() {
         <button
           onClick={() => setTableOpen(o => !o)}
           className="w-full flex items-center justify-between px-4 py-3 text-sm font-semibold text-[var(--text-body)] hover:bg-[var(--canvas)] transition-colors">
-          <span>📋 데이터 요약</span>
-          <span className="text-[var(--text-subtle)] text-xs">{tableOpen ? "▲ 접기" : "▼ 펼치기"}</span>
+          <span>📋 {t.statsPage.dataSummary}</span>
+          <span className="text-[var(--text-subtle)] text-xs">{tableOpen ? `▲ ${t.statsPage.collapse}` : `▼ ${t.statsPage.expand}`}</span>
         </button>
 
         {tableOpen && (
           <div className="border-t border-[var(--line)]">
             {/* 탭 */}
             <div className="flex border-b border-[var(--line)] px-4 gap-4">
-              {([ ["type", "유형별"], ["region", "지역별"], ["level", "경보단계"], ["quarter", "분기별"], ["daily", "일별"] ] as const).map(([key, label]) => (
+              {([ ["type", t.statsPage.tableTabs.type], ["region", t.statsPage.tableTabs.region], ["level", t.statsPage.tableTabs.level], ["quarter", t.statsPage.tableTabs.quarter], ["daily", t.statsPage.tableTabs.daily] ] as const).map(([key, label]) => (
                 <button key={key} onClick={() => setTableTab(key)}
                   className={`py-2 text-xs font-semibold border-b-2 transition-colors ${tableTab === key ? "border-[var(--blue)] text-[var(--blue)]" : "border-transparent text-[var(--text-subtle)] hover:text-[var(--text-body)]"}`}>
                   {label}
@@ -789,19 +809,19 @@ function StatsPageInner() {
               {tableTab === "type" && (
                 <table className="w-full text-xs">
                   <thead className="bg-[var(--canvas)]"><tr>
-                    <th className="px-4 py-2 text-left font-semibold text-[var(--text-muted)] w-8">순위</th>
-                    <th className="px-4 py-2 text-left font-semibold text-[var(--text-muted)]">유형</th>
-                    <th className="px-4 py-2 text-right font-semibold text-[var(--text-muted)]">건수</th>
-                    <th className="px-4 py-2 text-right font-semibold text-[var(--text-muted)]">비율</th>
+                    <th className="px-4 py-2 text-left font-semibold text-[var(--text-muted)] w-8">{t.statsPage.rank}</th>
+                    <th className="px-4 py-2 text-left font-semibold text-[var(--text-muted)]">{t.statsPage.type}</th>
+                    <th className="px-4 py-2 text-right font-semibold text-[var(--text-muted)]">{t.statsPage.count}</th>
+                    <th className="px-4 py-2 text-right font-semibold text-[var(--text-muted)]">{t.statsPage.share}</th>
                   </tr></thead>
                   <tbody className="divide-y divide-gray-50">
                     {typeStats.length === 0
-                      ? <tr><td colSpan={4} className="px-4 py-6 text-center text-[var(--text-subtle)]">데이터 없음</td></tr>
+                      ? <tr><td colSpan={4} className="px-4 py-6 text-center text-[var(--text-subtle)]">{t.statsPage.noData}</td></tr>
                       : typeStats.map((d, i) => (
                         <tr key={i} className="hover:bg-[var(--canvas)]">
                           <td className="px-4 py-2 text-[var(--text-subtle)]">{i + 1}</td>
-                          <td className="px-4 py-2 text-[var(--text-body)]">{d.type ?? "기타"}</td>
-                          <td className="px-4 py-2 text-right font-semibold text-[var(--ink)]">{d.count.toLocaleString("ko-KR")}</td>
+                          <td className="px-4 py-2 text-[var(--text-body)]">{t.disasterTypes[d.type as keyof typeof t.disasterTypes] ?? d.type ?? t.statsPage.other}</td>
+                          <td className="px-4 py-2 text-right font-semibold text-[var(--ink)]">{d.count.toLocaleString(locale)}</td>
                           <td className="px-4 py-2 text-right text-[var(--text-muted)]">{Math.round((d.count / (totalCount || 1)) * 100)}%</td>
                         </tr>
                     ))}
@@ -812,21 +832,21 @@ function StatsPageInner() {
               {tableTab === "region" && (
                 <table className="w-full text-xs">
                   <thead className="bg-[var(--canvas)]"><tr>
-                    <th className="px-4 py-2 text-left font-semibold text-[var(--text-muted)] w-8">순위</th>
-                    <th className="px-4 py-2 text-left font-semibold text-[var(--text-muted)]">지역</th>
-                    <th className="px-4 py-2 text-right font-semibold text-[var(--text-muted)]">건수</th>
-                    <th className="px-4 py-2 text-right font-semibold text-[var(--text-muted)]">비율</th>
+                    <th className="px-4 py-2 text-left font-semibold text-[var(--text-muted)] w-8">{t.statsPage.rank}</th>
+                    <th className="px-4 py-2 text-left font-semibold text-[var(--text-muted)]">{t.statsPage.region}</th>
+                    <th className="px-4 py-2 text-right font-semibold text-[var(--text-muted)]">{t.statsPage.count}</th>
+                    <th className="px-4 py-2 text-right font-semibold text-[var(--text-muted)]">{t.statsPage.share}</th>
                   </tr></thead>
                   <tbody className="divide-y divide-gray-50">
                     {regionStats.length === 0
-                      ? <tr><td colSpan={4} className="px-4 py-6 text-center text-[var(--text-subtle)]">데이터 없음</td></tr>
+                      ? <tr><td colSpan={4} className="px-4 py-6 text-center text-[var(--text-subtle)]">{t.statsPage.noData}</td></tr>
                       : regionStats.map((d, i) => {
                         const regionTotal = regionStats.reduce((s, r) => s + r.count, 0) || 1;
                         return (
                           <tr key={i} className="hover:bg-[var(--canvas)]">
                             <td className="px-4 py-2 text-[var(--text-subtle)]">{i + 1}</td>
-                            <td className="px-4 py-2 text-[var(--text-body)]">{d.region}</td>
-                            <td className="px-4 py-2 text-right font-semibold text-[var(--ink)]">{d.count.toLocaleString("ko-KR")}</td>
+                            <td className="px-4 py-2 text-[var(--text-body)]">{t.metros[d.region as keyof typeof t.metros] ?? d.region}</td>
+                            <td className="px-4 py-2 text-right font-semibold text-[var(--ink)]">{d.count.toLocaleString(locale)}</td>
                             <td className="px-4 py-2 text-right text-[var(--text-muted)]">{Math.round((d.count / regionTotal) * 100)}%</td>
                           </tr>
                         );
@@ -836,22 +856,21 @@ function StatsPageInner() {
               )}
 
               {tableTab === "level" && (() => {
-                const LEVEL_NAMES: Record<string, string> = { LEVEL_1: "안전안내", LEVEL_2: "긴급재난", LEVEL_3: "위급재난" };
                 const levelTotal = levelStats.reduce((s, d) => s + d.count, 0) || 1;
                 return (
                   <table className="w-full text-xs">
                     <thead className="bg-[var(--canvas)]"><tr>
-                      <th className="px-4 py-2 text-left font-semibold text-[var(--text-muted)]">경보단계</th>
-                      <th className="px-4 py-2 text-right font-semibold text-[var(--text-muted)]">건수</th>
-                      <th className="px-4 py-2 text-right font-semibold text-[var(--text-muted)]">비율</th>
+                      <th className="px-4 py-2 text-left font-semibold text-[var(--text-muted)]">{t.statsPage.tableTabs.level}</th>
+                      <th className="px-4 py-2 text-right font-semibold text-[var(--text-muted)]">{t.statsPage.count}</th>
+                      <th className="px-4 py-2 text-right font-semibold text-[var(--text-muted)]">{t.statsPage.share}</th>
                     </tr></thead>
                     <tbody className="divide-y divide-gray-50">
                       {levelStats.length === 0
-                        ? <tr><td colSpan={3} className="px-4 py-6 text-center text-[var(--text-subtle)]">데이터 없음</td></tr>
+                        ? <tr><td colSpan={3} className="px-4 py-6 text-center text-[var(--text-subtle)]">{t.statsPage.noData}</td></tr>
                         : levelStats.map((d, i) => (
                           <tr key={i} className="hover:bg-[var(--canvas)]">
-                            <td className="px-4 py-2 text-[var(--text-body)]">{d.level ? (LEVEL_NAMES[d.level] ?? d.level) : "기타"}</td>
-                            <td className="px-4 py-2 text-right font-semibold text-[var(--ink)]">{d.count.toLocaleString("ko-KR")}</td>
+                            <td className="px-4 py-2 text-[var(--text-body)]">{d.level ? (t.statsPage.levels[d.level as keyof typeof t.statsPage.levels] ?? d.level) : t.statsPage.other}</td>
+                            <td className="px-4 py-2 text-right font-semibold text-[var(--ink)]">{d.count.toLocaleString(locale)}</td>
                             <td className="px-4 py-2 text-right text-[var(--text-muted)]">{Math.round((d.count / levelTotal) * 100)}%</td>
                           </tr>
                       ))}
@@ -865,17 +884,17 @@ function StatsPageInner() {
                 return (
                   <table className="w-full text-xs">
                     <thead className="bg-[var(--canvas)]"><tr>
-                      <th className="px-4 py-2 text-left font-semibold text-[var(--text-muted)]">분기</th>
-                      <th className="px-4 py-2 text-right font-semibold text-[var(--text-muted)]">건수</th>
-                      <th className="px-4 py-2 text-right font-semibold text-[var(--text-muted)]">비율</th>
+                      <th className="px-4 py-2 text-left font-semibold text-[var(--text-muted)]">{t.statsPage.quarter}</th>
+                      <th className="px-4 py-2 text-right font-semibold text-[var(--text-muted)]">{t.statsPage.count}</th>
+                      <th className="px-4 py-2 text-right font-semibold text-[var(--text-muted)]">{t.statsPage.share}</th>
                     </tr></thead>
                     <tbody className="divide-y divide-gray-50">
                       {quarterStats.length === 0
-                        ? <tr><td colSpan={3} className="px-4 py-6 text-center text-[var(--text-subtle)]">데이터 없음</td></tr>
+                        ? <tr><td colSpan={3} className="px-4 py-6 text-center text-[var(--text-subtle)]">{t.statsPage.noData}</td></tr>
                         : quarterStats.map((d, i) => (
                           <tr key={i} className="hover:bg-[var(--canvas)]">
                             <td className="px-4 py-2 text-[var(--text-body)]">{d.quarter}</td>
-                            <td className="px-4 py-2 text-right font-semibold text-[var(--ink)]">{d.count.toLocaleString("ko-KR")}</td>
+                            <td className="px-4 py-2 text-right font-semibold text-[var(--ink)]">{d.count.toLocaleString(locale)}</td>
                             <td className="px-4 py-2 text-right text-[var(--text-muted)]">{Math.round((d.count / quarterTotal) * 100)}%</td>
                           </tr>
                       ))}
@@ -887,16 +906,16 @@ function StatsPageInner() {
               {tableTab === "daily" && (
                 <table className="w-full text-xs">
                   <thead className="bg-[var(--canvas)]"><tr>
-                    <th className="px-4 py-2 text-left font-semibold text-[var(--text-muted)]">날짜</th>
-                    <th className="px-4 py-2 text-right font-semibold text-[var(--text-muted)]">건수</th>
+                    <th className="px-4 py-2 text-left font-semibold text-[var(--text-muted)]">{t.statsPage.date}</th>
+                    <th className="px-4 py-2 text-right font-semibold text-[var(--text-muted)]">{t.statsPage.count}</th>
                   </tr></thead>
                   <tbody className="divide-y divide-gray-50">
                     {dailyStats.length === 0
-                      ? <tr><td colSpan={2} className="px-4 py-6 text-center text-[var(--text-subtle)]">데이터 없음</td></tr>
+                      ? <tr><td colSpan={2} className="px-4 py-6 text-center text-[var(--text-subtle)]">{t.statsPage.noData}</td></tr>
                       : dailyStats.map((d, i) => (
                         <tr key={i} className="hover:bg-[var(--canvas)]">
                           <td className="px-4 py-2 text-[var(--text-body)]">{d.date}</td>
-                          <td className="px-4 py-2 text-right font-semibold text-[var(--ink)]">{d.count.toLocaleString("ko-KR")}</td>
+                          <td className="px-4 py-2 text-right font-semibold text-[var(--ink)]">{d.count.toLocaleString(locale)}</td>
                         </tr>
                     ))}
                   </tbody>
@@ -911,12 +930,12 @@ function StatsPageInner() {
       {crossFilter.type && (
         <div className="flex items-center gap-2">
           <div className="flex items-center gap-2 bg-violet-50 border border-violet-200 rounded-lg px-3 py-1.5 text-sm text-violet-800">
-            <span className="text-xs">차트 필터</span>
-            <span className="font-bold">{crossFilter.type}</span>
+            <span className="text-xs">{t.statsPage.chartFilter}</span>
+            <span className="font-bold">{t.disasterTypes[crossFilter.type as keyof typeof t.disasterTypes] ?? crossFilter.type}</span>
             <button onClick={() => setCrossFilter({})}
               className="text-violet-400 hover:text-violet-700 font-bold leading-none ml-1">×</button>
           </div>
-          <span className="text-xs text-[var(--text-subtle)]">다른 유형 클릭 시 전환 · × 로 해제</span>
+          <span className="text-xs text-[var(--text-subtle)]">{t.statsPage.chartFilterHint}</span>
         </div>
       )}
 
@@ -925,13 +944,13 @@ function StatsPageInner() {
         <SortableContext items={layout.map(w => w.id)} strategy={rectSortingStrategy}>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(12, 1fr)", gap: 12 }}>
             {layout.map(w => {
-              const lib = WIDGET_LIBRARY.find(x => x.id === w.libId);
+              const lib = widgetLibrary.find(x => x.id === w.libId);
               if (!lib) return null;
               return (
                 <SortableWidgetCard key={w.id} id={w.id} span={w.span} widget={w} lib={lib}
                   onVariantChange={handleVariantChange}
                   onRemove={handleRemove}
-                  titleOverride={lib.id === "sido-bar" && sido ? `${sido} 시·군·구별 발생 건수` : undefined}
+                  titleOverride={lib.id === "sido-bar" && sido ? formatMessage(t.statsPage.districtCountTitle, { region: t.metros[sido as keyof typeof t.metros] ?? sido }) : undefined}
                   isNew={w.id === newWidgetId}>
                   <WidgetContent kind={lib.kind} variant={w.variant ?? lib.variants?.[0]?.key ?? ""}
                     typeStats={typeStats} regionStats={regionStats} levelStats={levelStats}
@@ -968,9 +987,8 @@ function StatsPageInner() {
 
       {/* 안내 */}
       <div className="bg-[var(--blue-soft)] border border-blue-200 rounded-xl px-4 py-3 text-xs text-blue-800 leading-relaxed">
-        💡 이 통계는 <b>재난문자 검색 결과</b>와 연동됩니다. 지역·기간·유형을 검색하면 그 결과가 모든 차트에 반영돼요.
-        <b> + 위젯</b> 버튼으로 원하는 차트를 추가·제거하고, 헤더 토글로 차트 유형도 전환할 수 있습니다.
-        <Link href="/alerts" className="ml-2 underline font-semibold">재난문자 검색 페이지 →</Link>
+        💡 <b>{t.statsPage.connectedNotice}</b> {t.statsPage.connectedNoticeBody}
+        <Link href="/alerts" className="ml-2 underline font-semibold">{t.statsPage.openAlerts} →</Link>
       </div>
 
       {/* 위젯 드로어 */}
