@@ -18,11 +18,11 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "My project",
-  description: "Next.js + TypeScript 기반 개인 프로젝트",
+  title: "재난 안전문자 아카이브",
+  description: "과거 재난문자를 누구나 쉽게 확인하고, 관심지역 맞춤 알림을 받을 수 있는 재난 안전문자 아카이브 서비스",
 
   manifest: "/manifest.json",
-  themeColor: "#3b82f6",
+  themeColor: "#3867e8",
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
