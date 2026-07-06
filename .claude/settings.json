@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Edit(/.claude/skills/speckit-plan/**)",
+      "Read(frontend/src/components/layout/**)",
+      "Read(frontend/src/components/ui/**)",
+      "Read(frontend/src/components/form/**)",
+      "Bash(grep -o '\"ko\":\"[^\"]*\"' \"frontend/src/components/map/koreaSido.data.js\" | sort -u)",
+      "Read(frontend/src/components/map/**)",
+      "Bash(node -e ' *)",
+      "Edit(/.claude/skills/speckit-specify/**)",
+      "Edit(/.claude/skills/speckit-tasks/**)",
+      "Bash(npm uninstall *)"
+    ]
+  }
+}
