@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Edit(/.claude/skills/speckit-plan/**)",
+      "Read(//Users/user/code/ssafy/Disaster_Alert_Archive_Fianl_Project/frontend/src/components/layout/**)",
+      "Read(//Users/user/code/ssafy/Disaster_Alert_Archive_Fianl_Project/frontend/src/components/ui/**)",
+      "Read(//Users/user/code/ssafy/Disaster_Alert_Archive_Fianl_Project/frontend/src/components/form/**)",
+      "Bash(grep -o '\"ko\":\"[^\"]*\"' \"/Users/user/code/ssafy/Disaster_Alert_Archive_Fianl_Project/frontend/src/components/map/koreaSido.data.js\" | sort -u)",
+      "Read(//Users/user/code/ssafy/Disaster_Alert_Archive_Fianl_Project/frontend/src/components/map/**)",
+      "Bash(node -e ' *)",
+      "Edit(/.claude/skills/speckit-specify/**)",
+      "Edit(/.claude/skills/speckit-tasks/**)",
+      "Bash(npm uninstall *)"
+    ]
+  }
+}
