@@ -155,22 +155,12 @@ public class DisasterAlertRepositoryImpl implements DisasterAlertRepositoryCusto
 
     @Override
     public List<DisasterAlertStatResponse.RegionStat> getStatsSido(AlertSearchRequest request) {
-        // 공백 정규화 + trim
-        StringTemplate norm =
-                Expressions.stringTemplate(
-                        "function('btrim', function('regexp_replace', {0}, '\\\\s+', ' ', 'g'))",
-                        legalDistrict.name
-                );
+        // sidoCodeExpr()/sidoNameByCode() 참고 — getWeatherBySido와 동일한 이유로
+        // legalDistrict.name을 regexp_replace/split_part로 파싱하는 대신 코드 prefix로 그룹핑
+        StringTemplate sido = sidoCodeExpr();
 
-        // 시/도 = 첫 토큰
-        StringTemplate sido =
-                Expressions.stringTemplate("function('split_part', {0}, ' ', 1)", norm);
-
-        return queryFactory
-                .select(Projections.constructor(DisasterAlertStatResponse.RegionStat.class,
-                        sido,                            // region (시/도명)
-                        disasterAlert.id.countDistinct() // 해당 시/도 내 알림 건수(중복 제거)
-                ))
+        List<Tuple> rows = queryFactory
+                .select(sido, disasterAlert.id.countDistinct())
                 .from(disasterAlert)
                 .join(disasterAlert.disasterAlertRegions, disasterAlertRegion)
                 .join(disasterAlertRegion.legalDistrict, legalDistrict)
@@ -179,8 +169,16 @@ public class DisasterAlertRepositoryImpl implements DisasterAlertRepositoryCusto
                         regionFilterOnJoin(request)    // 지역 필터를 조인 대상에 적용하는 보조 조건
                 )
                 .groupBy(sido)
-                .orderBy(disasterAlert.id.countDistinct().desc(), sido.asc())
                 .fetch();
+
+        Map<String, String> sidoNames = sidoNameByCode();
+        return rows.stream()
+                .map(t -> new DisasterAlertStatResponse.RegionStat(
+                        sidoNames.getOrDefault(t.get(0, String.class), t.get(0, String.class)),
+                        t.get(1, Long.class)))
+                .sorted(Comparator.comparingLong(DisasterAlertStatResponse.RegionStat::getCount).reversed()
+                        .thenComparing(DisasterAlertStatResponse.RegionStat::getRegion))
+                .collect(Collectors.toList());
     }
 
     @Override
