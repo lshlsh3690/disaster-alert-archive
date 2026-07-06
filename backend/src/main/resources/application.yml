@@ -9,7 +9,6 @@ spring:
     driver-class-name: org.postgresql.Driver
     hikari:
       maximum-pool-size: 20
-      connection-init-sql: "SET max_parallel_workers_per_gather = 0"
 
   jpa:
     hibernate:
