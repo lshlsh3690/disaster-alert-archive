@@ -35,12 +35,20 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Build image
-        run: |
-          docker build -t ${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }} -f backend/dockerfile backend
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
 
-      - name: Push image
-        run: docker push ${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push image (amd64 + arm64)
+        uses: docker/build-push-action@v6
+        with:
+          context: backend
+          file: backend/dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}
 
   backend-deploy-on-ec2:
     runs-on: ubuntu-latest
