@@ -29,43 +29,18 @@ jobs:
           echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT }}' \
           > backend/src/main/resources/firebase-service-account.json
 
-      - name: Set up JDK 17
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: "17"
-
-      # JAR은 JVM 바이트코드라 아키텍처 무관 — 러너 네이티브(x86)로 한 번만 빌드해서
-      # 이후 이미지 빌드 단계에서 amd64/arm64 둘 다 컴파일 없이 그대로 재사용한다.
-      - name: Gradle 빌드
-        working-directory: backend
-        run: |
-          chmod +x ./gradlew
-          ./gradlew --no-daemon clean bootJar -x test
-          cp build/libs/*.jar app.jar
-
       - name: Login to Docker Hub
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
+      - name: Build image
+        run: |
+          docker build -t ${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }} -f backend/dockerfile backend
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      # 이미지 빌드 자체는 이미 빌드된 app.jar를 복사만 하므로, arm64 레그가
-      # QEMU 에뮬레이션이어도 무거운 컴파일이 없어 몇 초 안에 끝난다.
-      - name: Build and push image (amd64 + arm64)
-        uses: docker/build-push-action@v6
-        with:
-          context: backend
-          file: backend/dockerfile
-          platforms: linux/amd64,linux/arm64
-          push: true
-          tags: ${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}
+      - name: Push image
+        run: docker push ${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}
 
   backend-deploy-on-ec2:
     runs-on: ubuntu-latest
