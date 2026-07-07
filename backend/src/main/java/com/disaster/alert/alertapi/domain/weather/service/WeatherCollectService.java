@@ -4,6 +4,7 @@ import com.disaster.alert.alertapi.domain.weather.api.KmaNowcastApiClient;
 import com.disaster.alert.alertapi.domain.weather.dto.UltraSrtNcstResponse;
 import com.disaster.alert.alertapi.domain.weather.model.WeatherSource;
 import com.disaster.alert.alertapi.domain.weather.model.WeatherStationMapping;
+import com.disaster.alert.alertapi.domain.weather.repository.WeatherHourlyCorrelationRollupRepository;
 import com.disaster.alert.alertapi.domain.weather.repository.WeatherObservationRepository;
 import com.disaster.alert.alertapi.domain.weather.repository.WeatherStationMappingRepository;
 import lombok.RequiredArgsConstructor;
@@ -53,6 +54,7 @@ public class WeatherCollectService {
     private final KmaNowcastApiClient apiClient;
     private final WeatherStationMappingRepository mappingRepository;
     private final WeatherObservationRepository observationRepository;
+    private final WeatherHourlyCorrelationRollupRepository rollupRepository;
 
     /**
      * 1회 수집 실행. 스케줄러/컨트롤러에서 호출.
@@ -110,6 +112,13 @@ public class WeatherCollectService {
                             WeatherSource.KMA_NOWCAST.name()
                     );
                     totalSaved++;
+
+                    // alert가 이 시각 날씨 수집보다 먼저 들어와 rollup 행이 NULL 날씨로 이미
+                    // 생성돼 있을 수 있음 — 존재하는 행만 채운다 (없으면 no-op, 새로 만들지 않음).
+                    rollupRepository.syncWeather(
+                            m.getLegalDistrictCode(), observedAt,
+                            values.temperature, values.precipitation, values.windSpeed
+                    );
                 } catch (Exception e) {
                     log.warn("upsert 실패: code={}, observedAt={}, err={}",
                             m.getLegalDistrictCode(), observedAt, e.getMessage());

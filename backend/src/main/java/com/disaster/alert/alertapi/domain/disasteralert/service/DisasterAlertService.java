@@ -10,6 +10,7 @@ import com.disaster.alert.alertapi.domain.disasteralert.repository.DisasterAlert
 import com.disaster.alert.alertapi.domain.event.repository.EventAlertMappingRepository;
 import com.disaster.alert.alertapi.domain.legaldistrict.model.LegalDistrict;
 import com.disaster.alert.alertapi.domain.legaldistrict.service.LegalDistrictTranslationService;
+import com.disaster.alert.alertapi.domain.weather.repository.WeatherHourlyCorrelationRollupRepository;
 import com.disaster.alert.alertapi.global.service.LegalDistrictCache;
 import com.disaster.alert.alertapi.global.translation.SupportedLanguage;
 import com.disaster.alert.alertapi.global.translation.TranslationService;
@@ -49,6 +50,7 @@ public class DisasterAlertService {
     private final LegalDistrictCache legalDistrictCache;
 
     private final EventAlertMappingRepository eventAlertMappingRepository;
+    private final WeatherHourlyCorrelationRollupRepository weatherHourlyCorrelationRollupRepository;
 
     // ─── 다국어 응답용 의존성 ──────────────────────────────
     private final TranslationService translationService;                          // lazy 번역 (message/disasterType)
@@ -121,10 +123,36 @@ public class DisasterAlertService {
                 }
             }
             log.info("재난문자 {}건 저장 완료", savedIds.size());
+            updateWeatherHourlyRollup(newAlerts, new HashSet<>(savedIds));
             return savedIds;
         } catch (Exception e) {
             log.error("재난문자 저장 중 오류 발생", e);
             return List.of();
+        }
+    }
+
+    /**
+     * 새로 저장된 alert들이 걸친 (시군구, 시간버킷) 조합만 추려 weather_hourly_correlation_rollup을
+     * upsert 한다. 좁은 스코프(그 시간대만 재계산)라 저렴하다 — 전체 재집계가 아님.
+     */
+    private void updateWeatherHourlyRollup(List<DisasterAlert> newAlerts, Set<Long> savedIds) {
+        record RollupKey(String districtCode, LocalDateTime bucketHour) {}
+
+        Set<RollupKey> keys = newAlerts.stream()
+                .filter(alert -> savedIds.contains(alert.getId()))
+                .flatMap(alert -> alert.getDisasterAlertRegions().stream()
+                        .map(region -> new RollupKey(
+                                region.getId().getDistrictCode(),
+                                alert.getCreatedAt().truncatedTo(java.time.temporal.ChronoUnit.HOURS))))
+                .collect(Collectors.toSet());
+
+        for (RollupKey key : keys) {
+            try {
+                weatherHourlyCorrelationRollupRepository.upsertFromAlerts(key.districtCode(), key.bucketHour());
+            } catch (Exception e) {
+                log.warn("weather_hourly_correlation_rollup upsert 실패: code={}, hour={}, err={}",
+                        key.districtCode(), key.bucketHour(), e.getMessage());
+            }
         }
     }
 

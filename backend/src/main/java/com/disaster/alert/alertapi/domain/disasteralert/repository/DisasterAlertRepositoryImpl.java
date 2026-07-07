@@ -2,6 +2,7 @@ package com.disaster.alert.alertapi.domain.disasteralert.repository;
 
 import com.disaster.alert.alertapi.domain.disasteralert.dto.*;
 import com.disaster.alert.alertapi.domain.weather.model.QWeatherDailySummary;
+import com.disaster.alert.alertapi.domain.weather.model.QWeatherHourlyCorrelationRollup;
 import com.disaster.alert.alertapi.domain.weather.model.QWeatherObservation;
 import com.disaster.alert.alertapi.domain.disasteralert.model.DisasterAlert;
 import com.disaster.alert.alertapi.domain.disasteralert.model.DisasterLevel;
@@ -15,8 +16,10 @@ import com.querydsl.core.Tuple;
 import com.querydsl.core.types.Projections;
 import com.querydsl.core.types.dsl.BooleanExpression;
 import com.querydsl.core.types.dsl.DateTemplate;
+import com.querydsl.core.types.dsl.DateTimePath;
 import com.querydsl.core.types.dsl.Expressions;
 import com.querydsl.core.types.dsl.NumberExpression;
+import com.querydsl.core.types.dsl.NumberPath;
 import com.querydsl.core.types.dsl.StringTemplate;
 import com.querydsl.jpa.JPAExpressions;
 import com.querydsl.jpa.impl.JPAQueryFactory;
@@ -30,6 +33,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -756,10 +760,82 @@ public class DisasterAlertRepositoryImpl implements DisasterAlertRepositoryCusto
                 .collect(Collectors.toList());
     }
 
-    // ─── 시간별 날씨 상관 (weather_observation, 7일 이하 기간 전용) ─────────────
+    // ─── 시간별 날씨 상관 (weather_hourly_correlation_rollup, type/level/keyword 필터 없을 때) ──
+    // type/level/keyword 필터가 있으면 롤업(alert_count가 유형 무관 전체 건수)으로 답할 수 없어
+    // weather_observation 라이브 조인으로 폴백한다 (7일 이하 기간 전용 — 프론트에서만 강제).
 
     @Override
     public List<WeatherCorrelationDto> getWeatherHourlyCorrelation(AlertSearchRequest request) {
+        return isUnfilteredForRollup(request)
+                ? getWeatherHourlyCorrelationFromRollup(request)
+                : getWeatherHourlyCorrelationLive(request);
+    }
+
+    private List<WeatherCorrelationDto> getWeatherHourlyCorrelationFromRollup(AlertSearchRequest request) {
+        QWeatherHourlyCorrelationRollup r = QWeatherHourlyCorrelationRollup.weatherHourlyCorrelationRollup;
+
+        // 주의: r.alertCount는 시군구별 값이라 그대로 SUM하면 여러 시군구에 걸친 alert가 중복
+        // 집계된다 (countDistinct가 아님). 표시용 건수는 weather 조인 없는 별도 경량 쿼리로
+        // 정확히 구하고, 롤업의 alertCount는 가중평균의 가중치로만 쓴다.
+        List<Tuple> rows = queryFactory
+                .select(r.bucketHour,
+                        weightedAvg(r.avgTemp, r.alertCount),
+                        weightedAvg(r.avgPrecip, r.alertCount),
+                        weightedAvg(r.avgWindSpeed, r.alertCount))
+                .from(r)
+                .join(legalDistrict).on(legalDistrict.code.eq(r.legalDistrictCode))
+                .where(rollupDateCondition(request, r.bucketHour), regionFilterOnJoin(request))
+                .groupBy(r.bucketHour)
+                .orderBy(r.bucketHour.asc())
+                .fetch();
+
+        if (rows.isEmpty()) return List.of();
+
+        Map<String, String> primaryTypeByHour = primaryTypeByHour(request);
+        Map<String, Long> alertCountByHour = alertCountByHour(request);
+
+        return rows.stream()
+                .map(t -> {
+                    String key = hourKey(t.get(0, LocalDateTime.class));
+                    return new WeatherCorrelationDto(
+                            key,
+                            alertCountByHour.getOrDefault(key, 0L),
+                            t.get(1, Double.class),
+                            null, null,           // minTemp/maxTemp — 시간별에는 없음
+                            t.get(2, Double.class),
+                            t.get(3, Double.class),
+                            primaryTypeByHour.get(key)
+                    );
+                })
+                .collect(Collectors.toList());
+    }
+
+    /** 시간당 정확한 alert 건수(countDistinct) — weather 조인 없이 disasterAlert만 대상이라 이미 충분히 빠르다. */
+    private Map<String, Long> alertCountByHour(AlertSearchRequest request) {
+        NumberExpression<Integer> year  = disasterAlert.createdAt.year();
+        NumberExpression<Integer> month = disasterAlert.createdAt.month();
+        NumberExpression<Integer> day   = disasterAlert.createdAt.dayOfMonth();
+        NumberExpression<Integer> hour  = disasterAlert.createdAt.hour();
+
+        List<Tuple> rows = queryFactory
+                .select(year, month, day, hour, disasterAlert.id.countDistinct())
+                .from(disasterAlert)
+                .where(byAlertCondition(request))
+                .groupBy(year, month, day, hour)
+                .fetch();
+
+        Map<String, Long> result = new HashMap<>();
+        for (Tuple t : rows) {
+            if (t.get(0, Integer.class) == null) continue;
+            result.put(String.format("%04d-%02d-%02d %02d:00",
+                            t.get(0, Integer.class), t.get(1, Integer.class),
+                            t.get(2, Integer.class), t.get(3, Integer.class)),
+                    t.get(4, Long.class));
+        }
+        return result;
+    }
+
+    private List<WeatherCorrelationDto> getWeatherHourlyCorrelationLive(AlertSearchRequest request) {
         QWeatherObservation wo = QWeatherObservation.weatherObservation;
 
         NumberExpression<Integer> year  = disasterAlert.createdAt.year();
@@ -789,22 +865,7 @@ public class DisasterAlertRepositoryImpl implements DisasterAlertRepositoryCusto
 
         if (rows.isEmpty()) return List.of();
 
-        List<Tuple> typeRows = queryFactory
-                .select(year, month, day, hour, disasterAlert.disasterType, disasterAlert.id.countDistinct())
-                .from(disasterAlert)
-                .where(byAlertCondition(request), disasterAlert.disasterType.isNotNull())
-                .groupBy(year, month, day, hour, disasterAlert.disasterType)
-                .orderBy(year.asc(), month.asc(), day.asc(), hour.asc(), disasterAlert.id.countDistinct().desc())
-                .fetch();
-
-        Map<String, String> primaryTypeByHour = new LinkedHashMap<>();
-        for (Tuple t : typeRows) {
-            if (t.get(0, Integer.class) == null) continue;
-            String key = String.format("%04d-%02d-%02d %02d:00",
-                    t.get(0, Integer.class), t.get(1, Integer.class),
-                    t.get(2, Integer.class), t.get(3, Integer.class));
-            primaryTypeByHour.putIfAbsent(key, t.get(4, String.class));
-        }
+        Map<String, String> primaryTypeByHour = primaryTypeByHour(request);
 
         return rows.stream()
                 .filter(t -> t.get(0, Integer.class) != null)
@@ -823,6 +884,55 @@ public class DisasterAlertRepositoryImpl implements DisasterAlertRepositoryCusto
                     );
                 })
                 .collect(Collectors.toList());
+    }
+
+    /** disasterType별 시간당 건수 상위 1건 — weather 조인과 무관하므로 롤업/라이브 양쪽에서 공용. */
+    private Map<String, String> primaryTypeByHour(AlertSearchRequest request) {
+        NumberExpression<Integer> year  = disasterAlert.createdAt.year();
+        NumberExpression<Integer> month = disasterAlert.createdAt.month();
+        NumberExpression<Integer> day   = disasterAlert.createdAt.dayOfMonth();
+        NumberExpression<Integer> hour  = disasterAlert.createdAt.hour();
+
+        List<Tuple> typeRows = queryFactory
+                .select(year, month, day, hour, disasterAlert.disasterType, disasterAlert.id.countDistinct())
+                .from(disasterAlert)
+                .where(byAlertCondition(request), disasterAlert.disasterType.isNotNull())
+                .groupBy(year, month, day, hour, disasterAlert.disasterType)
+                .orderBy(year.asc(), month.asc(), day.asc(), hour.asc(), disasterAlert.id.countDistinct().desc())
+                .fetch();
+
+        Map<String, String> result = new LinkedHashMap<>();
+        for (Tuple t : typeRows) {
+            if (t.get(0, Integer.class) == null) continue;
+            String key = String.format("%04d-%02d-%02d %02d:00",
+                    t.get(0, Integer.class), t.get(1, Integer.class),
+                    t.get(2, Integer.class), t.get(3, Integer.class));
+            result.putIfAbsent(key, t.get(4, String.class));
+        }
+        return result;
+    }
+
+    /** type/level/keyword 필터가 없어야 롤업(alert_count가 유형 무관 전체 건수)으로 답할 수 있다. */
+    private boolean isUnfilteredForRollup(AlertSearchRequest request) {
+        return request.getType() == null && request.getLevel() == null && !StringUtils.hasText(request.getKeyword());
+    }
+
+    private BooleanBuilder rollupDateCondition(AlertSearchRequest request, DateTimePath<LocalDateTime> bucketHour) {
+        BooleanBuilder b = new BooleanBuilder();
+        if (request.getStartDate() != null) b.and(bucketHour.goe(request.getStartDate().atStartOfDay()));
+        if (request.getEndDate() != null) b.and(bucketHour.loe(request.getEndDate().atTime(23, 59, 59, 999)));
+        return b;
+    }
+
+    /** alert_count로 가중한 평균 — NULL(날씨 미수집) 행은 분자/분모 양쪽에서 제외. */
+    private NumberExpression<Double> weightedAvg(NumberPath<Double> valueCol, NumberPath<Integer> weightCol) {
+        return Expressions.numberTemplate(Double.class,
+                "SUM(CASE WHEN {0} IS NOT NULL THEN {0} * {1} ELSE 0 END) / NULLIF(SUM(CASE WHEN {0} IS NOT NULL THEN {1} ELSE 0 END), 0)",
+                valueCol, weightCol);
+    }
+
+    private String hourKey(LocalDateTime dt) {
+        return String.format("%04d-%02d-%02d %02d:00", dt.getYear(), dt.getMonthValue(), dt.getDayOfMonth(), dt.getHour());
     }
 
     @Override
@@ -871,6 +981,76 @@ public class DisasterAlertRepositoryImpl implements DisasterAlertRepositoryCusto
 
     @Override
     public List<WeatherRegionStatDto> getWeatherHourlyBySido(AlertSearchRequest request) {
+        return isUnfilteredForRollup(request)
+                ? getWeatherHourlyBySidoFromRollup(request)
+                : getWeatherHourlyBySidoLive(request);
+    }
+
+    private List<WeatherRegionStatDto> getWeatherHourlyBySidoFromRollup(AlertSearchRequest request) {
+        QWeatherHourlyCorrelationRollup r = QWeatherHourlyCorrelationRollup.weatherHourlyCorrelationRollup;
+        StringTemplate sido = Expressions.stringTemplate("function('left', {0}, 2)", r.legalDistrictCode);
+
+        // 표시용 건수는 weather 조인 없는 alertCountByHourAndSido로 정확히 구한다 (사유는
+        // getWeatherHourlyCorrelationFromRollup 주석 참고 — 같은 시도 내 여러 시군구에 걸친
+        // alert가 r.alertCount 단순 SUM으로는 중복 집계됨).
+        List<Tuple> rows = queryFactory
+                .select(r.bucketHour, sido,
+                        weightedAvg(r.avgTemp, r.alertCount),
+                        weightedAvg(r.avgPrecip, r.alertCount))
+                .from(r)
+                .join(legalDistrict).on(legalDistrict.code.eq(r.legalDistrictCode))
+                .where(rollupDateCondition(request, r.bucketHour), regionFilterOnJoin(request))
+                .groupBy(r.bucketHour, sido)
+                .orderBy(r.bucketHour.asc())
+                .fetch();
+
+        Map<String, String> sidoNames = sidoNameByCode();
+        Map<String, Long> alertCountByHourAndSido = alertCountByHourAndSido(request);
+        return rows.stream()
+                .map(t -> {
+                    String sidoCode = t.get(1, String.class);
+                    String key = hourKey(t.get(0, LocalDateTime.class)) + "|" + sidoCode;
+                    return new WeatherRegionStatDto(
+                            hourKey(t.get(0, LocalDateTime.class)),
+                            sidoNames.getOrDefault(sidoCode, sidoCode),
+                            alertCountByHourAndSido.getOrDefault(key, 0L),
+                            t.get(2, Double.class),
+                            null, null,
+                            t.get(3, Double.class));
+                })
+                .collect(Collectors.toList());
+    }
+
+    /** 시간×시도별 정확한 alert 건수 — weather 조인 없이 disasterAlertRegion/legalDistrict만 대상이라 빠르다. */
+    private Map<String, Long> alertCountByHourAndSido(AlertSearchRequest request) {
+        NumberExpression<Integer> year  = disasterAlert.createdAt.year();
+        NumberExpression<Integer> month = disasterAlert.createdAt.month();
+        NumberExpression<Integer> day   = disasterAlert.createdAt.dayOfMonth();
+        NumberExpression<Integer> hour  = disasterAlert.createdAt.hour();
+        StringTemplate sido = sidoCodeExpr();
+
+        List<Tuple> rows = queryFactory
+                .select(year, month, day, hour, sido, disasterAlert.id.countDistinct())
+                .from(disasterAlert)
+                .join(disasterAlert.disasterAlertRegions, disasterAlertRegion)
+                .join(disasterAlertRegion.legalDistrict, legalDistrict)
+                .where(byAlertCondition(request), regionFilterOnJoin(request))
+                .groupBy(year, month, day, hour, sido)
+                .fetch();
+
+        Map<String, Long> result = new HashMap<>();
+        for (Tuple t : rows) {
+            if (t.get(0, Integer.class) == null) continue;
+            String key = String.format("%04d-%02d-%02d %02d:00",
+                            t.get(0, Integer.class), t.get(1, Integer.class),
+                            t.get(2, Integer.class), t.get(3, Integer.class))
+                    + "|" + t.get(4, String.class);
+            result.put(key, t.get(5, Long.class));
+        }
+        return result;
+    }
+
+    private List<WeatherRegionStatDto> getWeatherHourlyBySidoLive(AlertSearchRequest request) {
         QWeatherObservation wo = QWeatherObservation.weatherObservation;
 
         NumberExpression<Integer> year  = disasterAlert.createdAt.year();
@@ -916,6 +1096,76 @@ public class DisasterAlertRepositoryImpl implements DisasterAlertRepositoryCusto
 
     @Override
     public List<WeatherRegionStatDto> getWeatherHourlyBySigungu(AlertSearchRequest request) {
+        return isUnfilteredForRollup(request)
+                ? getWeatherHourlyBySigunguFromRollup(request)
+                : getWeatherHourlyBySigunguLive(request);
+    }
+
+    private List<WeatherRegionStatDto> getWeatherHourlyBySigunguFromRollup(AlertSearchRequest request) {
+        QWeatherHourlyCorrelationRollup r = QWeatherHourlyCorrelationRollup.weatherHourlyCorrelationRollup;
+        StringTemplate sigungu = sigunguExpr();
+
+        // 표시용 건수는 weather 조인 없는 alertCountByHourAndSigungu로 정확히 구한다 (사유는
+        // getWeatherHourlyCorrelationFromRollup 주석 참고 — 수원시/성남시처럼 구가 나뉜 일반시는
+        // legal_district_code가 구별로 달라 같은 시군구 표시명 안에서도 r.alertCount 단순 SUM이
+        // 중복 집계될 수 있음).
+        List<Tuple> rows = queryFactory
+                .select(r.bucketHour, sigungu,
+                        weightedAvg(r.avgTemp, r.alertCount),
+                        weightedAvg(r.avgPrecip, r.alertCount))
+                .from(r)
+                .join(legalDistrict).on(legalDistrict.code.eq(r.legalDistrictCode))
+                .where(rollupDateCondition(request, r.bucketHour), regionFilterOnJoin(request))
+                .groupBy(r.bucketHour, sigungu)
+                .orderBy(r.bucketHour.asc())
+                .fetch();
+
+        Map<String, Long> alertCountByHourAndSigungu = alertCountByHourAndSigungu(request);
+        return rows.stream()
+                .map(t -> {
+                    String sigunguName = t.get(1, String.class);
+                    String key = hourKey(t.get(0, LocalDateTime.class)) + "|" + sigunguName;
+                    return new WeatherRegionStatDto(
+                            hourKey(t.get(0, LocalDateTime.class)),
+                            sigunguName,
+                            alertCountByHourAndSigungu.getOrDefault(key, 0L),
+                            t.get(2, Double.class),
+                            null, null,
+                            t.get(3, Double.class));
+                })
+                .collect(Collectors.toList());
+    }
+
+    /** 시간×시군구별 정확한 alert 건수 — weather 조인 없이 disasterAlertRegion/legalDistrict만 대상이라 빠르다. */
+    private Map<String, Long> alertCountByHourAndSigungu(AlertSearchRequest request) {
+        NumberExpression<Integer> year  = disasterAlert.createdAt.year();
+        NumberExpression<Integer> month = disasterAlert.createdAt.month();
+        NumberExpression<Integer> day   = disasterAlert.createdAt.dayOfMonth();
+        NumberExpression<Integer> hour  = disasterAlert.createdAt.hour();
+        StringTemplate sigungu = sigunguExpr();
+
+        List<Tuple> rows = queryFactory
+                .select(year, month, day, hour, sigungu, disasterAlert.id.countDistinct())
+                .from(disasterAlert)
+                .join(disasterAlert.disasterAlertRegions, disasterAlertRegion)
+                .join(disasterAlertRegion.legalDistrict, legalDistrict)
+                .where(byAlertCondition(request), regionFilterOnJoin(request))
+                .groupBy(year, month, day, hour, sigungu)
+                .fetch();
+
+        Map<String, Long> result = new HashMap<>();
+        for (Tuple t : rows) {
+            if (t.get(0, Integer.class) == null) continue;
+            String key = String.format("%04d-%02d-%02d %02d:00",
+                            t.get(0, Integer.class), t.get(1, Integer.class),
+                            t.get(2, Integer.class), t.get(3, Integer.class))
+                    + "|" + t.get(4, String.class);
+            result.put(key, t.get(5, Long.class));
+        }
+        return result;
+    }
+
+    private List<WeatherRegionStatDto> getWeatherHourlyBySigunguLive(AlertSearchRequest request) {
         QWeatherObservation wo = QWeatherObservation.weatherObservation;
 
         NumberExpression<Integer> year  = disasterAlert.createdAt.year();
@@ -923,13 +1173,7 @@ public class DisasterAlertRepositoryImpl implements DisasterAlertRepositoryCusto
         NumberExpression<Integer> day   = disasterAlert.createdAt.dayOfMonth();
         NumberExpression<Integer> hour  = disasterAlert.createdAt.hour();
 
-        StringTemplate norm = Expressions.stringTemplate(
-                "function('btrim', function('regexp_replace', {0}, '\\\\s+', ' ', 'g'))", legalDistrict.name);
-        StringTemplate sigungu = Expressions.stringTemplate(
-                "CASE WHEN function('split_part', {0}, ' ', 2) = '' " +
-                "THEN function('split_part', {0}, ' ', 1) " +
-                "ELSE function('split_part', {0}, ' ', 1) || ' ' || function('split_part', {0}, ' ', 2) END",
-                norm);
+        StringTemplate sigungu = sigunguExpr();
 
         List<Tuple> rows = queryFactory
                 .select(year, month, day, hour, sigungu,
@@ -962,6 +1206,17 @@ public class DisasterAlertRepositoryImpl implements DisasterAlertRepositoryCusto
                         null, null,
                         t.get(7, Double.class)))
                 .collect(Collectors.toList());
+    }
+
+    /** legalDistrict.name의 첫 두 토큰("시/도 + 시/군/구")을 시군구 표시명으로 파싱. */
+    private StringTemplate sigunguExpr() {
+        StringTemplate norm = Expressions.stringTemplate(
+                "function('btrim', function('regexp_replace', {0}, '\\\\s+', ' ', 'g'))", legalDistrict.name);
+        return Expressions.stringTemplate(
+                "CASE WHEN function('split_part', {0}, ' ', 2) = '' " +
+                "THEN function('split_part', {0}, ' ', 1) " +
+                "ELSE function('split_part', {0}, ' ', 1) || ' ' || function('split_part', {0}, ' ', 2) END",
+                norm);
     }
 
     @Override
