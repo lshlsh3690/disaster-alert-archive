@@ -1,8 +1,10 @@
 package com.disaster.alert.alertapi.domain.weather.scheduler;
 
+import com.disaster.alert.alertapi.domain.disasteralert.constant.StatsCacheNames;
 import com.disaster.alert.alertapi.domain.weather.service.WeatherCollectService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
@@ -35,6 +37,12 @@ public class WeatherCollectScheduler {
      * 명시하지 않으면 UTC 매시 45분 = KST 매시 45분 - 9시간 으로 어긋남.
      */
     @Scheduled(cron = "0 45 * * * *", zone = "Asia/Seoul")
+    @CacheEvict(cacheNames = {
+            StatsCacheNames.WEATHER_CORRELATION, StatsCacheNames.WEATHER_BY_TYPE,
+            StatsCacheNames.WEATHER_BY_SIDO, StatsCacheNames.WEATHER_BY_SIGUNGU,
+            StatsCacheNames.WEATHER_HOURLY_CORRELATION, StatsCacheNames.WEATHER_HOURLY_BY_TYPE,
+            StatsCacheNames.WEATHER_HOURLY_BY_SIDO, StatsCacheNames.WEATHER_HOURLY_BY_SIGUNGU
+    }, allEntries = true)
     public void runHourly() {
         log.info("WeatherCollectScheduler 시작");
         try {

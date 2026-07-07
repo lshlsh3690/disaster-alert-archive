@@ -1,8 +1,10 @@
 package com.disaster.alert.alertapi.domain.weather.scheduler;
 
+import com.disaster.alert.alertapi.domain.disasteralert.constant.StatsCacheNames;
 import com.disaster.alert.alertapi.domain.weather.service.WeatherDailySummaryService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
@@ -27,6 +29,12 @@ public class WeatherDailySummaryScheduler {
     private final WeatherDailySummaryService summaryService;
 
     @Scheduled(cron = "0 5 0 * * *", zone = "Asia/Seoul")
+    @CacheEvict(cacheNames = {
+            StatsCacheNames.WEATHER_CORRELATION, StatsCacheNames.WEATHER_BY_TYPE,
+            StatsCacheNames.WEATHER_BY_SIDO, StatsCacheNames.WEATHER_BY_SIGUNGU,
+            StatsCacheNames.WEATHER_HOURLY_CORRELATION, StatsCacheNames.WEATHER_HOURLY_BY_TYPE,
+            StatsCacheNames.WEATHER_HOURLY_BY_SIDO, StatsCacheNames.WEATHER_HOURLY_BY_SIGUNGU
+    }, allEntries = true)
     public void runDaily() {
         LocalDate yesterday = LocalDate.now(KST).minusDays(1);
         log.info("WeatherDailySummaryScheduler 시작: targetDate={}", yesterday);

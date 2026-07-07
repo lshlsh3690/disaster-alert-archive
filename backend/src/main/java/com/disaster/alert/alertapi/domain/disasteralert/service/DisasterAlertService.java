@@ -1,6 +1,7 @@
 package com.disaster.alert.alertapi.domain.disasteralert.service;
 
 import com.disaster.alert.alertapi.api.DisasterOpenApiClient;
+import com.disaster.alert.alertapi.domain.disasteralert.constant.StatsCacheNames;
 import com.disaster.alert.alertapi.domain.disasteralert.dto.*;
 import com.disaster.alert.alertapi.domain.disasteralert.model.DisasterAlert;
 import com.disaster.alert.alertapi.domain.disasteralert.model.DisasterLevel;
@@ -18,6 +19,8 @@ import jakarta.persistence.EntityNotFoundException;
 import jakarta.persistence.PersistenceContext;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
@@ -54,7 +57,17 @@ public class DisasterAlertService {
     @PersistenceContext
     private EntityManager entityManager;
 
+    // 새로 저장된 재난문자가 있을 때만(#result가 비어있지 않을 때만) /stats 캐시 전체 무효화.
+    // 10분 스케줄러가 매번 돌아도 신규 alert가 없으면(대부분의 사이클) 캐시를 건드리지 않는다.
     @Transactional
+    @CacheEvict(cacheNames = {
+            StatsCacheNames.SUMMARY, StatsCacheNames.SIDO, StatsCacheNames.SIGUNGU,
+            StatsCacheNames.DAILY, StatsCacheNames.HOURLY, StatsCacheNames.MONTHLY_TYPE, StatsCacheNames.DAILY_TYPE,
+            StatsCacheNames.WEATHER_CORRELATION, StatsCacheNames.WEATHER_BY_TYPE,
+            StatsCacheNames.WEATHER_BY_SIDO, StatsCacheNames.WEATHER_BY_SIGUNGU,
+            StatsCacheNames.WEATHER_HOURLY_CORRELATION, StatsCacheNames.WEATHER_HOURLY_BY_TYPE,
+            StatsCacheNames.WEATHER_HOURLY_BY_SIDO, StatsCacheNames.WEATHER_HOURLY_BY_SIGUNGU
+    }, allEntries = true, condition = "!#result.isEmpty()")
     public List<Long> saveData(String raw) {
         if (raw == null || raw.isBlank()) {
             log.warn("saveData: 원시 응답이 null/blank 입니다. 저장을 건너뜁니다.");
@@ -335,6 +348,7 @@ public class DisasterAlertService {
         return page;
     }
 
+    @Cacheable(StatsCacheNames.SUMMARY)
     public DisasterAlertStatResponse getStats(AlertSearchRequest request) {
         long total = disasterAlertRepository.countAlerts(request);
         List<DisasterAlertStatResponse.RegionStat> regionStats = disasterAlertRepository.countByRegion(request);
@@ -416,60 +430,74 @@ public class DisasterAlertService {
     }
 
     @Transactional(readOnly = true)
+    @Cacheable(StatsCacheNames.SIDO)
     public List<DisasterAlertStatResponse.RegionStat> countBySido(AlertSearchRequest request) {
         List<DisasterAlertStatResponse.RegionStat> regionStats = disasterAlertRepository.getStatsSido(request);
         log.info("지역별 재난문자 통계: {}", regionStats);
         return regionStats;
     }
 
+    @Cacheable(StatsCacheNames.SIGUNGU)
     public List<DisasterAlertStatResponse.RegionStat> countBySigungu(AlertSearchRequest request) {
         return disasterAlertRepository.getStatsSigungu(request);
     }
 
+    @Cacheable(StatsCacheNames.DAILY)
     public List<DisasterAlertStatResponse.DailyStat> countByDate(AlertSearchRequest request) {
         return disasterAlertRepository.getStatsByDate(request);
     }
 
+    @Cacheable(StatsCacheNames.HOURLY)
     public List<DisasterAlertStatResponse.HourlyStat> countByHour(AlertSearchRequest request) {
         return disasterAlertRepository.getStatsByHour(request);
     }
 
+    @Cacheable(StatsCacheNames.MONTHLY_TYPE)
     public List<DisasterAlertStatResponse.MonthlyTypeStat> countByMonthType(AlertSearchRequest request) {
         return disasterAlertRepository.getStatsByMonthType(request);
     }
 
+    @Cacheable(StatsCacheNames.DAILY_TYPE)
     public List<DisasterAlertStatResponse.MonthlyTypeStat> countByDateType(AlertSearchRequest request) {
         return disasterAlertRepository.getStatsByDateType(request);
     }
 
+    @Cacheable(StatsCacheNames.WEATHER_CORRELATION)
     public List<WeatherCorrelationDto> getWeatherCorrelation(AlertSearchRequest request) {
         return disasterAlertRepository.getWeatherCorrelation(request);
     }
 
+    @Cacheable(StatsCacheNames.WEATHER_BY_TYPE)
     public List<WeatherTypeStatDto> getWeatherByType(AlertSearchRequest request) {
         return disasterAlertRepository.getWeatherByType(request);
     }
 
+    @Cacheable(StatsCacheNames.WEATHER_BY_SIDO)
     public List<WeatherRegionStatDto> getWeatherBySido(AlertSearchRequest request) {
         return disasterAlertRepository.getWeatherBySido(request);
     }
 
+    @Cacheable(StatsCacheNames.WEATHER_BY_SIGUNGU)
     public List<WeatherRegionStatDto> getWeatherBySigungu(AlertSearchRequest request) {
         return disasterAlertRepository.getWeatherBySigungu(request);
     }
 
+    @Cacheable(StatsCacheNames.WEATHER_HOURLY_CORRELATION)
     public List<WeatherCorrelationDto> getWeatherHourlyCorrelation(AlertSearchRequest request) {
         return disasterAlertRepository.getWeatherHourlyCorrelation(request);
     }
 
+    @Cacheable(StatsCacheNames.WEATHER_HOURLY_BY_TYPE)
     public List<WeatherTypeStatDto> getWeatherHourlyByType(AlertSearchRequest request) {
         return disasterAlertRepository.getWeatherHourlyByType(request);
     }
 
+    @Cacheable(StatsCacheNames.WEATHER_HOURLY_BY_SIDO)
     public List<WeatherRegionStatDto> getWeatherHourlyBySido(AlertSearchRequest request) {
         return disasterAlertRepository.getWeatherHourlyBySido(request);
     }
 
+    @Cacheable(StatsCacheNames.WEATHER_HOURLY_BY_SIGUNGU)
     public List<WeatherRegionStatDto> getWeatherHourlyBySigungu(AlertSearchRequest request) {
         return disasterAlertRepository.getWeatherHourlyBySigungu(request);
     }
