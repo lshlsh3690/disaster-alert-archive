@@ -15,6 +15,7 @@ public class DisasterAlertStatResponse {
     private List<TypeStat> typeStats;
 
     @Getter
+    @NoArgsConstructor
     @AllArgsConstructor
     @ToString
     public static class RegionStat {
@@ -23,6 +24,7 @@ public class DisasterAlertStatResponse {
     }
 
     @Getter
+    @NoArgsConstructor
     @AllArgsConstructor
     @ToString
     public static class LevelStat {
@@ -31,6 +33,7 @@ public class DisasterAlertStatResponse {
     }
 
     @Getter
+    @NoArgsConstructor
     @AllArgsConstructor
     @ToString
     public static class TypeStat {
@@ -39,6 +42,7 @@ public class DisasterAlertStatResponse {
     }
 
     @Getter
+    @NoArgsConstructor
     @AllArgsConstructor
     @ToString
     public static class DailyStat {
@@ -47,6 +51,7 @@ public class DisasterAlertStatResponse {
     }
 
     @Getter
+    @NoArgsConstructor
     @AllArgsConstructor
     @ToString
     public static class HourlyStat {
@@ -56,6 +61,7 @@ public class DisasterAlertStatResponse {
     }
 
     @Getter
+    @NoArgsConstructor
     @AllArgsConstructor
     @ToString
     public static class MonthlyTypeStat {
