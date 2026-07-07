@@ -376,7 +376,7 @@ public class DisasterAlertService {
         return page;
     }
 
-    @Cacheable(StatsCacheNames.SUMMARY)
+    @Cacheable(value = StatsCacheNames.SUMMARY, sync = true)
     public DisasterAlertStatResponse getStats(AlertSearchRequest request) {
         long total = disasterAlertRepository.countAlerts(request);
         List<DisasterAlertStatResponse.RegionStat> regionStats = disasterAlertRepository.countByRegion(request);
@@ -458,74 +458,74 @@ public class DisasterAlertService {
     }
 
     @Transactional(readOnly = true)
-    @Cacheable(StatsCacheNames.SIDO)
+    @Cacheable(value = StatsCacheNames.SIDO, sync = true)
     public List<DisasterAlertStatResponse.RegionStat> countBySido(AlertSearchRequest request) {
         List<DisasterAlertStatResponse.RegionStat> regionStats = disasterAlertRepository.getStatsSido(request);
         log.info("지역별 재난문자 통계: {}", regionStats);
         return regionStats;
     }
 
-    @Cacheable(StatsCacheNames.SIGUNGU)
+    @Cacheable(value = StatsCacheNames.SIGUNGU, sync = true)
     public List<DisasterAlertStatResponse.RegionStat> countBySigungu(AlertSearchRequest request) {
         return disasterAlertRepository.getStatsSigungu(request);
     }
 
-    @Cacheable(StatsCacheNames.DAILY)
+    @Cacheable(value = StatsCacheNames.DAILY, sync = true)
     public List<DisasterAlertStatResponse.DailyStat> countByDate(AlertSearchRequest request) {
         return disasterAlertRepository.getStatsByDate(request);
     }
 
-    @Cacheable(StatsCacheNames.HOURLY)
+    @Cacheable(value = StatsCacheNames.HOURLY, sync = true)
     public List<DisasterAlertStatResponse.HourlyStat> countByHour(AlertSearchRequest request) {
         return disasterAlertRepository.getStatsByHour(request);
     }
 
-    @Cacheable(StatsCacheNames.MONTHLY_TYPE)
+    @Cacheable(value = StatsCacheNames.MONTHLY_TYPE, sync = true)
     public List<DisasterAlertStatResponse.MonthlyTypeStat> countByMonthType(AlertSearchRequest request) {
         return disasterAlertRepository.getStatsByMonthType(request);
     }
 
-    @Cacheable(StatsCacheNames.DAILY_TYPE)
+    @Cacheable(value = StatsCacheNames.DAILY_TYPE, sync = true)
     public List<DisasterAlertStatResponse.MonthlyTypeStat> countByDateType(AlertSearchRequest request) {
         return disasterAlertRepository.getStatsByDateType(request);
     }
 
-    @Cacheable(StatsCacheNames.WEATHER_CORRELATION)
+    @Cacheable(value = StatsCacheNames.WEATHER_CORRELATION, sync = true)
     public List<WeatherCorrelationDto> getWeatherCorrelation(AlertSearchRequest request) {
         return disasterAlertRepository.getWeatherCorrelation(request);
     }
 
-    @Cacheable(StatsCacheNames.WEATHER_BY_TYPE)
+    @Cacheable(value = StatsCacheNames.WEATHER_BY_TYPE, sync = true)
     public List<WeatherTypeStatDto> getWeatherByType(AlertSearchRequest request) {
         return disasterAlertRepository.getWeatherByType(request);
     }
 
-    @Cacheable(StatsCacheNames.WEATHER_BY_SIDO)
+    @Cacheable(value = StatsCacheNames.WEATHER_BY_SIDO, sync = true)
     public List<WeatherRegionStatDto> getWeatherBySido(AlertSearchRequest request) {
         return disasterAlertRepository.getWeatherBySido(request);
     }
 
-    @Cacheable(StatsCacheNames.WEATHER_BY_SIGUNGU)
+    @Cacheable(value = StatsCacheNames.WEATHER_BY_SIGUNGU, sync = true)
     public List<WeatherRegionStatDto> getWeatherBySigungu(AlertSearchRequest request) {
         return disasterAlertRepository.getWeatherBySigungu(request);
     }
 
-    @Cacheable(StatsCacheNames.WEATHER_HOURLY_CORRELATION)
+    @Cacheable(value = StatsCacheNames.WEATHER_HOURLY_CORRELATION, sync = true)
     public List<WeatherCorrelationDto> getWeatherHourlyCorrelation(AlertSearchRequest request) {
         return disasterAlertRepository.getWeatherHourlyCorrelation(request);
     }
 
-    @Cacheable(StatsCacheNames.WEATHER_HOURLY_BY_TYPE)
+    @Cacheable(value = StatsCacheNames.WEATHER_HOURLY_BY_TYPE, sync = true)
     public List<WeatherTypeStatDto> getWeatherHourlyByType(AlertSearchRequest request) {
         return disasterAlertRepository.getWeatherHourlyByType(request);
     }
 
-    @Cacheable(StatsCacheNames.WEATHER_HOURLY_BY_SIDO)
+    @Cacheable(value = StatsCacheNames.WEATHER_HOURLY_BY_SIDO, sync = true)
     public List<WeatherRegionStatDto> getWeatherHourlyBySido(AlertSearchRequest request) {
         return disasterAlertRepository.getWeatherHourlyBySido(request);
     }
 
-    @Cacheable(StatsCacheNames.WEATHER_HOURLY_BY_SIGUNGU)
+    @Cacheable(value = StatsCacheNames.WEATHER_HOURLY_BY_SIGUNGU, sync = true)
     public List<WeatherRegionStatDto> getWeatherHourlyBySigungu(AlertSearchRequest request) {
         return disasterAlertRepository.getWeatherHourlyBySigungu(request);
     }
