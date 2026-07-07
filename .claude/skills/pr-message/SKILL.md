@@ -21,3 +21,4 @@ allowed-tools: Bash, Read
 - PR의 base(도착점) 브랜치는 항상 `develop`으로 고정한다. main으로의 PR은 이 스킬로 만들지 않는다 — 사용자가 main을 명시적으로 요청해도 확인 없이 develop 대신 열지 말고 되물어본다.
 - PR 생성은 사용자가 명시적으로 요청했을 때만 진행한다.
 - 커밋 메시지만으로 목적이 불분명하면 diff 내용을 직접 확인해 보완한다.
+- PR 본문 끝에 `Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>` 같은 AI 서명을 붙이지 않는다.
