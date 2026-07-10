@@ -62,7 +62,7 @@ Commits)을 따른다. `type`은 `feat`/`fix`/`chore`/`docs`/`refactor`/`test`/`
 - 백엔드: Spring Boot 3.x + JPA/QueryDSL + PostgreSQL(pgvector) + Redis + Flyway. 스키마 변경은
   반드시 새 Flyway 마이그레이션 파일로 관리하며 이미 적용된 파일은 수정하지 않는다.
 - 프론트엔드: Next.js(App Router) + TypeScript + TailwindCSS + React Query + Zustand.
-- AI/임베딩: Spring AI 경유 OpenAI 호환 엔드포인트(Timely GPT 프록시). 임베딩 차원(1536)과
+- AI/임베딩: Spring AI 경유 OpenAI 정식 API. 임베딩 차원(1536)과
   모델을 변경할 때는 기존 임베딩 데이터 마이그레이션 계획을 함께 세운다.
 - 인프라: Docker Compose 기반 로컬/운영 환경. 로컬 개발은 Postgres/Redis만 컨테이너로
   띄우고 백엔드/프론트엔드는 직접 실행하는 것을 기본으로 한다.
