@@ -7,6 +7,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 public interface DisasterAlertRepository extends JpaRepository<DisasterAlert, Long>, DisasterAlertRepositoryCustom {
@@ -66,8 +67,14 @@ public interface DisasterAlertRepository extends JpaRepository<DisasterAlert, Lo
             """)
     List<LatestAlertResponse> latestAlerts(Pageable pageable);
 
-    @Query("select count(d) from DisasterAlert d where d.createdAt >= CURRENT_DATE")
-    long countToday();
+    /**
+     * {@code createdAt}은 타임존 정보 없는 TIMESTAMP에 KST 벽시계 값으로 저장되므로,
+     * DB 세션 타임존(기본 UTC)에 좌우되는 {@code CURRENT_DATE} 대신 호출 측에서
+     * KST 기준 자정 시각을 명시적으로 계산해 넘긴다 (자정~오전 9시 사이에 전날 데이터까지
+     * "오늘"로 잘못 카운트되던 버그 수정).
+     */
+    @Query("select count(d) from DisasterAlert d where d.createdAt >= :startOfDay")
+    long countToday(@Param("startOfDay") LocalDateTime startOfDay);
 
     /**
      * 한 이벤트에 속한 모든 재난문자 + 영향 법정동을 fetch join 으로 조회 (위험도 계산용, N+1 방지).

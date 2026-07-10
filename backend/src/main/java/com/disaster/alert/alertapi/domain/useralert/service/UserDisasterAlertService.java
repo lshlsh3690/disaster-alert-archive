@@ -20,6 +20,8 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.Objects;
 
 @Slf4j
@@ -27,6 +29,8 @@ import java.util.Objects;
 @RequiredArgsConstructor
 @Transactional
 public class UserDisasterAlertService {
+
+    private static final ZoneId KST = ZoneId.of("Asia/Seoul");
 
     private final UserDisasterAlertRepository userDisasterAlertRepository;
     private final UserDisasterAlertRegionRepository userDisasterAlertRegionRepository;
@@ -176,7 +180,7 @@ public class UserDisasterAlertService {
 
     @Transactional(readOnly = true)
     public long countTodayActive() {
-        return userDisasterAlertRepository.countTodayActive();
+        return userDisasterAlertRepository.countTodayActive(LocalDate.now(KST).atStartOfDay());
     }
 
     /* -------------------- 헬퍼 -------------------- */
