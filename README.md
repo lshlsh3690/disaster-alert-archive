@@ -188,7 +188,7 @@ npm run dev
 | `JWT_SECRET` | JWT 서명 키 |
 | `DISASTER_ALERT_SERVICE_KEY` | 행안부 Open API 키 |
 | `KMA_ASOS_API_KEY` | 기상청 Open API 키 |
-| `TIMELY_API_KEY` | OpenAI 호환 AI API 키 |
+| `OPENAI_API_KEY` | OpenAI 호환 AI API 키 |
 | `DEEPL_API_KEY` | DeepL 번역 API 키 |
 | `GOOGLE_OAUTH_CLIENT_ID` / `_SECRET` | Google OAuth2 |
 | `KAKAO_OAUTH_CLIENT_ID` / `_SECRET` | Kakao OAuth2 |
