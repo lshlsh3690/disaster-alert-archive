@@ -29,7 +29,9 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
@@ -41,6 +43,8 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 @Slf4j
 public class DisasterAlertService {
+    private static final ZoneId KST = ZoneId.of("Asia/Seoul");
+
     private final DisasterAlertRepository disasterAlertRepository;
     private final DisasterAlertTranslationRepository translationRepository;
 
@@ -386,7 +390,7 @@ public class DisasterAlertService {
     }
 
     public DashboardSummaryResponse getDashboardSummary(long todayUserCount, long totalUserCount) {
-        long todayOfficial = disasterAlertRepository.countToday();
+        long todayOfficial = disasterAlertRepository.countToday(LocalDate.now(KST).atStartOfDay());
         long totalOfficial = disasterAlertRepository.count();
         long combined = totalOfficial + totalUserCount;
         return new DashboardSummaryResponse(todayOfficial, todayUserCount, totalUserCount, combined);

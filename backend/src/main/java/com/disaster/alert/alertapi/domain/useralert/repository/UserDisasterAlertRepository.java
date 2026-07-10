@@ -6,6 +6,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 
+import java.time.LocalDateTime;
 import java.util.Optional;
 
 public interface UserDisasterAlertRepository extends JpaRepository<UserDisasterAlert, Long> {
@@ -31,6 +32,7 @@ public interface UserDisasterAlertRepository extends JpaRepository<UserDisasterA
     @Query("select count(ua) from UserDisasterAlert ua where ua.isDeleted = false")
     long countAllActive();
 
-    @Query("select count(ua) from UserDisasterAlert ua where ua.isDeleted = false and ua.createdAt >= CURRENT_DATE")
-    long countTodayActive();
+    /** DisasterAlertRepository.countToday() 참고 — CURRENT_DATE(DB 세션 타임존) 대신 KST 자정을 명시적으로 전달받음. */
+    @Query("select count(ua) from UserDisasterAlert ua where ua.isDeleted = false and ua.createdAt >= :startOfDay")
+    long countTodayActive(LocalDateTime startOfDay);
 }
