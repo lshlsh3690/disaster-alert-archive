@@ -185,20 +185,7 @@ public class DisasterAlertService {
     }
 
     private DisasterAlert toEntity(DisasterAlertDto dto) {
-        List<String> regionNames = new ArrayList<>(
-                Arrays.stream(dto.getRegion().split(","))
-                        .flatMap(region -> {
-                            String cleanedRegion = cleanRegionString(region);
-                            return sanitizeRegionNames(cleanedRegion).stream();
-                        })
-                        .toList()
-        );
-
-        if (dto.getRegion().contains("임진강 수계지역(경기도 연천군,파주시),경기도 임진강")) {
-            regionNames = new ArrayList<>(regionNames);
-            regionNames.add("경기도 연천군");
-            regionNames.add("경기도 파주시");
-        }
+        List<String> regionNames = resolveRegionNamesFromRaw(dto.getRegion());
 
         DisasterAlert alert = DisasterAlert.builder()
                 .sn(dto.getSn())
@@ -210,6 +197,31 @@ public class DisasterAlertService {
                 .originalRegion(dto.getRegion())
                 .build();
 
+        attachRegionCodes(alert, regionNames);
+
+        return alert;
+    }
+
+    private List<String> resolveRegionNamesFromRaw(String rawRegion) {
+        List<String> regionNames = new ArrayList<>(
+                Arrays.stream(rawRegion.split(","))
+                        .flatMap(region -> {
+                            String cleanedRegion = cleanRegionString(region);
+                            return sanitizeRegionNames(cleanedRegion).stream();
+                        })
+                        .toList()
+        );
+
+        if (rawRegion.contains("임진강 수계지역(경기도 연천군,파주시),경기도 임진강")) {
+            regionNames = new ArrayList<>(regionNames);
+            regionNames.add("경기도 연천군");
+            regionNames.add("경기도 파주시");
+        }
+
+        return regionNames;
+    }
+
+    private void attachRegionCodes(DisasterAlert alert, List<String> regionNames) {
         Set<String> attachedCodes = new HashSet<>();
         for (String regionName : regionNames) {
             List<LegalDistrict> legalDistricts = legalDistrictCache.get(regionName);// 캐시에서 법정동 조회
@@ -231,8 +243,44 @@ public class DisasterAlertService {
             if (!attachedCodes.add(code)) continue;
             alert.addRegionCode(code);
         }
+    }
 
-        return alert;
+    /**
+     * 법정동 매핑이 비어있는 기존 alert를 원본 지역명(originalRegion)으로 재처리한다.
+     * 시도 개편 등으로 legal_district 코드가 갱신되기 전에 수집되어 매칭이 실패했던 데이터를
+     * 사후 복구할 때 사용한다 (DisasterAlertRegionBackfillTool 참고).
+     *
+     * @return 새로 법정동이 매핑된 alert 수
+     */
+    @Transactional
+    @CacheEvict(cacheNames = {
+            StatsCacheNames.SUMMARY, StatsCacheNames.SIDO, StatsCacheNames.SIGUNGU,
+            StatsCacheNames.DAILY, StatsCacheNames.HOURLY, StatsCacheNames.MONTHLY_TYPE, StatsCacheNames.DAILY_TYPE,
+            StatsCacheNames.WEATHER_CORRELATION, StatsCacheNames.WEATHER_BY_TYPE,
+            StatsCacheNames.WEATHER_BY_SIDO, StatsCacheNames.WEATHER_BY_SIGUNGU,
+            StatsCacheNames.WEATHER_HOURLY_CORRELATION, StatsCacheNames.WEATHER_HOURLY_BY_TYPE,
+            StatsCacheNames.WEATHER_HOURLY_BY_SIDO, StatsCacheNames.WEATHER_HOURLY_BY_SIGUNGU
+    }, allEntries = true, condition = "#result > 0")
+    public int remapMissingRegions(List<Long> alertIds) {
+        List<DisasterAlert> targets = disasterAlertRepository.findAllById(alertIds).stream()
+                .filter(alert -> alert.getDisasterAlertRegions().isEmpty())
+                .filter(alert -> alert.getOriginalRegion() != null && !alert.getOriginalRegion().isBlank())
+                .toList();
+
+        List<DisasterAlert> updatedAlerts = new ArrayList<>();
+        for (DisasterAlert alert : targets) {
+            attachRegionCodes(alert, resolveRegionNamesFromRaw(alert.getOriginalRegion()));
+            if (!alert.getDisasterAlertRegions().isEmpty()) {
+                updatedAlerts.add(alert);
+            }
+        }
+
+        if (!updatedAlerts.isEmpty()) {
+            Set<Long> updatedIds = updatedAlerts.stream().map(DisasterAlert::getId).collect(Collectors.toSet());
+            updateWeatherHourlyRollup(updatedAlerts, updatedIds);
+        }
+
+        return updatedAlerts.size();
     }
 
     private String cleanRegionString(String region) {
@@ -249,7 +297,6 @@ public class DisasterAlertService {
                 .toList();
 
         List<String> result = new ArrayList<>();
-
         for (String region : regions) {
             // 지역이름 : "세종특별자치시 가람동 1동"
             List<String> tokens = Arrays.asList(region.split(" "));
