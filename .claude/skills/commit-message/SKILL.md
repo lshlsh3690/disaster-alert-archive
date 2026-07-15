@@ -23,4 +23,3 @@ allowed-tools: Bash, Read
 - 커밋 메시지는 항상 한글로 작성한다 (이 레포의 기존 커밋 컨벤션).
 - 커밋은 사용자가 명시적으로 요청했을 때만 생성한다.
 - `.env`, `credentials.json` 등 민감한 파일은 커밋 대상에서 제외한다.
-- 커밋 메시지 끝에 `Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>` 같은 AI 서명을 붙이지 않는다.
