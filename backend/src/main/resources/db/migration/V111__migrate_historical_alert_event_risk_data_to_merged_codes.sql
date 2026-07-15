@@ -40,11 +40,26 @@ WHERE old_ld.is_active = false
   AND (old_ld.code LIKE '29%' OR old_ld.code LIKE '46%')
 ON CONFLICT (disaster_alert_id, legal_district_code) DO NOTHING;
 
+-- 이름 매칭에 실패해 위 INSERT가 건너뛴 옛 코드(예: 2026-07-01 개편으로 동 경계 자체가
+-- 재편되어 신규 seed에 동일 명칭이 없는 리/동, 또는 1986년 이전 "전라남도 광주시" 같은
+-- 훨씬 오래된 폐지 코드)까지 삭제하면 대체 없이 데이터가 영구 유실된다.
+-- INSERT와 동일한 매칭 조건으로 신규 코드가 실제로 존재함을 확인한 행만 삭제한다.
 DELETE FROM disaster_alert_region dar
 USING legal_district old_ld
 WHERE dar.legal_district_code = old_ld.code
   AND old_ld.is_active = false
-  AND (old_ld.code LIKE '29%' OR old_ld.code LIKE '46%');
+  AND (old_ld.code LIKE '29%' OR old_ld.code LIKE '46%')
+  AND EXISTS (
+      SELECT 1 FROM legal_district new_ld
+      WHERE new_ld.is_active = true
+        AND new_ld.name = (
+            CASE
+                WHEN old_ld.name IN ('광주광역시', '전라남도') THEN '전남광주통합특별시'
+                WHEN old_ld.name LIKE '광주광역시 %' THEN '전남광주통합특별시 ' || substring(old_ld.name FROM length('광주광역시 ') + 1)
+                WHEN old_ld.name LIKE '전라남도 %' THEN '전남광주통합특별시 ' || substring(old_ld.name FROM length('전라남도 ') + 1)
+            END
+        )
+  );
 
 -- =========================================================================
 -- A-2) user_disaster_alert_region (복합 PK: user_disaster_alert_id, legal_district_code)
@@ -69,7 +84,18 @@ DELETE FROM user_disaster_alert_region udar
 USING legal_district old_ld
 WHERE udar.legal_district_code = old_ld.code
   AND old_ld.is_active = false
-  AND (old_ld.code LIKE '29%' OR old_ld.code LIKE '46%');
+  AND (old_ld.code LIKE '29%' OR old_ld.code LIKE '46%')
+  AND EXISTS (
+      SELECT 1 FROM legal_district new_ld
+      WHERE new_ld.is_active = true
+        AND new_ld.name = (
+            CASE
+                WHEN old_ld.name IN ('광주광역시', '전라남도') THEN '전남광주통합특별시'
+                WHEN old_ld.name LIKE '광주광역시 %' THEN '전남광주통합특별시 ' || substring(old_ld.name FROM length('광주광역시 ') + 1)
+                WHEN old_ld.name LIKE '전라남도 %' THEN '전남광주통합특별시 ' || substring(old_ld.name FROM length('전라남도 ') + 1)
+            END
+        )
+  );
 
 -- =========================================================================
 -- A-3) guest_fcm_region (UNIQUE(fcm_token, legal_district_code), PK는 별도 id)
@@ -94,7 +120,18 @@ DELETE FROM guest_fcm_region gfr
 USING legal_district old_ld
 WHERE gfr.legal_district_code = old_ld.code
   AND old_ld.is_active = false
-  AND (old_ld.code LIKE '29%' OR old_ld.code LIKE '46%');
+  AND (old_ld.code LIKE '29%' OR old_ld.code LIKE '46%')
+  AND EXISTS (
+      SELECT 1 FROM legal_district new_ld
+      WHERE new_ld.is_active = true
+        AND new_ld.name = (
+            CASE
+                WHEN old_ld.name IN ('광주광역시', '전라남도') THEN '전남광주통합특별시'
+                WHEN old_ld.name LIKE '광주광역시 %' THEN '전남광주통합특별시 ' || substring(old_ld.name FROM length('광주광역시 ') + 1)
+                WHEN old_ld.name LIKE '전라남도 %' THEN '전남광주통합특별시 ' || substring(old_ld.name FROM length('전라남도 ') + 1)
+            END
+        )
+  );
 
 -- =========================================================================
 -- A-4) disaster_events.primary_region_code / primary_region_name (FK 없는 캐시 컬럼, 단일 UPDATE)
@@ -146,7 +183,18 @@ DELETE FROM event_region_impact eri
 USING legal_district old_ld
 WHERE eri.region_code = old_ld.code
   AND old_ld.is_active = false
-  AND (old_ld.code LIKE '29%' OR old_ld.code LIKE '46%');
+  AND (old_ld.code LIKE '29%' OR old_ld.code LIKE '46%')
+  AND EXISTS (
+      SELECT 1 FROM legal_district new_ld
+      WHERE new_ld.is_active = true
+        AND new_ld.name = (
+            CASE
+                WHEN old_ld.name IN ('광주광역시', '전라남도') THEN '전남광주통합특별시'
+                WHEN old_ld.name LIKE '광주광역시 %' THEN '전남광주통합특별시 ' || substring(old_ld.name FROM length('광주광역시 ') + 1)
+                WHEN old_ld.name LIKE '전라남도 %' THEN '전남광주통합특별시 ' || substring(old_ld.name FROM length('전라남도 ') + 1)
+            END
+        )
+  );
 
 -- =========================================================================
 -- B-1) region_risk_index (PK: region_code, 5자리 시군구코드 — 현재 스냅샷 성격)
