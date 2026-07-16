@@ -180,7 +180,7 @@ function EventsPageInner() {
     setPage(0);
   };
 
-  // 지역명 번역: 시도는 t.metros, 시군구는 /districts/sigungu 응답으로 매핑
+  // 지역명 번역: 시도는 t("metros"), 시군구는 /districts/sigungu 응답으로 매핑
   const [sigunguTransBySido, setSigunguTransBySido] = useState<Record<string, Map<string, string>>>({});
   const ensureSigunguTrans = useCallback(
     async (sido: string) => {
@@ -207,7 +207,7 @@ function EventsPageInner() {
     if (!name) return "";
     if (lang === "ko") return name;
     const { sido, sigungu } = splitRegion(name);
-    const tSido = t.metros?.[sido as keyof typeof t.metros] ?? sido;
+    const tSido = t(`metros.${sido}`, { defaultValue: sido });
     if (!sigungu) return tSido;
     const tSigungu = sigunguTransBySido[sido]?.get(sigungu) ?? sigungu;
     return `${tSido} ${tSigungu}`;
@@ -219,8 +219,8 @@ function EventsPageInner() {
     <main className="bg-[var(--canvas)] min-h-[calc(100vh-48px)]">
       <div className="mx-auto max-w-4xl space-y-4 px-4 py-8 sm:px-6">
         <div>
-          <h1 className="text-xl font-bold tracking-tight text-[var(--ink)]">{t.events.title}</h1>
-          <p className="mt-1 text-[13px] text-[var(--text-muted)]">{t.events.description}</p>
+          <h1 className="text-xl font-bold tracking-tight text-[var(--ink)]">{t("events.title")}</h1>
+          <p className="mt-1 text-[13px] text-[var(--text-muted)]">{t("events.description")}</p>
         </div>
 
         {/* 탭 */}
@@ -228,10 +228,10 @@ function EventsPageInner() {
           {(["active", "past", "all"] as ActiveTab[]).map((tabKey) => {
             const label =
               tabKey === "active"
-                ? t.events.tabActive
+                ? t("events.tabActive")
                 : tabKey === "past"
-                ? t.events.tabPast
-                : t.events.tabAll;
+                ? t("events.tabPast")
+                : t("events.tabAll");
             return (
               <button
                 key={tabKey}
@@ -254,14 +254,14 @@ function EventsPageInner() {
           className="grid grid-cols-2 gap-3 rounded-[var(--radius-panel-card)] border border-[var(--line)] bg-[var(--surface)] p-4 shadow-[0_10px_30px_rgba(28,39,60,0.04)] sm:grid-cols-3"
         >
           <select {...register("sido")} className="input">
-            <option value="">{t.events.filter.sido}</option>
+            <option value="">{t("events.filter.sido")}</option>
             {METROS.map((m) => (
-              <option key={m} value={m}>{t.metros[m as keyof typeof t.metros] ?? m}</option>
+              <option key={m} value={m}>{t(`metros.${m}`, { defaultValue: m })}</option>
             ))}
           </select>
 
           <select {...register("sigungu")} className="input disabled:opacity-60" disabled={!watchedSido}>
-            <option value="">{t.events.filter.sigungu}</option>
+            <option value="">{t("events.filter.sigungu")}</option>
             {sigunguList?.map((s) => (
               <option key={s.code} value={s.name}>
                 {s.translatedName ?? s.name}
@@ -270,33 +270,33 @@ function EventsPageInner() {
           </select>
 
           <select {...register("type")} className="input">
-            <option value="">{t.events.filter.type}</option>
+            <option value="">{t("events.filter.type")}</option>
             {DISASTER_TYPES.map((dt) => (
-              <option key={dt} value={dt}>{t.disasterTypes[dt as keyof typeof t.disasterTypes] ?? dt}</option>
+              <option key={dt} value={dt}>{t(`disasterTypes.${dt}`, { defaultValue: dt })}</option>
             ))}
           </select>
 
           <div className="flex flex-col gap-1">
-            <span className="text-xs text-[var(--text-muted)]">{t.events.filter.startDate}</span>
+            <span className="text-xs text-[var(--text-muted)]">{t("events.filter.startDate")}</span>
             <Controller
               name="startDate"
               control={control}
               render={({ field }) => (
-                <DatePicker value={field.value ?? ""} onChange={field.onChange} locale={LANG_LOCALE[lang] ?? "ko-KR"} clearLabel={t.datePicker.clear} prevMonthLabel={t.datePicker.prevMonth} nextMonthLabel={t.datePicker.nextMonth} />
+                <DatePicker value={field.value ?? ""} onChange={field.onChange} locale={LANG_LOCALE[lang] ?? "ko-KR"} clearLabel={t("datePicker.clear")} prevMonthLabel={t("datePicker.prevMonth")} nextMonthLabel={t("datePicker.nextMonth")} />
               )}
             />
           </div>
           <div className="flex flex-col gap-1">
-            <span className="text-xs text-[var(--text-muted)]">{t.events.filter.endDate}</span>
+            <span className="text-xs text-[var(--text-muted)]">{t("events.filter.endDate")}</span>
             <Controller
               name="endDate"
               control={control}
               render={({ field }) => (
-                <DatePicker value={field.value ?? ""} onChange={field.onChange} locale={LANG_LOCALE[lang] ?? "ko-KR"} clearLabel={t.datePicker.clear} prevMonthLabel={t.datePicker.prevMonth} nextMonthLabel={t.datePicker.nextMonth} />
+                <DatePicker value={field.value ?? ""} onChange={field.onChange} locale={LANG_LOCALE[lang] ?? "ko-KR"} clearLabel={t("datePicker.clear")} prevMonthLabel={t("datePicker.prevMonth")} nextMonthLabel={t("datePicker.nextMonth")} />
               )}
             />
           </div>
-          <input type="text" {...register("keyword")} className="input self-end" placeholder={t.events.filter.keyword} />
+          <input type="text" {...register("keyword")} className="input self-end" placeholder={t("events.filter.keyword")} />
 
           <div className="col-span-2 flex justify-end gap-2 sm:col-span-3">
             <button
@@ -304,23 +304,23 @@ function EventsPageInner() {
               onClick={onReset}
               className="rounded-[var(--radius-control)] border border-[var(--line)] bg-[var(--surface)] px-3 py-2 text-sm text-[var(--text-body)] transition-colors hover:bg-[var(--blue-soft)]"
             >
-              {t.alertList.reset}
+              {t("alertList.reset")}
             </button>
             <button
               type="submit"
               className="rounded-[var(--radius-control)] bg-[var(--blue)] px-4 py-2 text-sm font-semibold text-white transition hover:brightness-95 disabled:opacity-60"
               disabled={isFetching}
             >
-              {isFetching ? t.alertList.searching : t.alertList.search}
+              {isFetching ? t("alertList.searching") : t("alertList.search")}
             </button>
           </div>
         </form>
 
         {/* 목록 */}
         {isLoading ? (
-          <div className="py-8 text-center text-[13px] text-[var(--text-muted)]">{t.loading}</div>
+          <div className="py-8 text-center text-[13px] text-[var(--text-muted)]">{t("loading")}</div>
         ) : !data?.content.length ? (
-          <div className="py-8 text-center text-[13px] text-[var(--text-muted)]">{t.events.empty}</div>
+          <div className="py-8 text-center text-[13px] text-[var(--text-muted)]">{t("events.empty")}</div>
         ) : (
           <ul className="space-y-3">
             {data.content.map((e: Event) => (
@@ -338,7 +338,7 @@ function EventsPageInner() {
                         e.active ? "bg-[var(--coral-soft)] text-[#c0473b]" : "bg-[#eef1f5] text-[var(--text-muted)]"
                       }`}
                     >
-                      {e.active ? t.events.badgeActive : t.events.badgePast}
+                      {e.active ? t("events.badgeActive") : t("events.badgePast")}
                     </span>
                   </div>
                   <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
@@ -346,18 +346,18 @@ function EventsPageInner() {
                       <button
                         type="button"
                         onClick={(evt) => { evt.preventDefault(); evt.stopPropagation(); filterByType(e.primaryDisasterType); }}
-                        title={t.events.filterByType}
+                        title={t("events.filterByType")}
                         style={disasterTypeChipStyle(e.primaryDisasterType)}
                         className="cursor-pointer rounded-[var(--radius-pill)] px-2 py-0.5 font-medium transition hover:brightness-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--blue)]"
                       >
-                        {t.disasterTypes[e.primaryDisasterType as keyof typeof t.disasterTypes] ?? e.primaryDisasterType}
+                        {t(`disasterTypes.${e.primaryDisasterType}`, { defaultValue: e.primaryDisasterType })}
                       </button>
                     )}
                     {e.primaryRegionName && (
                       <button
                         type="button"
                         onClick={(evt) => { evt.preventDefault(); evt.stopPropagation(); filterByRegion(e); }}
-                        title={t.events.filterByRegion}
+                        title={t("events.filterByRegion")}
                         className="inline-flex cursor-pointer items-center gap-1 rounded-[var(--radius-pill)] bg-[#eef1f5] px-2 py-0.5 font-medium text-[var(--text-muted)] transition hover:bg-[#e4e8ee] hover:text-[var(--text-body)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--blue-soft)]"
                       >
                         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -371,9 +371,9 @@ function EventsPageInner() {
                       <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                         <path d="M4 4h16v12H7l-3 3V4z" />
                       </svg>
-                      {t.events.relatedCount} {e.alertCount}{t.alertList.countUnit}
+                      {t("events.relatedCount")} {e.alertCount}{t("alertList.countUnit")}
                     </span>
-                    <span className="text-[var(--text-subtle)]">{formatEventPeriod(e.firstAlertAt, e.lastAlertAt, t.events)}</span>
+                    <span className="text-[var(--text-subtle)]">{formatEventPeriod(e.firstAlertAt, e.lastAlertAt, { sameDay: t("events.sameDay"), daysSpan: t("events.daysSpan") })}</span>
                   </div>
                 </Link>
               </li>
@@ -389,7 +389,7 @@ function EventsPageInner() {
               disabled={page === 0}
               className="rounded-[var(--radius-control)] border border-[var(--line)] bg-[var(--surface)] px-3 py-1.5 text-sm text-[var(--text-body)] transition-colors hover:bg-[var(--blue-soft)] disabled:opacity-40 disabled:hover:bg-[var(--surface)]"
             >
-              {t.alertList.prev}
+              {t("alertList.prev")}
             </button>
             <span className="px-3 py-1 text-sm text-[var(--text-muted)]">
               {page + 1} / {totalPages}
@@ -399,7 +399,7 @@ function EventsPageInner() {
               disabled={page >= totalPages - 1}
               className="rounded-[var(--radius-control)] border border-[var(--line)] bg-[var(--surface)] px-3 py-1.5 text-sm text-[var(--text-body)] transition-colors hover:bg-[var(--blue-soft)] disabled:opacity-40 disabled:hover:bg-[var(--surface)]"
             >
-              {t.alertList.next}
+              {t("alertList.next")}
             </button>
           </div>
         )}

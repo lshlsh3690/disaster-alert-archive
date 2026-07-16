@@ -97,7 +97,7 @@ export function LineChart({ data }: { data: DailyStat[] }) {
     return (
       <div style={TT_BOX}>
         <p style={TT_LABEL}>{label}</p>
-        <p style={TT_VALUE}>{(payload[0].value ?? 0).toLocaleString(locale)}{t.statsPage.countUnit}</p>
+        <p style={TT_VALUE}>{(payload[0].value ?? 0).toLocaleString(locale)}{t("statsPage.countUnit")}</p>
       </div>
     );
   };
@@ -182,7 +182,7 @@ export function DailyBar({ data }: { data: DailyStat[] }) {
     return (
       <div style={TT_BOX}>
         <p style={TT_LABEL}>{label}</p>
-        <p style={TT_VALUE}>{(payload[0].value ?? 0).toLocaleString(locale)}{t.statsPage.countUnit}</p>
+        <p style={TT_VALUE}>{(payload[0].value ?? 0).toLocaleString(locale)}{t("statsPage.countUnit")}</p>
       </div>
     );
   };
@@ -302,19 +302,19 @@ export function Heatmap({ data }: { data: HourlyStat[] }) {
           className="absolute z-10 bg-gray-800 text-white text-xs rounded px-2 py-1.5 shadow-lg pointer-events-none whitespace-nowrap -translate-x-1/2 -translate-y-full"
           style={{ left: tooltip.x, top: tooltip.y - 6 }}
         >
-          <div className="font-semibold">{weekdays[tooltip.di]} {tooltip.hi}{t.statsPage.hourSuffix}</div>
-          <div className="text-gray-300">{tooltip.v.toLocaleString(locale)}{t.statsPage.countUnit}</div>
+          <div className="font-semibold">{weekdays[tooltip.di]} {tooltip.hi}{t("statsPage.hourSuffix")}</div>
+          <div className="text-gray-300">{tooltip.v.toLocaleString(locale)}{t("statsPage.countUnit")}</div>
         </div>
       )}
 
       {/* 색상 범례: 적음 → 많음 */}
       <div className="flex items-center gap-1.5 text-xs text-gray-400 mt-1 flex-wrap">
-        <span>{t.statsPage.low}</span>
+        <span>{t("statsPage.low")}</span>
         {[0.15, 0.3, 0.5, 0.7, 0.9].map(o => (
           <span key={o} className="w-4 h-2.5 rounded-sm inline-block"
             style={{ background: `rgba(37,99,235,${o})` }} />
         ))}
-        <span>{t.statsPage.high}</span>
+        <span>{t("statsPage.high")}</span>
       </div>
     </div>
   );
@@ -377,7 +377,7 @@ export function HourBar({ data }: { data: HourlyStat[] }) {
 
   // 0시 ~ 23시 24개 막대
   const bars = Array.from({ length: 24 }, (_, h) => ({
-    label: `${h}${t.statsPage.hourSuffix}`,
+    label: `${h}${t("statsPage.hourSuffix")}`,
     count: agg[h] ?? 0,
   }));
 
@@ -466,7 +466,7 @@ export function StackedArea({
           (i % Math.max(1, Math.floor(n / 5)) === 0 || i === n - 1) && (
             <text key={m} x={xs(i)} y={h - padB + 13}
               textAnchor="middle" fontSize="9" fill="#9ca3af">
-              {m.length === 10 ? m.slice(5) : `${parseInt(m.slice(5))}${t.statsPage.monthSuffix}`}
+              {m.length === 10 ? m.slice(5) : `${parseInt(m.slice(5))}${t("statsPage.monthSuffix")}`}
             </text>
           )
         )}
@@ -516,7 +516,7 @@ export function StackedBar({
       count: data.find(d => d.month === m && d.type === type)?.count ?? 0,
     }));
     return {
-      label: m.length === 10 ? m.slice(5) : `${parseInt(m.slice(5))}${t.statsPage.monthSuffix}`,
+      label: m.length === 10 ? m.slice(5) : `${parseInt(m.slice(5))}${t("statsPage.monthSuffix")}`,
       total: segments.reduce((s, g) => s + g.count, 0),
       segments,
     };
@@ -539,7 +539,7 @@ export function StackedBar({
               {/* flex-col-reverse: 아래 유형부터 쌓입니다 */}
               {m.segments.map((seg, j) => seg.count > 0 && (
                 <div key={j}
-                  title={`${seg.type}: ${seg.count}${t.statsPage.countUnit}`}
+                  title={`${seg.type}: ${seg.count}${t("statsPage.countUnit")}`}
                   style={{
                     // 이 세그먼트 높이 = 이 유형 건수 / 이 달 전체 건수 비율
                     height: `${(seg.count / (m.total || 1)) * 100}%`,
@@ -614,7 +614,7 @@ export function CompareBars({
   const currentMonth = new Date().getMonth() + 1;
   const months = Array.from({ length: 12 }, (_, i) => {
     const key = String(i + 1).padStart(2, "0"); // "01" ~ "12"
-    return { label: `${i + 1}${t.statsPage.monthSuffix}`, ty: ty[key] ?? 0, ly: ly[key] ?? 0, monthNum: i + 1 };
+    return { label: `${i + 1}${t("statsPage.monthSuffix")}`, ty: ty[key] ?? 0, ly: ly[key] ?? 0, monthNum: i + 1 };
   }).filter(m => m.ty > 0 || m.ly > 0);
 
   if (months.length === 0) return <EmptyChart />;
@@ -639,13 +639,13 @@ export function CompareBars({
         <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 2 }}>
           <span style={{ width: 8, height: 8, borderRadius: 2, background: "#cbd5e1", display: "inline-block", flexShrink: 0 }} />
           <span style={{ color: "#fff", fontSize: 11 }}>
-            {currentYear - 1}: {lyVal.toLocaleString(locale)}{t.statsPage.countUnit}
+            {currentYear - 1}: {lyVal.toLocaleString(locale)}{t("statsPage.countUnit")}
           </span>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: diff !== null ? 4 : 0 }}>
           <span style={{ width: 8, height: 8, borderRadius: 2, background: "#2563eb", display: "inline-block", flexShrink: 0 }} />
           <span style={{ color: "#fff", fontSize: 11 }}>
-            {currentYear}: {tyVal.toLocaleString(locale)}{t.statsPage.countUnit}
+            {currentYear}: {tyVal.toLocaleString(locale)}{t("statsPage.countUnit")}
           </span>
         </div>
         {diff !== null && (
@@ -734,7 +734,7 @@ export function CompareLines({
   const currentMonth = new Date().getMonth() + 1;
   const months = Array.from({ length: 12 }, (_, i) => {
     const key = String(i + 1).padStart(2, "0");
-    return { label: `${i + 1}${t.statsPage.monthSuffix}`, ty: ty[key] ?? 0, ly: ly[key] ?? 0, monthNum: i + 1 };
+    return { label: `${i + 1}${t("statsPage.monthSuffix")}`, ty: ty[key] ?? 0, ly: ly[key] ?? 0, monthNum: i + 1 };
   }).filter(m => m.ty > 0 || m.ly > 0);
 
   if (months.length === 0) return <EmptyChart />;
@@ -758,13 +758,13 @@ export function CompareLines({
         <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 2 }}>
           <span style={{ width: 8, height: 8, borderRadius: 2, background: "#cbd5e1", display: "inline-block", flexShrink: 0 }} />
           <span style={{ color: "#fff", fontSize: 11 }}>
-            {currentYear - 1}: {lyVal.toLocaleString(locale)}{t.statsPage.countUnit}
+            {currentYear - 1}: {lyVal.toLocaleString(locale)}{t("statsPage.countUnit")}
           </span>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: diff !== null ? 4 : 0 }}>
           <span style={{ width: 8, height: 8, borderRadius: 2, background: "#2563eb", display: "inline-block", flexShrink: 0 }} />
           <span style={{ color: "#fff", fontSize: 11 }}>
-            {currentYear}: {tyVal.toLocaleString(locale)}{t.statsPage.countUnit}
+            {currentYear}: {tyVal.toLocaleString(locale)}{t("statsPage.countUnit")}
           </span>
         </div>
         {diff !== null && (

@@ -8,6 +8,7 @@ import { normalizeScore, scoreToGrade, aggregateBySigungu, type ImpactGrade } fr
 import { useI18n } from "@/hooks/useI18n";
 import { useLanguageStore } from "@/store/languageStore";
 import type { RegionImpact } from "@/types/risk";
+import type { I18nKey } from "@/constants/i18n";
 
 /** Polygon | MultiPolygon geometry (kakaoGeo 헬퍼가 둘 다 처리). */
 type GeoGeometry = { type: "Polygon" | "MultiPolygon"; coordinates: number[][][] | number[][][][] };
@@ -23,7 +24,7 @@ interface SidoFeature {
   properties: { CTPRVN_CD: string; CTP_KOR_NM: string; CTP_ENG_NM: string };
 }
 
-// 등급 계산은 @/lib/riskScore, 등급 표시명은 i18n(t.risk.map.grade)에서 가져옴
+// 등급 계산은 @/lib/riskScore, 등급 표시명은 i18n(t("risk.map.grade"))에서 가져옴
 const GRADE_TEXT = ["#15803d", "#a16207", "#c2410c", "#b91c1c"] as const;
 
 // KakaoPolygonMap 의 위험도 팔레트(1~4단계)와 동일 계열 유지
@@ -184,7 +185,7 @@ export default function AlertRiskMap({ impacts, mapHeight = "420px" }: Props) {
   if (status === "error") {
     return (
       <div className="h-40 flex items-center justify-center rounded-lg border border-gray-200 bg-gray-50 text-sm text-gray-500">
-        {t.risk.map.error}
+        {t("risk.map.error")}
       </div>
     );
   }
@@ -203,16 +204,16 @@ export default function AlertRiskMap({ impacts, mapHeight = "420px" }: Props) {
 
       {status === "loading" && (
         <div className="absolute inset-0 flex items-center justify-center bg-gray-50 text-sm text-gray-500">
-          {t.risk.map.loading}
+          {t("risk.map.loading")}
         </div>
       )}
 
       {/* 등급 범례 */}
       {status === "ready" && (
         <div className="absolute bottom-3 left-3 z-10 bg-white/90 rounded-lg shadow px-3 py-2">
-          <p className="text-[11px] font-semibold text-gray-500 mb-1">{t.risk.map.legend}</p>
+          <p className="text-[11px] font-semibold text-gray-500 mb-1">{t("risk.map.legend")}</p>
           <div className="flex items-center gap-2">
-            {t.risk.map.grade.map((label, lv) => (
+            {(t("risk.map.grade", { returnObjects: true }) as I18nKey["ko"]["risk"]["map"]["grade"]).map((label, lv) => (
               <div key={label} className="flex items-center gap-1">
                 <span
                   className="inline-block w-3 h-3 rounded-sm border"
@@ -228,7 +229,7 @@ export default function AlertRiskMap({ impacts, mapHeight = "420px" }: Props) {
       {/* 지오메트리 매칭 실패 안내 (드물지만 코드 개편 등으로 발생 가능) */}
       {unmatched.length > 0 && (
         <div className="absolute top-3 left-3 z-10 bg-amber-50/95 border border-amber-200 rounded-lg px-3 py-1.5 text-[11px] text-amber-700">
-          {t.risk.map.unmatched}
+          {t("risk.map.unmatched")}
         </div>
       )}
 
@@ -240,13 +241,13 @@ export default function AlertRiskMap({ impacts, mapHeight = "420px" }: Props) {
         >
           <div className="text-[13px] font-bold text-gray-900">{hoverInfo.name}</div>
           <div className="flex items-center justify-between gap-3 mt-0.5">
-            <span className="text-[11px] text-gray-500">{t.risk.map.legend}</span>
+            <span className="text-[11px] text-gray-500">{t("risk.map.legend")}</span>
             <span className="text-xs font-bold" style={{ color: GRADE_TEXT[hoverInfo.grade] }}>
-              {t.risk.map.grade[hoverInfo.grade]}
+              {t(`risk.map.grade.${hoverInfo.grade}`)}
             </span>
           </div>
           <div className="flex items-center justify-between gap-3">
-            <span className="text-[11px] text-gray-500">{t.risk.map.score}</span>
+            <span className="text-[11px] text-gray-500">{t("risk.map.score")}</span>
             <span className="text-[11px] font-semibold text-gray-700">
               {Math.round(normalizeScore(hoverInfo.score) * 100)}%
             </span>

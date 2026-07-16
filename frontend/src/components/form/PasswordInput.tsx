@@ -23,13 +23,13 @@ export default function PasswordInput<T extends FieldValues>({
   const [showPassword, setShowPassword] = useState(false);
 
   const labels: Record<string, string> = {
-    password: t.form.passwordLabel,
-    confirmPassword: t.form.confirmPasswordLabel,
+    password: t("form.passwordLabel"),
+    confirmPassword: t("form.confirmPasswordLabel"),
   };
 
   const message: Record<string, string> = {
-    password: t.form.passwordRequired,
-    confirmPassword: t.form.confirmPasswordRequired,
+    password: t("form.passwordRequired"),
+    confirmPassword: t("form.confirmPasswordRequired"),
   };
 
   const hasValue = value.trim().length > 0;
@@ -39,14 +39,14 @@ export default function PasswordInput<T extends FieldValues>({
       <div className="relative">
         <input
           type={showPassword ? "text" : "password"}
-          placeholder={labels[name] ?? t.form.passwordPlaceholderDefault}
+          placeholder={labels[name] ?? t("form.passwordPlaceholderDefault")}
           {...register(name)}
           className="input pr-10"
         />
         <button
           type="button"
           className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-[var(--text-subtle)] transition-colors hover:text-[var(--text-body)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--blue-soft)]"
-          aria-label={showPassword ? t.form.hidePassword : t.form.showPassword}
+          aria-label={showPassword ? t("form.hidePassword") : t("form.showPassword")}
           onClick={() => setShowPassword((prev) => !prev)}
         >
           {showPassword ? (
@@ -71,9 +71,9 @@ export default function PasswordInput<T extends FieldValues>({
           isValid={hasValue && isPasswordMatched}
           message={
             hasValue && isPasswordMatched
-              ? t.form.passwordMatch
+              ? t("form.passwordMatch")
               : hasValue && !isPasswordMatched && !error
-              ? t.form.passwordValid
+              ? t("form.passwordValid")
               : message[name]
           }
         />

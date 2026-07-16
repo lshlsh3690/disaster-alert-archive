@@ -14,7 +14,7 @@ export default function OAuthButton({
   provider: "google" | "kakao" | "naver";
 }) {
   const t = useI18n();
-  const cfg = { label: t.oauth[provider], className: PROVIDER_STYLE[provider] };
+  const cfg = { label: t(`oauth.${provider}`), className: PROVIDER_STYLE[provider] };
 
   const handleOAuth = () => {
     const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL || "";

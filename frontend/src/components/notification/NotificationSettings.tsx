@@ -10,9 +10,9 @@ type NotificationType = "NONE" | "PUSH" | "ALARM";
 function useNotificationOptions(): { type: NotificationType; label: string; description: string }[] {
   const t = useI18n();
   return [
-    { type: "NONE", label: t.notificationSettings.none.label, description: t.notificationSettings.none.description },
-    { type: "PUSH", label: t.notificationSettings.push.label, description: t.notificationSettings.push.description },
-    { type: "ALARM", label: t.notificationSettings.alarm.label, description: t.notificationSettings.alarm.description },
+    { type: "NONE", label: t("notificationSettings.none.label"), description: t("notificationSettings.none.description") },
+    { type: "PUSH", label: t("notificationSettings.push.label"), description: t("notificationSettings.push.description") },
+    { type: "ALARM", label: t("notificationSettings.alarm.label"), description: t("notificationSettings.alarm.description") },
   ];
 }
 
@@ -79,7 +79,7 @@ export default function NotificationSettings() {
       const granted = await requestPermission();
       if (!granted) {
         setSaveStatus("error");
-        setSaveMessage(t.notificationSettings.permissionDenied);
+        setSaveMessage(t("notificationSettings.permissionDenied"));
         return;
       }
     }
@@ -96,13 +96,13 @@ export default function NotificationSettings() {
       if (res.ok) {
         setSelectedType(type);
         setSaveStatus("success");
-        setSaveMessage(t.notificationSettings.saveSuccess);
+        setSaveMessage(t("notificationSettings.saveSuccess"));
         setTimeout(() => setSaveMessage(""), 3000);
       }
     } catch (error) {
       console.error("알림 설정 저장 실패:", error);
       setSaveStatus("error");
-      setSaveMessage(t.notificationSettings.saveError);
+      setSaveMessage(t("notificationSettings.saveError"));
     } finally {
       setIsSaving(false);
     }
@@ -110,18 +110,18 @@ export default function NotificationSettings() {
 
   return (
     <div className="space-y-4">
-      <h2 className="text-lg font-semibold text-[var(--ink)]">{t.notificationSettings.title}</h2>
+      <h2 className="text-lg font-semibold text-[var(--ink)]">{t("notificationSettings.title")}</h2>
 
       {/* 권한 상태 배너 */}
       {permission === "denied" && (
         <p className="rounded-[var(--radius-compact)] border border-[#f3c7c1] bg-[var(--coral-soft)] px-3 py-2.5 text-[13px] text-[#b4453a]">
-          {t.notificationSettings.permissionBlocked}
+          {t("notificationSettings.permissionBlocked")}
         </p>
       )}
 
       {permission === "default" && (
         <p className="rounded-[var(--radius-compact)] border border-[#cfe0fb] bg-[var(--blue-soft)] px-3 py-2.5 text-[13px] text-[var(--blue)]">
-          {t.notificationSettings.permissionPrompt}
+          {t("notificationSettings.permissionPrompt")}
         </p>
       )}
 
@@ -153,7 +153,7 @@ export default function NotificationSettings() {
                   <span className="font-medium text-[var(--ink)]">{option.label}</span>
                   {isSelected && (
                     <span className="rounded-[var(--radius-pill)] bg-[var(--blue)] px-2 py-0.5 text-[11px] font-semibold text-white">
-                      {t.notificationSettings.currentSetting}
+                      {t("notificationSettings.currentSetting")}
                     </span>
                   )}
                 </span>

@@ -86,7 +86,7 @@ export default function EmailInput<T extends FieldValues>({ formMethods, showVer
 
   const statusMessage =
     emailCodeData?.message ??
-    (isEmailVerified ? "" : isCodeSended ? t.form.emailCodeSent : t.form.emailPrompt);
+    (isEmailVerified ? "" : isCodeSended ? t("form.emailCodeSent") : t("form.emailPrompt"));
 
   return (
     <div className="space-y-2">
@@ -94,12 +94,12 @@ export default function EmailInput<T extends FieldValues>({ formMethods, showVer
         <input
           type="email"
           {...formMethods.register("email" as Path<T>)}
-          placeholder={t.form.emailPlaceholder}
+          placeholder={t("form.emailPlaceholder")}
           className="input flex-1"
         />
         {showVerificationUI && (
           <Button type="button" onClick={handleSendVerification} isLoading={isEmailCodeSending}>
-            {t.form.requestCode}
+            {t("form.requestCode")}
           </Button>
         )}
       </div>

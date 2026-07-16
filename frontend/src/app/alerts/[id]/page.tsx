@@ -62,7 +62,7 @@ export default function AlertDetailPage() {
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editingText, setEditingText] = useState("");
 
-  if (isLoading) return <main className="p-6 text-[13px] text-[var(--text-muted)]">{t.loading}</main>;
+  if (isLoading) return <main className="p-6 text-[13px] text-[var(--text-muted)]">{t("loading")}</main>;
   if (!data) return <main className="p-6 text-[13px] text-[var(--text-muted)]">데이터가 없습니다.</main>;
 
   const translatedRegions = lang === "en" && offData?.translatedRegionNames?.length
@@ -84,17 +84,17 @@ export default function AlertDetailPage() {
           <div className="flex flex-wrap items-center gap-2">
             {data.disasterType && (
               <span style={disasterTypeChipStyle(data.disasterType)} className="rounded-[var(--radius-pill)] px-2 py-0.5 text-[11px] font-medium">
-                {(lang === "en" && offData?.translatedDisasterType) ? offData.translatedDisasterType : (t.disasterTypes[data.disasterType as keyof typeof t.disasterTypes] ?? data.disasterType)}
+                {(lang === "en" && offData?.translatedDisasterType) ? offData.translatedDisasterType : (t(`disasterTypes.${data.disasterType}`, { defaultValue: data.disasterType }))}
               </span>
             )}
             {data.emergencyLevelText && (
               <span style={levelBadgeStyle(data.emergencyLevelText)} className="rounded-[var(--radius-pill)] px-2 py-0.5 text-[11px] font-medium">
-                {t.levels[data.emergencyLevelText as keyof typeof t.levels] ?? data.emergencyLevelText}
+                {t(`levels.${data.emergencyLevelText}`, { defaultValue: data.emergencyLevelText })}
               </span>
             )}
             {isUser && (
               <span className="rounded-[var(--radius-pill)] bg-[#eef1f5] px-2 py-0.5 text-[11px] font-medium text-[var(--text-muted)]">
-                {t.alertList.filter.sourceUser}
+                {t("alertList.filter.sourceUser")}
               </span>
             )}
             {isUser && (
@@ -126,7 +126,7 @@ export default function AlertDetailPage() {
 
           <dl className="space-y-1.5 border-t border-[var(--line)] pt-3 text-[13px]">
             <div className="flex gap-2">
-              <dt className="w-20 shrink-0 text-[var(--text-muted)]">{t.alertDetail.region}</dt>
+              <dt className="w-20 shrink-0 text-[var(--text-muted)]">{t("alertDetail.region")}</dt>
               <dd className="min-w-0 text-[var(--text-body)]">{regionText}</dd>
             </div>
             {!isUser && (
@@ -142,7 +142,7 @@ export default function AlertDetailPage() {
               href={`/events/${offData.eventId}`}
               className="inline-flex items-center gap-1 text-sm font-medium text-[var(--blue)] hover:underline"
             >
-              {t.events.viewEvent} →
+              {t("events.viewEvent")} →
             </Link>
           )}
           {canEdit && (
@@ -198,7 +198,7 @@ export default function AlertDetailPage() {
                   const redirect = encodeURIComponent(location.pathname + location.search);
                   router.push(`/login?redirect=${redirect}`);
                 }}
-              >{t.nav.login}</button>
+              >{t("nav.login")}</button>
             </div>
           )}
           <ul className="divide-y divide-[var(--line)]">
@@ -282,7 +282,7 @@ export default function AlertDetailPage() {
             </div>
           )}
           {infinite.isFetchingNextPage && (
-            <div className="text-center text-sm text-[var(--text-muted)] py-2">{t.loading}</div>
+            <div className="text-center text-sm text-[var(--text-muted)] py-2">{t("loading")}</div>
           )}
           {!infinite.hasNextPage && (infinite.data?.pages?.[0]?.totalElements ?? 0) > 0 && (
             <div className="text-center text-xs text-[var(--text-subtle)] py-2">마지막 댓글입니다.</div>

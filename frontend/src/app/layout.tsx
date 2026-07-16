@@ -5,6 +5,7 @@ import Header from "@/components/layout/Header";
 import ReactQueryProvider from "@/lib/reactQueryProvider";
 import Footer from "@/components/layout/Footer";
 import NotificationPermissionBanner from "@/components/notification/NotificationPermissionBanner";
+import I18nSync from "@/components/providers/I18nSync";
 
 
 const geistSans = Geist({
@@ -258,6 +259,7 @@ export default function RootLayout({
       </head>
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
         <ReactQueryProvider>
+          <I18nSync />
           <div className="min-h-screen flex flex-col">
             <Header />
             <div className="flex-1">{children}</div>

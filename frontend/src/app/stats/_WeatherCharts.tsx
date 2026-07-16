@@ -62,8 +62,8 @@ function fmtKey(key: string, mode: AggMode, monthSuffix: string): string {
 
 // 집계 단위 안내 텍스트 (차트 우상단에 표시)
 function aggModeLabel(mode: AggMode, t: ReturnType<typeof useI18n>): string {
-  if (mode === "weekly") return t.statsPage.weatherChart.weeklyAggregate;
-  if (mode === "monthly") return t.statsPage.weatherChart.monthlyAggregate;
+  if (mode === "weekly") return t("statsPage.weatherChart.weeklyAggregate");
+  if (mode === "monthly") return t("statsPage.weatherChart.monthlyAggregate");
   return "";
 }
 
@@ -87,7 +87,7 @@ const TT_VALUE: React.CSSProperties = { color: "#fff", fontSize: 12, fontWeight:
 export function WeatherByTypeChart({ data }: { data: WeatherTypeStat[] }) {
   const t = useI18n();
   const locale = LANG_LOCALE[useLanguageStore((s) => s.language)] ?? "ko-KR";
-  const translateType = (type: string) => t.disasterTypes[type as keyof typeof t.disasterTypes] ?? type;
+  const translateType = (type: string) => t(`disasterTypes.${type}`, { defaultValue: type });
   // 툴팁 핀 로딩 진행률 (0~100)
   const [progress, setProgress] = useState(0);
   // 툴팁 고정 여부
@@ -136,7 +136,7 @@ export function WeatherByTypeChart({ data }: { data: WeatherTypeStat[] }) {
 
   // 날짜별로 쪼개진 data를 유형 단위로 합산 → 상위 6개만 차트에 표시
   const typeTotals = new Map<string, number>();
-  data.forEach(d => typeTotals.set(d.type ?? t.statsPage.other, (typeTotals.get(d.type ?? t.statsPage.other) ?? 0) + d.count));
+  data.forEach(d => typeTotals.set(d.type ?? t("statsPage.other"), (typeTotals.get(d.type ?? t("statsPage.other")) ?? 0) + d.count));
   const types = [...typeTotals.entries()].sort((a, b) => b[1] - a[1]).slice(0, 6).map(([type]) => type);
 
   // 중복 제거한 날짜 목록 → 집계 단위 결정
@@ -153,7 +153,7 @@ export function WeatherByTypeChart({ data }: { data: WeatherTypeStat[] }) {
   const keyDates = new Map<string, Set<string>>();
   data.forEach(d => {
     const key = getAggKey(d.date, mode);
-    const type = d.type ?? t.statsPage.other;
+    const type = d.type ?? t("statsPage.other");
     if (!keyTypeCount.has(key)) keyTypeCount.set(key, new Map());
     keyTypeCount.get(key)!.set(type, (keyTypeCount.get(key)!.get(type) ?? 0) + d.count);
     if (!keyDates.has(key)) keyDates.set(key, new Set());
@@ -171,7 +171,7 @@ export function WeatherByTypeChart({ data }: { data: WeatherTypeStat[] }) {
     const typeMap = keyTypeCount.get(key)!;
     // 해당 집계 기간에 속한 날짜들의 기온 평균
     const temps = [...keyDates.get(key)!].map(d => dateTemp.get(d) ?? null).filter((v): v is number => v != null);
-    const obj: PivotRow = { date: fmtKey(key, mode, t.statsPage.monthSuffix) };
+    const obj: PivotRow = { date: fmtKey(key, mode, t("statsPage.monthSuffix")) };
     types.forEach(type => { obj[type] = typeMap.get(type) ?? 0; });
     obj._avgTemp = temps.length > 0 ? Math.round(temps.reduce((a, b) => a + b, 0) / temps.length * 10) / 10 : null;
     return obj;
@@ -190,11 +190,11 @@ export function WeatherByTypeChart({ data }: { data: WeatherTypeStat[] }) {
           {bars.map((p, i) => (
             <div key={i} style={{ display: "flex", alignItems: "center", gap: 5, marginBottom: 2 }}>
               <span style={{ width: 8, height: 8, borderRadius: 2, background: STACKED_COLORS[types.indexOf(String(p.dataKey)) % STACKED_COLORS.length], display: "inline-block", flexShrink: 0 }} />
-              <span style={{ color: "#e2e8f0", fontSize: 11 }}>{translateType(String(p.dataKey))}: {(p.value ?? 0).toLocaleString(locale)}{t.statsPage.countUnit}</span>
+              <span style={{ color: "#e2e8f0", fontSize: 11 }}>{translateType(String(p.dataKey))}: {(p.value ?? 0).toLocaleString(locale)}{t("statsPage.countUnit")}</span>
             </div>
           ))}
         </div>
-        {tempEntry?.value != null && <p style={{ ...TT_LABEL, marginTop: 4 }}>{t.statsPage.weatherChart.temperatureLabel} {tempEntry.value}°C</p>}
+        {tempEntry?.value != null && <p style={{ ...TT_LABEL, marginTop: 4 }}>{t("statsPage.weatherChart.temperatureLabel")} {tempEntry.value}°C</p>}
       </div>
     );
   };
@@ -218,12 +218,12 @@ export function WeatherByTypeChart({ data }: { data: WeatherTypeStat[] }) {
             {pinnedSnap.payload?.filter(p => p.dataKey !== "_avgTemp" && (p.value ?? 0) > 0).map((p, i) => (
               <div key={i} style={{ display: "flex", alignItems: "center", gap: 5, marginBottom: 2 }}>
                 <span style={{ width: 8, height: 8, borderRadius: 2, background: STACKED_COLORS[types.indexOf(String(p.dataKey)) % STACKED_COLORS.length], display: "inline-block", flexShrink: 0 }} />
-                <span style={{ color: "#e2e8f0", fontSize: 11 }}>{translateType(String(p.dataKey))}: {(p.value ?? 0).toLocaleString(locale)}{t.statsPage.countUnit}</span>
+                <span style={{ color: "#e2e8f0", fontSize: 11 }}>{translateType(String(p.dataKey))}: {(p.value ?? 0).toLocaleString(locale)}{t("statsPage.countUnit")}</span>
               </div>
             ))}
           </div>
           {pinnedSnap.payload?.find(p => p.dataKey === "_avgTemp")?.value != null && (
-            <p style={{ ...TT_LABEL, marginTop: 4, flexShrink: 0 }}>{t.statsPage.weatherChart.temperatureLabel} {pinnedSnap.payload.find(p => p.dataKey === "_avgTemp")?.value}°C</p>
+            <p style={{ ...TT_LABEL, marginTop: 4, flexShrink: 0 }}>{t("statsPage.weatherChart.temperatureLabel")} {pinnedSnap.payload.find(p => p.dataKey === "_avgTemp")?.value}°C</p>
           )}
         </div>
       )}
@@ -239,7 +239,7 @@ export function WeatherByTypeChart({ data }: { data: WeatherTypeStat[] }) {
               tick={{ fontSize: 9, fill: "#f97316" }} width={36} tickFormatter={(v: number) => `${v}°`} />
             <Tooltip content={<TooltipContent />} />
             <Legend wrapperStyle={{ fontSize: 10 }}
-              formatter={(v: string) => v === "_avgTemp" ? t.statsPage.weatherChart.averageTempLegend : translateType(v)} />
+              formatter={(v: string) => v === "_avgTemp" ? t("statsPage.weatherChart.averageTempLegend") : translateType(v)} />
             {types.map((type, i) => (
               <Bar key={type} yAxisId="cnt" dataKey={type} stackId="s"
                 fill={STACKED_COLORS[i % STACKED_COLORS.length]} maxBarSize={24}
@@ -259,7 +259,7 @@ export function WeatherByTypeChart({ data }: { data: WeatherTypeStat[] }) {
 export function WeatherByRegionChart({ data, regionLabel }: { data: WeatherRegionStat[]; regionLabel: string }) {
   const t = useI18n();
   const locale = LANG_LOCALE[useLanguageStore((s) => s.language)] ?? "ko-KR";
-  const translateRegion = (region: string) => t.metros[region as keyof typeof t.metros] ?? region;
+  const translateRegion = (region: string) => t(`metros.${region}`, { defaultValue: region });
   // 툴팁 핀 로딩 진행률 (0~100)
   const [progress, setProgress] = useState(0);
   // 툴팁 고정 여부
@@ -343,7 +343,7 @@ export function WeatherByRegionChart({ data, regionLabel }: { data: WeatherRegio
     const regionMap = keyRegionCount.get(key)!;
     // 해당 집계 기간에 속한 날짜들의 기온 평균
     const temps = [...(keyDates.get(key) ?? [])].map(d => dateTemp.get(d) ?? null).filter((v): v is number => v != null);
-    const obj: PivotRow = { date: fmtKey(key, mode, t.statsPage.monthSuffix) };
+    const obj: PivotRow = { date: fmtKey(key, mode, t("statsPage.monthSuffix")) };
     topRegions.forEach(r => { obj[r] = regionMap.get(r) ?? 0; });
     obj._avgTemp = temps.length > 0 ? Math.round(temps.reduce((a, b) => a + b, 0) / temps.length * 10) / 10 : null;
     return obj;
@@ -362,11 +362,11 @@ export function WeatherByRegionChart({ data, regionLabel }: { data: WeatherRegio
           {bars.map((p, i) => (
             <div key={i} style={{ display: "flex", alignItems: "center", gap: 5, marginBottom: 2 }}>
               <span style={{ width: 8, height: 8, borderRadius: 2, background: BAR_COLORS[topRegions.indexOf(String(p.dataKey)) % BAR_COLORS.length], display: "inline-block", flexShrink: 0 }} />
-              <span style={{ color: "#e2e8f0", fontSize: 11 }}>{translateRegion(String(p.dataKey))}: {(p.value ?? 0).toLocaleString(locale)}{t.statsPage.countUnit}</span>
+              <span style={{ color: "#e2e8f0", fontSize: 11 }}>{translateRegion(String(p.dataKey))}: {(p.value ?? 0).toLocaleString(locale)}{t("statsPage.countUnit")}</span>
             </div>
           ))}
         </div>
-        {tempEntry?.value != null && <p style={{ ...TT_LABEL, marginTop: 4 }}>{t.statsPage.weatherChart.temperatureLabel} {tempEntry.value}°C</p>}
+        {tempEntry?.value != null && <p style={{ ...TT_LABEL, marginTop: 4 }}>{t("statsPage.weatherChart.temperatureLabel")} {tempEntry.value}°C</p>}
       </div>
     );
   };
@@ -376,7 +376,7 @@ export function WeatherByRegionChart({ data, regionLabel }: { data: WeatherRegio
       onMouseEnter={() => { isHoveringRef.current = true; startTimer(); }}
       onMouseLeave={() => { isHoveringRef.current = false; stopTimer(); }}>
       <p className="text-[10px] text-gray-400 text-right pr-1">
-        {regionLabel} · {t.statsPage.weatherChart.topRegionsSuffix}{mode !== "daily" ? ` · ${aggModeLabel(mode, t)}` : ""}
+        {regionLabel} · {t("statsPage.weatherChart.topRegionsSuffix")}{mode !== "daily" ? ` · ${aggModeLabel(mode, t)}` : ""}
       </p>
 
       {pinned && pinnedSnap && (
@@ -392,12 +392,12 @@ export function WeatherByRegionChart({ data, regionLabel }: { data: WeatherRegio
             {pinnedSnap.payload?.filter(p => p.dataKey !== "_avgTemp" && (p.value ?? 0) > 0).map((p, i) => (
               <div key={i} style={{ display: "flex", alignItems: "center", gap: 5, marginBottom: 2 }}>
                 <span style={{ width: 8, height: 8, borderRadius: 2, background: BAR_COLORS[topRegions.indexOf(String(p.dataKey)) % BAR_COLORS.length], display: "inline-block", flexShrink: 0 }} />
-                <span style={{ color: "#e2e8f0", fontSize: 11 }}>{translateRegion(String(p.dataKey))}: {(p.value ?? 0).toLocaleString(locale)}{t.statsPage.countUnit}</span>
+                <span style={{ color: "#e2e8f0", fontSize: 11 }}>{translateRegion(String(p.dataKey))}: {(p.value ?? 0).toLocaleString(locale)}{t("statsPage.countUnit")}</span>
               </div>
             ))}
           </div>
           {pinnedSnap.payload?.find(p => p.dataKey === "_avgTemp")?.value != null && (
-            <p style={{ ...TT_LABEL, marginTop: 4, flexShrink: 0 }}>{t.statsPage.weatherChart.temperatureLabel} {pinnedSnap.payload.find(p => p.dataKey === "_avgTemp")?.value}°C</p>
+            <p style={{ ...TT_LABEL, marginTop: 4, flexShrink: 0 }}>{t("statsPage.weatherChart.temperatureLabel")} {pinnedSnap.payload.find(p => p.dataKey === "_avgTemp")?.value}°C</p>
           )}
         </div>
       )}
@@ -413,7 +413,7 @@ export function WeatherByRegionChart({ data, regionLabel }: { data: WeatherRegio
               tick={{ fontSize: 9, fill: "#f97316" }} width={36} tickFormatter={(v: number) => `${v}°`} />
             <Tooltip content={<TooltipContent />} />
             <Legend wrapperStyle={{ fontSize: 10 }}
-              formatter={(v: string) => v === "_avgTemp" ? t.statsPage.weatherChart.averageTempLegend : translateRegion(v)} />
+              formatter={(v: string) => v === "_avgTemp" ? t("statsPage.weatherChart.averageTempLegend") : translateRegion(v)} />
             {topRegions.map((r, i) => (
               <Bar key={r} yAxisId="cnt" dataKey={r} stackId="s"
                 fill={BAR_COLORS[i % BAR_COLORS.length]} maxBarSize={24}
@@ -433,7 +433,7 @@ export function WeatherByRegionChart({ data, regionLabel }: { data: WeatherRegio
 export function WeatherOverlayChart({ data }: { data: WeatherCorrelationStat[] }) {
   const t = useI18n();
   const locale = LANG_LOCALE[useLanguageStore((s) => s.language)] ?? "ko-KR";
-  const translateType = (type: string) => t.disasterTypes[type as keyof typeof t.disasterTypes] ?? type;
+  const translateType = (type: string) => t(`disasterTypes.${type}`, { defaultValue: type });
   if (data.length === 0) return <EmptyChart />;
 
   const mode = getAggMode(data.length);
@@ -466,7 +466,7 @@ export function WeatherOverlayChart({ data }: { data: WeatherCorrelationStat[] }
     // 해당 기간에서 가장 많이 발생한 재난 유형
     const primaryType = e.typeCount.size > 0 ? [...e.typeCount.entries()].sort((a, b) => b[1] - a[1])[0][0] : null;
     return {
-      date: fmtKey(key, mode, t.statsPage.monthSuffix),
+      date: fmtKey(key, mode, t("statsPage.monthSuffix")),
       count: e.count,
       avgTemp,
       minTemp: e.minTemp,
@@ -485,19 +485,19 @@ export function WeatherOverlayChart({ data }: { data: WeatherCorrelationStat[] }
     return (
       <div style={TT_BOX}>
         <p style={TT_LABEL}>{row.date}</p>
-        <p style={{ ...TT_VALUE, color: "#60a5fa" }}>{(get("count") ?? 0).toLocaleString(locale)}{t.statsPage.countUnit}</p>
+        <p style={{ ...TT_VALUE, color: "#60a5fa" }}>{(get("count") ?? 0).toLocaleString(locale)}{t("statsPage.countUnit")}</p>
         {row?.primaryType && (
-          <p style={{ ...TT_LABEL, marginTop: 4 }}>{t.statsPage.weatherChart.primaryTypeLabel}: <span style={{ color: "#e2e8f0" }}>{translateType(row.primaryType)}</span></p>
+          <p style={{ ...TT_LABEL, marginTop: 4 }}>{t("statsPage.weatherChart.primaryTypeLabel")}: <span style={{ color: "#e2e8f0" }}>{translateType(row.primaryType)}</span></p>
         )}
         {row.avgTemp != null && (
           <p style={TT_LABEL}>
-            {t.statsPage.weatherChart.temperatureLabel} {row.avgTemp.toFixed(1)}°C
+            {t("statsPage.weatherChart.temperatureLabel")} {row.avgTemp.toFixed(1)}°C
             {row.minTemp != null && row.maxTemp != null && (
               <span style={{ color: "#94a3b8" }}> ({row.minTemp.toFixed(1)}~{row.maxTemp.toFixed(1)})</span>
             )}
           </p>
         )}
-        {get("maxPrecip") != null && <p style={TT_LABEL}>{t.statsPage.weatherChart.precipitationLabel} {get("maxPrecip")}mm</p>}
+        {get("maxPrecip") != null && <p style={TT_LABEL}>{t("statsPage.weatherChart.precipitationLabel")} {get("maxPrecip")}mm</p>}
       </div>
     );
   };
@@ -516,10 +516,10 @@ export function WeatherOverlayChart({ data }: { data: WeatherCorrelationStat[] }
           <Tooltip content={<TooltipContent />} />
           <Legend wrapperStyle={{ fontSize: 11 }}
             formatter={(v: string) => ({
-              count: t.statsPage.weatherChart.occurrenceCountLegend,
-              avgTemp: t.statsPage.weatherChart.averageTempLegend,
-              tempRange: t.statsPage.weatherChart.tempRangeLegend,
-              maxPrecip: t.statsPage.weatherChart.maxPrecipLegend,
+              count: t("statsPage.weatherChart.occurrenceCountLegend"),
+              avgTemp: t("statsPage.weatherChart.averageTempLegend"),
+              tempRange: t("statsPage.weatherChart.tempRangeLegend"),
+              maxPrecip: t("statsPage.weatherChart.maxPrecipLegend"),
             }[v] ?? v)} />
           <Bar yAxisId="cnt" dataKey="count" fill="#3b82f6" fillOpacity={0.7} radius={[2, 2, 0, 0]} maxBarSize={20} isAnimationActive={false} />
           <Area yAxisId="temp" type="monotone" dataKey="tempRange" stroke="none"
@@ -537,7 +537,7 @@ export function WeatherOverlayChart({ data }: { data: WeatherCorrelationStat[] }
 export function WeatherCorrelationScatter({ data }: { data: WeatherCorrelationStat[] }) {
   const t = useI18n();
   const locale = LANG_LOCALE[useLanguageStore((s) => s.language)] ?? "ko-KR";
-  const translateType = (type: string) => t.disasterTypes[type as keyof typeof t.disasterTypes] ?? type;
+  const translateType = (type: string) => t(`disasterTypes.${type}`, { defaultValue: type });
   // 범례 클릭으로 숨긴 유형 집합 (겹침이 심할 때 유형을 켜고 끄며 분리해 보기)
   const [hidden, setHidden] = useState<Set<string>>(new Set());
   const toggleType = (name: string) => setHidden(prev => {
@@ -551,7 +551,7 @@ export function WeatherCorrelationScatter({ data }: { data: WeatherCorrelationSt
   if (filtered.length === 0) return <EmptyChart />;
 
   // 등장하는 재난 유형 목록 (중복 제거)
-  const types = [...new Set(filtered.map(d => d.primaryType ?? t.statsPage.other))];
+  const types = [...new Set(filtered.map(d => d.primaryType ?? t("statsPage.other")))];
   // 유형별 색상 매핑
   const colorMap: Record<string, string> = {};
   types.forEach((type, i) => { colorMap[type] = TYPE_COLORS[i % TYPE_COLORS.length]; });
@@ -562,7 +562,7 @@ export function WeatherCorrelationScatter({ data }: { data: WeatherCorrelationSt
     name: type,
     color: colorMap[type],
     points: filtered
-      .filter(d => (d.primaryType ?? t.statsPage.other) === type)
+      .filter(d => (d.primaryType ?? t("statsPage.other")) === type)
       .map(d => ({ x: d.avgTemp!, y: d.count, z: Math.max((d.maxPrecip ?? 0) + 1, 1), date: d.date, minTemp: d.minTemp, maxTemp: d.maxTemp })),
   }));
 
@@ -572,14 +572,14 @@ export function WeatherCorrelationScatter({ data }: { data: WeatherCorrelationSt
     return (
       <div style={TT_BOX}>
         <p style={TT_LABEL}>{p.date}</p>
-        <p style={TT_VALUE}>{p.y.toLocaleString(locale)}{t.statsPage.countUnit}</p>
+        <p style={TT_VALUE}>{p.y.toLocaleString(locale)}{t("statsPage.countUnit")}</p>
         <p style={TT_LABEL}>
-          {t.statsPage.weatherChart.averageTempLegend} {p.x.toFixed(1)}°C
+          {t("statsPage.weatherChart.averageTempLegend")} {p.x.toFixed(1)}°C
           {p.minTemp != null && p.maxTemp != null && (
             <span style={{ color: "#64748b" }}> ({p.minTemp.toFixed(1)}~{p.maxTemp.toFixed(1)})</span>
           )}
         </p>
-        <p style={TT_LABEL}>{t.statsPage.weatherChart.precipitationLabel} {(p.z - 1).toFixed(1)}mm</p>
+        <p style={TT_LABEL}>{t("statsPage.weatherChart.precipitationLabel")} {(p.z - 1).toFixed(1)}mm</p>
       </div>
     );
   };
@@ -589,9 +589,9 @@ export function WeatherCorrelationScatter({ data }: { data: WeatherCorrelationSt
       <ResponsiveContainer width="100%" height="100%">
         <ScatterChart margin={{ top: 8, right: 8, bottom: 4, left: 4 }}>
           <CartesianGrid stroke="#f3f4f6" />
-          <XAxis type="number" dataKey="x" name={t.statsPage.weatherChart.temperatureLabel} axisLine={false} tickLine={false}
+          <XAxis type="number" dataKey="x" name={t("statsPage.weatherChart.temperatureLabel")} axisLine={false} tickLine={false}
             tick={{ fontSize: 9, fill: "#9ca3af" }} tickFormatter={(v: number) => `${v}°`} />
-          <YAxis type="number" dataKey="y" name={t.statsPage.weatherChart.countAxisLabel} axisLine={false} tickLine={false}
+          <YAxis type="number" dataKey="y" name={t("statsPage.weatherChart.countAxisLabel")} axisLine={false} tickLine={false}
             tick={{ fontSize: 9, fill: "#9ca3af" }} width={32} />
           {/* 버블 크기 범위를 줄여 점들이 서로 덜 겹치도록 함 */}
           <ZAxis type="number" dataKey="z" range={[20, 120]} />

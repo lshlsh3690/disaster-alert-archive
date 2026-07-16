@@ -13,7 +13,6 @@ import { useSigungu } from "@/lib/queries/useAlerts";
 import { useI18n } from "@/hooks/useI18n";
 import { METROS } from "@/ui/metros";
 import type { MemberFavoriteRegion } from "@/types/memberFavoriteRegion";
-import { formatMessage } from "@/utils/formatMessage";
 
 const MAX_REGIONS = 5;
 
@@ -63,7 +62,7 @@ export default function FavoriteRegionsPage() {
     const found = sigunguList.find((s) => (s.code ?? "") === code);
     if (!found) return code;
     return found.name === "전체"
-      ? `${selectedSido} ${t.userRegions.all}`
+      ? `${selectedSido} ${t("userRegions.all")}`
       : (found.translatedName ?? found.name);
   };
 
@@ -85,22 +84,22 @@ export default function FavoriteRegionsPage() {
 
   const handleAdd = () => {
     if (!selectedSigunguCode) {
-      setErrorMsg(t.userRegions.selectRegionError);
+      setErrorMsg(t("userRegions.selectRegionError"));
       return;
     }
     if (regions.some((region) => region.legalDistrictCode === selectedSigunguCode)) {
-      setErrorMsg(t.userRegions.alreadyRegisteredError);
+      setErrorMsg(t("userRegions.alreadyRegisteredError"));
       return;
     }
     if (regions.length >= MAX_REGIONS) {
-      setErrorMsg(formatMessage(t.userRegions.maxReachedError, { max: MAX_REGIONS }));
+      setErrorMsg(t("userRegions.maxReachedError", { max: MAX_REGIONS }));
       return;
     }
     addMutation.mutate(selectedSigunguCode);
   };
 
   const handleDelete = (code: string) => {
-    if (!confirm(t.userRegions.deleteConfirm)) return;
+    if (!confirm(t("userRegions.deleteConfirm"))) return;
     deleteMutation.mutate(code);
   };
 
@@ -122,9 +121,9 @@ export default function FavoriteRegionsPage() {
     <main className="bg-[var(--canvas)] min-h-[calc(100vh-48px)]">
       <div className="mx-auto max-w-6xl px-4 py-8 space-y-5">
       <header>
-        <h1 className="text-2xl font-bold tracking-tight text-[var(--ink)]">{t.userRegions.title}</h1>
+        <h1 className="text-2xl font-bold tracking-tight text-[var(--ink)]">{t("userRegions.title")}</h1>
         <p className="mt-1 text-[13px] text-[var(--text-muted)]">
-          {formatMessage(t.userRegions.description, { max: MAX_REGIONS })}
+          {t("userRegions.description", { max: MAX_REGIONS })}
         </p>
       </header>
 
@@ -137,13 +136,13 @@ export default function FavoriteRegionsPage() {
             <line x1="12" y1="8" x2="12.01" y2="8" />
           </svg>
           <div>
-            <p className="font-semibold text-[var(--ink)]">{t.userRegions.guestBannerTitle}</p>
+            <p className="font-semibold text-[var(--ink)]">{t("userRegions.guestBannerTitle")}</p>
             <p className="mt-0.5 text-[var(--text-muted)]">
-              {t.userRegions.guestBannerBody1}{" "}
+              {t("userRegions.guestBannerBody1")}{" "}
               <Link href="/login" className="font-semibold text-[var(--blue)] hover:underline">
-                {t.userRegions.guestBannerLogin}
+                {t("userRegions.guestBannerLogin")}
               </Link>
-              {t.userRegions.guestBannerBody2}
+              {t("userRegions.guestBannerBody2")}
             </p>
           </div>
         </div>
@@ -159,17 +158,17 @@ export default function FavoriteRegionsPage() {
         {/* 왼쪽: 등록된 관심지역 */}
         <section className="rounded-[var(--radius-panel-card)] border border-[var(--line)] bg-[var(--surface)] p-6 shadow-[0_10px_30px_rgba(28,39,60,0.04)]">
           <div className="mb-4 flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-[var(--ink)]">{t.userRegions.registeredTitle}</h2>
+            <h2 className="text-lg font-semibold text-[var(--ink)]">{t("userRegions.registeredTitle")}</h2>
             <span className="text-[13px] text-[var(--text-muted)]">
               {regions.length} / {MAX_REGIONS}
             </span>
           </div>
 
           {isLoading ? (
-            <div className="text-[13px] text-[var(--text-muted)]">{t.loading}</div>
+            <div className="text-[13px] text-[var(--text-muted)]">{t("loading")}</div>
           ) : regions.length === 0 ? (
             <div className="py-8 text-center text-[13px] text-[var(--text-muted)]">
-              {t.userRegions.registeredEmpty}
+              {t("userRegions.registeredEmpty")}
             </div>
           ) : (
             <ul className="space-y-2">
@@ -181,7 +180,7 @@ export default function FavoriteRegionsPage() {
                   <button
                     type="button"
                     className="min-w-0 flex-1 cursor-pointer rounded-l-[var(--radius-card)] px-3 py-3 text-left font-medium text-[var(--text-body)] focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--blue)]"
-                    aria-label={`${getDisplayRegionName(r)}: ${t.alertList.title}`}
+                    aria-label={`${getDisplayRegionName(r)}: ${t("alertList.title")}`}
                     onClick={() => handleRegionClick(r)}
                   >
                     <span className="block truncate">{getDisplayRegionName(r)}</span>
@@ -192,7 +191,7 @@ export default function FavoriteRegionsPage() {
                     disabled={deleteMutation.isPending}
                     className="mr-3 shrink-0 rounded-[var(--radius-control)] border border-[var(--coral)] bg-[var(--coral)] px-3 py-1 text-sm font-semibold text-white transition hover:brightness-95 disabled:opacity-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--coral-soft)] focus-visible:ring-offset-1"
                   >
-                    {t.userRegions.delete}
+                    {t("userRegions.delete")}
                   </button>
                 </li>
               ))}
@@ -202,11 +201,11 @@ export default function FavoriteRegionsPage() {
 
         {/* 오른쪽: 지역 추가 */}
         <section className="space-y-4 rounded-[var(--radius-panel-card)] border border-[var(--line)] bg-[var(--surface)] p-6 shadow-[0_10px_30px_rgba(28,39,60,0.04)]">
-          <h2 className="text-lg font-semibold text-[var(--ink)]">{t.userRegions.addTitle}</h2>
+          <h2 className="text-lg font-semibold text-[var(--ink)]">{t("userRegions.addTitle")}</h2>
 
           <div className="space-y-3">
             <div>
-              <label className="mb-1 block text-[13px] text-[var(--text-muted)]">{t.userRegions.sidoLabel}</label>
+              <label className="mb-1 block text-[13px] text-[var(--text-muted)]">{t("userRegions.sidoLabel")}</label>
               <select
                 value={selectedSido}
                 onChange={(e) => {
@@ -215,17 +214,17 @@ export default function FavoriteRegionsPage() {
                 }}
                 className="input"
               >
-                <option value="">{t.userRegions.sidoPlaceholder}</option>
+                <option value="">{t("userRegions.sidoPlaceholder")}</option>
                 {METROS.map((m) => (
                   <option key={m} value={m}>
-                    {t.metros[m]}
+                    {t(`metros.${m}`)}
                   </option>
                 ))}
               </select>
             </div>
 
             <div>
-              <label className="mb-1 block text-[13px] text-[var(--text-muted)]">{t.userRegions.sigunguLabel}</label>
+              <label className="mb-1 block text-[13px] text-[var(--text-muted)]">{t("userRegions.sigunguLabel")}</label>
               <select
                 value={selectedSigunguCode}
                 onChange={(e) => setSelectedSigunguCode(e.target.value)}
@@ -234,15 +233,15 @@ export default function FavoriteRegionsPage() {
               >
                 <option value="">
                   {!selectedSido
-                    ? t.userRegions.sigunguPlaceholderNoSido
+                    ? t("userRegions.sigunguPlaceholderNoSido")
                     : sigunguLoading
-                      ? t.loading
-                      : t.userRegions.sigunguPlaceholder}
+                      ? t("loading")
+                      : t("userRegions.sigunguPlaceholder")}
                 </option>
                 {sigunguList.map((s) => (
                   <option key={s.code ?? s.name} value={s.code ?? ""}>
                     {s.name === "전체"
-                      ? `${t.metros[selectedSido as keyof typeof t.metros] ?? selectedSido} ${t.userRegions.all}`
+                      ? `${t(`metros.${selectedSido}`, { defaultValue: selectedSido })} ${t("userRegions.all")}`
                       : s.translatedName ?? s.name}
                   </option>
                 ))}
@@ -258,12 +257,12 @@ export default function FavoriteRegionsPage() {
               }
               className="h-11 w-full rounded-[var(--radius-control)] bg-[var(--blue)] text-sm font-semibold text-white transition hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[var(--blue)]"
             >
-              {addMutation.isPending ? t.userRegions.adding : t.userRegions.addButton}
+              {addMutation.isPending ? t("userRegions.adding") : t("userRegions.addButton")}
             </button>
           </div>
 
           <p className="rounded-[var(--radius-card)] bg-[var(--blue-soft)] p-3 text-[13px] text-[var(--blue)]">
-            {formatMessage(t.userRegions.addHint, { sido: selectedSido ? (t.metros[selectedSido as keyof typeof t.metros] ?? selectedSido) : t.userRegions.sidoLabel })}
+            {t("userRegions.addHint", { sido: selectedSido ? (t(`metros.${selectedSido}`, { defaultValue: selectedSido })) : t("userRegions.sidoLabel") })}
           </p>
         </section>
       </div>

@@ -25,7 +25,7 @@ export function EmptyChart() {
     // flex-1: 부모 컨테이너의 남은 공간을 모두 차지합니다
     // items-center justify-center: 가로·세로 모두 가운데 정렬
     <div className="flex-1 flex items-center justify-center text-sm text-gray-400">
-      {t.statsPage.noData}
+      {t("statsPage.noData")}
     </div>
   );
 }

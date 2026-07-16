@@ -23,15 +23,15 @@ export default function LatestAlertsSection({ limit = 5 }: { limit?: number }) {
     });
   }
 
-  if (isLoading) return <p className="feed-state">{t.loading}</p>;
-  if (isError) return <p className="feed-state feed-state--error">{t.dashboard.loadError}</p>;
-  if (!data || data.length === 0) return <p className="feed-state">{t.dashboard.noAlerts}</p>;
+  if (isLoading) return <p className="feed-state">{t("loading")}</p>;
+  if (isError) return <p className="feed-state feed-state--error">{t("dashboard.loadError")}</p>;
+  if (!data || data.length === 0) return <p className="feed-state">{t("dashboard.noAlerts")}</p>;
 
   return (
     <ul>
       {data.map((a: LatestAlert) => {
         const translated = language !== "ko";
-        const region = (translated && a.translatedTopRegion) || a.topRegion || t.dashboard.unknownRegion;
+        const region = (translated && a.translatedTopRegion) || a.topRegion || t("dashboard.unknownRegion");
         const message = (translated && a.translatedMessage) || a.message;
         const disasterType = (translated && a.translatedDisasterType) || a.disasterType;
         return (

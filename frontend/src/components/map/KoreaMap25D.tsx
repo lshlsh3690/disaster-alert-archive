@@ -190,9 +190,9 @@ export default function KoreaMap25D({
     return () => cancelAnimationFrame(rafIdRef.current);
   }, []);
 
-  const localName = (ko: string) => t.metros?.[ko as keyof typeof t.metros] ?? ko;
-  const mapLabel = t.dashboard.todayAlerts;
-  const mapUnit = t.dashboard.count;
+  const localName = (ko: string) => t(`metros.${ko}`, { defaultValue: ko });
+  const mapLabel = t("dashboard.todayAlerts");
+  const mapUnit = t("dashboard.count");
   const boxStyle = { left: `${lineEnd.x}px`, top: `${lineEnd.y}px` };
 
   return (

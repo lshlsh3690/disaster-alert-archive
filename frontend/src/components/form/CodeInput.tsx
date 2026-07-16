@@ -9,7 +9,6 @@ import { useCountdownContext } from "@/context/useCountdownContext";
 import { useEmailCodeVerify } from "@/lib/mutations/useEmailCodeVerify";
 import InputStatusMessage from "../ui/InputStatusMessage";
 import { useI18n } from "@/hooks/useI18n";
-import { formatMessage } from "@/utils/formatMessage";
 
 interface CodeInputProps<T extends FieldValues> {
   formMethods: UseFormReturn<T>;
@@ -32,7 +31,7 @@ export default function CodeInput<T extends FieldValues>({ formMethods }: CodeIn
   const { mutate, isPending: isCodeVerifying } = useEmailCodeVerify({
     onSuccessCallback: () => {
       setIsEmailVerified(true);
-      alert(t.form.codeVerified);
+      alert(t("form.codeVerified"));
       clearErrors("verificationCode" as Path<T>);
     },
     onErrorCallback: (errorMessage) => {
@@ -49,12 +48,12 @@ export default function CodeInput<T extends FieldValues>({ formMethods }: CodeIn
 
     console.log("isCodeSended ", isCodeSended);
     if (!isCodeSended) {
-      setError("verificationCode" as Path<T>, { message: t.form.codeRequestFirst });
+      setError("verificationCode" as Path<T>, { message: t("form.codeRequestFirst") });
       return;
     }
 
     if (isEmailCodeTimeout) {
-      setError("verificationCode" as Path<T>, { message: t.form.codeExpired });
+      setError("verificationCode" as Path<T>, { message: t("form.codeExpired") });
       return;
     }
     mutate({
@@ -79,14 +78,14 @@ export default function CodeInput<T extends FieldValues>({ formMethods }: CodeIn
       <div className="flex gap-2">
         <input
           type="text"
-          placeholder={t.form.codePlaceholder}
+          placeholder={t("form.codePlaceholder")}
           {...formMethods.register("verificationCode" as Path<T>)}
           disabled={isEmailVerified}
           className={`input ${isEmailVerified ? "bg-[#f1f3f6] text-[var(--text-subtle)]" : ""}`}
         />
 
         <Button type="button" onClick={handleVerifyCode} isLoading={isCodeVerifying} disabled={isEmailVerified}>
-          {t.form.codeVerify}
+          {t("form.codeVerify")}
         </Button>
       </div>
 
@@ -98,12 +97,12 @@ export default function CodeInput<T extends FieldValues>({ formMethods }: CodeIn
         isPending={isCodeVerifying}
         message={
           isEmailVerified
-            ? t.form.codeEmailVerified
+            ? t("form.codeEmailVerified")
             : isEmailCodeTimeout
-            ? t.form.codeExpired
+            ? t("form.codeExpired")
             : secondsLeft > 0
-            ? formatMessage(t.form.codeTimeRemaining, { time: formatted })
-            : t.form.emailPrompt
+            ? t("form.codeTimeRemaining", { time: formatted })
+            : t("form.emailPrompt")
         }
       />
     </div>

@@ -18,8 +18,8 @@ export function WidgetLibrary({ open, onClose, layout, onAdd, onRemove }: {
       <div className="fixed inset-0 bg-black/30 z-10" onClick={onClose} />
       <aside className="fixed top-0 right-0 bottom-0 w-80 bg-[var(--surface)] shadow-2xl z-20 flex flex-col" onClick={e => e.stopPropagation()}>
         <div className="flex items-center gap-2 px-4 py-3.5 border-b border-[var(--line)]">
-          <h3 className="flex-1 text-sm font-bold text-[var(--ink)]">{t.statsPage.widgetLibrary}</h3>
-          <button onClick={onClose} className="w-7 h-7 border border-[var(--line)] rounded-lg text-[var(--text-subtle)] text-sm" aria-label={t.statsPage.close}>×</button>
+          <h3 className="flex-1 text-sm font-bold text-[var(--ink)]">{t("statsPage.widgetLibrary")}</h3>
+          <button onClick={onClose} className="w-7 h-7 border border-[var(--line)] rounded-lg text-[var(--text-subtle)] text-sm" aria-label={t("statsPage.close")}>×</button>
         </div>
         <div className="flex-1 overflow-auto p-4 space-y-2">
           {widgetLibrary.map(item => {
@@ -31,19 +31,19 @@ export function WidgetLibrary({ open, onClose, layout, onAdd, onRemove }: {
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-1.5">
                     <span className="text-xs font-bold text-[var(--ink)]">{item.title}</span>
-                    {added && <span className="text-xs font-bold text-[var(--blue)] bg-blue-100 px-1.5 py-0.5 rounded">{t.statsPage.visible}</span>}
+                    {added && <span className="text-xs font-bold text-[var(--blue)] bg-blue-100 px-1.5 py-0.5 rounded">{t("statsPage.visible")}</span>}
                   </div>
                   <div className="text-xs text-[var(--text-subtle)] mt-0.5">{item.desc}</div>
                 </div>
                 {added ? (
                   <button onClick={() => onRemove(widgetId!)}
                     className="shrink-0 px-2 py-1 text-xs font-semibold border border-red-200 text-red-500 rounded hover:bg-red-50 transition-colors">
-                    {t.statsPage.remove}
+                    {t("statsPage.remove")}
                   </button>
                 ) : (
                   <button onClick={() => onAdd(item)}
                     className="shrink-0 px-2 py-1 text-xs font-semibold border border-blue-300 text-[var(--blue)] rounded hover:bg-[var(--blue-soft)] transition-colors">
-                    {t.statsPage.add}
+                    {t("statsPage.add")}
                   </button>
                 )}
               </div>
