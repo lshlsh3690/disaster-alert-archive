@@ -2,7 +2,7 @@ import { useState } from "react";
 import { FieldValues, Path, UseFormReturn } from "react-hook-form";
 import InputStatusMessage from "../ui/InputStatusMessage";
 import useSignupStore from "@/store/signupStore";
-import { useI18n } from "@/hooks/useI18n";
+import { useTranslation } from "react-i18next";
 
 interface PasswordInput<T extends FieldValues> {
   formMethods: UseFormReturn<T>;
@@ -15,7 +15,7 @@ export default function PasswordInput<T extends FieldValues>({
   name,
   showVerificationUI,
 }: PasswordInput<T>) {
-  const t = useI18n();
+  const { t } = useTranslation();
   const { register, watch, formState } = formMethods;
   const value = watch(name);
   const isPasswordMatched = useSignupStore((s) => s.isPasswordMatched);

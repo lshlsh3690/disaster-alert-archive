@@ -2,13 +2,13 @@
 
 import type { LibItem, WidgetItem } from "./_constants";
 import { getWidgetLibrary } from "./_constants";
-import { useI18n } from "@/hooks/useI18n";
+import { useTranslation } from "react-i18next";
 
 export function WidgetLibrary({ open, onClose, layout, onAdd, onRemove }: {
   open: boolean; onClose: () => void; layout: WidgetItem[];
   onAdd: (item: LibItem) => void; onRemove: (id: string) => void;
 }) {
-  const t = useI18n();
+  const { t } = useTranslation();
   if (!open) return null;
   const widgetLibrary = getWidgetLibrary(t);
   // 현재 레이아웃에서 사용 중인 위젯의 libId → 인스턴스 id 맵 (추가/삭제 버튼 분기에 사용)

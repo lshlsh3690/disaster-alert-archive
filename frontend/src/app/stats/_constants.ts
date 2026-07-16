@@ -1,7 +1,7 @@
-import type { useI18n } from "@/hooks/useI18n";
+import type { TFunction } from "i18next";
 import type { I18nKey } from "@/constants/i18n";
 
-type T = ReturnType<typeof useI18n>;
+type T = TFunction;
 
 // ─── 공통 타입 ────────────────────────────────────────────────────────────────
 

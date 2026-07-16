@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { loadKakaoMapSdk } from "@/lib/kakaoMapLoader";
 import { useSigunguStats } from "@/lib/queries/useAlerts";
 import type { AlertSearchRequest } from "@/api/alertApi";
-import { useI18n } from "@/hooks/useI18n";
+import { useTranslation } from "react-i18next";
 import { useLanguageStore } from "@/store/languageStore";
 import type { I18nKey } from "@/constants/i18n";
 
@@ -145,7 +145,7 @@ interface Props {
 }
 
 export default function KakaoPolygonMap({ params = {}, mapHeight = "500px", showSidebar = true, externalSido, onSidoSelect }: Props) {
-  const t = useI18n();
+  const { t } = useTranslation();
   const locale = LANG_LOCALE[useLanguageStore((s) => s.language)] ?? "ko-KR";
   const DANGER_LABEL = t("weatherMap.dangerLabels", { returnObjects: true }) as I18nKey["ko"]["weatherMap"]["dangerLabels"];
   const containerRef = useRef<HTMLDivElement>(null);

@@ -22,7 +22,7 @@ import {
 import { TYPE_COLORS, BAR_COLORS, CHART_COLORS, getLevelMeta } from "./_constants";
 import type { LevelStat, RegionStat } from "./_constants";
 import { EmptyChart } from "./_charts";
-import { useI18n } from "@/hooks/useI18n";
+import { useTranslation } from "react-i18next";
 import { useLanguageStore } from "@/store/languageStore";
 
 const LANG_LOCALE: Record<string, string> = { ko: "ko-KR", en: "en-US", zh: "zh-CN", ja: "ja-JP" };
@@ -88,7 +88,7 @@ export function DonutChart({
   selectedType?: string;
   labelFormatter?: (label: string) => string;
 }) {
-  const t = useI18n();
+  const { t } = useTranslation();
   const locale = LANG_LOCALE[useLanguageStore((s) => s.language)] ?? "ko-KR";
   const r = 38;              // 원 반지름 (px 기준, SVG viewBox 100x100 내)
   const c = 2 * Math.PI * r; // 원의 전체 둘레 길이
@@ -170,7 +170,7 @@ export function DonutChart({
  * @param data - { region: 지역명, count: 건수 }[] 배열
  */
 export function HorizontalBar({ data, onBarClick, labelFormatter }: { data: RegionStat[]; onBarClick?: (label: string) => void; labelFormatter?: (label: string) => string }) {
-  const t = useI18n();
+  const { t } = useTranslation();
   const locale = LANG_LOCALE[useLanguageStore((s) => s.language)] ?? "ko-KR";
   if (data.length === 0) return <EmptyChart />;
 
@@ -233,7 +233,7 @@ export function VerticalBar({
   onBarClick?: (label: string) => void;
   labelFormatter?: (label: string) => string;
 }) {
-  const t = useI18n();
+  const { t } = useTranslation();
   const locale = LANG_LOCALE[useLanguageStore((s) => s.language)] ?? "ko-KR";
   if (data.length === 0) return <EmptyChart />;
 
@@ -286,7 +286,7 @@ export function VerticalBar({
  *              LEVEL_META(_constants.ts)에서 각 단계의 색상·텍스트를 가져옵니다.
  */
 export function LevelsCard({ data }: { data: LevelStat[] }) {
-  const t = useI18n();
+  const { t } = useTranslation();
   const locale = LANG_LOCALE[useLanguageStore((s) => s.language)] ?? "ko-KR";
   const levelMeta = getLevelMeta(t);
   // LEVEL_1, LEVEL_2, LEVEL_3 순서를 고정하고 데이터가 없으면 count=0으로 채웁니다

@@ -15,7 +15,7 @@ import { DISASTER_TYPES } from "@/ui/disasterType";
 import { METROS } from "@/ui/metros";
 import { disasterTypeChipStyle } from "@/ui/disasterTypeColor";
 import { formatEventPeriod } from "@/utils/eventDate";
-import { useI18n } from "@/hooks/useI18n";
+import { useTranslation } from "react-i18next";
 import { useLanguageStore } from "@/store/languageStore";
 import type { Event } from "@/types/events";
 
@@ -65,7 +65,7 @@ export default function EventsPage() {
 }
 
 function EventsPageInner() {
-  const t = useI18n();
+  const { t } = useTranslation();
   const lang = useLanguageStore((s) => s.language);
   const router = useRouter();
   const searchParams = useSearchParams();

@@ -2,12 +2,12 @@
 
 import { useRouter } from "next/navigation";
 import { useAuthStore } from "@/store/authStore";
-import { useI18n } from "@/hooks/useI18n";
+import { useTranslation } from "react-i18next";
 
 export default function ReportButton() {
   const router = useRouter();
   const user = useAuthStore((state) => state.user);
-  const t = useI18n();
+  const { t } = useTranslation();
 
 
   const handleClick = () => {

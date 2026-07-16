@@ -3,7 +3,7 @@
 import { useMemo, useRef, useState, useEffect, useCallback, useId } from "react";
 import { useRouter } from "next/navigation";
 import { KOREA_SIDO, SidoRegion } from "./koreaSido.data";
-import { useI18n } from "@/hooks/useI18n";
+import { useTranslation } from "react-i18next";
 import { useSidoStats } from "@/lib/queries/useAlerts";
 import { groupToMetros, Metro } from "@/ui/metros";
 import styles from "./KoreaMap25D.module.css";
@@ -54,7 +54,7 @@ export default function KoreaMap25D({
   todayOnly = true,
   onSelect,
 }: KoreaMap25DProps) {
-  const t = useI18n();
+  const { t } = useTranslation();
   const router = useRouter();
 
   // useId(): 서버/클라이언트 렌더 간 동일한 값을 보장 (Math.random은 하이드레이션 불일치 발생)

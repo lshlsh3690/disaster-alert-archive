@@ -7,7 +7,7 @@ import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useUserAlert } from "@/lib/queries/useAlerts";
 import { LEVEL_OPTIONS } from "@/ui/level";
-import { useI18n } from "@/hooks/useI18n";
+import { useTranslation } from "react-i18next";
 
 const DISASTER_TYPES = [
   "호우",
@@ -34,7 +34,7 @@ const ZEdit = z.object({
 type EditForm = z.infer<typeof ZEdit>;
 
 export default function AlertEditPage() {
-  const t = useI18n();
+  const { t } = useTranslation();
   const params = useParams<{ id: string }>();
   const router = useRouter();
   const id = Number(params.id);

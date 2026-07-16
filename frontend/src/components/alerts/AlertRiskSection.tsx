@@ -6,7 +6,7 @@ import { useAlertRisk, useRegionRisk, useRegionRiskHistory } from "@/lib/queries
 import { fetchGeoJsonCached } from "@/lib/geojsonCache";
 import { normalizeScore, scoreToGrade, aggregateBySigungu, type ImpactGrade } from "@/lib/riskScore";
 import type { RiskHistoryPoint } from "@/types/risk";
-import { useI18n } from "@/hooks/useI18n";
+import { useTranslation } from "react-i18next";
 import { useLanguageStore } from "@/store/languageStore";
 
 // 지도 + Kakao SDK 코드는 무겁기 때문에 별도 청크로 분리하고,
@@ -204,7 +204,7 @@ interface Props {
  * 클러스터링 전(204)이면 안내 문구만 표시.
  */
 export default function AlertRiskSection({ alertId, alertCreatedAt }: Props) {
-  const t = useI18n();
+  const { t } = useTranslation();
   const language = useLanguageStore((s) => s.language);
   const { data, isLoading, isError, refetch } = useAlertRisk(alertId);
   const regionNames = useRegionNames(language);

@@ -11,7 +11,7 @@
  *   - 한 곳에 모아두면 스타일을 바꿀 때 여기서만 수정하면 됩니다.
  */
 
-import { useI18n } from "@/hooks/useI18n";
+import { useTranslation } from "react-i18next";
 
 /**
  * EmptyChart
@@ -20,7 +20,7 @@ import { useI18n } from "@/hooks/useI18n";
  * props(입력값)가 없으므로 <EmptyChart /> 처럼 단순하게 사용합니다.
  */
 export function EmptyChart() {
-  const t = useI18n();
+  const { t } = useTranslation();
   return (
     // flex-1: 부모 컨테이너의 남은 공간을 모두 차지합니다
     // items-center justify-center: 가로·세로 모두 가운데 정렬

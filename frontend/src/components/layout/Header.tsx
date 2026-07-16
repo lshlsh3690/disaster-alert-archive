@@ -11,7 +11,7 @@ import { deleteGuestFcmToken } from "@/api/guestFcmApi";
 import { useRouter } from "next/navigation";
 import { useInitAuth } from "@/hooks/useInitAuth";
 import { LANGUAGES, LangCode } from "@/constants/language";
-import { useI18n } from "@/hooks/useI18n";
+import { useTranslation } from "react-i18next";
 import { useForegroundMessage } from "@/hooks/useForegroundMessage";
 
 export default function Header() {
@@ -32,7 +32,7 @@ export default function Header() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState<boolean>(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  const t = useI18n();
+  const { t } = useTranslation();
 
   const menu = [
     { name: t("nav.dashboard"), href: "/" },

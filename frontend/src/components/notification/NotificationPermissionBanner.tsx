@@ -4,10 +4,10 @@ import { useState } from "react";
 import { useNotificationPermission } from "@/hooks/useNotificationPermission";
 import { useAuthStore } from "@/store/authStore";
 import { useGuestFavoriteRegionsStore } from "@/store/guestFavoriteRegionsStore";
-import { useI18n } from "@/hooks/useI18n";
+import { useTranslation } from "react-i18next";
 
 export default function NotificationPermissionBanner() {
-  const t = useI18n();
+  const { t } = useTranslation();
   const user = useAuthStore((state) => state.user);
   const guestRegions = useGuestFavoriteRegionsStore((s) => s.regions);
   const { permission, isLoading, requestPermission } = useNotificationPermission();

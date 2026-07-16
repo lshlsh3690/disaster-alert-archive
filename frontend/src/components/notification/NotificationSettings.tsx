@@ -3,12 +3,12 @@
 
 import { useState, useEffect } from "react";
 import { useNotificationPermission } from "@/hooks/useNotificationPermission";
-import { useI18n } from "@/hooks/useI18n";
+import { useTranslation } from "react-i18next";
 
 type NotificationType = "NONE" | "PUSH" | "ALARM";
 
 function useNotificationOptions(): { type: NotificationType; label: string; description: string }[] {
-  const t = useI18n();
+  const { t } = useTranslation();
   return [
     { type: "NONE", label: t("notificationSettings.none.label"), description: t("notificationSettings.none.description") },
     { type: "PUSH", label: t("notificationSettings.push.label"), description: t("notificationSettings.push.description") },
@@ -46,7 +46,7 @@ function NotificationTypeIcon({ type }: { type: NotificationType }) {
 }
 
 export default function NotificationSettings() {
-  const t = useI18n();
+  const { t } = useTranslation();
   const NOTIFICATION_OPTIONS = useNotificationOptions();
   const { permission, isLoading, requestPermission } = useNotificationPermission();
   const [selectedType, setSelectedType] = useState<NotificationType>("PUSH");

@@ -10,7 +10,7 @@ import { useAddFavoriteRegion } from "@/lib/mutations/useAddFavoriteRegion";
 import { useDeleteFavoriteRegion } from "@/lib/mutations/useDeleteFavoriteRegion";
 import { useGuestFavoriteSync } from "@/hooks/useGuestFavoriteSync";
 import { useSigungu } from "@/lib/queries/useAlerts";
-import { useI18n } from "@/hooks/useI18n";
+import { useTranslation } from "react-i18next";
 import { METROS } from "@/ui/metros";
 import type { MemberFavoriteRegion } from "@/types/memberFavoriteRegion";
 
@@ -42,7 +42,7 @@ export default function FavoriteRegionsPage() {
   const router = useRouter();
   const isLoggedIn = useAuthStore((s) => s.user !== null);
   const language = useLanguageStore((s) => s.language);
-  const t = useI18n();
+  const { t } = useTranslation();
 
   // 로그인 시 게스트 데이터를 서버에 자동 병합
   useGuestFavoriteSync();

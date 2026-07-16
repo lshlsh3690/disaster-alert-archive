@@ -4,7 +4,7 @@ import { useEffect } from "react";
 import { FieldValues, Path, UseFormReturn, useWatch } from "react-hook-form";
 import useSignupStore from "@/store/signupStore";
 import InputStatusMessage from "../ui/InputStatusMessage";
-import { useI18n } from "@/hooks/useI18n";
+import { useTranslation } from "react-i18next";
 
 interface NicknameInputProps<T extends FieldValues> {
   formMethods: UseFormReturn<T>;
@@ -13,7 +13,7 @@ interface NicknameInputProps<T extends FieldValues> {
 }
 
 export default function NicknameInput<T extends FieldValues>({ formMethods }: NicknameInputProps<T>) {
-  const t = useI18n();
+  const { t } = useTranslation();
   const {
     control,
     setError,

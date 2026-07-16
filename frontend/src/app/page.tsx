@@ -5,7 +5,7 @@ import Link from "next/link";
 import LatestAlertsSection from "./LatestAlertsSection";
 import { useDashboardSummary, useSidoStats } from "@/lib/queries/useAlerts";
 import { useLatestComments } from "@/lib/queries/useComments";
-import { useI18n } from "@/hooks/useI18n";
+import { useTranslation } from "react-i18next";
 import { groupToMetros, Metro } from "@/ui/metros";
 import KoreaMap25D from "@/components/map/KoreaMap25D";
 import "./dashboard.css";
@@ -13,7 +13,7 @@ import "./dashboard.css";
 const clean = (value: string) => value.replace(/[\p{Extended_Pictographic}️]/gu, "").trim();
 
 export default function Home() {
-  const t = useI18n();
+  const { t } = useTranslation();
   const { data } = useDashboardSummary();
   const latestComments = useLatestComments(5);
 

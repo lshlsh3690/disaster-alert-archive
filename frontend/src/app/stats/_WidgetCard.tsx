@@ -19,13 +19,13 @@ import { EmptyChart, LoadingChart } from "./_charts";
 import { DonutChart, HorizontalBar, VerticalBar, LevelsCard } from "./_DistributionCharts";
 import { LineChart, DailyBar, Heatmap, DayOfWeekBar, HourBar, CompareBars, CompareLines } from "./_TimeCharts";
 import { WeatherCorrelationScatter, WeatherOverlayChart, WeatherByTypeChart, WeatherByRegionChart } from "./_WeatherCharts";
-import { useI18n } from "@/hooks/useI18n";
+import { useTranslation } from "react-i18next";
 import type { I18nKey } from "@/constants/i18n";
 
 // ─── 일별/시간별 토글 ────────────────────────────────────────────────────────
 
 function GranularityToggle({ value, onChange }: { value: "daily" | "hourly"; onChange: (v: "daily" | "hourly") => void }) {
-  const t = useI18n();
+  const { t } = useTranslation();
   return (
     <div className="flex border border-[var(--line)] rounded overflow-hidden self-start">
       {(["daily", "hourly"] as const).map(g => (
@@ -69,7 +69,7 @@ export function WidgetContent({ kind, variant, typeStats, regionStats, levelStat
   onTypeClick?: (type: string) => void;
   selectedType?: string;
 }) {
-  const t = useI18n();
+  const { t } = useTranslation();
   // 날씨 위젯의 일별/시간별 전환 상태 (isShortPeriod일 때만 토글 표시)
   const [granularity, setGranularity] = useState<"daily" | "hourly">("daily");
 
@@ -193,7 +193,7 @@ export function WidgetCard({ widget, lib, onVariantChange, onRemove, titleOverri
   dragHandleListeners?: Record<string, unknown>;
   children: React.ReactNode;
 }) {
-  const t = useI18n();
+  const { t } = useTranslation();
   // PNG 다운로드 시 html-to-image로 캡처할 카드 DOM 참조
   const cardRef = useRef<HTMLDivElement>(null);
   // ? 버튼 hover 시 도움말 툴팁 표시 여부

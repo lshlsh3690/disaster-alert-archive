@@ -14,7 +14,7 @@ import { z } from "zod";
 import { useRouter, useSearchParams } from "next/navigation";
 import { DISASTER_TYPES } from "@/ui/disasterType";
 import { METROS } from "@/ui/metros";
-import { useI18n } from "@/hooks/useI18n";
+import { useTranslation } from "react-i18next";
 import { useLanguageStore } from "@/store/languageStore";
 import { disasterTypeChipStyle, disasterTypePalette } from "@/ui/disasterTypeColor";
 
@@ -58,7 +58,7 @@ function DisasterListPageInner() {
   const [formState, setFormState] = useState<SearchForm>({});
   const router = useRouter();
   const searchParams = useSearchParams();
-  const t = useI18n();
+  const { t } = useTranslation();
   const language = useLanguageStore((state) => state.language);
 
 
