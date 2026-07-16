@@ -109,13 +109,13 @@ export function FilterBanner({
   // 값이 있는 필터만 태그 배열로 모읍니다
   // filter(Boolean): falsy 값(undefined, null, false)을 제거합니다
   const tags = [
-    sido                             && { label: t.metros[sido as keyof typeof t.metros] ?? sido },
+    sido                             && { label: t(`metros.${sido}`, { defaultValue: sido }) },
     sigungu                          && { label: sigungu },
     (startDate || endDate)           && { label: `${startDate ?? "~"} ~ ${endDate ?? "~"}` },
-    type                             && { label: `${t.statsPage.typePrefix}: ${t.disasterTypes[type as keyof typeof t.disasterTypes] ?? type}` },
-    levelText                        && { label: `${t.statsPage.levelPrefix}: ${levelText}` },
+    type                             && { label: `${t("statsPage.typePrefix")}: ${t(`disasterTypes.${type}`, { defaultValue: type })}` },
+    levelText                        && { label: `${t("statsPage.levelPrefix")}: ${levelText}` },
     keyword                          && { label: `"${keyword}"` },
-    source && source !== "ALL"       && { label: source === "OFFICIAL" ? t.alertList.filter.sourceOfficial : t.alertList.filter.sourceUser },
+    source && source !== "ALL"       && { label: source === "OFFICIAL" ? t("alertList.filter.sourceOfficial") : t("alertList.filter.sourceUser") },
   ].filter(Boolean) as { label: string }[];
 
   // 재난문자 페이지로 돌아갈 때 현재 필터를 유지하는 URL을 만듭니다
@@ -134,14 +134,14 @@ export function FilterBanner({
   if (tags.length === 0) {
     return (
       <div className="bg-[var(--canvas)] border border-[var(--line)] rounded-[var(--radius-card)] px-4 py-3 text-sm text-[var(--text-muted)]">
-        {t.statsPage.noFilters}{" "}
+        {t("statsPage.noFilters")}{" "}
         {onFilterOpen ? (
           <button onClick={onFilterOpen} className="text-[var(--blue)] font-semibold hover:underline">
-            {t.statsPage.setFilters} →
+            {t("statsPage.setFilters")} →
           </button>
         ) : (
           <Link href="/alerts" className="text-[var(--blue)] font-semibold hover:underline">
-            {t.statsPage.changeFilters} →
+            {t("statsPage.changeFilters")} →
           </Link>
         )}
       </div>
@@ -158,7 +158,7 @@ export function FilterBanner({
           <path d="M2 3h10l-3.5 4.5V12L5.5 10.5V7.5L2 3z"
             stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" />
         </svg>
-        {t.statsPage.filtersApplied}
+        {t("statsPage.filtersApplied")}
       </span>
 
       {/* 필터 태그들 */}
@@ -173,11 +173,11 @@ export function FilterBanner({
 
       {onFilterOpen ? (
         <button onClick={onFilterOpen} className="text-xs text-[var(--blue)] font-semibold hover:underline">
-          ✎ {t.statsPage.changeFilters}
+          ✎ {t("statsPage.changeFilters")}
         </button>
       ) : (
         <Link href={alertsHref} className="text-xs text-[var(--blue)] font-semibold hover:underline">
-          ↗ {t.statsPage.changeFilters}
+          ↗ {t("statsPage.changeFilters")}
         </Link>
       )}
     </div>

@@ -242,7 +242,7 @@ export default function AlertRiskSection({ alertId, alertCreatedAt }: Props) {
 
   return (
     <section className="space-y-3 rounded-[var(--radius-panel-card)] border border-[var(--line)] bg-[var(--surface)] p-4 shadow-[0_10px_30px_rgba(28,39,60,0.04)]">
-      <h2 className="text-lg font-semibold text-[var(--ink)]">{t.risk.title}</h2>
+      <h2 className="text-lg font-semibold text-[var(--ink)]">{t("risk.title")}</h2>
 
       {/* 로딩 */}
       {isLoading && (
@@ -255,19 +255,19 @@ export default function AlertRiskSection({ alertId, alertCreatedAt }: Props) {
       {/* 에러 */}
       {isError && (
         <div className="flex items-center justify-between gap-3 rounded-lg border border-red-200 bg-red-50 px-4 py-3">
-          <span className="text-sm text-red-700">{t.risk.loadError}</span>
+          <span className="text-sm text-red-700">{t("risk.loadError")}</span>
           <button
             className="px-3 py-1 text-sm rounded border border-red-300 text-red-700 hover:bg-red-100"
             onClick={() => refetch()}
-          >{t.risk.retry}</button>
+          >{t("risk.retry")}</button>
         </div>
       )}
 
       {/* 분석 전 (204) */}
       {!isLoading && !isError && data === null && (
         <div className="rounded-lg border border-gray-200 bg-gray-50 px-4 py-6 text-center">
-          <p className="text-sm text-gray-600">{t.risk.pending}</p>
-          <p className="text-xs text-gray-400 mt-1">{t.risk.pendingSub}</p>
+          <p className="text-sm text-gray-600">{t("risk.pending")}</p>
+          <p className="text-xs text-gray-400 mt-1">{t("risk.pendingSub")}</p>
         </div>
       )}
 
@@ -279,7 +279,7 @@ export default function AlertRiskSection({ alertId, alertCreatedAt }: Props) {
             <AlertRiskMap impacts={data.regionImpacts} mapHeight="472px" />
           ) : (
             <div className="h-40 flex items-center justify-center rounded-lg border border-gray-200 bg-gray-50 text-sm text-gray-500">
-              {t.risk.noRegions}
+              {t("risk.noRegions")}
             </div>
           )}
 
@@ -288,15 +288,15 @@ export default function AlertRiskSection({ alertId, alertCreatedAt }: Props) {
               {/* 요약 스탯 타일 */}
               <div className="grid grid-cols-2 gap-2">
                 <div className="rounded-[var(--radius-card)] border border-[var(--line)] bg-[var(--canvas)] px-3 py-2">
-                  <div className="text-[11px] text-[var(--text-muted)]">{t.risk.disasterType}</div>
+                  <div className="text-[11px] text-[var(--text-muted)]">{t("risk.disasterType")}</div>
                   <div className="mt-0.5 truncate text-sm font-semibold text-[var(--ink)]">
-                    {t.disasterTypes[data.disasterType as keyof typeof t.disasterTypes] ?? data.disasterType ?? "-"}
+                    {t(`disasterTypes.${data.disasterType}`, { defaultValue: data.disasterType }) ?? "-"}
                   </div>
                 </div>
                 <div className="rounded-[var(--radius-card)] border border-[var(--line)] bg-[var(--canvas)] px-3 py-2">
-                  <div className="text-[11px] text-[var(--text-muted)]">{t.risk.maxRisk}</div>
+                  <div className="text-[11px] text-[var(--text-muted)]">{t("risk.maxRisk")}</div>
                   <div className="mt-0.5 text-sm font-semibold" style={{ color: GRADE_HEX[stats.issuedGrade] }}>
-                    {stats.issuedPct}% · {t.risk.map.grade[stats.issuedGrade]}
+                    {stats.issuedPct}% · {t(`risk.map.grade.${stats.issuedGrade}`)}
                   </div>
                 </div>
               </div>
@@ -306,13 +306,13 @@ export default function AlertRiskSection({ alertId, alertCreatedAt }: Props) {
                 <div className="border-t border-[var(--line)] pt-3">
                   <div className="mb-2 flex items-baseline justify-between gap-2">
                     <h3 className="truncate text-sm font-semibold text-[var(--text-body)]">
-                      {t.risk.currentRisk} · {regionNames?.get(topCode) ?? topCode}
+                      {t("risk.currentRisk")} · {regionNames?.get(topCode) ?? topCode}
                     </h3>
                     <span
                       className="shrink-0 rounded-[var(--radius-pill)] px-2 py-0.5 text-[11px] font-semibold"
                       style={{ backgroundColor: GRADE_SOFT[currentGrade], color: GRADE_HEX[currentGrade] }}
                     >
-                      {t.risk.map.grade[currentGrade]}
+                      {t(`risk.map.grade.${currentGrade}`)}
                     </span>
                   </div>
                   <div className="flex items-end gap-0.5">
@@ -331,14 +331,14 @@ export default function AlertRiskSection({ alertId, alertCreatedAt }: Props) {
                   </div>
                   {regionRisk?.updatedAt && (
                     <div className="mt-1 text-[10px] text-[var(--text-subtle)]">
-                      {t.risk.updated} {new Date(regionRisk.updatedAt).toLocaleString()}
+                      {t("risk.updated")} {new Date(regionRisk.updatedAt).toLocaleString()}
                     </div>
                   )}
                   <div className="mt-2">
                     {riskHistory && riskHistory.length > 0 ? (
-                      <TrendSparkline points={riskHistory} trendLabel={t.risk.trend} vsStartLabel={t.risk.vsStart} />
+                      <TrendSparkline points={riskHistory} trendLabel={t("risk.trend")} vsStartLabel={t("risk.vsStart")} />
                     ) : (
-                      <p className="py-2 text-center text-xs text-[var(--text-subtle)]">{t.risk.noData}</p>
+                      <p className="py-2 text-center text-xs text-[var(--text-subtle)]">{t("risk.noData")}</p>
                     )}
                   </div>
                 </div>
@@ -347,7 +347,7 @@ export default function AlertRiskSection({ alertId, alertCreatedAt }: Props) {
               {/* 영향 지역 목록 (동일 등급이라 순위 없이 나열) */}
               <div className="pt-2 border-t border-[var(--line)]">
                 <h3 className="text-sm font-semibold text-[var(--text-body)] mb-2">
-                  {t.risk.affectedRegions} · {stats.regionCount}
+                  {t("risk.affectedRegions")} · {stats.regionCount}
                 </h3>
                 <div className="flex flex-wrap gap-1.5">
                   {stats.codes.map((code) => (

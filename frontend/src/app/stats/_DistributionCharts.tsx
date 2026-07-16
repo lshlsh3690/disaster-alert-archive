@@ -24,7 +24,6 @@ import type { LevelStat, RegionStat } from "./_constants";
 import { EmptyChart } from "./_charts";
 import { useI18n } from "@/hooks/useI18n";
 import { useLanguageStore } from "@/store/languageStore";
-import { formatMessage } from "@/utils/formatMessage";
 
 const LANG_LOCALE: Record<string, string> = { ko: "ko-KR", en: "en-US", zh: "zh-CN", ja: "ja-JP" };
 
@@ -126,7 +125,7 @@ export function DonutChart({
         })}
 
         {/* 중앙 텍스트: 총 건수 */}
-        <text x="50" y="47" textAnchor="middle" fontSize="8" fill="#6b7280">{t.statsPage.total}</text>
+        <text x="50" y="47" textAnchor="middle" fontSize="8" fill="#6b7280">{t("statsPage.total")}</text>
         <text x="50" y="60" textAnchor="middle" fontSize="13" fontWeight="700" fill="#111827">
           {total.toLocaleString(locale)}
         </text>
@@ -135,7 +134,7 @@ export function DonutChart({
       {/* 범례 목록 — onTypeClick이 있으면 클릭 가능, selectedType이 있으면 해당 항목 외 흐리게 */}
       <ul className="flex-1 space-y-1.5">
         {data.map((d, i) => {
-          const key = d.type ?? t.statsPage.other;
+          const key = d.type ?? t("statsPage.other");
           const label = labelFormatter ? labelFormatter(key) : key;
           const isSelected = selectedType === key;
           const isDimmed = !!selectedType && !isSelected;
@@ -183,7 +182,7 @@ export function HorizontalBar({ data, onBarClick, labelFormatter }: { data: Regi
       <div style={TT_BOX}>
         {/* payload[0].payload는 해당 막대의 원본 데이터 객체입니다 */}
         <p style={TT_LABEL}>{region ? (labelFormatter ? labelFormatter(region) : region) : ""}</p>
-        <p style={TT_VALUE}>{(payload[0].value ?? 0).toLocaleString(locale)}{t.statsPage.countUnit}</p>
+        <p style={TT_VALUE}>{(payload[0].value ?? 0).toLocaleString(locale)}{t("statsPage.countUnit")}</p>
       </div>
     );
   };
@@ -246,7 +245,7 @@ export function VerticalBar({
     return (
       <div style={TT_BOX}>
         <p style={TT_LABEL}>{label ? (labelFormatter ? labelFormatter(label) : label) : ""}</p>
-        <p style={TT_VALUE}>{(payload[0].value ?? 0).toLocaleString(locale)}{t.statsPage.countUnit}</p>
+        <p style={TT_VALUE}>{(payload[0].value ?? 0).toLocaleString(locale)}{t("statsPage.countUnit")}</p>
       </div>
     );
   };
@@ -326,7 +325,7 @@ export function LevelsCard({ data }: { data: LevelStat[] }) {
       </div>
 
       <p className="text-xs text-gray-500 leading-relaxed">
-        {formatMessage(t.statsPage.urgentSummary, { total: total.toLocaleString(locale), percent: urgentPct })}
+        {t("statsPage.urgentSummary", { total: total.toLocaleString(locale), percent: urgentPct })}
       </p>
     </div>
   );

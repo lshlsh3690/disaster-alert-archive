@@ -59,7 +59,7 @@ export default function NicknameInput<T extends FieldValues>({ formMethods }: Ni
       <input
         type="text"
         {...formMethods.register("nickname" as Path<T>)}
-        placeholder={t.form.nicknamePlaceholder}
+        placeholder={t("form.nicknamePlaceholder")}
         className="input"
       />
 
@@ -68,7 +68,7 @@ export default function NicknameInput<T extends FieldValues>({ formMethods }: Ni
         formMethods={formMethods}
         isPending={isPending}
         isValid={showSuccess}
-        message={showSuccess ? t.form.nicknameValid : t.form.nicknamePrompt}
+        message={showSuccess ? t("form.nicknameValid") : t("form.nicknamePrompt")}
       />
     </div>
   );

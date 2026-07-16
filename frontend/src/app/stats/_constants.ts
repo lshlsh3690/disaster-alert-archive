@@ -1,4 +1,5 @@
 import type { useI18n } from "@/hooks/useI18n";
+import type { I18nKey } from "@/constants/i18n";
 
 type T = ReturnType<typeof useI18n>;
 
@@ -30,9 +31,9 @@ export const CHART_COLORS  = ["#3b82f6","#f97316","#22c55e","#a855f7","#ef4444",
 // 경보 단계별 표시 텍스트·색상 정의 (안전안내/긴급재난/위급재난)
 export function getLevelMeta(t: T): Record<string, { text: string; bg: string; textCls: string; border: string; solid: string }> {
   return {
-    LEVEL_1: { text: t.statsPage.levels.LEVEL_1, bg: "bg-blue-50",   textCls: "text-blue-700",   border: "border-blue-200",   solid: "#3b82f6" },
-    LEVEL_2: { text: t.statsPage.levels.LEVEL_2, bg: "bg-orange-50", textCls: "text-orange-700", border: "border-orange-200", solid: "#f97316" },
-    LEVEL_3: { text: t.statsPage.levels.LEVEL_3, bg: "bg-red-50",    textCls: "text-red-700",    border: "border-red-200",    solid: "#ef4444" },
+    LEVEL_1: { text: t("statsPage.levels.LEVEL_1"), bg: "bg-blue-50",   textCls: "text-blue-700",   border: "border-blue-200",   solid: "#3b82f6" },
+    LEVEL_2: { text: t("statsPage.levels.LEVEL_2"), bg: "bg-orange-50", textCls: "text-orange-700", border: "border-orange-200", solid: "#f97316" },
+    LEVEL_3: { text: t("statsPage.levels.LEVEL_3"), bg: "bg-red-50",    textCls: "text-red-700",    border: "border-red-200",    solid: "#ef4444" },
   };
 }
 
@@ -40,7 +41,7 @@ export function getLevelMeta(t: T): Record<string, { text: string; bg: string; t
 
 // 히트맵 Y축 요일 레이블 (월~일 순서)
 export function getWeekdays(t: T): string[] {
-  const w = t.statsPage.weekdays;
+  const w = t("statsPage.weekdays", { returnObjects: true }) as I18nKey["ko"]["statsPage"]["weekdays"];
   return [w.mon, w.tue, w.wed, w.thu, w.fri, w.sat, w.sun];
 }
 // PostgreSQL EXTRACT(DOW): 0=Sun,1=Mon,...,6=Sat → 표시 순서 Mon=0..Sun=6
@@ -50,8 +51,8 @@ export const DOW_TO_IDX: Record<number, number> = { 1:0, 2:1, 3:2, 4:3, 5:4, 6:5
 
 // 사용 가능한 모든 위젯의 정적 정의 목록 (id, 차트 종류, 기본 스팬, 변형 옵션 등)
 export function getWidgetLibrary(t: T): LibItem[] {
-  const w = t.statsPage.widgets;
-  const v = t.statsPage.variants;
+  const w = t("statsPage.widgets", { returnObjects: true }) as I18nKey["ko"]["statsPage"]["widgets"];
+  const v = t("statsPage.variants", { returnObjects: true }) as I18nKey["ko"]["statsPage"]["variants"];
   return [
     { id: "type-donut", kind: "donut", title: w.typeDistribution.title, desc: w.typeDistribution.desc, help: w.typeDistribution.help,
       defaultSpan: 6, icon: "🍩", variants: [{ key: "donut", label: v.donut }, { key: "hbar", label: v.horizontalBar }, { key: "vbar", label: v.verticalBar }] },

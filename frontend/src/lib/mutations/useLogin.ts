@@ -40,7 +40,7 @@ export default function useLogin(options: {
       console.error("로그인 실패:", error);
       const errorResponse = parseErrorResponse(error.response?.data);
       if (!errorResponse) {
-        options.onErrorCallback(t.login.unknownError);
+        options.onErrorCallback(t("login.unknownError"));
         return;
       }
 

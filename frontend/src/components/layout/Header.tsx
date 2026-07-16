@@ -35,11 +35,11 @@ export default function Header() {
   const t = useI18n();
 
   const menu = [
-    { name: t.nav.dashboard, href: "/" },
-    { name: t.nav.alerts, href: "/alerts" },
-    { name: t.nav.events, href: "/events" },
-    { name: t.nav.stats, href: "/stats" },
-    { name: t.nav.community, href: "/community" },
+    { name: t("nav.dashboard"), href: "/" },
+    { name: t("nav.alerts"), href: "/alerts" },
+    { name: t("nav.events"), href: "/events" },
+    { name: t("nav.stats"), href: "/stats" },
+    { name: t("nav.community"), href: "/community" },
   ];
 
   const isActive = (href: string) => {
@@ -87,7 +87,7 @@ export default function Header() {
           <Link href="/" className="flex items-center gap-2">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src="/icons/apple-icon-180.png" alt="logo" className="w-8 h-8 rounded-full" />
-            <span className="text-xl font-bold text-[var(--blue)] tracking-tight">{t.appName}</span>
+            <span className="text-xl font-bold text-[var(--blue)] tracking-tight">{t("appName")}</span>
           </Link>
           <select
             value={language}
@@ -122,25 +122,25 @@ export default function Header() {
                 href="/user/settings/regions"
                 className="px-3 py-2 rounded-[var(--radius-control)] text-[var(--text-muted)] transition-colors hover:text-[var(--blue)] hover:bg-[var(--blue-soft)]"
               >
-                {t.nav.favoriteRegions}
+                {t("nav.favoriteRegions")}
               </Link>
               <div className="relative" ref={dropdownRef}>
                 <button
                   onClick={() => setOpen((prev) => !prev)}
                   className="px-3 py-2 rounded-[var(--radius-control)] font-medium text-[var(--blue)] transition-colors hover:bg-[var(--blue-soft)]"
                 >
-                  {nickname ?? t.nav.user} ▾
+                  {nickname ?? t("nav.user")} ▾
                 </button>
                 {open && (
                   <div className="absolute right-0 mt-2 w-44 bg-[var(--surface)] border border-[var(--line)] rounded-[var(--radius-compact)] shadow-[0_10px_30px_rgba(28,39,60,0.08)] text-sm z-50 overflow-hidden">
                     <Link href="/notifications" className="block px-4 py-2.5 text-[var(--text-body)] hover:bg-[var(--blue-soft)] hover:text-[var(--blue)]" onClick={() => setOpen(false)}>
-                      {t.nav.notificationHistory}
+                      {t("nav.notificationHistory")}
                     </Link>
                     <Link href="/user/settings" className="block px-4 py-2.5 text-[var(--text-body)] hover:bg-[var(--blue-soft)] hover:text-[var(--blue)]" onClick={() => setOpen(false)}>
-                      {t.nav.settings}
+                      {t("nav.settings")}
                     </Link>
                     <button onClick={handleLogout} className="w-full text-left px-4 py-2.5 text-[var(--coral)] hover:bg-[var(--coral-soft)]">
-                      {t.nav.logout}
+                      {t("nav.logout")}
                     </button>
                   </div>
                 )}
@@ -152,10 +152,10 @@ export default function Header() {
                 href="/user/settings/regions"
                 className="px-3 py-2 rounded-[var(--radius-control)] text-[var(--text-muted)] transition-colors hover:text-[var(--blue)] hover:bg-[var(--blue-soft)]"
               >
-                {t.nav.favoriteRegions}
+                {t("nav.favoriteRegions")}
               </Link>
               <Link href="/login" className="px-3 py-2 rounded-[var(--radius-control)] font-medium text-[var(--blue)] transition-colors hover:bg-[var(--blue-soft)]">
-                {t.nav.login}
+                {t("nav.login")}
               </Link>
             </>
           )}
@@ -165,7 +165,7 @@ export default function Header() {
         <button
           className="md:hidden p-2 rounded-[var(--radius-control)] text-[var(--text-muted)] hover:bg-[var(--blue-soft)] hover:text-[var(--blue)]"
           onClick={() => setMobileMenuOpen((prev) => !prev)}
-          aria-label={t.nav.openMenu}
+          aria-label={t("nav.openMenu")}
         >
           {mobileMenuOpen ? (
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -195,7 +195,7 @@ export default function Header() {
             </Link>
           ))}
           <div className="flex items-center gap-2 px-3 py-2.5">
-            <span className="text-[var(--text-muted)]">{t.dashboard.langLabel}:</span>
+            <span className="text-[var(--text-muted)]">{t("dashboard.langLabel")}:</span>
             <select
               value={language}
               onChange={(e) => handleLangChange(e.target.value as LangCode)}
@@ -209,28 +209,28 @@ export default function Header() {
           {isLoggedIn ? (
             <>
               <Link href="/notifications" className="block px-3 py-2.5 rounded-[var(--radius-control)] text-[var(--text-body)] hover:bg-[var(--blue-soft)] hover:text-[var(--blue)]" onClick={() => setMobileMenuOpen(false)}>
-                {t.nav.notificationHistory}
+                {t("nav.notificationHistory")}
               </Link>
               <Link href="/user/settings/regions" className="block px-3 py-2.5 rounded-[var(--radius-control)] text-[var(--text-body)] hover:bg-[var(--blue-soft)] hover:text-[var(--blue)]" onClick={() => setMobileMenuOpen(false)}>
-                {t.nav.favoriteRegions}
+                {t("nav.favoriteRegions")}
               </Link>
               <Link href="/user/settings" className="block px-3 py-2.5 rounded-[var(--radius-control)] text-[var(--text-body)] hover:bg-[var(--blue-soft)] hover:text-[var(--blue)]" onClick={() => setMobileMenuOpen(false)}>
-                {t.nav.settings}
+                {t("nav.settings")}
               </Link>
               <button
                 onClick={() => { handleLogout(); setMobileMenuOpen(false); }}
                 className="block w-full text-left px-3 py-2.5 rounded-[var(--radius-control)] text-[var(--coral)] hover:bg-[var(--coral-soft)]"
               >
-                {t.nav.logout}
+                {t("nav.logout")}
               </button>
             </>
           ) : (
             <>
               <Link href="/user/settings/regions" className="block px-3 py-2.5 rounded-[var(--radius-control)] text-[var(--text-body)] hover:bg-[var(--blue-soft)] hover:text-[var(--blue)]" onClick={() => setMobileMenuOpen(false)}>
-                {t.nav.favoriteRegions}
+                {t("nav.favoriteRegions")}
               </Link>
               <Link href="/login" className="block px-3 py-2.5 rounded-[var(--radius-control)] text-[var(--blue)] font-medium hover:bg-[var(--blue-soft)]" onClick={() => setMobileMenuOpen(false)}>
-                {t.nav.login}
+                {t("nav.login")}
               </Link>
             </>
           )}

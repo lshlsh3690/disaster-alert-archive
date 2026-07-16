@@ -118,21 +118,21 @@ function DisasterListPageInner() {
   const topType = useMemo(() => {
     if (!filteredStats?.typeStats) return null;
     return filteredStats.typeStats
-      .filter((t) => t.type)
+      .filter((s) => s.type)
       .sort((a, b) => b.count - a.count)[0] ?? null;
   }, [filteredStats]);
 
   const typeDistribution = useMemo(() => {
     if (!filteredStats?.typeStats) return [];
     const sorted = filteredStats.typeStats
-      .filter((t) => t.type)
+      .filter((s) => s.type)
       .sort((a, b) => b.count - a.count)
       .slice(0, 5);
-    const total = sorted.reduce((sum, t) => sum + t.count, 0);
-    return sorted.map((t) => ({
-      type: t.type!,
-      count: t.count,
-      pct: total > 0 ? Math.round((t.count / total) * 100) : 0,
+    const total = sorted.reduce((sum, s) => sum + s.count, 0);
+    return sorted.map((s) => ({
+      type: s.type!,
+      count: s.count,
+      pct: total > 0 ? Math.round((s.count / total) * 100) : 0,
     }));
   }, [filteredStats]);
 
@@ -235,15 +235,15 @@ function DisasterListPageInner() {
       <div className="mx-auto max-w-7xl space-y-4 px-4 py-8 sm:px-6 sm:space-y-6">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h1 className="text-xl font-bold tracking-tight text-[var(--ink)]">{t.alertList.title}</h1>
-            <p className="mt-1 text-[13px] text-[var(--text-muted)]">{t.alertList.description}</p>
+            <h1 className="text-xl font-bold tracking-tight text-[var(--ink)]">{t("alertList.title")}</h1>
+            <p className="mt-1 text-[13px] text-[var(--text-muted)]">{t("alertList.description")}</p>
           </div>
           <div className="flex items-center gap-2">
             <Link
               href={`/stats${searchParams.toString() ? `?${searchParams.toString()}` : ""}`}
               className="rounded-[var(--radius-control)] border border-[var(--line)] bg-[var(--surface)] px-3 py-2 text-sm font-semibold text-[var(--text-body)] transition-colors hover:border-[var(--blue)] hover:text-[var(--blue)]"
             >
-              📊 {t.alertList.viewStats}
+              📊 {t("alertList.viewStats")}
             </Link>
             <ReportButton />
           </div>
@@ -257,18 +257,18 @@ function DisasterListPageInner() {
               className="grid grid-cols-1 gap-3 rounded-[var(--radius-panel-card)] border border-[var(--line)] bg-[var(--surface)] p-4 shadow-[0_10px_30px_rgba(28,39,60,0.04)] sm:grid-cols-2 md:grid-cols-4"
             >
               <div className="flex flex-col gap-1">
-                <label className="text-xs text-[var(--text-muted)]">{t.alertList.filter.sido}</label>
+                <label className="text-xs text-[var(--text-muted)]">{t("alertList.filter.sido")}</label>
                 <select {...register("sido")} className="input">
-                  <option value="">{t.alertList.filter.sido}</option>
+                  <option value="">{t("alertList.filter.sido")}</option>
                   {METROS.map((m) => (
-                    <option key={m} value={m}>{t.metros[m]}</option>
+                    <option key={m} value={m}>{t(`metros.${m}`)}</option>
                   ))}
                 </select>
               </div>
               <div className="flex flex-col gap-1">
-                <label className="text-xs text-[var(--text-muted)]">{t.alertList.filter.sigungu}</label>
+                <label className="text-xs text-[var(--text-muted)]">{t("alertList.filter.sigungu")}</label>
                 <select {...register("sigungu")} className="input disabled:opacity-60" disabled={!watchedSido}>
-                  <option value="">{t.alertList.filter.sigungu}</option>
+                  <option value="">{t("alertList.filter.sigungu")}</option>
                   {/* 드롭다운 - value는 한국어 이름(검색용), 표시는 번역된 이름 */}
                   {sigunguList?.filter((s) => s.name !== "전체").map((s) => (
                     <option key={s.code} value={s.name}>
@@ -278,54 +278,54 @@ function DisasterListPageInner() {
                 </select>
               </div>
               <div className="flex flex-col gap-1">
-                <label className="text-xs text-[var(--text-muted)]">{t.alertList.filter.startDate}</label>
+                <label className="text-xs text-[var(--text-muted)]">{t("alertList.filter.startDate")}</label>
                 <Controller
                   name="startDate"
                   control={control}
                   render={({ field }) => (
-                    <DatePicker value={field.value ?? ""} onChange={field.onChange} locale={LANG_LOCALE[language] ?? "ko-KR"} clearLabel={t.datePicker.clear} prevMonthLabel={t.datePicker.prevMonth} nextMonthLabel={t.datePicker.nextMonth} />
+                    <DatePicker value={field.value ?? ""} onChange={field.onChange} locale={LANG_LOCALE[language] ?? "ko-KR"} clearLabel={t("datePicker.clear")} prevMonthLabel={t("datePicker.prevMonth")} nextMonthLabel={t("datePicker.nextMonth")} />
                   )}
                 />
               </div>
               <div className="flex flex-col gap-1">
-                <label className="text-xs text-[var(--text-muted)]">{t.alertList.filter.endDate}</label>
+                <label className="text-xs text-[var(--text-muted)]">{t("alertList.filter.endDate")}</label>
                 <Controller
                   name="endDate"
                   control={control}
                   render={({ field }) => (
-                    <DatePicker value={field.value ?? ""} onChange={field.onChange} locale={LANG_LOCALE[language] ?? "ko-KR"} clearLabel={t.datePicker.clear} prevMonthLabel={t.datePicker.prevMonth} nextMonthLabel={t.datePicker.nextMonth} />
+                    <DatePicker value={field.value ?? ""} onChange={field.onChange} locale={LANG_LOCALE[language] ?? "ko-KR"} clearLabel={t("datePicker.clear")} prevMonthLabel={t("datePicker.prevMonth")} nextMonthLabel={t("datePicker.nextMonth")} />
                   )}
                 />
               </div>
               <div className="flex flex-col gap-1">
-                <label className="text-xs text-[var(--text-muted)]">{t.alertList.filter.type}</label>
+                <label className="text-xs text-[var(--text-muted)]">{t("alertList.filter.type")}</label>
                 <select {...register("type")} className="input">
-                  <option value="">{t.alertList.filter.type}</option>
+                  <option value="">{t("alertList.filter.type")}</option>
                   {DISASTER_TYPES.map((type) => (
-                    <option key={type} value={type}>{t.disasterTypes[type]}</option>
+                    <option key={type} value={type}>{t(`disasterTypes.${type}`)}</option>
                   ))}
                 </select>
               </div>
               <div className="flex flex-col gap-1">
-                <label className="text-xs text-[var(--text-muted)]">{t.alertList.filter.level}</label>
+                <label className="text-xs text-[var(--text-muted)]">{t("alertList.filter.level")}</label>
                 <select {...register("levelText")} className="input">
-                  <option value="">{t.alertList.filter.level}</option>
+                  <option value="">{t("alertList.filter.level")}</option>
                   {LEVEL_OPTIONS.map((o) => (
-                    <option key={o.code} value={o.text}>{t.levels[o.text]}</option>
+                    <option key={o.code} value={o.text}>{t(`levels.${o.text}`)}</option>
                   ))}
                 </select>
               </div>
               <div className="flex flex-col gap-1">
-                <label className="text-xs text-[var(--text-muted)]">{t.alertList.filter.sourceAll}</label>
+                <label className="text-xs text-[var(--text-muted)]">{t("alertList.filter.sourceAll")}</label>
                 <select {...register("source")} className="input">
-                  <option value="ALL">{t.alertList.filter.sourceAll}</option>
-                  <option value="OFFICIAL">{t.alertList.filter.sourceOfficial}</option>
-                  <option value="USER">{t.alertList.filter.sourceUser}</option>
+                  <option value="ALL">{t("alertList.filter.sourceAll")}</option>
+                  <option value="OFFICIAL">{t("alertList.filter.sourceOfficial")}</option>
+                  <option value="USER">{t("alertList.filter.sourceUser")}</option>
                 </select>
               </div>
               <div className="flex flex-col gap-1 col-span-full sm:col-span-2">
-                <label className="text-xs text-[var(--text-muted)]">{t.alertList.filter.keyword}</label>
-                <input {...register("keyword")} placeholder={t.alertList.filter.keyword} className="input" />
+                <label className="text-xs text-[var(--text-muted)]">{t("alertList.filter.keyword")}</label>
+                <input {...register("keyword")} placeholder={t("alertList.filter.keyword")} className="input" />
               </div>
               <div className="col-span-full flex justify-end gap-2">
                 <button
@@ -333,14 +333,14 @@ function DisasterListPageInner() {
                   onClick={onReset}
                   className="rounded-[var(--radius-control)] border border-[var(--line)] bg-[var(--surface)] px-3 py-2 text-sm text-[var(--text-body)] transition-colors hover:bg-[var(--blue-soft)]"
                 >
-                  {t.alertList.reset}
+                  {t("alertList.reset")}
                 </button>
                 <button
                   type="submit"
                   className="rounded-[var(--radius-control)] bg-[var(--blue)] px-4 py-2 text-sm font-semibold text-white transition hover:brightness-95 disabled:opacity-60"
                   disabled={isFetching}
                 >
-                  {isFetching ? t.alertList.searching : t.alertList.search}
+                  {isFetching ? t("alertList.searching") : t("alertList.search")}
                 </button>
               </div>
             </form>
@@ -348,9 +348,9 @@ function DisasterListPageInner() {
             {/* 목록 */}
             <div id="list" className="flex flex-1 flex-col rounded-[var(--radius-panel-card)] border border-[var(--line)] bg-[var(--surface)] p-2 shadow-[0_10px_30px_rgba(28,39,60,0.04)]">
               {isLoading ? (
-                <div className="p-4 text-[13px] text-[var(--text-muted)]">{t.loading}</div>
+                <div className="p-4 text-[13px] text-[var(--text-muted)]">{t("loading")}</div>
               ) : !(data?.content ?? []).length ? (
-                <div className="p-8 text-center text-[13px] text-[var(--text-muted)]">{t.alertList.noData}</div>
+                <div className="p-8 text-center text-[13px] text-[var(--text-muted)]">{t("alertList.noData")}</div>
               ) : (
                 <>
                   <ul>
@@ -362,7 +362,7 @@ function DisasterListPageInner() {
                         : a.regionNames && a.regionNames.length > 0 ? a.regionNames.join(", ") : "-";
                       const message = (translated && a.translatedMessage) || a.message;
                       const disasterTypeLabel = (translated && a.translatedDisasterType)
-                        || (t.disasterTypes[a.disasterType as keyof typeof t.disasterTypes] ?? a.disasterType);
+                        || (t(`disasterTypes.${a.disasterType}`, { defaultValue: a.disasterType }));
                       const href = a.source === "USER" ? `/alerts/${a.id}?source=USER` : `/alerts/${a.id}?source=OFFICIAL`;
                       return (
                         <li key={a.id} className="border-b border-[var(--line)] last:border-0">
@@ -383,12 +383,12 @@ function DisasterListPageInner() {
                               )}
                               {a.emergencyLevelText && (
                                 <span style={levelBadgeStyle(a.emergencyLevelText)} className="rounded-[var(--radius-pill)] px-2 py-0.5 text-[11px] font-medium">
-                                  {t.levels[a.emergencyLevelText as keyof typeof t.levels] ?? a.emergencyLevelText}
+                                  {t(`levels.${a.emergencyLevelText}`, { defaultValue: a.emergencyLevelText })}
                                 </span>
                               )}
                               {a.source === "USER" && (
                                 <span className="rounded-[var(--radius-pill)] bg-[#eef1f5] px-2 py-0.5 text-[11px] font-medium text-[var(--text-muted)]">
-                                  {t.alertList.filter.sourceUser}
+                                  {t("alertList.filter.sourceUser")}
                                 </span>
                               )}
                             </div>
@@ -403,7 +403,7 @@ function DisasterListPageInner() {
                       onClick={() => setPage((p) => Math.max(0, p - 1))}
                       disabled={page === 0}
                     >
-                      {t.alertList.prev}
+                      {t("alertList.prev")}
                     </button>
                     <div className="text-sm text-[var(--text-muted)]">{data ? `${data.number + 1} / ${data.totalPages}` : "-"}</div>
                     <button
@@ -411,7 +411,7 @@ function DisasterListPageInner() {
                       onClick={() => setPage((p) => (data ? Math.min(data.totalPages - 1, p + 1) : p))}
                       disabled={!data || data.number + 1 >= data.totalPages}
                     >
-                      {t.alertList.next}
+                      {t("alertList.next")}
                     </button>
                   </div>
                 </>
@@ -429,21 +429,21 @@ function DisasterListPageInner() {
             <div className="space-y-3 rounded-[var(--radius-panel-card)] border border-[var(--line)] bg-[var(--surface)] p-4 shadow-[0_10px_30px_rgba(28,39,60,0.04)]">
               <div className="space-y-2">
                 <div className="flex items-center justify-between text-sm">
-                  <span className="text-[var(--text-muted)]">{t.alertList.totalCount}</span>
+                  <span className="text-[var(--text-muted)]">{t("alertList.totalCount")}</span>
                   <span className="font-semibold text-[var(--ink)]">
-                    {filteredStats ? filteredStats.totalCount.toLocaleString("ko-KR") + t.alertList.countUnit : "-"}
+                    {filteredStats ? filteredStats.totalCount.toLocaleString("ko-KR") + t("alertList.countUnit") : "-"}
                   </span>
                 </div>
                 <div className="flex items-center justify-between text-sm">
-                  <span className="text-[var(--text-muted)]">{t.alertList.topRegion}</span>
+                  <span className="text-[var(--text-muted)]">{t("alertList.topRegion")}</span>
                   <span className="font-semibold text-[var(--ink)]">
-                    {maxRegion ? `${t.metros[maxRegion.region as keyof typeof t.metros] ?? maxRegion.region} (${maxRegion.count.toLocaleString("ko-KR")}${t.alertList.countUnit})` : "-"}
+                    {maxRegion ? `${t(`metros.${maxRegion.region}`, { defaultValue: maxRegion.region })} (${maxRegion.count.toLocaleString("ko-KR")}${t("alertList.countUnit")})` : "-"}
                   </span>
                 </div>
                 <div className="flex items-center justify-between text-sm">
-                  <span className="text-[var(--text-muted)]">{t.alertList.topType}</span>
+                  <span className="text-[var(--text-muted)]">{t("alertList.topType")}</span>
                   <span className="font-semibold text-[var(--ink)]">
-                    {topType ? `${t.disasterTypes[topType.type as keyof typeof t.disasterTypes] ?? topType.type} (${topType.count.toLocaleString("ko-KR")}${t.alertList.countUnit})` : "-"}
+                    {topType ? `${t(`disasterTypes.${topType.type}`, { defaultValue: topType.type })} (${topType.count.toLocaleString("ko-KR")}${t("alertList.countUnit")})` : "-"}
                   </span>
                 </div>
               </div>
@@ -451,17 +451,17 @@ function DisasterListPageInner() {
               {/* 재난 유형 분포 */}
               <div className="border-t border-[var(--line)] pt-2">
                 <h3 className="mb-2 text-sm font-semibold text-[var(--text-body)]">
-                  {t.alertList.typeDistribution}{formState.sido ? ` · ${t.metros[formState.sido as keyof typeof t.metros] ?? formState.sido}` : ` · ${t.alertList.nationwide}`}
+                  {t("alertList.typeDistribution")}{formState.sido ? ` · ${t(`metros.${formState.sido}`, { defaultValue: formState.sido })}` : ` · ${t("alertList.nationwide")}`}
                 </h3>
                 {typeDistribution.length === 0 ? (
-                  <p className="py-2 text-center text-xs text-[var(--text-subtle)]">{t.alertList.noData}</p>
+                  <p className="py-2 text-center text-xs text-[var(--text-subtle)]">{t("alertList.noData")}</p>
                 ) : (
                   <ul className="space-y-1.5">
                     {typeDistribution.map(({ type, count, pct }) => (
                       <li key={type}>
                         <div className="mb-0.5 flex justify-between text-xs">
-                          <span className="truncate text-[var(--text-body)]">{t.disasterTypes[type as keyof typeof t.disasterTypes] ?? type}</span>
-                          <span className="ml-2 shrink-0 text-[var(--text-muted)]">{pct}% ({count.toLocaleString("ko-KR")}{t.alertList.countUnit})</span>
+                          <span className="truncate text-[var(--text-body)]">{t(`disasterTypes.${type}`, { defaultValue: type })}</span>
+                          <span className="ml-2 shrink-0 text-[var(--text-muted)]">{pct}% ({count.toLocaleString("ko-KR")}{t("alertList.countUnit")})</span>
                         </div>
                         <div className="h-1.5 w-full overflow-hidden rounded-full bg-[#eef1f5]">
                           <div
@@ -478,7 +478,7 @@ function DisasterListPageInner() {
               {/* 재난 경보 단계별 건수 */}
               <div className="border-t border-[var(--line)] pt-2">
                 <h3 className="mb-2 text-sm font-semibold text-[var(--text-body)]">
-                  {t.alertList.alertLevel}{formState.sido ? ` · ${t.metros[formState.sido as keyof typeof t.metros] ?? formState.sido}` : ` · ${t.alertList.nationwide}`}
+                  {t("alertList.alertLevel")}{formState.sido ? ` · ${t(`metros.${formState.sido}`, { defaultValue: formState.sido })}` : ` · ${t("alertList.nationwide")}`}
                 </h3>
                 <div className="grid grid-cols-3 gap-2">
                   {[
@@ -494,9 +494,9 @@ function DisasterListPageInner() {
                         className="flex flex-col items-center gap-0.5 rounded-[var(--radius-compact)] py-1.5"
                       >
                         <span className="flex min-h-[2rem] items-center justify-center text-center text-xs font-medium leading-tight">
-                          {t.levels[lvl.key as keyof typeof t.levels]}
+                          {t(`levels.${lvl.key}`)}
                         </span>
-                        <span className="text-sm font-bold">{count.toLocaleString("ko-KR")}{t.alertList.countUnit}</span>
+                        <span className="text-sm font-bold">{count.toLocaleString("ko-KR")}{t("alertList.countUnit")}</span>
                       </div>
                     );
                   })}

@@ -32,7 +32,7 @@ export default function Home() {
     return ranked.map(([name, count]) => ({ name, count, ratio: (count / max) * 100 }));
   }, [sidoData]);
 
-  const localRegionName = (name: string) => t.metros?.[name as keyof typeof t.metros] ?? name;
+  const localRegionName = (name: string) => t(`metros.${name}`, { defaultValue: name });
 
   return (
     <main className="safety-dashboard">
@@ -43,10 +43,10 @@ export default function Home() {
               <div>
                 <p className="dashboard-label">
                   <span></span>
-                  {t.nav.dashboard}
+                  {t("nav.dashboard")}
                 </p>
-                <h1>{t.dashboard.overviewTitle}</h1>
-                <p className="dashboard-description">{t.home.subtitle}</p>
+                <h1>{t("dashboard.overviewTitle")}</h1>
+                <p className="dashboard-description">{t("home.subtitle")}</p>
               </div>
             </header>
 
@@ -61,7 +61,7 @@ export default function Home() {
                   </svg>
                 </span>
                 <strong>{data?.todayOfficialCount ?? 0}</strong>
-                <p>{t.dashboard.todayAlerts}</p>
+                <p>{t("dashboard.todayAlerts")}</p>
               </Link>
               <Link
                 className="stat-card stat-card--blue"
@@ -73,7 +73,7 @@ export default function Home() {
                   </svg>
                 </span>
                 <strong>{data?.todayUserCount ?? 0}</strong>
-                <p>{t.dashboard.todayUserReports}</p>
+                <p>{t("dashboard.todayUserReports")}</p>
               </Link>
               <Link className="stat-card stat-card--green" href={{ pathname: "/alerts", query: { source: "USER" } } as never}>
                 <span className="stat-card__icon" aria-hidden="true">
@@ -82,18 +82,18 @@ export default function Home() {
                   </svg>
                 </span>
                 <strong>{data?.totalUserCount ?? 0}</strong>
-                <p>{t.dashboard.totalUserReports}</p>
+                <p>{t("dashboard.totalUserReports")}</p>
               </Link>
             </div>
 
             <article className="feed-card">
               <header className="card-heading">
                 <div>
-                  <p>{t.nav.alerts}</p>
-                  <h2>{clean(t.dashboard.latestAlerts)}</h2>
+                  <p>{t("nav.alerts")}</p>
+                  <h2>{clean(t("dashboard.latestAlerts"))}</h2>
                 </div>
                 <Link href="/alerts" className="card-link">
-                  {t.dashboard.viewAll}
+                  {t("dashboard.viewAll")}
                 </Link>
               </header>
               <div className="alert-feed">
@@ -104,8 +104,8 @@ export default function Home() {
             <article className="region-card">
               <header className="card-heading card-heading--compact">
                 <div>
-                  <p>{t.nav.stats}</p>
-                  <h2>{t.dashboard.topRegions}</h2>
+                  <p>{t("nav.stats")}</p>
+                  <h2>{t("dashboard.topRegions")}</h2>
                 </div>
               </header>
               {topRegions.length ? (
@@ -123,13 +123,13 @@ export default function Home() {
                       </span>
                       <strong>
                         {region.count}
-                        {t.dashboard.count}
+                        {t("dashboard.count")}
                       </strong>
                     </Link>
                   ))}
                 </div>
               ) : (
-                <div className="empty-copy">{t.dashboard.noRegionalAlerts}</div>
+                <div className="empty-copy">{t("dashboard.noRegionalAlerts")}</div>
               )}
             </article>
           </section>
@@ -137,8 +137,8 @@ export default function Home() {
           <section className="map-card">
             <header className="map-heading">
               <div>
-                <p>{t.nav.dashboard}</p>
-                <h2>{clean(t.dashboard.alertMap)}</h2>
+                <p>{t("nav.dashboard")}</p>
+                <h2>{clean(t("dashboard.alertMap"))}</h2>
               </div>
               <div className="map-heading__actions">
                 <span className="live-status">
@@ -166,27 +166,27 @@ export default function Home() {
         >
           <header className="card-heading">
             <div>
-              <p>{t.nav.community}</p>
-              <h2>{clean(t.dashboard.latestComments)}</h2>
+              <p>{t("nav.community")}</p>
+              <h2>{clean(t("dashboard.latestComments"))}</h2>
             </div>
             <Link href="/community" className="card-link">
-              {t.dashboard.viewAll}
+              {t("dashboard.viewAll")}
             </Link>
           </header>
           <div style={{ padding: "8px 20px 18px" }} className="text-sm text-[var(--text-body)] space-y-2">
-            {latestComments.isLoading && <div className="feed-state">{t.loading}</div>}
+            {latestComments.isLoading && <div className="feed-state">{t("loading")}</div>}
             {latestComments.data?.map((c) => (
               <div key={c.id} className="flex items-start justify-between gap-3 py-1.5 border-b border-[var(--line)] last:border-0">
                 <div className="flex-1 min-w-0">
                   <div className="text-[var(--ink)] line-clamp-1">{c.content}</div>
                   <div className="text-xs text-[var(--text-subtle)]">
-                    {c.authorNickname ?? t.dashboard.anonymous} · {new Date(c.createdAt).toLocaleString()}
+                    {c.authorNickname ?? t("dashboard.anonymous")} · {new Date(c.createdAt).toLocaleString()}
                   </div>
                 </div>
               </div>
             ))}
             {latestComments.data && latestComments.data.length === 0 && (
-              <div className="feed-state">{t.dashboard.noComments}</div>
+              <div className="feed-state">{t("dashboard.noComments")}</div>
             )}
           </div>
         </article>

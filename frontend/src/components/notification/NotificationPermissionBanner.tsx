@@ -25,8 +25,8 @@ export default function NotificationPermissionBanner() {
         <span className="text-xl">🔔</span>
         <p className="text-sm font-medium">
           {isLoggedIn
-            ? t.notificationBanner.askLoggedIn
-            : t.notificationBanner.askGuest}
+            ? t("notificationBanner.askLoggedIn")
+            : t("notificationBanner.askGuest")}
         </p>
       </div>
       <div className="flex items-center gap-2 shrink-0">
@@ -35,9 +35,9 @@ export default function NotificationPermissionBanner() {
           disabled={isLoading}
           className="bg-white text-blue-600 text-sm font-semibold px-3 py-1.5 rounded-lg"
         >
-          {isLoading ? t.notificationBanner.processing : t.notificationBanner.allow}
+          {isLoading ? t("notificationBanner.processing") : t("notificationBanner.allow")}
         </button>
-        <button className="text-white/70 hover:text-white text-sm" onClick={() => setDismissed(true)} aria-label={t.notificationBanner.close}>
+        <button className="text-white/70 hover:text-white text-sm" onClick={() => setDismissed(true)} aria-label={t("notificationBanner.close")}>
           ✕
         </button>
       </div>

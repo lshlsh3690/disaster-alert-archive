@@ -40,7 +40,7 @@ export default function SignupForm() {
   const { mutate, isPending: isSignupPending } = useSignup({
     setError,
     onSuccessCallback: () => {
-      alert(t.signup.completed);
+      alert(t("signup.completed"));
       router.push("/login");
     },
     onErrorCallback: (errorMessage) => {
@@ -52,7 +52,7 @@ export default function SignupForm() {
     const { isCodeSended } = useSignupStore.getState();
 
     if (isCodeSended && !values.verificationCode) {
-      setError("verificationCode", { message: t.signup.verificationCodeRequired });
+      setError("verificationCode", { message: t("signup.verificationCodeRequired") });
       return;
     }
 
@@ -82,10 +82,10 @@ export default function SignupForm() {
       <PasswordInputGroup<SignupFormValues> formMethods={formMethods} showVerificationUI />
       <NicknameInput<SignupFormValues> formMethods={formMethods} />
       <Button type="submit" isLoading={isSignupPending} fullWidth disabled={isSignupPending}>
-        {t.signup.title}
+        {t("signup.title")}
       </Button>
       <Button type="button" variant="secondary" fullWidth onClick={() => router.back()}>
-        {t.signup.cancel}
+        {t("signup.cancel")}
       </Button>
     </form>
   );

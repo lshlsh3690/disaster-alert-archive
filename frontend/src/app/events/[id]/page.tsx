@@ -26,7 +26,7 @@ export default function EventDetailPage() {
   const [allExpanded, setAllExpanded] = useState(false);
   const [expandedDates, setExpandedDates] = useState<Set<string>>(new Set());
 
-  // 대표 지역명 번역: 시도는 t.metros, 시군구는 /districts/sigungu 응답으로 매핑
+  // 대표 지역명 번역: 시도는 t("metros"), 시군구는 /districts/sigungu 응답으로 매핑
   const [sigunguMap, setSigunguMap] = useState<Map<string, string> | null>(null);
   useEffect(() => {
     setSigunguMap(null);
@@ -50,7 +50,7 @@ export default function EventDetailPage() {
     if (!name) return "";
     if (lang === "ko") return name;
     const { sido, sigungu } = splitRegion(name);
-    const tSido = t.metros?.[sido as keyof typeof t.metros] ?? sido;
+    const tSido = t(`metros.${sido}`, { defaultValue: sido });
     if (!sigungu) return tSido;
     return `${tSido} ${sigunguMap?.get(sigungu) ?? sigungu}`;
   }, [data, lang, t, sigunguMap]);
@@ -82,11 +82,11 @@ export default function EventDetailPage() {
     });
   };
 
-  if (isLoading) return <main className="py-8 text-center text-[13px] text-[var(--text-muted)]">{t.loading}</main>;
-  if (!data) return <main className="py-8 text-center text-[13px] text-[var(--text-muted)]">{t.events.notFound}</main>;
+  if (isLoading) return <main className="py-8 text-center text-[13px] text-[var(--text-muted)]">{t("loading")}</main>;
+  if (!data) return <main className="py-8 text-center text-[13px] text-[var(--text-muted)]">{t("events.notFound")}</main>;
 
   const title = data.translatedTitle ?? data.eventTitle;
-  const period = formatEventPeriod(data.firstAlertAt, data.lastAlertAt, t.events);
+  const period = formatEventPeriod(data.firstAlertAt, data.lastAlertAt, { sameDay: t("events.sameDay"), daysSpan: t("events.daysSpan") });
 
   return (
     <main className="bg-[var(--canvas)] min-h-[calc(100vh-48px)]">
@@ -100,13 +100,13 @@ export default function EventDetailPage() {
               data.active ? "bg-[var(--coral-soft)] text-[#c0473b]" : "bg-[#eef1f5] text-[var(--text-muted)]"
             }`}
           >
-            {data.active ? t.events.badgeActive : t.events.badgePast}
+            {data.active ? t("events.badgeActive") : t("events.badgePast")}
           </span>
         </div>
         <div className="flex flex-wrap items-center gap-2 text-xs">
           {data.primaryDisasterType && (
             <span style={disasterTypeChipStyle(data.primaryDisasterType)} className="rounded-[var(--radius-pill)] px-2 py-0.5 font-medium">
-              {t.disasterTypes[data.primaryDisasterType as keyof typeof t.disasterTypes] ?? data.primaryDisasterType}
+              {t(`disasterTypes.${data.primaryDisasterType}`, { defaultValue: data.primaryDisasterType })}
             </span>
           )}
           {data.primaryRegionName && (
@@ -122,19 +122,19 @@ export default function EventDetailPage() {
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <path d="M4 4h16v12H7l-3 3V4z" />
             </svg>
-            {t.events.relatedCount} {data.alertCount}{t.alertList.countUnit}
+            {t("events.relatedCount")} {data.alertCount}{t("alertList.countUnit")}
           </span>
           <span className="text-[var(--text-subtle)]">{period}</span>
         </div>
         {data.primaryRegionName && (
-          <p className="text-xs text-[var(--text-subtle)]">{t.events.approxRegion}</p>
+          <p className="text-xs text-[var(--text-subtle)]">{t("events.approxRegion")}</p>
         )}
       </div>
 
       {/* 타임라인 */}
       <section className="space-y-3 rounded-[var(--radius-panel-card)] border border-[var(--line)] bg-[var(--surface)] p-4 shadow-[0_10px_30px_rgba(28,39,60,0.04)]">
         <div className="flex items-center justify-between">
-          <h2 className="font-semibold text-[var(--ink)]">{t.events.timelineTitle}</h2>
+          <h2 className="font-semibold text-[var(--ink)]">{t("events.timelineTitle")}</h2>
           {isRepetitive && (
             <button
               className="text-xs font-medium text-[var(--blue)] hover:underline"
@@ -147,7 +147,7 @@ export default function EventDetailPage() {
                 setAllExpanded((v) => !v);
               }}
             >
-              {allExpanded ? t.events.collapseAll : t.events.expandAll}
+              {allExpanded ? t("events.collapseAll") : t("events.expandAll")}
             </button>
           )}
         </div>
@@ -175,7 +175,7 @@ export default function EventDetailPage() {
                     <path d="m9 6 6 6-6 6" />
                   </svg>
                   <span className="text-sm font-medium text-[var(--text-body)]">
-                    {dateLabel} ({group.items.length}{t.alertList.countUnit})
+                    {dateLabel} ({group.items.length}{t("alertList.countUnit")})
                   </span>
                 </button>
                 {isOpen && (
@@ -220,7 +220,7 @@ function TimelineNode({
   const type =
     lang !== "ko" && item.translatedType
       ? item.translatedType
-      : t.disasterTypes[item.disasterType as keyof typeof t.disasterTypes] ?? item.disasterType;
+      : t(`disasterTypes.${item.disasterType}`, { defaultValue: item.disasterType });
   const regions =
     lang !== "ko" && item.translatedRegionNames?.length
       ? item.translatedRegionNames
