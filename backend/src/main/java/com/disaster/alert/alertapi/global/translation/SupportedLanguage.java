@@ -17,7 +17,9 @@ import java.util.Optional;
 public enum SupportedLanguage {
     EN("en"),
     JA("ja"),
-    ZH("zh");
+    ZH("zh"),
+    VI("vi"),
+    TH("th");
 
     /** API 요청/응답에서 사용하는 소문자 표기 */
     private final String code;
