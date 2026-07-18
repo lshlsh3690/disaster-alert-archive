@@ -3,10 +3,10 @@
 import OAuthButton from "@/components/ui/OAuthButton";
 import Link from "next/link";
 import SignupForm from "./SignupForm";
-import { useI18n } from "@/hooks/useI18n";
+import { useTranslation } from "react-i18next";
 
 export default function SignupPage() {
-  const t = useI18n();
+  const { t } = useTranslation();
   return (
     <main className="flex min-h-[calc(100vh-48px)] flex-col items-center justify-center bg-[var(--canvas)] p-4">
       <div className="w-full max-w-md space-y-4 rounded-[var(--radius-panel-card)] border border-[var(--line)] bg-[var(--surface)] p-6 shadow-[0_10px_30px_rgba(28,39,60,0.04)]">

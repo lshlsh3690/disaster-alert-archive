@@ -8,14 +8,14 @@ import Button from "../ui/Button";
 import { useCountdownContext } from "@/context/useCountdownContext";
 import { useEmailCodeVerify } from "@/lib/mutations/useEmailCodeVerify";
 import InputStatusMessage from "../ui/InputStatusMessage";
-import { useI18n } from "@/hooks/useI18n";
+import { useTranslation } from "react-i18next";
 
 interface CodeInputProps<T extends FieldValues> {
   formMethods: UseFormReturn<T>;
 }
 
 export default function CodeInput<T extends FieldValues>({ formMethods }: CodeInputProps<T>) {
-  const t = useI18n();
+  const { t } = useTranslation();
   const { control, trigger, setError, clearErrors } = formMethods;
   const isCodeSended = useSignupStore((s) => s.isCodeSended);
   const isEmailVerified = useSignupStore((s) => s.isEmailVerified);

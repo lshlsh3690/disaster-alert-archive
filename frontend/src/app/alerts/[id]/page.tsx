@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useAlert, useUserAlert } from "@/lib/queries/useAlerts";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
-import { useI18n } from "@/hooks/useI18n";
+import { useTranslation } from "react-i18next";
 import { useDeleteUserAlert } from "@/lib/mutations/useDeleteUserAlert";
 import { useAuthStore } from "@/store/authStore";
 import { useComments, useCreateComment, useDeleteComment, useInfiniteComments, useUpdateComment } from "@/lib/queries/useComments";
@@ -28,7 +28,7 @@ export default function AlertDetailPage() {
   const source = (sp.get("source") || "OFFICIAL").toUpperCase();
   const isUser = source === "USER";
   const [lang, setLang] = useState<"ko" | "en">("ko");
-  const t = useI18n();
+  const { t } = useTranslation();
   const { data: offData, isLoading: offLoading } = useAlert(isUser ? 0 : id, lang);
   const { data: userData, isLoading: userLoading } = useUserAlert(isUser ? id : 0);
   const data = isUser ? userData : offData;

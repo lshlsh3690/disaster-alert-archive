@@ -2,14 +2,14 @@
 
 import Link from "next/link";
 import { useLatestAlerts } from "@/lib/queries/useAlerts";
-import { useI18n } from "@/hooks/useI18n";
+import { useTranslation } from "react-i18next";
 import { useLanguageStore } from "@/store/languageStore";
 import { LatestAlert } from "@/types/alerts";
 
 const LANG_LOCALE: Record<string, string> = { ko: "ko-KR", en: "en-US", zh: "zh-CN", ja: "ja-JP" };
 
 export default function LatestAlertsSection({ limit = 5 }: { limit?: number }) {
-  const t = useI18n();
+  const { t } = useTranslation();
   const language = useLanguageStore((state) => state.language);
   const { data, isLoading, isError } = useLatestAlerts(limit, language);
 

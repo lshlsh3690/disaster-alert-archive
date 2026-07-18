@@ -4,7 +4,7 @@ import React, { useState } from "react";
 import { useCreateUserAlert } from "@/lib/mutations/useCreateUserAlert";
 import { LEVEL_OPTIONS } from "@/ui/level";
 import { useRouter } from "next/navigation";
-import { useI18n } from "@/hooks/useI18n";
+import { useTranslation } from "react-i18next";
 import { useLanguageStore } from "@/store/languageStore";
 import DatePicker from "@/components/form/DatePicker";
 
@@ -33,7 +33,7 @@ type JusoItem = {
 };
 
 export default function RegisterAlertsPage() {
-  const t = useI18n();
+  const { t } = useTranslation();
   const locale = LANG_LOCALE[useLanguageStore((s) => s.language)] ?? "ko-KR";
   const router = useRouter();
   const { mutate, isPending, isError, error } = useCreateUserAlert();
@@ -292,7 +292,7 @@ export default function RegisterAlertsPage() {
 
 // 간단한 모달 컴포넌트
 function Modal({ open, onClose, children }: { open: boolean; onClose: () => void; children: React.ReactNode }) {
-  const t = useI18n();
+  const { t } = useTranslation();
   if (!open) return null;
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">

@@ -5,7 +5,7 @@ import { loadKakaoMapSdk } from "@/lib/kakaoMapLoader";
 import { toLatLngPaths, calcBounds, largestRingCenter } from "@/lib/kakaoGeo";
 import { fetchGeoJsonCached } from "@/lib/geojsonCache";
 import { normalizeScore, scoreToGrade, aggregateBySigungu, type ImpactGrade } from "@/lib/riskScore";
-import { useI18n } from "@/hooks/useI18n";
+import { useTranslation } from "react-i18next";
 import { useLanguageStore } from "@/store/languageStore";
 import type { RegionImpact } from "@/types/risk";
 import type { I18nKey } from "@/constants/i18n";
@@ -55,7 +55,7 @@ interface Props {
  * 영향받은 시군구 폴리곤을 영향 등급별 색상으로 칠하고, 그 외 지역은 회색 배경으로 표시.
  */
 export default function AlertRiskMap({ impacts, mapHeight = "420px" }: Props) {
-  const t = useI18n();
+  const { t } = useTranslation();
   const language = useLanguageStore((s) => s.language);
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef       = useRef<any>(null);

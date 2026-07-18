@@ -5,7 +5,8 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEvent } from "@/lib/queries/useEvents";
 import { useLanguageStore } from "@/store/languageStore";
-import { useI18n } from "@/hooks/useI18n";
+import { useTranslation } from "react-i18next";
+import type { TFunction } from "i18next";
 import { disasterTypeChipStyle } from "@/ui/disasterTypeColor";
 import { fetchSigungu } from "@/api/alertApi";
 import { formatEventPeriod } from "@/utils/eventDate";
@@ -21,7 +22,7 @@ export default function EventDetailPage() {
   const params = useParams<{ id: string }>();
   const id = Number(params.id);
   const lang = useLanguageStore((s) => s.language);
-  const t = useI18n();
+  const { t } = useTranslation();
   const { data, isLoading } = useEvent(id, lang);
   const [allExpanded, setAllExpanded] = useState(false);
   const [expandedDates, setExpandedDates] = useState<Set<string>>(new Set());
@@ -210,7 +211,7 @@ function TimelineNode({
   item: EventAlertItem;
   isLast: boolean;
   lang: string;
-  t: ReturnType<typeof useI18n>;
+  t: TFunction;
 }) {
   const dt = new Date(item.createdAt);
   const timeStr = `${String(dt.getFullYear()).slice(2)}/${String(dt.getMonth() + 1).padStart(2, "0")}/${String(dt.getDate()).padStart(2, "0")} ${String(dt.getHours()).padStart(2, "0")}:${String(dt.getMinutes()).padStart(2, "0")}`;

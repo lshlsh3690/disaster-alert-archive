@@ -5,7 +5,7 @@ import Button from "@/components/ui/Button";
 import { useSendEmailVerificationCode } from "@/lib/mutations/useSendEmailVerificationCode";
 import InputStatusMessage from "../ui/InputStatusMessage";
 import { useOptionalCountdownContext } from "@/context/useCountdownContext";
-import { useI18n } from "@/hooks/useI18n";
+import { useTranslation } from "react-i18next";
 
 interface EmailInputProps<T extends FieldValues> {
   formMethods: UseFormReturn<T>;
@@ -15,7 +15,7 @@ interface EmailInputProps<T extends FieldValues> {
 }
 
 export default function EmailInput<T extends FieldValues>({ formMethods, showVerificationUI }: EmailInputProps<T>) {
-  const t = useI18n();
+  const { t } = useTranslation();
   const { control, trigger, setError, clearErrors } = formMethods;
   const isEmailVerified = useSignupStore((state) => state.isEmailVerified);
   const isCodeSended = useSignupStore((state) => state.isCodeSended);

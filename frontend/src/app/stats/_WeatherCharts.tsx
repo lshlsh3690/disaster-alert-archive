@@ -27,7 +27,8 @@ import type { WeatherCorrelationStat, WeatherTypeStat, WeatherRegionStat } from 
 import { TYPE_COLORS, STACKED_COLORS, BAR_COLORS } from "./_constants";
 import { EmptyChart } from "./_charts";
 import { LoadingDonut } from "@/components/ui/LoadingDonut";
-import { useI18n } from "@/hooks/useI18n";
+import { useTranslation } from "react-i18next";
+import type { TFunction } from "i18next";
 import { useLanguageStore } from "@/store/languageStore";
 
 const LANG_LOCALE: Record<string, string> = { ko: "ko-KR", en: "en-US", zh: "zh-CN", ja: "ja-JP" };
@@ -61,7 +62,7 @@ function fmtKey(key: string, mode: AggMode, monthSuffix: string): string {
 }
 
 // 집계 단위 안내 텍스트 (차트 우상단에 표시)
-function aggModeLabel(mode: AggMode, t: ReturnType<typeof useI18n>): string {
+function aggModeLabel(mode: AggMode, t: TFunction): string {
   if (mode === "weekly") return t("statsPage.weatherChart.weeklyAggregate");
   if (mode === "monthly") return t("statsPage.weatherChart.monthlyAggregate");
   return "";
@@ -85,7 +86,7 @@ const TT_VALUE: React.CSSProperties = { color: "#fff", fontSize: 12, fontWeight:
 // ─── 날씨·유형별 누적 막대 ───────────────────────────────────────────────────
 
 export function WeatherByTypeChart({ data }: { data: WeatherTypeStat[] }) {
-  const t = useI18n();
+  const { t } = useTranslation();
   const locale = LANG_LOCALE[useLanguageStore((s) => s.language)] ?? "ko-KR";
   const translateType = (type: string) => t(`disasterTypes.${type}`, { defaultValue: type });
   // 툴팁 핀 로딩 진행률 (0~100)
@@ -257,7 +258,7 @@ export function WeatherByTypeChart({ data }: { data: WeatherTypeStat[] }) {
 // ─── 날씨·지역별 누적 막대 ───────────────────────────────────────────────────
 
 export function WeatherByRegionChart({ data, regionLabel }: { data: WeatherRegionStat[]; regionLabel: string }) {
-  const t = useI18n();
+  const { t } = useTranslation();
   const locale = LANG_LOCALE[useLanguageStore((s) => s.language)] ?? "ko-KR";
   const translateRegion = (region: string) => t(`metros.${region}`, { defaultValue: region });
   // 툴팁 핀 로딩 진행률 (0~100)
@@ -431,7 +432,7 @@ export function WeatherByRegionChart({ data, regionLabel }: { data: WeatherRegio
 // ─── 날씨 오버레이 (총 건수 + 기온 범위·강수 복합) ──────────────────────────
 
 export function WeatherOverlayChart({ data }: { data: WeatherCorrelationStat[] }) {
-  const t = useI18n();
+  const { t } = useTranslation();
   const locale = LANG_LOCALE[useLanguageStore((s) => s.language)] ?? "ko-KR";
   const translateType = (type: string) => t(`disasterTypes.${type}`, { defaultValue: type });
   if (data.length === 0) return <EmptyChart />;
@@ -535,7 +536,7 @@ export function WeatherOverlayChart({ data }: { data: WeatherCorrelationStat[] }
 // ─── 날씨 상관 산점도 ────────────────────────────────────────────────────────
 
 export function WeatherCorrelationScatter({ data }: { data: WeatherCorrelationStat[] }) {
-  const t = useI18n();
+  const { t } = useTranslation();
   const locale = LANG_LOCALE[useLanguageStore((s) => s.language)] ?? "ko-KR";
   const translateType = (type: string) => t(`disasterTypes.${type}`, { defaultValue: type });
   // 범례 클릭으로 숨긴 유형 집합 (겹침이 심할 때 유형을 켜고 끄며 분리해 보기)

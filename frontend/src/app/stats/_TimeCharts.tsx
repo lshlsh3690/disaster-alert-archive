@@ -35,7 +35,7 @@ import type { DailyStat, HourlyStat, MonthlyTypeStat } from "@/types/alerts";
 import { STACKED_COLORS, CHART_COLORS, DOW_TO_IDX, getWeekdays } from "./_constants";
 import { EmptyChart } from "./_charts";
 import { VerticalBar } from "./_DistributionCharts";
-import { useI18n } from "@/hooks/useI18n";
+import { useTranslation } from "react-i18next";
 import { useLanguageStore } from "@/store/languageStore";
 
 const LANG_LOCALE: Record<string, string> = { ko: "ko-KR", en: "en-US", zh: "zh-CN", ja: "ja-JP" };
@@ -79,7 +79,7 @@ type TTProps = {
  *       (그라디언트 면적 채우기를 위해)
  */
 export function LineChart({ data }: { data: DailyStat[] }) {
-  const t = useI18n();
+  const { t } = useTranslation();
   const locale = LANG_LOCALE[useLanguageStore((s) => s.language)] ?? "ko-KR";
   if (data.length === 0) return <EmptyChart />;
 
@@ -171,7 +171,7 @@ export function LineChart({ data }: { data: DailyStat[] }) {
  * @param data - { date: "YYYY-MM-DD", count: number }[] 배열
  */
 export function DailyBar({ data }: { data: DailyStat[] }) {
-  const t = useI18n();
+  const { t } = useTranslation();
   const locale = LANG_LOCALE[useLanguageStore((s) => s.language)] ?? "ko-KR";
   if (data.length === 0) return <EmptyChart />;
 
@@ -223,7 +223,7 @@ export function DailyBar({ data }: { data: DailyStat[] }) {
  *              dayOfWeek은 PostgreSQL EXTRACT(DOW) 기준: 0=일요일, 1=월요일 ... 6=토요일
  */
 export function Heatmap({ data }: { data: HourlyStat[] }) {
-  const t = useI18n();
+  const { t } = useTranslation();
   const locale = LANG_LOCALE[useLanguageStore((s) => s.language)] ?? "ko-KR";
   const weekdays = getWeekdays(t);
   // tooltip: 현재 마우스가 올라간 셀의 위치·값 정보
@@ -331,7 +331,7 @@ export function Heatmap({ data }: { data: HourlyStat[] }) {
  * @param data - useHourlyStats()가 반환하는 HourlyStat[] 그대로 넘기면 됩니다
  */
 export function DayOfWeekBar({ data }: { data: HourlyStat[] }) {
-  const t = useI18n();
+  const { t } = useTranslation();
   const weekdays = getWeekdays(t);
   // agg: { 요일번호: 총건수 } 형태로 집계
   const agg: Record<number, number> = {};
@@ -369,7 +369,7 @@ export function DayOfWeekBar({ data }: { data: HourlyStat[] }) {
  * @param data - useHourlyStats()가 반환하는 HourlyStat[] 그대로 넘기면 됩니다
  */
 export function HourBar({ data }: { data: HourlyStat[] }) {
-  const t = useI18n();
+  const { t } = useTranslation();
   const agg: Record<number, number> = {};
   data.forEach(({ hour, count }) => {
     agg[hour] = (agg[hour] ?? 0) + count;
@@ -413,7 +413,7 @@ export function StackedArea({
   data: MonthlyTypeStat[];
   types: string[];
 }) {
-  const t = useI18n();
+  const { t } = useTranslation();
   if (data.length === 0 || types.length === 0) return <EmptyChart />;
 
   const isDaily = data.length > 0 && data[0].month.length === 10;
@@ -504,7 +504,7 @@ export function StackedBar({
   data: MonthlyTypeStat[];
   types: string[];
 }) {
-  const t = useI18n();
+  const { t } = useTranslation();
   const isDaily = data.length > 0 && data[0].month.length === 10;
   const months = [...new Set(data.map(d => d.month))].sort().slice(isDaily ? -60 : -12);
   if (months.length === 0) return <EmptyChart />;
@@ -597,7 +597,7 @@ export function CompareBars({
   lastYearData: DailyStat[];
   currentYear: number;
 }) {
-  const t = useI18n();
+  const { t } = useTranslation();
   const locale = LANG_LOCALE[useLanguageStore((s) => s.language)] ?? "ko-KR";
   // 일별 데이터를 월별로 합산합니다: "2024-07-15" → "07" 키로 그룹핑
   const agg = (data: DailyStat[]) => {
@@ -718,7 +718,7 @@ export function CompareLines({
   lastYearData: DailyStat[];
   currentYear: number;
 }) {
-  const t = useI18n();
+  const { t } = useTranslation();
   const locale = LANG_LOCALE[useLanguageStore((s) => s.language)] ?? "ko-KR";
   const agg = (data: DailyStat[]) => {
     const m: Record<string, number> = {};

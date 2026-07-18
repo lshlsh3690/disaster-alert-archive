@@ -1,6 +1,6 @@
 "use client";
 
-import { useI18n } from "@/hooks/useI18n";
+import { useTranslation } from "react-i18next";
 
 const PROVIDER_STYLE = {
   google: "bg-white text-[#1f1f1f] border border-[#747775] hover:bg-[#f7f8f8]",
@@ -13,7 +13,7 @@ export default function OAuthButton({
 }: {
   provider: "google" | "kakao" | "naver";
 }) {
-  const t = useI18n();
+  const { t } = useTranslation();
   const cfg = { label: t(`oauth.${provider}`), className: PROVIDER_STYLE[provider] };
 
   const handleOAuth = () => {

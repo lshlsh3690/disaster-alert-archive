@@ -60,14 +60,15 @@ import { getWidgetLibrary, DEFAULT_LAYOUT } from "./_constants";
 import { WidgetCard, WidgetContent } from "./_WidgetCard";
 import { WidgetLibrary } from "./_WidgetLibrary";
 import { KpiBox, FilterBanner } from "./_KpiCards";
-import { useI18n } from "@/hooks/useI18n";
+import { useTranslation } from "react-i18next";
+import type { TFunction } from "i18next";
 import { useLanguageStore } from "@/store/languageStore";
 import type { I18nKey } from "@/constants/i18n";
 import DatePicker from "@/components/form/DatePicker";
 import "./stats.css";
 
 const LANG_LOCALE: Record<string, string> = { ko: "ko-KR", en: "en-US", zh: "zh-CN", ja: "ja-JP" };
-type T = ReturnType<typeof useI18n>;
+type T = TFunction;
 
 // ─── CSV 다운로드 ─────────────────────────────────────────────────────────────
 
@@ -252,7 +253,7 @@ function SortableWidgetCard({ id, span, children, ...cardProps }: {
 // ─── 메인 ────────────────────────────────────────────────────────────────────
 
 export default function StatsPage() {
-  const t = useI18n();
+  const { t } = useTranslation();
   return (
     <Suspense fallback={<main className="p-6">{t("statsPage.loading")}</main>}>
       <StatsPageInner />
@@ -261,7 +262,7 @@ export default function StatsPage() {
 }
 
 function StatsPageInner() {
-  const t = useI18n();
+  const { t } = useTranslation();
   const locale = LANG_LOCALE[useLanguageStore((s) => s.language)] ?? "ko-KR";
   const widgetLibrary = useMemo(() => getWidgetLibrary(t), [t]);
   const searchParams = useSearchParams();

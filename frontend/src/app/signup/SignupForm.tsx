@@ -13,10 +13,10 @@ import Button from "@/components/ui/Button";
 import NicknameInput from "@/components/form/NicknameInput";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { SignupFormData, SignupFormValues, signup } from "@/types/signup";
-import { useI18n } from "@/hooks/useI18n";
+import { useTranslation } from "react-i18next";
 
 export default function SignupForm() {
-  const t = useI18n();
+  const { t } = useTranslation();
   const router = useRouter();
   const formMethods = useForm<SignupFormValues>({
     resolver: zodResolver(signup),

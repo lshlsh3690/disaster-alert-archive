@@ -6,7 +6,7 @@ import { useMutation } from "@tanstack/react-query";
 import { AxiosError } from "axios";
 import { SuccessResponse } from "@/types/SuccessResponse";
 import { getMyInfo } from "@/api/memberApi";
-import { useI18n } from "@/hooks/useI18n";
+import { useTranslation } from "react-i18next";
 
 interface LoginFormData {
   email: string;
@@ -25,7 +25,7 @@ export default function useLogin(options: {
   onSuccessCallback?: () => void;
   onErrorCallback: (errorMessage: string) => void;
 }) {
-  const t = useI18n();
+  const { t } = useTranslation();
   return useMutation<SuccessResponse<LoginResponseBody>, AxiosError, LoginFormData>({
     mutationFn: async ({ email, password }) => {
       return await loginApi(email, password);

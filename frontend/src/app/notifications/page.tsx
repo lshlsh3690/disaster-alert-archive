@@ -10,7 +10,7 @@ import {
   NotificationLogItem,
   NotificationLogPage,
 } from "@/api/notificationLogApi";
-import { useI18n } from "@/hooks/useI18n";
+import { useTranslation } from "react-i18next";
 import { useLanguageStore } from "@/store/languageStore";
 
 const LEVEL_BADGE: Record<string, string> = {
@@ -33,7 +33,7 @@ function formatDate(dateStr: string, locale: string) {
 }
 
 export default function NotificationsPage() {
-  const t = useI18n();
+  const { t } = useTranslation();
   const locale = LANG_LOCALE[useLanguageStore((s) => s.language)] ?? "ko-KR";
   const router = useRouter();
   const user = useAuthStore((s) => s.user);
