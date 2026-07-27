@@ -1,14 +1,25 @@
 "use client";
 
 import { useMemo } from "react";
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import LatestAlertsSection from "./LatestAlertsSection";
 import { useDashboardSummary, useSidoStats } from "@/lib/queries/useAlerts";
 import { useLatestComments } from "@/lib/queries/useComments";
 import { useTranslation } from "react-i18next";
 import { groupToMetros, Metro } from "@/ui/metros";
-import KoreaMap25D from "@/components/map/KoreaMap25D";
 import "./dashboard.css";
+
+// SVG 좌표 데이터 + 집계 로직이 커서 홈 진입 시 초기 JS에서 분리 (AlertRiskMap과 동일 패턴).
+const KoreaMap25D = dynamic(() => import("@/components/map/KoreaMap25D"), {
+  ssr: false,
+  loading: () => (
+    <div
+      className="animate-pulse rounded-lg bg-gray-100"
+      style={{ height: "clamp(650px, calc(100vh - 96px), 920px)" }}
+    />
+  ),
+});
 
 const clean = (value: string) => value.replace(/[\p{Extended_Pictographic}️]/gu, "").trim();
 

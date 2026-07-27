@@ -1,7 +1,7 @@
 "use client";
 
 import ReportButton from "@/components/alerts/ReportButton";
-import KakaoPolygonMap from "@/components/map/KakaoPolygonMap";
+import dynamic from "next/dynamic";
 import { useSearchCombinedAlerts, useSigungu, useSidoStats, useAlertStats, useSigunguStats } from "@/lib/queries/useAlerts";
 import { Alert } from "@/types/alerts";
 import { LEVEL_OPTIONS, levelTextToCode } from "@/ui/level";
@@ -17,6 +17,13 @@ import { METROS } from "@/ui/metros";
 import { useTranslation } from "react-i18next";
 import { useLanguageStore } from "@/store/languageStore";
 import { disasterTypeChipStyle, disasterTypePalette } from "@/ui/disasterTypeColor";
+
+// Kakao Maps SDK 로드 + 폴리곤 렌더링 코드가 무거워서 alerts 페이지 초기 JS에서 분리
+// (AlertRiskMap과 동일 패턴). 지도는 SDK를 window에서 로드하므로 ssr 렌더링 대상이 아님.
+const KakaoPolygonMap = dynamic(() => import("@/components/map/KakaoPolygonMap"), {
+  ssr: false,
+  loading: () => <div className="h-[520px] animate-pulse rounded-lg bg-gray-100" />,
+});
 
 // <input type="date">의 표시 포맷은 JS 텍스트가 아니라 브라우저가 lang 속성을 보고 렌더링하므로
 // 언어 전환 시 실제로 반영되도록 명시적으로 넘겨준다.
