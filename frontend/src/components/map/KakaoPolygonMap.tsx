@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { loadKakaoMapSdk } from "@/lib/kakaoMapLoader";
-import { useSigunguStats } from "@/lib/queries/useAlerts";
+import { useSigunguStatsBreakdown } from "@/lib/queries/useAlerts";
 import type { AlertSearchRequest } from "@/api/alertApi";
 import { useTranslation } from "react-i18next";
 import { useLanguageStore } from "@/store/languageStore";
@@ -185,60 +185,36 @@ export default function KakaoPolygonMap({ params = {}, mapHeight = "500px", show
   const [hoverInfo,    setHoverInfo]    = useState<{ name: string; count: number; danger: DangerLevel; l1: number; l2: number; l3: number } | null>(null);
   const [mousePos,     setMousePos]     = useState<{ x: number; y: number } | null>(null);
 
-  const sigunguStatsQuery = useSigunguStats(
+  const sigunguStatsQuery = useSigunguStatsBreakdown(
     { ...params, region: selectedSido?.properties.CTP_KOR_NM ?? undefined },
-    !!selectedSido
-  );
-  const sigunguStatsL1 = useSigunguStats(
-    { ...params, region: selectedSido?.properties.CTP_KOR_NM ?? undefined, level: "LEVEL_1" },
-    !!selectedSido
-  );
-  const sigunguStatsL2 = useSigunguStats(
-    { ...params, region: selectedSido?.properties.CTP_KOR_NM ?? undefined, level: "LEVEL_2" },
-    !!selectedSido
-  );
-  const sigunguStatsL3 = useSigunguStats(
-    { ...params, region: selectedSido?.properties.CTP_KOR_NM ?? undefined, level: "LEVEL_3" },
     !!selectedSido
   );
 
   useEffect(() => { selectedSidoRef.current = selectedSido; }, [selectedSido]);
 
-  /* ── 시군구 stats 데이터 → ref 업데이트 후 재렌더 ── */
-  useEffect(() => {
-    const m = new Map<string, number>();
-    const prefix = selectedSidoRef.current
-      ? selectedSidoRef.current.properties.CTP_KOR_NM + " "
-      : "";
-    sigunguStatsQuery.data?.forEach(({ region, count }) => {
-      const name = prefix && region.startsWith(prefix) ? region.slice(prefix.length) : region;
-      m.set(name, count);
-    });
-    sigunguStatsRef.current = m;
-    if (selectedSidoRef.current && mapRef.current && kakaoRef.current) {
-      drawSigunguOf(selectedSidoRef.current);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sigunguStatsQuery.data]);
-
-  /* ── 레벨별 sigungu stats → ref 업데이트 ── */
+  /* ── 시군구 stats(전체 + 레벨별) → ref 업데이트 후 재렌더 ──
+   * 이전에는 전체/L1/L2/L3를 useSigunguStats 4번 호출로 따로 받아왔으나,
+   * 백엔드가 한 쿼리로 breakdown을 반환하도록 바뀌어(useSigunguStatsBreakdown) 1회 호출로 축소됨. */
   useEffect(() => {
     const prefix = selectedSidoRef.current
       ? selectedSidoRef.current.properties.CTP_KOR_NM + " "
       : "";
     const strip = (r: string) => prefix && r.startsWith(prefix) ? r.slice(prefix.length) : r;
 
+    const m = new Map<string, number>();
     const lm = new Map<string, { l1: number; l2: number; l3: number }>();
-    const ensure = (name: string) => {
-      if (!lm.has(name)) lm.set(name, { l1: 0, l2: 0, l3: 0 });
-      return lm.get(name)!;
-    };
-    sigunguStatsL1.data?.forEach(({ region, count }) => { ensure(strip(region)).l1 = count; });
-    sigunguStatsL2.data?.forEach(({ region, count }) => { ensure(strip(region)).l2 = count; });
-    sigunguStatsL3.data?.forEach(({ region, count }) => { ensure(strip(region)).l3 = count; });
+    sigunguStatsQuery.data?.forEach(({ region, total, level1Count, level2Count, level3Count }) => {
+      const name = strip(region);
+      m.set(name, total);
+      lm.set(name, { l1: level1Count, l2: level2Count, l3: level3Count });
+    });
+    sigunguStatsRef.current = m;
     sigunguLevelRef.current = lm;
+    if (selectedSidoRef.current && mapRef.current && kakaoRef.current) {
+      drawSigunguOf(selectedSidoRef.current);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sigunguStatsL1.data, sigunguStatsL2.data, sigunguStatsL3.data]);
+  }, [sigunguStatsQuery.data]);
 
   /* ── 헬퍼 ── */
 
