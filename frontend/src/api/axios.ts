@@ -1,7 +1,13 @@
 import axios, { AxiosError, InternalAxiosRequestConfig } from "axios";
 import { reissue } from "./authApi";
 
-const baseURL = process.env.NEXT_PUBLIC_API_URL || "";
+// 브라우저에서는 상대 경로("") + next.config.ts의 /api rewrite로 백엔드에 도달하지만,
+// 서버(RSC/SSR prefetch)에는 rewrite가 적용되는 자기 자신에게 요청을 보낼 방법이 없어
+// window가 없는 환경에서는 next.config.ts와 동일한 BASE_API_URL로 절대 경로를 사용한다.
+const baseURL =
+  typeof window === "undefined"
+    ? process.env.BASE_API_URL || "https://api.disaster-alert-archive.co.kr"
+    : process.env.NEXT_PUBLIC_API_URL || "";
 
 const instance = axios.create({
   baseURL: baseURL || undefined,

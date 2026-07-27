@@ -15,6 +15,7 @@ import com.querydsl.core.BooleanBuilder;
 import com.querydsl.core.Tuple;
 import com.querydsl.core.types.Projections;
 import com.querydsl.core.types.dsl.BooleanExpression;
+import com.querydsl.core.types.dsl.CaseBuilder;
 import com.querydsl.core.types.dsl.DateTemplate;
 import com.querydsl.core.types.dsl.DateTimePath;
 import com.querydsl.core.types.dsl.Expressions;
@@ -205,6 +206,63 @@ public class DisasterAlertRepositoryImpl implements DisasterAlertRepositoryCusto
                 .select(Projections.constructor(DisasterAlertStatResponse.RegionStat.class,
                         sigungu,
                         disasterAlert.id.countDistinct()
+                ))
+                .from(disasterAlert)
+                .join(disasterAlert.disasterAlertRegions, disasterAlertRegion)
+                .join(disasterAlertRegion.legalDistrict, legalDistrict)
+                .where(
+                        byAlertCondition(request),
+                        regionFilterOnJoin(request)
+                )
+                .groupBy(sigungu)
+                .orderBy(disasterAlert.id.countDistinct().desc(), sigungu.asc())
+                .fetch();
+    }
+
+    /**
+     * {@link #getStatsSigungu}를 level별로 4번(전체+LEVEL_1/2/3) 호출하던 프론트 패턴을
+     * 한 쿼리로 대체하기 위한 breakdown 버전. WHERE절 대신 SELECT의 조건부 countDistinct로
+     * level별 집계를 함께 뽑는다 — region-legalDistrict join의 fan-out 때문에 SUM(CASE)이 아니라
+     * countDistinct(CASE WHEN ... THEN id)를 써야 기존 level 필터 쿼리와 동일한 결과가 나온다.
+     */
+    @Override
+    public List<DisasterAlertStatResponse.RegionLevelStat> getStatsSigunguBreakdown(AlertSearchRequest request) {
+        // breakdown은 항상 전체 레벨을 함께 반환해야 하므로, 호출자가 level을 실어 보내더라도 무시한다.
+        request.setLevel(null);
+
+        StringTemplate norm =
+                Expressions.stringTemplate(
+                        "function('btrim', function('regexp_replace', {0}, '\\\\s+', ' ', 'g'))",
+                        legalDistrict.name
+                );
+
+        StringTemplate sigungu = Expressions.stringTemplate(
+                "CASE WHEN function('split_part', {0}, ' ', 2) = '' " +
+                "THEN function('split_part', {0}, ' ', 1) " +
+                "ELSE function('split_part', {0}, ' ', 1) || ' ' || function('split_part', {0}, ' ', 2) END",
+                norm
+        );
+
+        NumberExpression<Long> level1Count = new CaseBuilder()
+                .when(disasterAlert.emergencyLevel.eq(DisasterLevel.LEVEL_1)).then(disasterAlert.id)
+                .otherwise((Long) null)
+                .countDistinct();
+        NumberExpression<Long> level2Count = new CaseBuilder()
+                .when(disasterAlert.emergencyLevel.eq(DisasterLevel.LEVEL_2)).then(disasterAlert.id)
+                .otherwise((Long) null)
+                .countDistinct();
+        NumberExpression<Long> level3Count = new CaseBuilder()
+                .when(disasterAlert.emergencyLevel.eq(DisasterLevel.LEVEL_3)).then(disasterAlert.id)
+                .otherwise((Long) null)
+                .countDistinct();
+
+        return queryFactory
+                .select(Projections.constructor(DisasterAlertStatResponse.RegionLevelStat.class,
+                        sigungu,
+                        disasterAlert.id.countDistinct(),
+                        level1Count,
+                        level2Count,
+                        level3Count
                 ))
                 .from(disasterAlert)
                 .join(disasterAlert.disasterAlertRegions, disasterAlertRegion)

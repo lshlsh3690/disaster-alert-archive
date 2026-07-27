@@ -23,6 +23,22 @@ public class DisasterAlertStatResponse {
         private long count;
     }
 
+    /**
+     * 시군구별 등급(LEVEL_1/2/3)별 건수를 한 번에 담은 breakdown.
+     * {@link RegionStat}을 level별로 4번(전체+L1+L2+L3) 조회하던 것을 한 쿼리로 합치기 위해 도입.
+     */
+    @Getter
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @ToString
+    public static class RegionLevelStat {
+        private String region;
+        private long total;
+        private long level1Count;
+        private long level2Count;
+        private long level3Count;
+    }
+
     @Getter
     @NoArgsConstructor
     @AllArgsConstructor

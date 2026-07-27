@@ -46,6 +46,14 @@ export const ZPageMetaCombined = z.object({
 
 
 export const ZRegionStat = z.object({ region: z.string(), count: z.number() });
+export const ZRegionLevelStat = z.object({
+  region: z.string(),
+  total: z.number(),
+  level1Count: z.number(),
+  level2Count: z.number(),
+  level3Count: z.number(),
+});
+export type RegionLevelStat = z.infer<typeof ZRegionLevelStat>;
 export const ZLevelStat  = z.object({ level: z.string().nullable(), count: z.number() });
 export const ZTypeStat   = z.object({ type: z.string().nullable(), count: z.number() });
 export const ZDailyStat  = z.object({ date: z.string(), count: z.number() });
