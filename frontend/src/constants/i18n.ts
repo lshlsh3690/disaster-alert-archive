@@ -71,12 +71,24 @@ export const i18n = {
 
     // 재난 문자 상세
     alertDetail: {
+      title: "재난 문자 상세",
+      notFound: "데이터가 없습니다.",
       original: "원문",
       translated: "번역",
       disasterType: "재난 유형",
       region: "지역",
       occurredAt: "발령 시각",
       comments: "댓글",
+      edit: "수정",
+      delete: "삭제",
+      deleteConfirm: "정말 삭제하시겠습니까?",
+      deleteCommentConfirm: "삭제하시겠습니까?",
+      commentPlaceholder: "댓글을 입력하세요",
+      submit: "등록",
+      loginToComment: "로그인 후 댓글을 작성할 수 있어요.",
+      save: "저장",
+      cancel: "취소",
+      edited: "수정됨",
     },
 
     // 커뮤니티
@@ -594,12 +606,24 @@ export const i18n = {
     },
 
     alertDetail: {
+      title: "Alert Details",
+      notFound: "No data available.",
       original: "Original",
       translated: "Translated",
       disasterType: "Disaster Type",
       region: "Region",
       occurredAt: "Issued At",
       comments: "Comments",
+      edit: "Edit",
+      delete: "Delete",
+      deleteConfirm: "Are you sure you want to delete this?",
+      deleteCommentConfirm: "Delete this comment?",
+      commentPlaceholder: "Write a comment",
+      submit: "Submit",
+      loginToComment: "Log in to write a comment.",
+      save: "Save",
+      cancel: "Cancel",
+      edited: "Edited",
     },
 
     community: {
@@ -1044,12 +1068,24 @@ export const i18n = {
     },
 
     alertDetail: {
+      title: "災害速報詳細",
+      notFound: "データがありません。",
       original: "原文",
       translated: "翻訳",
       disasterType: "災害種別",
       region: "地域",
       occurredAt: "発令時刻",
       comments: "コメント",
+      edit: "編集",
+      delete: "削除",
+      deleteConfirm: "本当に削除しますか？",
+      deleteCommentConfirm: "削除しますか？",
+      commentPlaceholder: "コメントを入力してください",
+      submit: "登録",
+      loginToComment: "ログイン後にコメントを投稿できます。",
+      save: "保存",
+      cancel: "キャンセル",
+      edited: "編集済み",
     },
 
     community: {
@@ -1494,12 +1530,24 @@ export const i18n = {
     },
 
     alertDetail: {
+      title: "灾害预警详情",
+      notFound: "暂无数据。",
       original: "原文",
       translated: "翻译",
       disasterType: "灾害类型",
       region: "地区",
       occurredAt: "发布时间",
       comments: "评论",
+      edit: "编辑",
+      delete: "删除",
+      deleteConfirm: "确定要删除吗？",
+      deleteCommentConfirm: "确定要删除此评论吗？",
+      commentPlaceholder: "请输入评论",
+      submit: "提交",
+      loginToComment: "登录后可以发表评论。",
+      save: "保存",
+      cancel: "取消",
+      edited: "已编辑",
     },
 
     community: {
@@ -1944,12 +1992,24 @@ export const i18n = {
     },
 
     alertDetail: {
+      title: "Chi tiết tin nhắn thiên tai",
+      notFound: "Không có dữ liệu.",
       original: "Bản gốc",
       translated: "Bản dịch",
       disasterType: "Loại thiên tai",
       region: "Khu vực",
       occurredAt: "Thời gian phát hành",
       comments: "Bình luận",
+      edit: "Sửa",
+      delete: "Xóa",
+      deleteConfirm: "Bạn có chắc chắn muốn xóa không?",
+      deleteCommentConfirm: "Xóa bình luận này?",
+      commentPlaceholder: "Nhập bình luận",
+      submit: "Gửi",
+      loginToComment: "Đăng nhập để viết bình luận.",
+      save: "Lưu",
+      cancel: "Hủy",
+      edited: "Đã chỉnh sửa",
     },
 
     community: {
@@ -2466,12 +2526,24 @@ export const i18n = {
     },
 
     alertDetail: {
+      title: "รายละเอียดข้อความภัยพิบัติ",
+      notFound: "ไม่มีข้อมูล",
       original: "ต้นฉบับ",
       translated: "แปล",
       disasterType: "ประเภทภัยพิบัติ",
       region: "พื้นที่",
       occurredAt: "เวลาที่ประกาศ",
       comments: "ความคิดเห็น",
+      edit: "แก้ไข",
+      delete: "ลบ",
+      deleteConfirm: "ยืนยันการลบใช่หรือไม่?",
+      deleteCommentConfirm: "ลบความคิดเห็นนี้หรือไม่?",
+      commentPlaceholder: "กรอกความคิดเห็น",
+      submit: "ส่ง",
+      loginToComment: "เข้าสู่ระบบเพื่อแสดงความคิดเห็น",
+      save: "บันทึก",
+      cancel: "ยกเลิก",
+      edited: "แก้ไขแล้ว",
     },
 
     community: {

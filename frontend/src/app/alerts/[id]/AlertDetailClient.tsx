@@ -63,7 +63,7 @@ export default function AlertDetailClient() {
   const [editingText, setEditingText] = useState("");
 
   if (isLoading) return <main className="p-6 text-[13px] text-[var(--text-muted)]">{t("loading")}</main>;
-  if (!data) return <main className="p-6 text-[13px] text-[var(--text-muted)]">데이터가 없습니다.</main>;
+  if (!data) return <main className="p-6 text-[13px] text-[var(--text-muted)]">{t("alertDetail.notFound")}</main>;
 
   const translatedRegions = lang === "en" && offData?.translatedRegionNames?.length
     ? offData.translatedRegionNames
@@ -77,7 +77,7 @@ export default function AlertDetailClient() {
   return (
     <main className="bg-[var(--canvas)] min-h-[calc(100vh-48px)]">
       <div className="mx-auto max-w-6xl space-y-4 px-4 py-8 sm:px-6">
-        <h1 className="text-xl font-bold tracking-tight text-[var(--ink)]">📨 재난 문자 상세</h1>
+        <h1 className="text-xl font-bold tracking-tight text-[var(--ink)]">📨 {t("alertDetail.title")}</h1>
         {/* 좌측 문자 상세(가변) / 우측 위험도 분석(340px 고정) — /alerts 목록 페이지와 동일 비율 */}
         <div className={`grid grid-cols-1 gap-4 sm:gap-6 items-start ${!isUser ? "xl:grid-cols-[minmax(0,1fr)_340px]" : ""}`}>
         <div className="space-y-3 rounded-[var(--radius-panel-card)] border border-[var(--line)] bg-[var(--surface)] p-5 shadow-[0_10px_30px_rgba(28,39,60,0.04)]">
@@ -151,17 +151,17 @@ export default function AlertDetailClient() {
                 className="rounded-[var(--radius-control)] bg-[var(--blue)] px-3 py-1.5 text-sm font-medium text-white transition hover:brightness-95"
                 onClick={() => router.push(`/alerts/${id}/edit?source=USER`)}
               >
-                수정
+                {t("alertDetail.edit")}
               </button>
               <button
                 className="rounded-[var(--radius-control)] border border-[#f3c7c1] px-3 py-1.5 text-sm font-medium text-[var(--coral)] transition-colors hover:bg-[var(--coral-soft)]"
                 onClick={async () => {
-                  if (!confirm("정말 삭제하시겠습니까?")) return;
+                  if (!confirm(t("alertDetail.deleteConfirm"))) return;
                   await deleteUser(id);
                   router.push("/alerts?page=0");
                 }}
               >
-                삭제
+                {t("alertDetail.delete")}
               </button>
             </div>
           )}
@@ -170,13 +170,13 @@ export default function AlertDetailClient() {
         {!isUser && <AlertRiskSection alertId={id} alertCreatedAt={offData?.createdAt} />}
         </div>
         <section className="space-y-3 rounded-[var(--radius-panel-card)] border border-[var(--line)] bg-[var(--surface)] p-5 shadow-[0_10px_30px_rgba(28,39,60,0.04)]">
-          <h2 className="text-lg font-semibold text-[var(--ink)]">댓글</h2>
+          <h2 className="text-lg font-semibold text-[var(--ink)]">{t("alertDetail.comments")}</h2>
           {authUser ? (
             <div className="flex flex-col sm:flex-row gap-2">
               <input
                 value={commentText}
                 onChange={(e) => setCommentText(e.target.value)}
-                placeholder="댓글을 입력하세요"
+                placeholder={t("alertDetail.commentPlaceholder")}
                 className="input flex-1"
               />
               <button
@@ -187,11 +187,11 @@ export default function AlertDetailClient() {
                   await addComment({ source: isUser ? "USER" : "OFFICIAL", targetId: id, content: text });
                   setCommentText("");
                 }}
-              >등록</button>
+              >{t("alertDetail.submit")}</button>
             </div>
           ) : (
             <div className="flex items-center justify-between gap-3 rounded-[var(--radius-control)] border border-[var(--line)] bg-[var(--canvas)] px-3 py-2">
-              <span className="text-sm text-[var(--text-muted)]">로그인 후 댓글을 작성할 수 있어요.</span>
+              <span className="text-sm text-[var(--text-muted)]">{t("alertDetail.loginToComment")}</span>
               <button
                 className="rounded-[var(--radius-control)] bg-[var(--blue)] px-3 py-1.5 text-sm font-medium text-white transition hover:brightness-95"
                 onClick={() => {
@@ -210,9 +210,9 @@ export default function AlertDetailClient() {
                   <div className="text-sm flex-1 min-w-0">
                     <div className="text-[var(--text-body)]">{c.content}</div>
                         <div className="mt-0.5 text-xs text-[var(--text-subtle)]">
-                          {c.authorNickname ?? "익명"} · {new Date(c.createdAt).toLocaleString()}
+                          {c.authorNickname ?? t("dashboard.anonymous")} · {new Date(c.createdAt).toLocaleString()}
                           {c.edited && (
-                            <span className="ml-2 text-[11px]">(수정됨 · {c.updatedAt ? new Date(c.updatedAt).toLocaleString() : ""})</span>
+                            <span className="ml-2 text-[11px]">({t("alertDetail.edited")} · {c.updatedAt ? new Date(c.updatedAt).toLocaleString() : ""})</span>
                           )}
                         </div>
                     {isEditing && (
@@ -231,14 +231,14 @@ export default function AlertDetailClient() {
                             setEditingId(null);
                             setEditingText("");
                           }}
-                        >저장</button>
+                        >{t("alertDetail.save")}</button>
                         <button
                           className="rounded-[var(--radius-control)] border border-[var(--line)] px-3 py-1.5 text-sm text-[var(--text-body)] transition-colors hover:bg-[var(--blue-soft)]"
                           onClick={() => {
                             setEditingId(null);
                             setEditingText("");
                           }}
-                        >취소</button>
+                        >{t("alertDetail.cancel")}</button>
                       </div>
                     )}
                   </div>
@@ -250,7 +250,7 @@ export default function AlertDetailClient() {
                           setEditingId(c.id);
                           setEditingText(c.content);
                         }}
-                      >수정</button>
+                      >{t("alertDetail.edit")}</button>
                       <button
                         className="text-xs text-[var(--coral)] hover:underline"
                         onClick={async () => {
@@ -259,10 +259,10 @@ export default function AlertDetailClient() {
                             router.push(`/login?redirect=${redirect}`);
                             return;
                           }
-                          if (!confirm("삭제하시겠습니까?")) return;
+                          if (!confirm(t("alertDetail.deleteCommentConfirm"))) return;
                           await removeComment(c.id);
                         }}
-                      >삭제</button>
+                      >{t("alertDetail.delete")}</button>
                     </div>
                   )}
                 </li>
