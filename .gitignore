@@ -1,9 +1,6 @@
 # System files
 .DS_Store
 
-# Docker
-.dockerignore
-
 # Build logs
 *.log
 *.pid
