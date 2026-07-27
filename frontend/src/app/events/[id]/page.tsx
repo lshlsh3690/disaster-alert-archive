@@ -1,14 +1,14 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEvent } from "@/lib/queries/useEvents";
+import { useSigungu } from "@/lib/queries/useAlerts";
 import { useLanguageStore } from "@/store/languageStore";
 import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
 import { disasterTypeChipStyle } from "@/ui/disasterTypeColor";
-import { fetchSigungu } from "@/api/alertApi";
 import { formatEventPeriod } from "@/utils/eventDate";
 import { REPETITIVE_TYPES } from "@/constants/eventTypes";
 import type { EventAlertItem } from "@/types/events";
@@ -27,24 +27,24 @@ export default function EventDetailPage() {
   const [allExpanded, setAllExpanded] = useState(false);
   const [expandedDates, setExpandedDates] = useState<Set<string>>(new Set());
 
-  // 대표 지역명 번역: 시도는 t("metros"), 시군구는 /districts/sigungu 응답으로 매핑
-  const [sigunguMap, setSigunguMap] = useState<Map<string, string> | null>(null);
-  useEffect(() => {
-    setSigunguMap(null);
-    if (lang === "ko" || !data?.primaryRegionName) return;
-    const { sido, sigungu } = splitRegion(data.primaryRegionName);
-    if (!sido || !sigungu) return;
-    let cancelled = false;
-    fetchSigungu(sido, lang)
-      .then((list) => {
-        if (cancelled) return;
-        const map = new Map<string, string>();
-        (list ?? []).forEach((s) => { if (s.translatedName) map.set(s.name, s.translatedName); });
-        setSigunguMap(map);
-      })
-      .catch(() => { /* 번역 실패 시 원문 유지 */ });
-    return () => { cancelled = true; };
-  }, [data, lang]);
+  // 대표 지역명 번역: 시도는 t("metros"), 시군구는 /districts/sigungu 응답으로 매핑.
+  // sido는 useEvent 응답에서 파생되므로(이벤트→지역 조회 순서 자체는 불가피한 의존관계),
+  // 원래는 fetchSigungu를 useEffect에서 직접 호출했으나 React Query 캐시를 타지 않아
+  // 같은 시/도의 이벤트를 여러 개 넘나들 때마다 매번 재요청됐다. staleTime: Infinity인
+  // useSigungu 훅으로 바꿔 동일 시/도+언어 조합은 최초 1회만 요청되도록 함.
+  const { sido: primarySido, sigungu: primarySigungu } = useMemo(
+    () => splitRegion(data?.primaryRegionName),
+    [data]
+  );
+  const { data: sigunguList } = useSigungu(
+    lang !== "ko" && primarySido && primarySigungu ? primarySido : undefined,
+    lang
+  );
+  const sigunguMap = useMemo(() => {
+    const map = new Map<string, string>();
+    (sigunguList ?? []).forEach((s) => { if (s.translatedName) map.set(s.name, s.translatedName); });
+    return map;
+  }, [sigunguList]);
 
   const regionDisplay = useMemo(() => {
     const name = data?.primaryRegionName;
@@ -53,7 +53,7 @@ export default function EventDetailPage() {
     const { sido, sigungu } = splitRegion(name);
     const tSido = t(`metros.${sido}`, { defaultValue: sido });
     if (!sigungu) return tSido;
-    return `${tSido} ${sigunguMap?.get(sigungu) ?? sigungu}`;
+    return `${tSido} ${sigunguMap.get(sigungu) ?? sigungu}`;
   }, [data, lang, t, sigunguMap]);
 
   const isRepetitive = useMemo(
