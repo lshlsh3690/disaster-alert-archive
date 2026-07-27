@@ -97,6 +97,7 @@ oauth:
 
 deepl:
   api-key: ${DEEPL_API_KEY}
+  api-key2: ${DEEPL_API_KEY2:}
   api-url: https://api-free.deepl.com/v2/translate
   enabled: true
 
