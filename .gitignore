@@ -1,9 +1,6 @@
 # System files
 .DS_Store
 
-# Docker
-.dockerignore
-
 # Build logs
 *.log
 *.pid
@@ -70,3 +67,6 @@ frontend/public/workbox-*.js
 frontend/public/workbox-*.js.map
 
 backend/src/main/resources/firebase-service-account.json
+
+# Claude Code 로컬 권한 설정 (세션마다 누적되는 개인 허용 목록이라 저장소에 안 남김)
+.claude/settings.json

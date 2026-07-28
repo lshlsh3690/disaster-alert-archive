@@ -79,6 +79,18 @@ public class DisasterAlertController {
         return ResponseEntity.ok(disasterAlertService.countBySigungu(request));
     }
 
+    /**
+     * 시군구별 등급(LEVEL_1/2/3)별 건수를 한 번에 반환.
+     * 지도(KakaoPolygonMap)가 이전에 {@code /stats/sigungu}를 level 파라미터만 바꿔 4번(전체+L1+L2+L3)
+     * 호출하던 것을 대체하는 단일 쿼리 엔드포인트 — 요청의 {@code level}은 무시된다.
+     */
+    @GetMapping("/stats/sigungu/breakdown")
+    public ResponseEntity<List<DisasterAlertStatResponse.RegionLevelStat>> countBySigunguBreakdown(
+            AlertSearchRequest request
+    ) {
+        return ResponseEntity.ok(disasterAlertService.countBySigunguBreakdown(request));
+    }
+
     @GetMapping("/stats/daily")
     public ResponseEntity<List<DisasterAlertStatResponse.DailyStat>> countByDate(
             AlertSearchRequest request

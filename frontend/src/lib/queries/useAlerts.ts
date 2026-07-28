@@ -1,6 +1,6 @@
 // hooks/useAlerts.ts
 import { useQuery, keepPreviousData } from "@tanstack/react-query";
-import { fetchLatestAlerts, searchAlerts, fetchAlert, fetchStats, type AlertSearchRequest, fetchLatestAlertsBySido, fetchSigunguStats, searchCombinedAlerts, fetchDashboardSummary, fetchSigungu, fetchDailyStats, fetchHourlyStats, fetchMonthlyTypeStats, fetchDailyTypeStats, fetchWeatherCorrelation, fetchWeatherByType, fetchWeatherByRegion, fetchAlertWeather, fetchWeatherHourlyCorrelation, fetchWeatherHourlyByType, fetchWeatherHourlyByRegion } from "@/api/alertApi";
+import { fetchLatestAlerts, searchAlerts, fetchAlert, fetchStats, type AlertSearchRequest, fetchLatestAlertsBySido, fetchSigunguStats, fetchSigunguStatsBreakdown, searchCombinedAlerts, fetchDashboardSummary, fetchSigungu, fetchDailyStats, fetchHourlyStats, fetchMonthlyTypeStats, fetchDailyTypeStats, fetchWeatherCorrelation, fetchWeatherByType, fetchWeatherByRegion, fetchAlertWeather, fetchWeatherHourlyCorrelation, fetchWeatherHourlyByType, fetchWeatherHourlyByRegion } from "@/api/alertApi";
 import { fetchUserAlert, fetchUserAlerts } from "@/api/userAlertApi";
 
 export function useLatestAlerts(limit = 5, lang = "ko") {
@@ -64,6 +64,15 @@ export function useSigunguStats(params: AlertSearchRequest, enabled = true) {
   return useQuery({
     queryKey: ["alert-stats-sigungu", params],
     queryFn: () => fetchSigunguStats(params),
+    placeholderData: keepPreviousData,
+    enabled,
+  });
+}
+
+export function useSigunguStatsBreakdown(params: AlertSearchRequest, enabled = true) {
+  return useQuery({
+    queryKey: ["alert-stats-sigungu-breakdown", params],
+    queryFn: () => fetchSigunguStatsBreakdown(params),
     placeholderData: keepPreviousData,
     enabled,
   });

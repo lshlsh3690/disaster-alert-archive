@@ -1,0 +1,13 @@
+.git
+.gradle
+build/
+bin/
+out/
+.idea
+*.iws
+*.iml
+*.ipr
+src/main/generated
+.env
+.env.*
+*.log

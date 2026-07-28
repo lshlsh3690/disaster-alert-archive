@@ -67,7 +67,7 @@ public class DisasterAlertService {
     // 10분 스케줄러가 매번 돌아도 신규 alert가 없으면(대부분의 사이클) 캐시를 건드리지 않는다.
     @Transactional
     @CacheEvict(cacheNames = {
-            StatsCacheNames.SUMMARY, StatsCacheNames.SIDO, StatsCacheNames.SIGUNGU,
+            StatsCacheNames.SUMMARY, StatsCacheNames.SIDO, StatsCacheNames.SIGUNGU, StatsCacheNames.SIGUNGU_BREAKDOWN,
             StatsCacheNames.DAILY, StatsCacheNames.HOURLY, StatsCacheNames.MONTHLY_TYPE, StatsCacheNames.DAILY_TYPE,
             StatsCacheNames.WEATHER_CORRELATION, StatsCacheNames.WEATHER_BY_TYPE,
             StatsCacheNames.WEATHER_BY_SIDO, StatsCacheNames.WEATHER_BY_SIGUNGU,
@@ -254,7 +254,7 @@ public class DisasterAlertService {
      */
     @Transactional
     @CacheEvict(cacheNames = {
-            StatsCacheNames.SUMMARY, StatsCacheNames.SIDO, StatsCacheNames.SIGUNGU,
+            StatsCacheNames.SUMMARY, StatsCacheNames.SIDO, StatsCacheNames.SIGUNGU, StatsCacheNames.SIGUNGU_BREAKDOWN,
             StatsCacheNames.DAILY, StatsCacheNames.HOURLY, StatsCacheNames.MONTHLY_TYPE, StatsCacheNames.DAILY_TYPE,
             StatsCacheNames.WEATHER_CORRELATION, StatsCacheNames.WEATHER_BY_TYPE,
             StatsCacheNames.WEATHER_BY_SIDO, StatsCacheNames.WEATHER_BY_SIGUNGU,
@@ -519,6 +519,11 @@ public class DisasterAlertService {
     @Cacheable(value = StatsCacheNames.SIGUNGU, sync = true)
     public List<DisasterAlertStatResponse.RegionStat> countBySigungu(AlertSearchRequest request) {
         return disasterAlertRepository.getStatsSigungu(request);
+    }
+
+    @Cacheable(value = StatsCacheNames.SIGUNGU_BREAKDOWN, sync = true)
+    public List<DisasterAlertStatResponse.RegionLevelStat> countBySigunguBreakdown(AlertSearchRequest request) {
+        return disasterAlertRepository.getStatsSigunguBreakdown(request);
     }
 
     @Cacheable(value = StatsCacheNames.DAILY, sync = true)

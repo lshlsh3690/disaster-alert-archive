@@ -29,6 +29,8 @@ public interface DisasterAlertRepositoryCustom {
 
     List<DisasterAlertStatResponse.RegionStat> getStatsSigungu(AlertSearchRequest request);
 
+    List<DisasterAlertStatResponse.RegionLevelStat> getStatsSigunguBreakdown(AlertSearchRequest request);
+
     List<DisasterAlertStatResponse.DailyStat> getStatsByDate(AlertSearchRequest request);
 
     List<DisasterAlertStatResponse.HourlyStat> getStatsByHour(AlertSearchRequest request);
