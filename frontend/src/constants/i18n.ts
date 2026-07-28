@@ -89,6 +89,7 @@ export const i18n = {
       save: "저장",
       cancel: "취소",
       edited: "수정됨",
+      translationPending: "번역 준비 중입니다.",
     },
 
     // 커뮤니티
@@ -624,6 +625,7 @@ export const i18n = {
       save: "Save",
       cancel: "Cancel",
       edited: "Edited",
+      translationPending: "Translation is being prepared.",
     },
 
     community: {
@@ -1086,6 +1088,7 @@ export const i18n = {
       save: "保存",
       cancel: "キャンセル",
       edited: "編集済み",
+      translationPending: "翻訳を準備中です。",
     },
 
     community: {
@@ -1548,6 +1551,7 @@ export const i18n = {
       save: "保存",
       cancel: "取消",
       edited: "已编辑",
+      translationPending: "翻译准备中。",
     },
 
     community: {
@@ -2010,6 +2014,7 @@ export const i18n = {
       save: "Lưu",
       cancel: "Hủy",
       edited: "Đã chỉnh sửa",
+      translationPending: "Đang chuẩn bị bản dịch.",
     },
 
     community: {
@@ -2544,6 +2549,7 @@ export const i18n = {
       save: "บันทึก",
       cancel: "ยกเลิก",
       edited: "แก้ไขแล้ว",
+      translationPending: "กำลังเตรียมคำแปล",
     },
 
     community: {

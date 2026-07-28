@@ -6,6 +6,7 @@ import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useTranslation } from "react-i18next";
 import { useDeleteUserAlert } from "@/lib/mutations/useDeleteUserAlert";
 import { useAuthStore } from "@/store/authStore";
+import { useLanguageStore } from "@/store/languageStore";
 import { useComments, useCreateComment, useDeleteComment, useInfiniteComments, useUpdateComment } from "@/lib/queries/useComments";
 import { useEffect, useRef, useState } from "react";
 import AlertRiskSection from "@/components/alerts/AlertRiskSection";
@@ -27,9 +28,12 @@ export default function AlertDetailClient() {
   const id = Number(params.id);
   const source = (sp.get("source") || "OFFICIAL").toUpperCase();
   const isUser = source === "USER";
-  const [lang, setLang] = useState<"ko" | "en">("ko");
+  // 헤더의 전역 언어 선택(useLanguageStore)을 그대로 따른다 — 예전엔 이 페이지만
+  // "한국어/English" 버튼으로 별도 로컬 lang을 관리해서, 헤더에서 언어를 바꿔도
+  // 본문 번역(useAlert의 lang 파라미터)엔 반영이 안 되던 버그가 있었다.
+  const language = useLanguageStore((s) => s.language);
   const { t } = useTranslation();
-  const { data: offData, isLoading: offLoading } = useAlert(isUser ? 0 : id, lang);
+  const { data: offData, isLoading: offLoading } = useAlert(isUser ? 0 : id, language);
   const { data: userData, isLoading: userLoading } = useUserAlert(isUser ? id : 0);
   const data = isUser ? userData : offData;
   const isLoading = isUser ? userLoading : offLoading;
@@ -65,7 +69,8 @@ export default function AlertDetailClient() {
   if (isLoading) return <main className="p-6 text-[13px] text-[var(--text-muted)]">{t("loading")}</main>;
   if (!data) return <main className="p-6 text-[13px] text-[var(--text-muted)]">{t("alertDetail.notFound")}</main>;
 
-  const translatedRegions = lang === "en" && offData?.translatedRegionNames?.length
+  const translated = language !== "ko";
+  const translatedRegions = translated && offData?.translatedRegionNames?.length
     ? offData.translatedRegionNames
     : null;
   const regionText = translatedRegions
@@ -84,7 +89,7 @@ export default function AlertDetailClient() {
           <div className="flex flex-wrap items-center gap-2">
             {data.disasterType && (
               <span style={disasterTypeChipStyle(data.disasterType)} className="rounded-[var(--radius-pill)] px-2 py-0.5 text-[11px] font-medium">
-                {(lang === "en" && offData?.translatedDisasterType) ? offData.translatedDisasterType : (t(`disasterTypes.${data.disasterType}`, { defaultValue: data.disasterType }))}
+                {(translated && offData?.translatedDisasterType) ? offData.translatedDisasterType : (t(`disasterTypes.${data.disasterType}`, { defaultValue: data.disasterType }))}
               </span>
             )}
             {data.emergencyLevelText && (
@@ -97,31 +102,16 @@ export default function AlertDetailClient() {
                 {t("alertList.filter.sourceUser")}
               </span>
             )}
-            {isUser && (
-              <time className="ml-auto text-xs text-[var(--text-subtle)]">{new Date(data.createdAt).toLocaleString()}</time>
-            )}
-            {!isUser && (
-              <div className="ml-auto flex items-center gap-2">
-                <time className="text-xs text-[var(--text-subtle)]">{new Date(data.createdAt).toLocaleString()}</time>
-                <button
-                  className={`px-2.5 py-1 text-xs rounded-[var(--radius-control)] border transition-colors ${lang === "ko" ? "bg-[var(--blue)] text-white border-[var(--blue)]" : "text-[var(--text-muted)] border-[var(--line)] hover:bg-[var(--blue-soft)]"}`}
-                  onClick={() => setLang("ko")}
-                >한국어</button>
-                <button
-                  className={`px-2.5 py-1 text-xs rounded-[var(--radius-control)] border transition-colors ${lang === "en" ? "bg-[var(--blue)] text-white border-[var(--blue)]" : "text-[var(--text-muted)] border-[var(--line)] hover:bg-[var(--blue-soft)]"}`}
-                  onClick={() => setLang("en")}
-                >English</button>
-              </div>
-            )}
+            <time className="ml-auto text-xs text-[var(--text-subtle)]">{new Date(data.createdAt).toLocaleString()}</time>
           </div>
 
           <p className="text-[15px] leading-relaxed text-[var(--ink)]">
-            {lang === "en" && offData?.translatedMessage
+            {translated && offData?.translatedMessage
               ? offData.translatedMessage
               : data.message}
           </p>
-          {lang === "en" && !offData?.translatedMessage && !isUser && (
-            <p className="text-[13px] text-[var(--text-subtle)]">번역 준비 중입니다.</p>
+          {translated && !offData?.translatedMessage && !isUser && (
+            <p className="text-[13px] text-[var(--text-subtle)]">{t("alertDetail.translationPending")}</p>
           )}
 
           <dl className="space-y-1.5 border-t border-[var(--line)] pt-3 text-[13px]">
