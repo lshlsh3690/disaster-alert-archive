@@ -4,7 +4,7 @@
 
 > 재난 안전 문자 아카이브 및 사용자 맞춤형 실시간 알림 서비스
 
-[![Next.js](https://img.shields.io/badge/Next.js-15-000000?logo=next.js&logoColor=white)](https://nextjs.org/)
+[![Next.js](https://img.shields.io/badge/Next.js-16-000000?logo=next.js&logoColor=white)](https://nextjs.org/)
 [![Spring Boot](https://img.shields.io/badge/Spring_Boot-3.x-6DB33F?logo=springboot&logoColor=white)](https://spring.io/projects/spring-boot)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-4169E1?logo=postgresql&logoColor=white)](https://www.postgresql.org/)
 [![Redis](https://img.shields.io/badge/Redis-7-DC382D?logo=redis&logoColor=white)](https://redis.io/)
@@ -31,7 +31,7 @@ AI 기반 이벤트 클러스터링으로 중복 알림을 제거하고, 기상 
 | 재난 통계 대시보드 | 지역별·유형별·기간별 통계 및 기상 상관 분석 시각화 |
 | 위험도 분석 | 지역별 위험도 지수 산출 (유형 가중치 × 강도 × 시간 감쇠) 및 지도 표시 |
 | 날씨 연계 | 기상청 관측 데이터 수집 및 재난 발령 시점 날씨 조회 |
-| 다국어 지원 | DeepL API 기반 재난 문자 번역 (KO/EN/ZH/JA) |
+| 다국어 지원 | DeepL API 기반 재난 문자 번역 (원본 KO → EN/JA/ZH/VI/TH) |
 | 소셜 로그인 | Google / Naver / Kakao OAuth2 |
 | 재난 제보 / 댓글 | 재난 현장 제보 작성 및 재난 문자별 댓글 |
 | 실종아동 | 실종아동 데이터 적재 및 조회 |
@@ -46,7 +46,7 @@ AI 기반 이벤트 클러스터링으로 중복 알림을 제거하고, 기상 
 
 | 분류 | 기술 |
 |------|------|
-| Framework | Next.js 15 (App Router) |
+| Framework | Next.js 16 (App Router) |
 | 상태 관리 | Zustand |
 | 서버 상태 | TanStack Query (React Query) |
 | 폼 | React Hook Form + Zod |
@@ -54,7 +54,7 @@ AI 기반 이벤트 클러스터링으로 중복 알림을 제거하고, 기상 
 | 차트 | Recharts |
 | 알림 | Firebase SDK (FCM) + PWA (next-pwa) |
 | 지도 | Kakao Map API |
-| 배포 | Netlify |
+| 배포 | Vercel |
 
 ### Backend
 
@@ -70,13 +70,13 @@ AI 기반 이벤트 클러스터링으로 중복 알림을 제거하고, 기상 
 | 푸시 알림 | Firebase Admin SDK (FCM) |
 | 모니터링 | Spring Actuator |
 | API 문서 | SpringDoc OpenAPI (Swagger UI) |
-| 배포 | AWS EC2 + Docker Compose + Nginx |
+| 배포 | AWS EC2 + Docker Compose + Caddy |
 
 ### 데이터
 
 | 분류 | 기술 |
 |------|------|
-| 메인 DB | PostgreSQL + pgvector (VECTOR 1536) |
+| 메인 DB | PostgreSQL + pgvector (VECTOR 1536), 운영은 AWS RDS |
 | 캐시 | Redis 7 |
 
 ### 외부 API
@@ -95,9 +95,9 @@ AI 기반 이벤트 클러스터링으로 중복 알림을 제거하고, 기상 
 
 | 분류 | 기술 |
 |------|------|
-| 클라우드 | AWS EC2 |
+| 클라우드 | AWS EC2 (백엔드), AWS RDS (PostgreSQL) |
 | 컨테이너 | Docker + Docker Compose |
-| 리버스 프록시 | Nginx |
+| 리버스 프록시 | Caddy (자동 HTTPS) |
 | CI/CD | GitHub Actions |
 
 ---
@@ -152,14 +152,17 @@ disaster-alert-archive/
 ### 백엔드
 
 ```bash
-# Docker로 PostgreSQL(pgvector) + Redis 실행 (레포 루트에서)
+# Docker로 PostgreSQL(pgvector) + Redis 실행 (레포 루트에서, --profile docker 불필요)
 docker compose -f docker-compose.dev.yml up postgres redis
 
-# 환경 변수는 루트 .env.dev 값을 참고해 로컬 환경(또는 IDE 실행 설정)에 채운다
+# 레포 루트의 .env.example을 .env.dev로 복사해 값을 채운다
+cp .env.example .env.dev
 
 cd backend
 ./gradlew bootRun
 ```
+
+> 백엔드/프론트엔드는 `docker-compose.dev.yml`의 `docker` 프로필에도 정의돼 있지만, 로컬 개발 시에는 Postgres/Redis만 컨테이너로 띄우고 백엔드·프론트엔드는 위처럼 직접 실행하는 것을 권장한다.
 
 ### 프론트엔드
 
@@ -169,9 +172,10 @@ cd frontend
 # 패키지 설치
 npm install
 
-# 환경 변수 설정 (frontend/.env.local 참고)
+# 환경 변수 설정
+cp .env.local.example .env.local   # 값을 채운다
 
-# 개발 서버 실행 (http://localhost:3000)
+# 개발 서버 실행 (http://localhost:3000, Turbopack)
 npm run dev
 ```
 
@@ -179,7 +183,7 @@ npm run dev
 
 ## 환경 변수
 
-주요 환경 변수 목록입니다. 전체 목록은 루트 `.env.dev`를 참고하세요.
+주요 환경 변수 목록입니다. 전체 목록/템플릿은 루트 `.env.example`(백엔드)과 `frontend/.env.local.example`(프론트엔드)를 참고하세요.
 
 | 변수 | 설명 |
 |------|------|
@@ -188,8 +192,8 @@ npm run dev
 | `JWT_SECRET` | JWT 서명 키 |
 | `DISASTER_ALERT_SERVICE_KEY` | 행안부 Open API 키 |
 | `KMA_ASOS_API_KEY` | 기상청 Open API 키 |
-| `OPENAI_API_KEY` | OpenAI 호환 AI API 키 |
-| `DEEPL_API_KEY` | DeepL 번역 API 키 |
+| `TIMELY_API_KEY` | Spring AI(Timely GMS 프록시) — 임베딩/챗 API 키 |
+| `DEEPL_API_KEY` / `DEEPL_API_KEY2` | DeepL 번역 API 키 (1번 키 쿼터 초과 시 2번 키로 자동 폴백) |
 | `GOOGLE_OAUTH_CLIENT_ID` / `_SECRET` | Google OAuth2 |
 | `KAKAO_OAUTH_CLIENT_ID` / `_SECRET` | Kakao OAuth2 |
 | `NAVER_OAUTH_CLIENT_ID` / `_SECRET` | Naver OAuth2 |
