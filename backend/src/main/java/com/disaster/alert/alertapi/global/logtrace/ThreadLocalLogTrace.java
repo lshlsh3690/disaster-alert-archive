@@ -23,9 +23,9 @@ public class ThreadLocalLogTrace implements LogTrace {
     public TraceStatus begin(String message) {
         syncTraceId();
         TraceId traceId = traceIdHolder.get();
-        long startTimeMs = System.currentTimeMillis();
+        long startTimeNanos = System.nanoTime();
         log.info("[{}] {}{}", traceId.getId(), startArrow(traceId.getLevel()), message);
-        return new TraceStatus(traceId, startTimeMs, message);
+        return new TraceStatus(traceId, startTimeNanos, message);
     }
 
     @Override
@@ -39,7 +39,7 @@ public class ThreadLocalLogTrace implements LogTrace {
     }
 
     private void complete(TraceStatus status, Exception e) {
-        long resultTimeMs = System.currentTimeMillis() - status.getStartTimeMs();
+        long resultTimeMs = (System.nanoTime() - status.getStartTimeNanos()) / 1_000_000;
         TraceId traceId = status.getTraceId();
         int level = traceId.getLevel();
         if (e == null) {

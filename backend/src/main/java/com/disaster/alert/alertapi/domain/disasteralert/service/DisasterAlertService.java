@@ -81,17 +81,9 @@ public class DisasterAlertService {
             log.warn("saveData: 원시 응답이 null/blank 입니다. 저장을 건너뜁니다.");
             return List.of();
         }
-        DisasterApiResponse response;
-        try {
-            response = objectMapper.readValue(raw, DisasterApiResponse.class);
-        } catch (JsonProcessingException e) {
-            // 파싱 실패 원인 추적용 — 어떤 응답이 몇 시(KST)에 실패했는지 남긴다.
-            // raw는 공공데이터포털 응답 전체라 커질 수 있어 앞부분만 미리보기로 자른다.
-            String failedAtKst = LocalDateTime.now(KST).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
-            String bodyPreview = raw.length() > 2000 ? raw.substring(0, 2000) + "...(이하 생략, 총 " + raw.length() + "자)" : raw;
-            log.error("재난문자 응답 파싱 실패 - 실패 시각(KST): {}, 원본 응답: {}", failedAtKst, bodyPreview, e);
-            return List.of();
-        }
+        Optional<DisasterApiResponse> parsed = parseResponse(raw);
+        if (parsed.isEmpty()) return List.of();
+        DisasterApiResponse response = parsed.get();
         try {
             if (checkAPIFailure(response)) return List.of();
 
@@ -143,6 +135,22 @@ public class DisasterAlertService {
         } catch (Exception e) {
             log.error("재난문자 저장 중 오류 발생", e);
             return List.of();
+        }
+    }
+
+    /**
+     * 공공데이터포털 응답 JSON 파싱 — saveData()와 initAllDisasterData() 양쪽에서 공유한다.
+     * 실패 시 어떤 응답이 몇 시(KST)에 실패했는지 로그로 남기고 빈 Optional을 반환한다.
+     * raw는 응답 전체라 커질 수 있어 앞부분만 미리보기로 자른다.
+     */
+    private Optional<DisasterApiResponse> parseResponse(String raw) {
+        try {
+            return Optional.of(objectMapper.readValue(raw, DisasterApiResponse.class));
+        } catch (JsonProcessingException e) {
+            String failedAtKst = LocalDateTime.now(KST).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
+            String bodyPreview = raw.length() > 2000 ? raw.substring(0, 2000) + "...(이하 생략, 총 " + raw.length() + "자)" : raw;
+            log.error("재난문자 응답 파싱 실패 - 실패 시각(KST): {}, 원본 응답: {}", failedAtKst, bodyPreview, e);
+            return Optional.empty();
         }
     }
 
@@ -352,7 +360,9 @@ public class DisasterAlertService {
                 log.warn("initAllDisasterData: 첫 페이지 응답이 없습니다. 초기화를 중단합니다.");
                 return;
             }
-            DisasterApiResponse response = objectMapper.readValue(raw, DisasterApiResponse.class);
+            Optional<DisasterApiResponse> parsedFirstPage = parseResponse(raw);
+            if (parsedFirstPage.isEmpty()) return;
+            DisasterApiResponse response = parsedFirstPage.get();
 
             if (checkAPIFailure(response)) return;
 
