@@ -17,7 +17,9 @@ import com.disaster.alert.alertapi.global.service.LegalDistrictCache;
 import com.disaster.alert.alertapi.global.translation.SupportedLanguage;
 import com.disaster.alert.alertapi.global.translation.TranslationService;
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import lombok.RequiredArgsConstructor;
@@ -139,21 +141,73 @@ public class DisasterAlertService {
 
     /**
      * 공공데이터포털 응답 JSON 파싱 — saveData()와 initAllDisasterData() 양쪽에서 공유한다.
-     * 실패 시 어떤 응답이 몇 시(KST)에 실패했는지 로그로 남기고 CustomException을 던진다.
-     * 파싱 실패를 빈 결과로 조용히 덮으면 호출부(특히 initAllDisasterData의 페이지 루프)가
-     * "저장 완료"로 잘못 보고할 수 있어, 반드시 호출부가 실패를 인지하도록 예외로 전파한다
-     * (그 외 저장 로직 실패는 기존대로 saveData 내부에서 계속 삼킨다 — 이 메서드만 예외).
-     * raw는 응답 전체라 커질 수 있어 로그엔 앞부분만 미리보기로 자른다.
+     * body 배열은 원소 단위로 파싱한다 — objectMapper.readValue로 통째로 매핑하면 원소 하나만
+     * 이상해도(가끔 실제로 이상한 배열이 옴) 배열 전체가 실패해서 멀쩡한 나머지까지 다 날아갔다.
+     * header/numOfRows/pageNo/totalCount 같은 메타데이터, 또는 최상위 구조 자체가 깨진 경우는
+     * 여전히 복구 불가능한 실패로 보고 CustomException을 던진다 — 호출부(특히
+     * initAllDisasterData의 페이지 루프)가 "저장 완료"로 잘못 보고하지 않도록 반드시 전파한다.
      */
     private DisasterApiResponse parseResponse(String raw) {
+        JsonNode root;
         try {
-            return objectMapper.readValue(raw, DisasterApiResponse.class);
+            root = objectMapper.readTree(raw);
         } catch (JsonProcessingException e) {
-            String failedAtKst = LocalDateTime.now(KST).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
-            String bodyPreview = raw.length() > 2000 ? raw.substring(0, 2000) + "...(이하 생략, 총 " + raw.length() + "자)" : raw;
-            log.error("재난문자 응답 파싱 실패 - 실패 시각(KST): {}, 원본 응답: {}", failedAtKst, bodyPreview, e);
+            logParseFailure(raw, e);
             throw new CustomException(ErrorCode.JSON_PARSE_ERROR, "재난문자 응답 파싱 실패 (raw " + raw.length() + "자)");
         }
+        if (!(root instanceof ObjectNode rootObject)) {
+            log.error("재난문자 응답이 예상된 객체 형태가 아님 - raw {}자", raw.length());
+            throw new CustomException(ErrorCode.JSON_PARSE_ERROR, "재난문자 응답이 객체 형태가 아님");
+        }
+
+        List<DisasterAlertDto> dtos = parseBodyElements(rootObject.path("body"));
+        rootObject.set("body", objectMapper.createArrayNode()); // 메타데이터만 안전하게 변환하기 위해 원본 body는 비워둔다
+
+        DisasterApiResponse response;
+        try {
+            response = objectMapper.treeToValue(rootObject, DisasterApiResponse.class);
+        } catch (JsonProcessingException e) {
+            logParseFailure(raw, e);
+            throw new CustomException(ErrorCode.JSON_PARSE_ERROR, "재난문자 응답 파싱 실패 (raw " + raw.length() + "자)");
+        }
+        response.setBody(dtos);
+        return response;
+    }
+
+    /**
+     * body 배열 원소를 하나씩 파싱한다. 원소 하나가 깨져도 나머지는 계속 처리하고, 그 원소는
+     * 원본 JSON과 함께 WARN으로 남긴다(Sentry는 원소 개수 건당이 아니라 응답 1건당 ERROR 1개만
+     * 받도록 — 원소 단위로 전부 ERROR 찍으면 한 페이지에서 여러 건 실패 시 이벤트가 과다 발생함).
+     */
+    private List<DisasterAlertDto> parseBodyElements(JsonNode bodyNode) {
+        if (!bodyNode.isArray()) {
+            if (!bodyNode.isMissingNode()) {
+                log.warn("재난문자 응답 body가 배열이 아닙니다({}) - 빈 것으로 처리", bodyNode.getNodeType());
+            }
+            return List.of();
+        }
+        List<DisasterAlertDto> dtos = new ArrayList<>();
+        int skipped = 0;
+        for (JsonNode item : bodyNode) {
+            try {
+                dtos.add(objectMapper.treeToValue(item, DisasterAlertDto.class));
+            } catch (JsonProcessingException e) {
+                skipped++;
+                log.warn("재난문자 응답 원소 파싱 실패, 해당 원소만 건너뜀 - 원본: {}", item, e);
+            }
+        }
+        if (skipped > 0) {
+            String failedAtKst = LocalDateTime.now(KST).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
+            log.error("재난문자 응답 원소 {}건 파싱 실패 - 해당 원소만 건너뛰고 나머지 {}건은 계속 처리함 (KST {})",
+                    skipped, dtos.size(), failedAtKst);
+        }
+        return dtos;
+    }
+
+    private void logParseFailure(String raw, JsonProcessingException e) {
+        String failedAtKst = LocalDateTime.now(KST).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
+        String bodyPreview = raw.length() > 2000 ? raw.substring(0, 2000) + "...(이하 생략, 총 " + raw.length() + "자)" : raw;
+        log.error("재난문자 응답 파싱 실패 - 실패 시각(KST): {}, 원본 응답: {}", failedAtKst, bodyPreview, e);
     }
 
     /**
