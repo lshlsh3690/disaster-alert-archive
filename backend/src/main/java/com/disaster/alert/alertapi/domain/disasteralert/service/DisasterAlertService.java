@@ -1,6 +1,8 @@
 package com.disaster.alert.alertapi.domain.disasteralert.service;
 
 import com.disaster.alert.alertapi.api.DisasterOpenApiClient;
+import com.disaster.alert.alertapi.domain.common.exception.CustomException;
+import com.disaster.alert.alertapi.domain.common.exception.ErrorCode;
 import com.disaster.alert.alertapi.domain.disasteralert.constant.StatsCacheNames;
 import com.disaster.alert.alertapi.domain.disasteralert.dto.*;
 import com.disaster.alert.alertapi.domain.disasteralert.model.DisasterAlert;
@@ -14,9 +16,11 @@ import com.disaster.alert.alertapi.domain.weather.repository.WeatherHourlyCorrel
 import com.disaster.alert.alertapi.global.service.LegalDistrictCache;
 import com.disaster.alert.alertapi.global.translation.SupportedLanguage;
 import com.disaster.alert.alertapi.global.translation.TranslationService;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import jakarta.persistence.EntityManager;
-import jakarta.persistence.EntityNotFoundException;
 import jakarta.persistence.PersistenceContext;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -37,6 +41,7 @@ import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
 @Service
@@ -79,9 +84,8 @@ public class DisasterAlertService {
             log.warn("saveData: 원시 응답이 null/blank 입니다. 저장을 건너뜁니다.");
             return List.of();
         }
+        DisasterApiResponse response = parseResponse(raw);
         try {
-            DisasterApiResponse response = objectMapper.readValue(raw, DisasterApiResponse.class);
-
             if (checkAPIFailure(response)) return List.of();
 
             List<DisasterAlertDto> dtos = response.getBody();
@@ -133,6 +137,81 @@ public class DisasterAlertService {
             log.error("재난문자 저장 중 오류 발생", e);
             return List.of();
         }
+    }
+
+    /**
+     * 공공데이터포털 응답 JSON 파싱 — saveData()와 initAllDisasterData() 양쪽에서 공유한다.
+     * body 배열은 원소 단위로 파싱한다 — objectMapper.readValue로 통째로 매핑하면 원소 하나만
+     * 이상해도(가끔 실제로 이상한 배열이 옴) 배열 전체가 실패해서 멀쩡한 나머지까지 다 날아갔다.
+     * header/numOfRows/pageNo/totalCount 같은 메타데이터, 또는 최상위 구조 자체가 깨진 경우는
+     * 여전히 복구 불가능한 실패로 보고 CustomException을 던진다 — 호출부(특히
+     * initAllDisasterData의 페이지 루프)가 "저장 완료"로 잘못 보고하지 않도록 반드시 전파한다.
+     */
+    private DisasterApiResponse parseResponse(String raw) {
+        JsonNode root;
+        try {
+            root = objectMapper.readTree(raw);
+        } catch (JsonProcessingException e) {
+            logParseFailure(raw, e);
+            throw new CustomException(ErrorCode.JSON_PARSE_ERROR, "재난문자 응답 파싱 실패 (raw " + raw.length() + "자)");
+        }
+        if (!(root instanceof ObjectNode rootObject)) {
+            log.error("재난문자 응답이 예상된 객체 형태가 아님 - raw {}자", raw.length());
+            throw new CustomException(ErrorCode.JSON_PARSE_ERROR, "재난문자 응답이 객체 형태가 아님");
+        }
+
+        List<DisasterAlertDto> dtos = parseBodyElements(rootObject.path("body"));
+        rootObject.set("body", objectMapper.createArrayNode()); // 메타데이터만 안전하게 변환하기 위해 원본 body는 비워둔다
+
+        DisasterApiResponse response;
+        try {
+            response = objectMapper.treeToValue(rootObject, DisasterApiResponse.class);
+        } catch (JsonProcessingException e) {
+            logParseFailure(raw, e);
+            throw new CustomException(ErrorCode.JSON_PARSE_ERROR, "재난문자 응답 파싱 실패 (raw " + raw.length() + "자)");
+        }
+        response.setBody(dtos);
+        return response;
+    }
+
+    /**
+     * body 배열 원소를 하나씩 파싱한다. 원소 하나가 깨져도 나머지는 계속 처리한다.
+     * 실패한 원소들의 원문(JSON)은 응답 1건당 ERROR 로그 1개에 모아서 남긴다 — 원소마다 개별
+     * ERROR를 찍으면 한 페이지에서 여러 건 실패 시 Sentry 이벤트가 과다 발생하기 때문에,
+     * 건수와 무관하게 항상 1개의 이벤트로 묶되 그 안에 실패한 원소 원문을 그대로 담는다
+     * (최대 10건까지 미리보기 — 그 이상은 페이로드 비대화 방지를 위해 개수만 표기).
+     */
+    private List<DisasterAlertDto> parseBodyElements(JsonNode bodyNode) {
+        if (!bodyNode.isArray()) {
+            if (!bodyNode.isMissingNode()) {
+                log.warn("재난문자 응답 body가 배열이 아닙니다({}) - 빈 것으로 처리", bodyNode.getNodeType());
+            }
+            return List.of();
+        }
+        List<DisasterAlertDto> dtos = new ArrayList<>();
+        List<String> failedItems = new ArrayList<>();
+        for (JsonNode item : bodyNode) {
+            try {
+                dtos.add(objectMapper.treeToValue(item, DisasterAlertDto.class));
+            } catch (JsonProcessingException e) {
+                failedItems.add(item.toString());
+            }
+        }
+        if (!failedItems.isEmpty()) {
+            String failedAtKst = LocalDateTime.now(KST).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
+            String preview = failedItems.size() > 10
+                    ? String.join(" | ", failedItems.subList(0, 10)) + " ...(외 " + (failedItems.size() - 10) + "건 생략)"
+                    : String.join(" | ", failedItems);
+            log.error("재난문자 응답 원소 {}건 파싱 실패 - 해당 원소만 건너뛰고 나머지 {}건은 계속 처리함 (KST {}), 실패 원문: {}",
+                    failedItems.size(), dtos.size(), failedAtKst, preview);
+        }
+        return dtos;
+    }
+
+    private void logParseFailure(String raw, JsonProcessingException e) {
+        String failedAtKst = LocalDateTime.now(KST).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
+        String bodyPreview = raw.length() > 2000 ? raw.substring(0, 2000) + "...(이하 생략, 총 " + raw.length() + "자)" : raw;
+        log.error("재난문자 응답 파싱 실패 - 실패 시각(KST): {}, 원본 응답: {}", failedAtKst, bodyPreview, e);
     }
 
     /**
@@ -341,7 +420,7 @@ public class DisasterAlertService {
                 log.warn("initAllDisasterData: 첫 페이지 응답이 없습니다. 초기화를 중단합니다.");
                 return;
             }
-            DisasterApiResponse response = objectMapper.readValue(raw, DisasterApiResponse.class);
+            DisasterApiResponse response = parseResponse(raw);
 
             if (checkAPIFailure(response)) return;
 
@@ -359,6 +438,9 @@ public class DisasterAlertService {
 
             ExecutorService executor = Executors.newFixedThreadPool(10);
             List<CompletableFuture<Void>> futures = new ArrayList<>();
+            // saveData()가 파싱 실패 시 예외를 던지므로 아래 catch에서 잡혀 실패로 집계된다 —
+            // 그냥 "page 저장 완료"로 덮이지 않도록 실패 페이지 수를 세어 최종 요약에 반영한다.
+            AtomicInteger failedPages = new AtomicInteger();
 
             for (int page = 1; page <= totalPages; page++) {
                 final int currentPage = page;
@@ -372,6 +454,7 @@ public class DisasterAlertService {
                         this.saveData(pageRaw);
                         log.info("page {} 저장 완료", currentPage);
                     } catch (Exception e) {
+                        failedPages.incrementAndGet();
                         log.error("page {} 저장 오류: {}", currentPage, e.getMessage());
                     }
                 }, executor);
@@ -380,7 +463,11 @@ public class DisasterAlertService {
 
             CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).join();
             executor.shutdown();
-            log.info("총 {}건 재난문자 초기화 완료", totalCount);
+            if (failedPages.get() > 0) {
+                log.error("재난문자 초기화 완료 - 목표 {}건, 실패 페이지 {}개(데이터 누락 가능)", totalCount, failedPages.get());
+            } else {
+                log.info("총 {}건 재난문자 초기화 완료", totalCount);
+            }
         } catch (Exception e) {
             log.error("DisasterAlertService.initAllDisasterData() 오류 발생", e);
         }
@@ -455,7 +542,7 @@ public class DisasterAlertService {
     @Transactional
     public DisasterAlertDetailDto getAlertDetail(Long id, String lang) {
         DisasterAlert alert = disasterAlertRepository.findById(id)
-                .orElseThrow(() -> new EntityNotFoundException("재난문자를 찾을 수 없습니다: id=" + id));
+                .orElseThrow(() -> new CustomException(ErrorCode.DISASTER_ALERT_NOT_FOUND, "id=" + id));
 
         List<String> regionNames = disasterAlertRepository.legalDistrictNamesByAlertId(id);
         DisasterAlertDetailDto dto = new DisasterAlertDetailDto(alert, regionNames);

@@ -18,6 +18,7 @@ public enum ErrorCode {
     FORBIDDEN(403, "A108", "권한이 없습니다."),
 
     USER_ALERT_NOT_FOUND(404, "A108", "사용자 재난 알림을 찾을 수 없습니다."),
+    NOTIFICATION_LOG_NOT_FOUND(404, "NL404", "알림 내역을 찾을 수 없습니다."),
 
     DISASTER_ALERT_NOT_FOUND(404, "D404", "공식 재난문자를 찾을 수 없습니다."),
     EVENT_NOT_FOUND(404, "EV404", "재난 이벤트를 찾을 수 없습니다."),

@@ -197,6 +197,7 @@ npm run dev
 | `GOOGLE_OAUTH_CLIENT_ID` / `_SECRET` | Google OAuth2 |
 | `KAKAO_OAUTH_CLIENT_ID` / `_SECRET` | Kakao OAuth2 |
 | `NAVER_OAUTH_CLIENT_ID` / `_SECRET` | Naver OAuth2 |
+| `SENTRY_DSN` | Sentry 에러 트래킹 프로젝트 DSN (비워두면 SDK가 자동 no-op) |
 
 ---
 
