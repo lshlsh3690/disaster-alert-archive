@@ -14,6 +14,7 @@ import com.disaster.alert.alertapi.domain.weather.repository.WeatherHourlyCorrel
 import com.disaster.alert.alertapi.global.service.LegalDistrictCache;
 import com.disaster.alert.alertapi.global.translation.SupportedLanguage;
 import com.disaster.alert.alertapi.global.translation.TranslationService;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.EntityNotFoundException;
@@ -79,9 +80,18 @@ public class DisasterAlertService {
             log.warn("saveData: 원시 응답이 null/blank 입니다. 저장을 건너뜁니다.");
             return List.of();
         }
+        DisasterApiResponse response;
         try {
-            DisasterApiResponse response = objectMapper.readValue(raw, DisasterApiResponse.class);
-
+            response = objectMapper.readValue(raw, DisasterApiResponse.class);
+        } catch (JsonProcessingException e) {
+            // 파싱 실패 원인 추적용 — 어떤 응답이 몇 시(KST)에 실패했는지 남긴다.
+            // raw는 공공데이터포털 응답 전체라 커질 수 있어 앞부분만 미리보기로 자른다.
+            String failedAtKst = LocalDateTime.now(KST).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
+            String bodyPreview = raw.length() > 2000 ? raw.substring(0, 2000) + "...(이하 생략, 총 " + raw.length() + "자)" : raw;
+            log.error("재난문자 응답 파싱 실패 - 실패 시각(KST): {}, 원본 응답: {}", failedAtKst, bodyPreview, e);
+            return List.of();
+        }
+        try {
             if (checkAPIFailure(response)) return List.of();
 
             List<DisasterAlertDto> dtos = response.getBody();

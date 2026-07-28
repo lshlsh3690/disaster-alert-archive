@@ -51,6 +51,9 @@ dependencies {
 
     implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
     implementation 'org.springframework.boot:spring-boot-starter-actuator'
+    // Controller/Service 계층 호출을 김영한 LogTrace 스타일(트랜잭션ID+들여쓰기)로 자동 로깅
+    // (global/logtrace/LogTraceConfig 의 AOP 어드바이저). 새 라이브러리지만 명시적으로 요청받음.
+    implementation 'org.springframework.boot:spring-boot-starter-aop'
     implementation 'org.springframework.boot:spring-boot-starter-data-redis'
     implementation 'org.springframework.boot:spring-boot-starter-mail'
 //    implementation 'org.springframework.boot:spring-boot-starter-oauth2-client'
