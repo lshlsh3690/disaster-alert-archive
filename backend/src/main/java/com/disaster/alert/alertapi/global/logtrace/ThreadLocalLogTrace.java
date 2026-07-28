@@ -2,7 +2,11 @@ package com.disaster.alert.alertapi.global.logtrace;
 
 import lombok.extern.slf4j.Slf4j;
 
-// Controller -> Service 호출을 [트랜잭션ID] |   |-->method() 형태로 들여쓰기 출력한다.
+// Controller(level 0, 화살표 없음) -> Service(level 1, "-->") -> Repository(level 2, "---->")
+// 순으로 깊이마다 화살표가 2칸씩 늘어나는 형태로 [트랜잭션ID] 를 붙여 로깅한다.
+// 예) [ab12cd34] DisasterAlertController.getAlertDetail()
+//     [ab12cd34] -->DisasterAlertService.getAlertDetail()
+//     [ab12cd34] ---->DisasterAlertRepository.findById()
 // ThreadLocal 로 요청(스레드)별 깊이를 추적 — end/exception에서 반드시 level을 되돌리거나
 // remove() 해야 스레드 풀 재사용 시 이전 요청의 level이 새 요청에 새어 들어가지 않는다.
 //
@@ -13,10 +17,6 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 public class ThreadLocalLogTrace implements LogTrace {
 
-    private static final String START_PREFIX = "-->";
-    private static final String COMPLETE_PREFIX = "<--";
-    private static final String EX_PREFIX = "<X-";
-
     private final ThreadLocal<TraceId> traceIdHolder = new ThreadLocal<>();
 
     @Override
@@ -24,7 +24,7 @@ public class ThreadLocalLogTrace implements LogTrace {
         syncTraceId();
         TraceId traceId = traceIdHolder.get();
         long startTimeMs = System.currentTimeMillis();
-        log.info("[{}] {}{}", traceId.getId(), addSpace(START_PREFIX, traceId.getLevel()), message);
+        log.info("[{}] {}{}", traceId.getId(), startArrow(traceId.getLevel()), message);
         return new TraceStatus(traceId, startTimeMs, message);
     }
 
@@ -41,10 +41,11 @@ public class ThreadLocalLogTrace implements LogTrace {
     private void complete(TraceStatus status, Exception e) {
         long resultTimeMs = System.currentTimeMillis() - status.getStartTimeMs();
         TraceId traceId = status.getTraceId();
+        int level = traceId.getLevel();
         if (e == null) {
-            log.info("[{}] {}{} time={}ms", traceId.getId(), addSpace(COMPLETE_PREFIX, traceId.getLevel()), status.getMessage(), resultTimeMs);
+            log.info("[{}] {}{} time={}ms", traceId.getId(), completeArrow(level), status.getMessage(), resultTimeMs);
         } else {
-            log.info("[{}] {}{} time={}ms ex={}", traceId.getId(), addSpace(EX_PREFIX, traceId.getLevel()), status.getMessage(), resultTimeMs, e.toString());
+            log.info("[{}] {}{} time={}ms ex={}", traceId.getId(), exceptionArrow(level), status.getMessage(), resultTimeMs, e.toString());
         }
         releaseTraceId();
     }
@@ -63,11 +64,16 @@ public class ThreadLocalLogTrace implements LogTrace {
         }
     }
 
-    private static String addSpace(String prefix, int level) {
-        StringBuilder sb = new StringBuilder();
-        for (int i = 0; i < level; i++) {
-            sb.append(i == level - 1 ? "|" + prefix : "|   ");
-        }
-        return sb.toString();
+    // level 0(Controller)은 화살표 없이 메서드명만 — 최상위 진입은 트랜잭션ID 자체가 표식.
+    private static String startArrow(int level) {
+        return level == 0 ? "" : "-".repeat(2 * level) + ">";
+    }
+
+    private static String completeArrow(int level) {
+        return level == 0 ? "" : "<" + "-".repeat(2 * level);
+    }
+
+    private static String exceptionArrow(int level) {
+        return level == 0 ? "" : "<X" + "-".repeat(2 * level - 1);
     }
 }

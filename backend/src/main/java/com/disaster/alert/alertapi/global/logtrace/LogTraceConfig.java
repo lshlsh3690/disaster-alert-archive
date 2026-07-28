@@ -6,10 +6,10 @@ import org.springframework.aop.support.DefaultPointcutAdvisor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
-// Controller/Service 계층 호출을 자동으로 들여쓰기 로깅한다(인프런 김영한 "스프링 핵심 원리 -
-// 고급편" LogTrace 패턴). Repository는 대부분 Spring Data JPA 인터페이스 프록시라 클래스 기반
-// execution 포인트컷으로 걸기 애매해서 제외했다 — QueryDSL 커스텀 구현체(*RepositoryImpl)까지
-// 추적하고 싶으면 아래 expression에 execution(* ..*RepositoryImpl.*(..))만 추가하면 된다.
+// Controller/Service/Repository 계층 호출을 자동으로 들여쓰기 로깅한다(인프런 김영한
+// "스프링 핵심 원리 - 고급편" LogTrace 패턴). Repository는 Spring Data JPA가 만드는
+// 인터페이스 프록시라 execution 포인트컷이 인터페이스 선언 메서드(findById, save 등)
+// 기준으로 매칭된다 — 클래스가 아니라 인터페이스 이름이 *Repository로 끝나는 경우 매칭.
 @Configuration
 public class LogTraceConfig {
 
@@ -23,7 +23,8 @@ public class LogTraceConfig {
         AspectJExpressionPointcut pointcut = new AspectJExpressionPointcut();
         pointcut.setExpression(
                 "execution(* com.disaster.alert.alertapi..*Controller.*(..)) "
-                        + "|| execution(* com.disaster.alert.alertapi..*Service.*(..))"
+                        + "|| execution(* com.disaster.alert.alertapi..*Service.*(..)) "
+                        + "|| execution(* com.disaster.alert.alertapi..*Repository.*(..))"
         );
         return new DefaultPointcutAdvisor(pointcut, new LogTraceAdvice(logTrace));
     }
