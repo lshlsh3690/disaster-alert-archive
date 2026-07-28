@@ -18,9 +18,12 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://www.disaster-alert-archive.co.kr";
+
 export const metadata: Metadata = {
+  metadataBase: new URL(SITE_URL),
   title: "재난 안전문자 아카이브",
-  description: "과거 재난문자를 누구나 쉽게 확인하고, 관심지역 맞춤 알림을 받을 수 있는 재난 안전문자 아카이브 서비스",
+  description: "과거 재난문자 다시보기와 지역별 재난 안전문자 내역을 누구나 쉽게 확인하고, 관심지역 맞춤 알림을 받을 수 있는 재난 안전문자 아카이브 서비스",
 
   manifest: "/manifest.json",
   themeColor: "#3867e8",
