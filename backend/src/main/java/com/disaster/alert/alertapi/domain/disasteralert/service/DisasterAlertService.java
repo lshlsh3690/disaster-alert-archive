@@ -175,9 +175,11 @@ public class DisasterAlertService {
     }
 
     /**
-     * body 배열 원소를 하나씩 파싱한다. 원소 하나가 깨져도 나머지는 계속 처리하고, 그 원소는
-     * 원본 JSON과 함께 WARN으로 남긴다(Sentry는 원소 개수 건당이 아니라 응답 1건당 ERROR 1개만
-     * 받도록 — 원소 단위로 전부 ERROR 찍으면 한 페이지에서 여러 건 실패 시 이벤트가 과다 발생함).
+     * body 배열 원소를 하나씩 파싱한다. 원소 하나가 깨져도 나머지는 계속 처리한다.
+     * 실패한 원소들의 원문(JSON)은 응답 1건당 ERROR 로그 1개에 모아서 남긴다 — 원소마다 개별
+     * ERROR를 찍으면 한 페이지에서 여러 건 실패 시 Sentry 이벤트가 과다 발생하기 때문에,
+     * 건수와 무관하게 항상 1개의 이벤트로 묶되 그 안에 실패한 원소 원문을 그대로 담는다
+     * (최대 10건까지 미리보기 — 그 이상은 페이로드 비대화 방지를 위해 개수만 표기).
      */
     private List<DisasterAlertDto> parseBodyElements(JsonNode bodyNode) {
         if (!bodyNode.isArray()) {
@@ -187,19 +189,21 @@ public class DisasterAlertService {
             return List.of();
         }
         List<DisasterAlertDto> dtos = new ArrayList<>();
-        int skipped = 0;
+        List<String> failedItems = new ArrayList<>();
         for (JsonNode item : bodyNode) {
             try {
                 dtos.add(objectMapper.treeToValue(item, DisasterAlertDto.class));
             } catch (JsonProcessingException e) {
-                skipped++;
-                log.warn("재난문자 응답 원소 파싱 실패, 해당 원소만 건너뜀 - 원본: {}", item, e);
+                failedItems.add(item.toString());
             }
         }
-        if (skipped > 0) {
+        if (!failedItems.isEmpty()) {
             String failedAtKst = LocalDateTime.now(KST).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
-            log.error("재난문자 응답 원소 {}건 파싱 실패 - 해당 원소만 건너뛰고 나머지 {}건은 계속 처리함 (KST {})",
-                    skipped, dtos.size(), failedAtKst);
+            String preview = failedItems.size() > 10
+                    ? String.join(" | ", failedItems.subList(0, 10)) + " ...(외 " + (failedItems.size() - 10) + "건 생략)"
+                    : String.join(" | ", failedItems);
+            log.error("재난문자 응답 원소 {}건 파싱 실패 - 해당 원소만 건너뛰고 나머지 {}건은 계속 처리함 (KST {}), 실패 원문: {}",
+                    failedItems.size(), dtos.size(), failedAtKst, preview);
         }
         return dtos;
     }
