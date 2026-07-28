@@ -103,7 +103,9 @@ export default function HomeClient() {
                   <p>{t("nav.alerts")}</p>
                   <h2>{clean(t("dashboard.latestAlerts"))}</h2>
                 </div>
-                <Link href="/alerts" className="card-link">
+                {/* prefetch=false: 홈에서 항상 보이는 링크 — Header 내비게이션과 같은 이유로
+                    /alerts(force-dynamic, 서버 prefetchQuery 3개)를 백그라운드 실행시키지 않음 */}
+                <Link href="/alerts" className="card-link" prefetch={false}>
                   {t("dashboard.viewAll")}
                 </Link>
               </header>

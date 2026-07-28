@@ -346,7 +346,9 @@ function AlertsClientInner() {
                       const href = a.source === "USER" ? `/alerts/${a.id}?source=USER` : `/alerts/${a.id}?source=OFFICIAL`;
                       return (
                         <li key={a.id} className="border-b border-[var(--line)] last:border-0">
-                          <Link href={href} className="group relative block py-3 pl-5 pr-2 transition-colors hover:bg-[var(--blue-soft)]">
+                          {/* prefetch=false: 목록 한 페이지(10건)가 뜰 때마다 상세(force-dynamic)
+                              서버 데이터 페칭이 프리페치로 전부 백그라운드 실행되는 걸 방지 */}
+                          <Link href={href} className="group relative block py-3 pl-5 pr-2 transition-colors hover:bg-[var(--blue-soft)]" prefetch={false}>
                             <span className="absolute left-2 top-[18px] h-1.5 w-1.5 rounded-sm bg-[var(--coral)]" aria-hidden="true" />
                             <div className="flex items-baseline justify-between gap-3">
                               <span className="truncate text-[13px] font-semibold text-[var(--ink)]">{regionLabel}</span>

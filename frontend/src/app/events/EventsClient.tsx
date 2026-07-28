@@ -283,9 +283,12 @@ function EventsClientInner() {
           <ul className="space-y-3">
             {data.content.map((e: Event) => (
               <li key={e.id}>
+                {/* prefetch=false: alerts 목록과 동일한 이유 — 상세(force-dynamic) 프리페치가
+                    목록에 보이는 항목만큼 백그라운드 서버 데이터 페칭을 일으키는 걸 방지 */}
                 <Link
                   href={`/events/${e.id}`}
                   className="block rounded-[var(--radius-panel-card)] border border-[var(--line)] bg-[var(--surface)] p-4 shadow-[0_10px_30px_rgba(28,39,60,0.04)] transition-shadow hover:shadow-[0_12px_28px_rgba(28,39,60,0.08)]"
+                  prefetch={false}
                 >
                   <div className="flex items-start justify-between gap-2">
                     <h2 className="flex-1 font-semibold leading-snug text-[var(--ink)]">

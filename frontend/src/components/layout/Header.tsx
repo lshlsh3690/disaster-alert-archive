@@ -101,11 +101,16 @@ export default function Header() {
         </div>
 
         {/* 데스크톱 네비게이션 */}
+        {/* prefetch=false: Header는 모든 페이지에 항상 떠 있어 링크가 계속 뷰포트에 잡힘.
+            "/", "/alerts"는 force-dynamic + 서버 prefetchQuery(axios)라 기본 prefetch가
+            어느 페이지를 보든 백그라운드에서 그 데이터 페칭을 통째로 실행해버려 백엔드에
+            불필요한 요청이 계속 발생했음(캐디 로그에서 axios UA 중복 호출로 확인). */}
         <nav className="hidden md:flex items-center gap-1 text-sm">
           {menu.map(({ name, href }) => (
             <Link
               key={href}
               href={href}
+              prefetch={false}
               className={`px-3 py-2 rounded-[var(--radius-control)] transition-colors hover:text-[var(--blue)] hover:bg-[var(--blue-soft)] ${
                 isActive(href) ? "font-semibold text-[var(--blue)] bg-[var(--blue-soft)]" : "text-[var(--text-body)]"
               }`}
@@ -186,6 +191,7 @@ export default function Header() {
             <Link
               key={href}
               href={href}
+              prefetch={false}
               className={`block px-3 py-2.5 rounded-[var(--radius-control)] hover:bg-[var(--blue-soft)] hover:text-[var(--blue)] ${
                 isActive(href) ? "font-semibold text-[var(--blue)] bg-[var(--blue-soft)]" : "text-[var(--text-body)]"
               }`}

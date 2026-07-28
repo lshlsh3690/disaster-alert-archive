@@ -36,7 +36,9 @@ export default function LatestAlertsSection({ limit = 5 }: { limit?: number }) {
         const disasterType = (translated && a.translatedDisasterType) || a.disasterType;
         return (
           <li key={a.id}>
-            <Link href={`/alerts/${a.id}`} className="feed-item">
+            {/* prefetch=false: 홈(force-dynamic)에 최근 알림 목록이 뜰 때마다 상세(마찬가지로
+                force-dynamic) 서버 데이터 페칭이 프리페치로 백그라운드 실행되는 걸 방지 */}
+            <Link href={`/alerts/${a.id}`} className="feed-item" prefetch={false}>
               <div className="feed-item__head">
                 <span className="feed-item__region">{region}</span>
                 <time className="feed-item__time">{formatKST(a.createdAt)}</time>
