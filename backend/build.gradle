@@ -91,6 +91,8 @@ dependencies {
 
     implementation 'org.apache.httpcomponents.client5:httpclient5'
 
+    // Sentry — 백엔드 에러 트래킹 (5xx/미처리 예외 + 스케줄러 log.error 를 이벤트로 전송)
+    implementation 'io.sentry:sentry-spring-boot-starter-jakarta:8.50.1'
 
 }
 
