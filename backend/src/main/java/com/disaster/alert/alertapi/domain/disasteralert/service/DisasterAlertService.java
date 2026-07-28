@@ -39,6 +39,7 @@ import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
 @Service
@@ -81,9 +82,7 @@ public class DisasterAlertService {
             log.warn("saveData: 원시 응답이 null/blank 입니다. 저장을 건너뜁니다.");
             return List.of();
         }
-        Optional<DisasterApiResponse> parsed = parseResponse(raw);
-        if (parsed.isEmpty()) return List.of();
-        DisasterApiResponse response = parsed.get();
+        DisasterApiResponse response = parseResponse(raw);
         try {
             if (checkAPIFailure(response)) return List.of();
 
@@ -140,17 +139,20 @@ public class DisasterAlertService {
 
     /**
      * 공공데이터포털 응답 JSON 파싱 — saveData()와 initAllDisasterData() 양쪽에서 공유한다.
-     * 실패 시 어떤 응답이 몇 시(KST)에 실패했는지 로그로 남기고 빈 Optional을 반환한다.
-     * raw는 응답 전체라 커질 수 있어 앞부분만 미리보기로 자른다.
+     * 실패 시 어떤 응답이 몇 시(KST)에 실패했는지 로그로 남기고 CustomException을 던진다.
+     * 파싱 실패를 빈 결과로 조용히 덮으면 호출부(특히 initAllDisasterData의 페이지 루프)가
+     * "저장 완료"로 잘못 보고할 수 있어, 반드시 호출부가 실패를 인지하도록 예외로 전파한다
+     * (그 외 저장 로직 실패는 기존대로 saveData 내부에서 계속 삼킨다 — 이 메서드만 예외).
+     * raw는 응답 전체라 커질 수 있어 로그엔 앞부분만 미리보기로 자른다.
      */
-    private Optional<DisasterApiResponse> parseResponse(String raw) {
+    private DisasterApiResponse parseResponse(String raw) {
         try {
-            return Optional.of(objectMapper.readValue(raw, DisasterApiResponse.class));
+            return objectMapper.readValue(raw, DisasterApiResponse.class);
         } catch (JsonProcessingException e) {
             String failedAtKst = LocalDateTime.now(KST).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
             String bodyPreview = raw.length() > 2000 ? raw.substring(0, 2000) + "...(이하 생략, 총 " + raw.length() + "자)" : raw;
             log.error("재난문자 응답 파싱 실패 - 실패 시각(KST): {}, 원본 응답: {}", failedAtKst, bodyPreview, e);
-            return Optional.empty();
+            throw new CustomException(ErrorCode.JSON_PARSE_ERROR, "재난문자 응답 파싱 실패 (raw " + raw.length() + "자)");
         }
     }
 
@@ -360,9 +362,7 @@ public class DisasterAlertService {
                 log.warn("initAllDisasterData: 첫 페이지 응답이 없습니다. 초기화를 중단합니다.");
                 return;
             }
-            Optional<DisasterApiResponse> parsedFirstPage = parseResponse(raw);
-            if (parsedFirstPage.isEmpty()) return;
-            DisasterApiResponse response = parsedFirstPage.get();
+            DisasterApiResponse response = parseResponse(raw);
 
             if (checkAPIFailure(response)) return;
 
@@ -380,6 +380,9 @@ public class DisasterAlertService {
 
             ExecutorService executor = Executors.newFixedThreadPool(10);
             List<CompletableFuture<Void>> futures = new ArrayList<>();
+            // saveData()가 파싱 실패 시 예외를 던지므로 아래 catch에서 잡혀 실패로 집계된다 —
+            // 그냥 "page 저장 완료"로 덮이지 않도록 실패 페이지 수를 세어 최종 요약에 반영한다.
+            AtomicInteger failedPages = new AtomicInteger();
 
             for (int page = 1; page <= totalPages; page++) {
                 final int currentPage = page;
@@ -393,6 +396,7 @@ public class DisasterAlertService {
                         this.saveData(pageRaw);
                         log.info("page {} 저장 완료", currentPage);
                     } catch (Exception e) {
+                        failedPages.incrementAndGet();
                         log.error("page {} 저장 오류: {}", currentPage, e.getMessage());
                     }
                 }, executor);
@@ -401,7 +405,11 @@ public class DisasterAlertService {
 
             CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).join();
             executor.shutdown();
-            log.info("총 {}건 재난문자 초기화 완료", totalCount);
+            if (failedPages.get() > 0) {
+                log.error("재난문자 초기화 완료 - 목표 {}건, 실패 페이지 {}개(데이터 누락 가능)", totalCount, failedPages.get());
+            } else {
+                log.info("총 {}건 재난문자 초기화 완료", totalCount);
+            }
         } catch (Exception e) {
             log.error("DisasterAlertService.initAllDisasterData() 오류 발생", e);
         }
