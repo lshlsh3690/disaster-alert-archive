@@ -9,6 +9,7 @@ services:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data
       - caddy_config:/config
+      - caddy_logs:/var/log/caddy
     depends_on:
       - backend
 
@@ -39,3 +40,4 @@ volumes:
   redis_data:
   caddy_data:
   caddy_config:
+  caddy_logs:
