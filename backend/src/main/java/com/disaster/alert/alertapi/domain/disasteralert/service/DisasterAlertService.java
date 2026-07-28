@@ -1,6 +1,8 @@
 package com.disaster.alert.alertapi.domain.disasteralert.service;
 
 import com.disaster.alert.alertapi.api.DisasterOpenApiClient;
+import com.disaster.alert.alertapi.domain.common.exception.CustomException;
+import com.disaster.alert.alertapi.domain.common.exception.ErrorCode;
 import com.disaster.alert.alertapi.domain.disasteralert.constant.StatsCacheNames;
 import com.disaster.alert.alertapi.domain.disasteralert.dto.*;
 import com.disaster.alert.alertapi.domain.disasteralert.model.DisasterAlert;
@@ -17,7 +19,6 @@ import com.disaster.alert.alertapi.global.translation.TranslationService;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.persistence.EntityManager;
-import jakarta.persistence.EntityNotFoundException;
 import jakarta.persistence.PersistenceContext;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -465,7 +466,7 @@ public class DisasterAlertService {
     @Transactional
     public DisasterAlertDetailDto getAlertDetail(Long id, String lang) {
         DisasterAlert alert = disasterAlertRepository.findById(id)
-                .orElseThrow(() -> new EntityNotFoundException("재난문자를 찾을 수 없습니다: id=" + id));
+                .orElseThrow(() -> new CustomException(ErrorCode.DISASTER_ALERT_NOT_FOUND, "id=" + id));
 
         List<String> regionNames = disasterAlertRepository.legalDistrictNamesByAlertId(id);
         DisasterAlertDetailDto dto = new DisasterAlertDetailDto(alert, regionNames);

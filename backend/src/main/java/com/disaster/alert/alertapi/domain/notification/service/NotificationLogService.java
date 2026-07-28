@@ -1,9 +1,10 @@
 package com.disaster.alert.alertapi.domain.notification.service;
 
+import com.disaster.alert.alertapi.domain.common.exception.CustomException;
+import com.disaster.alert.alertapi.domain.common.exception.ErrorCode;
 import com.disaster.alert.alertapi.domain.notification.dto.NotificationLogDtos;
 import com.disaster.alert.alertapi.domain.notification.model.UserNotificationLog;
 import com.disaster.alert.alertapi.domain.notification.repository.UserNotificationLogRepository;
-import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -43,7 +44,7 @@ public class NotificationLogService {
     public void markAsRead(Long id, Long memberId) {
         UserNotificationLog log = userNotificationLogRepository
                 .findByIdAndMemberId(id, memberId)
-                .orElseThrow(() -> new EntityNotFoundException("알림을 찾을 수 없습니다."));
+                .orElseThrow(() -> new CustomException(ErrorCode.NOTIFICATION_LOG_NOT_FOUND));
         log.markAsRead();
     }
 }
