@@ -41,7 +41,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                                     HttpServletResponse response,
                                     FilterChain filterChain)
             throws ServletException, IOException {
-        log.info("JWT Authentication Filter invoked");
+        log.debug("JWT Authentication Filter invoked");
 
         String token = resolveToken(request);
 
