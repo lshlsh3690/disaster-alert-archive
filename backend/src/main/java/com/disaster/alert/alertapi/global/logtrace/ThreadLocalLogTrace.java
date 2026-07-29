@@ -2,11 +2,12 @@ package com.disaster.alert.alertapi.global.logtrace;
 
 import lombok.extern.slf4j.Slf4j;
 
-// Controller(level 0, 화살표 없음) -> Service(level 1, "-->") -> Repository(level 2, "---->")
-// 순으로 깊이마다 화살표가 2칸씩 늘어나는 형태로 [트랜잭션ID] 를 붙여 로깅한다.
+// 호출 깊이(level)마다 화살표가 2칸씩 늘어나는 형태로 [트랜잭션ID] 를 붙여 로깅한다
+// (level 0은 화살표 없음). 현재 LogTraceConfig 포인트컷은 Controller(level 0) ->
+// Service(level 1, "-->")까지만 걸어두지만, 포인트컷에 다른 계층이 추가되면 이 클래스는
+// 그대로 더 깊은 레벨(예: "---->")도 자동으로 처리한다.
 // 예) [ab12cd34] DisasterAlertController.getAlertDetail()
 //     [ab12cd34] -->DisasterAlertService.getAlertDetail()
-//     [ab12cd34] ---->DisasterAlertRepository.findById()
 // ThreadLocal 로 요청(스레드)별 깊이를 추적 — end/exception에서 반드시 level을 되돌리거나
 // remove() 해야 스레드 풀 재사용 시 이전 요청의 level이 새 요청에 새어 들어가지 않는다.
 //
