@@ -173,6 +173,11 @@ function AlertsClientInner() {
         const el = document.getElementById("list");
         if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
       }, 0);
+      // #list는 다른 페이지(대시보드 지도 등)에서 넘어올 때 한 번만 목록으로 스크롤시키기
+      // 위한 용도다. 안 지우면 해시가 주소창에 계속 남아있어서, 이 페이지 안에서
+      // 지도를 클릭하거나 필터를 바꿀 때마다(=searchParams가 바뀔 때마다) 이 조건이
+      // 매번 다시 걸려 원치 않는 스크롤 점프가 반복됐다.
+      window.history.replaceState(null, "", window.location.pathname + window.location.search);
     }
   }, [searchParams, reset]);
 
@@ -207,7 +212,17 @@ function AlertsClientInner() {
       qs.delete("sido");
       qs.delete("sigungu");
     }
-    router.push(`/alerts?${qs.toString()}`);
+    // scroll:false — 지도 안에서 지역을 클릭한 것뿐이라 본문 스크롤 위치는 그대로 둔다.
+    // Next 라우터 기본값은 push 시 스크롤을 최상단으로 리셋해, 지도를 보려고
+    // 스크롤해 둔 위치가 클릭할 때마다 흐트러지는 문제가 있었음.
+    router.push(`/alerts?${qs.toString()}`, { scroll: false });
+  }, [searchParams, router]);
+
+  const onMapSigunguSelect = useCallback((sigungu: string) => {
+    setPage(0);
+    const qs = new URLSearchParams(searchParams.toString());
+    qs.set("sigungu", sigungu);
+    router.push(`/alerts?${qs.toString()}`, { scroll: false });
   }, [searchParams, router]);
 
   return (
@@ -404,7 +419,7 @@ function AlertsClientInner() {
           {/* 오른쪽: 폴리곤 지도 + 통계 */}
           <div className="flex w-full min-w-0 flex-col gap-4">
             <div className="overflow-hidden rounded-[var(--radius-panel-card)] border border-[var(--line)] bg-[var(--surface)] shadow-[0_10px_30px_rgba(28,39,60,0.04)]">
-              <KakaoPolygonMap params={mapParams} mapHeight="520px" showSidebar={false} externalSido={formState.sido || undefined} onSidoSelect={onMapSidoSelect} />
+              <KakaoPolygonMap params={mapParams} mapHeight="520px" showSidebar={false} externalSido={formState.sido || undefined} onSidoSelect={onMapSidoSelect} onSigunguSelect={onMapSigunguSelect} />
             </div>
 
             {/* 재난 통계 요약 */}

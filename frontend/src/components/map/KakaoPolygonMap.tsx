@@ -142,9 +142,10 @@ interface Props {
   showSidebar?: boolean;
   externalSido?: string;
   onSidoSelect?: (sido: string | null) => void;
+  onSigunguSelect?: (sigungu: string) => void;
 }
 
-export default function KakaoPolygonMap({ params = {}, mapHeight = "500px", showSidebar = true, externalSido, onSidoSelect }: Props) {
+export default function KakaoPolygonMap({ params = {}, mapHeight = "500px", showSidebar = true, externalSido, onSidoSelect, onSigunguSelect }: Props) {
   const { t } = useTranslation();
   const locale = LANG_LOCALE[useLanguageStore((s) => s.language)] ?? "ko-KR";
   const DANGER_LABEL = t("weatherMap.dangerLabels", { returnObjects: true }) as I18nKey["ko"]["weatherMap"]["dangerLabels"];
@@ -163,6 +164,13 @@ export default function KakaoPolygonMap({ params = {}, mapHeight = "500px", show
 
   const hoveredCdRef    = useRef<string | null>(null);
   const selectedSidoRef = useRef<SidoFeature | null>(null);
+  // 시군구 폴리곤의 click 리스너는 drawSigunguOf가 실행될 때(= sido 변경/통계 갱신 시에만)
+  // 등록되므로, 그 사이 searchParams가 바뀌어 onSigunguSelect가 새 함수로 바뀌어도
+  // 리스너는 등록 시점의 예전 클로저를 계속 참조한다 — 그 상태에서 클릭하면 오래된
+  // searchParams 기준으로 URL을 만들어 그 사이 바뀐 다른 필터를 덮어써 버린다.
+  // ref로 감싸 항상 최신 콜백을 호출하도록 한다.
+  const onSigunguSelectRef = useRef(onSigunguSelect);
+  onSigunguSelectRef.current = onSigunguSelect;
   const svgOverlayRef   = useRef<SVGSVGElement | null>(null);
   const dimmedSidosRef  = useRef<SidoFeature[]>([]);
   const hatchPathRef    = useRef<SVGPathElement | null>(null);
@@ -437,6 +445,9 @@ export default function KakaoPolygonMap({ params = {}, mapHeight = "500px", show
         kakao.maps.event.addListener(p, "mouseout", () => {
           p.setOptions(style);
           setHoverInfo(null);
+        });
+        kakao.maps.event.addListener(p, "click", () => {
+          onSigunguSelectRef.current?.(name);
         });
         sigunguPolys.current.push(p);
       });
