@@ -10,19 +10,26 @@ import org.springframework.context.annotation.Configuration;
 // "스프링 핵심 원리 - 고급편" LogTrace 패턴). Repository는 Spring Data JPA 인터페이스
 // 프록시라도 execution이 인터페이스 선언 메서드 기준으로 정상 매칭된다.
 //
-// risk 도메인 전체와 event의 클러스터링 관련 서비스는 뺐다 — 이쪽은 원래 설계상 지역·
-// 후보 단위로 반복 호출되는 게 정상 동작이라(예: RiskMaintenanceService가 활성 시군구
-// 수백 개마다 RiskCalculationService.recomputeRegionSource()를, 그 안에서
-// RegionRiskIndexRepository.upsertEffective()를 반복 호출), 계층 종류와 무관하게
-// 계층형 로그를 붙이면 호출 1회당 로그 수백~수천 줄이 쏟아지는 걸 운영 로그에서 직접
-// 확인함. 이 서비스들은 기존에도 실패 지점마다 log.error(msg, e)로 직접 잡아서 남기고
-// 있어서(RiskMaintenanceService의 catch(Exception e) 등), LogTrace 없이도 예외는 그대로
-// 일반 로그로 보이고 Sentry 로그백 연동도 유지된다.
+// 포인트컷 자체엔 도메인 제외를 안 건다 — 처음엔 !within(...), 그다음 !cflow(...)로
+// risk/클러스터링/auth 도메인을 걸러보려 했는데:
+//   1) !within(SomeService)는 "그 메서드 자신이 그 클래스에 선언돼 있는지"만 보기 때문에,
+//      그 안에서 다른 패키지의 Repository를 호출하면(예: AuthService.reissue()가
+//      memberRepository.findByEmail() 호출) 그 Repository 호출은 별도 join point라
+//      제외가 안 먹힘.
+//   2) 그래서 "호출 흐름 전체를 제외"하는 !cflow(...)로 바꿨는데, Spring AOP는
+//      execution/within/args 등 일부 AspectJ 지시자만 지원하고 cflow()는 지원하지
+//      않는다(Spring 공식 문서에 명시된 제약). 실제로 붙여보니 포인트컷 전체가 조용히
+//      아무 것도 안 걸리는 것으로 확인됨(정상 Controller/Service까지 트레이스가 하나도
+//      안 찍힘) — 둘 다 CodeRabbit 리뷰/직접 검증으로 잡아낸 문제.
+// 그래서 도메인 제외는 포인트컷이 아니라 LogTraceAdvice 안에서 ThreadLocal 깊이
+// 카운터로 직접 처리한다(LogTraceAdvice 주석 참고) — Spring AOP 제약과 무관하게 정확히
+// "그 도메인 진입 후로는 무엇을 호출하든" 억제할 수 있다.
 //
-// 이 필터에 안 걸리는 다른 반복 호출 패턴(예: DisasterAlertService.saveData()의 중복 SN
-// 재시도 저장 루프 — disasterAlertRepository.save(alert)를 페이지당 최대 1000번까지 호출
-// 가능)도 이론상 남아있다. 지금까지는 실제 운영 로그에서 문제될 만큼 자주 걸린 적이
-// 없어서 남겨뒀지만, 비슷하게 로그가 몰리는 게 보이면 이 방식대로 좁혀서 제외할 것.
+// 그 억제 목록에 안 걸리는 다른 반복 호출 패턴(예: DisasterAlertService.saveData()의
+// 중복 SN 재시도 저장 루프 — disasterAlertRepository.save(alert)를 페이지당 최대
+// 1000번까지 호출 가능)도 이론상 남아있다. 지금까지는 실제 운영 로그에서 문제될 만큼
+// 자주 걸린 적이 없어서 남겨뒀지만, 비슷하게 로그가 몰리는 게 보이면
+// LogTraceAdvice.isSuppressedDomain()에 좁혀서 추가할 것.
 @Configuration
 public class LogTraceConfig {
 
@@ -35,13 +42,9 @@ public class LogTraceConfig {
     public Advisor logTraceAdvisor(LogTrace logTrace) {
         AspectJExpressionPointcut pointcut = new AspectJExpressionPointcut();
         pointcut.setExpression(
-                "(execution(* com.disaster.alert.alertapi..*Controller.*(..)) "
+                "execution(* com.disaster.alert.alertapi..*Controller.*(..)) "
                         + "|| execution(* com.disaster.alert.alertapi..*Service.*(..)) "
-                        + "|| execution(* com.disaster.alert.alertapi..*Repository.*(..))) "
-                        + "&& !within(com.disaster.alert.alertapi.domain.risk..*) "
-                        + "&& !within(com.disaster.alert.alertapi.domain.event.service.EventClusteringService) "
-                        + "&& !within(com.disaster.alert.alertapi.domain.event.service.EventCrossRegionService) "
-                        + "&& !within(com.disaster.alert.alertapi.domain.event.service.EventLLMDecisionService)"
+                        + "|| execution(* com.disaster.alert.alertapi..*Repository.*(..))"
         );
         return new DefaultPointcutAdvisor(pointcut, new LogTraceAdvice(logTrace));
     }
