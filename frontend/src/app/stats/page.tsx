@@ -232,6 +232,7 @@ function SortableWidgetCard({ id, span, children, ...cardProps }: {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
   return (
     <div ref={setNodeRef}
+      className="stats-widget"
       style={{
         gridColumn: `span ${span}`,
         transform: CSS.Transform.toString(transform),
@@ -943,7 +944,7 @@ function StatsPageInner() {
       {/* 위젯 그리드 */}
       <DndContext id="stats-widget-dnd" sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
         <SortableContext items={layout.map(w => w.id)} strategy={rectSortingStrategy}>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(12, 1fr)", gap: 12 }}>
+          <div className="stats-grid" style={{ display: "grid", gridTemplateColumns: "repeat(12, 1fr)", gap: 12 }}>
             {layout.map(w => {
               const lib = widgetLibrary.find(x => x.id === w.libId);
               if (!lib) return null;

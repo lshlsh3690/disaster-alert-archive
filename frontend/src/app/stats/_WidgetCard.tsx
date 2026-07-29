@@ -219,7 +219,7 @@ export function WidgetCard({ widget, lib, onVariantChange, onRemove, titleOverri
 
   return (
     <div ref={cardRef} className={`bg-[var(--surface)] rounded-xl shadow flex flex-col${highlighted ? " widget-added" : ""}`} style={{ gridColumn: `span ${widget.span}`, minHeight: 240 }}>
-      <div className="flex items-center justify-between px-3.5 py-2.5 border-b border-[var(--line)]">
+      <div className="flex flex-wrap items-center justify-between gap-y-1.5 px-3.5 py-2.5 border-b border-[var(--line)]">
         <div className="flex items-center gap-1.5">
           {dragHandleListeners && (
             <span {...dragHandleListeners}
