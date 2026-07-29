@@ -5,3 +5,8 @@
 logging:
   level:
     org.springframework.web: info
+
+# Sentry는 base application.yml에서 기본 꺼져있음(enabled: false) — 실제 운영 트래픽의
+# 에러만 여기서 켠다.
+sentry:
+  enabled: true
