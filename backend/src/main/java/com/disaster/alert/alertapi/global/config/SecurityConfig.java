@@ -67,13 +67,14 @@ public class SecurityConfig {
                         .authenticationEntryPoint((request, response, authException) -> {
                             // 비로그인 사용자의 정상적인 401(예: 프론트 /auth/reissue 인터셉터)이
                             // 요청마다 찍혀서 INFO로 두면 로그가 금방 찬다 — DEBUG로.
-                            log.debug(authException.getMessage());
+                            // 어떤 엔드포인트에서 401이 몰리는지 진단하려고 요청 경로를 같이 남긴다.
+                            log.debug("{} {} - {}", request.getMethod(), request.getRequestURI(), authException.getMessage());
                             response.setStatus(HttpServletResponse.SC_UNAUTHORIZED); // 401
                             response.setContentType("application/json");
                             response.getWriter().write("{\"message\":\"UNAUTHORIZED\"}");
                         })
                         .accessDeniedHandler((request, response, accessDeniedException) -> {
-                            log.debug(accessDeniedException.getMessage());
+                            log.debug("{} {} - {}", request.getMethod(), request.getRequestURI(), accessDeniedException.getMessage());
                             response.setStatus(HttpServletResponse.SC_FORBIDDEN); // 403
                             response.setContentType("application/json");
                             response.getWriter().write("{\"message\":\"FORBIDDEN\"}");
