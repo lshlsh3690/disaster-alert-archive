@@ -142,9 +142,10 @@ interface Props {
   showSidebar?: boolean;
   externalSido?: string;
   onSidoSelect?: (sido: string | null) => void;
+  onSigunguSelect?: (sigungu: string) => void;
 }
 
-export default function KakaoPolygonMap({ params = {}, mapHeight = "500px", showSidebar = true, externalSido, onSidoSelect }: Props) {
+export default function KakaoPolygonMap({ params = {}, mapHeight = "500px", showSidebar = true, externalSido, onSidoSelect, onSigunguSelect }: Props) {
   const { t } = useTranslation();
   const locale = LANG_LOCALE[useLanguageStore((s) => s.language)] ?? "ko-KR";
   const DANGER_LABEL = t("weatherMap.dangerLabels", { returnObjects: true }) as I18nKey["ko"]["weatherMap"]["dangerLabels"];
@@ -437,6 +438,9 @@ export default function KakaoPolygonMap({ params = {}, mapHeight = "500px", show
         kakao.maps.event.addListener(p, "mouseout", () => {
           p.setOptions(style);
           setHoverInfo(null);
+        });
+        kakao.maps.event.addListener(p, "click", () => {
+          onSigunguSelect?.(name);
         });
         sigunguPolys.current.push(p);
       });

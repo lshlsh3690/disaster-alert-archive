@@ -210,6 +210,13 @@ function AlertsClientInner() {
     router.push(`/alerts?${qs.toString()}`);
   }, [searchParams, router]);
 
+  const onMapSigunguSelect = useCallback((sigungu: string) => {
+    setPage(0);
+    const qs = new URLSearchParams(searchParams.toString());
+    qs.set("sigungu", sigungu);
+    router.push(`/alerts?${qs.toString()}#list`);
+  }, [searchParams, router]);
+
   return (
     <main className="bg-[var(--canvas)] min-h-[calc(100vh-48px)]">
       <div className="mx-auto max-w-7xl space-y-4 px-4 py-8 sm:px-6 sm:space-y-6">
@@ -404,7 +411,7 @@ function AlertsClientInner() {
           {/* 오른쪽: 폴리곤 지도 + 통계 */}
           <div className="flex w-full min-w-0 flex-col gap-4">
             <div className="overflow-hidden rounded-[var(--radius-panel-card)] border border-[var(--line)] bg-[var(--surface)] shadow-[0_10px_30px_rgba(28,39,60,0.04)]">
-              <KakaoPolygonMap params={mapParams} mapHeight="520px" showSidebar={false} externalSido={formState.sido || undefined} onSidoSelect={onMapSidoSelect} />
+              <KakaoPolygonMap params={mapParams} mapHeight="520px" showSidebar={false} externalSido={formState.sido || undefined} onSidoSelect={onMapSidoSelect} onSigunguSelect={onMapSigunguSelect} />
             </div>
 
             {/* 재난 통계 요약 */}
