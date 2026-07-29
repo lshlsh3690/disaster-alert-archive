@@ -1,0 +1,7 @@
+# 운영 프로필 전용 오버라이드 (docker-compose.prod.yml 의 SPRING_PROFILES_ACTIVE=prod 로 활성화).
+# base application.yml 은 로컬 개발 편의를 위해 org.springframework.web: debug 로 켜뒀는데,
+# 운영에서 그대로 두면 요청마다 프레임워크 내부 동작(핸들러 매핑/직렬화 등)이 전부 로그로
+# 찍혀서 로그량이 커지고, 요청 상세 정보 노출 위험도 있음 — 운영에선 info로 낮춘다.
+logging:
+  level:
+    org.springframework.web: info
