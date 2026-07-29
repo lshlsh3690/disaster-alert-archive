@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+    <!-- Spring Boot 기본 콘솔 포맷/설정을 그대로 가져온다 (CONSOLE 어펜더, logging.level.* yml
+         설정 등) — 그 위에 LogTrace 로거만 별도 포맷을 추가하는 구조. -->
+    <include resource="org/springframework/boot/logging/logback/defaults.xml"/>
+    <include resource="org/springframework/boot/logging/logback/console-appender.xml"/>
+
+    <!-- LogTrace(Controller/Service/Repository 계층 호출 추적)는 한눈에 스캔할 수 있어야 하는데,
+         기본 포맷(시각/레벨/PID/스레드/로거 풀네임)이 붙으면 정작 중요한
+         [트랜잭션ID] 화살표 들여쓰기가 오른쪽으로 밀려서 안 보임 — 시각+메시지만 남긴다. -->
+    <appender name="LOGTRACE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>%d{HH:mm:ss.SSS} %msg%n</pattern>
+        </encoder>
+    </appender>
+
+    <logger name="com.disaster.alert.alertapi.global.logtrace" additivity="false">
+        <appender-ref ref="LOGTRACE"/>
+    </logger>
+
+    <root level="INFO">
+        <appender-ref ref="CONSOLE"/>
+    </root>
+</configuration>
