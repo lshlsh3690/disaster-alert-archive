@@ -229,8 +229,8 @@ export function WeatherByTypeChart({ data }: { data: WeatherTypeStat[] }) {
         </div>
       )}
 
-      <div className="flex-1 min-h-0" style={{ height: "100%" }}>
-        <ResponsiveContainer width="100%" height="100%">
+      <div className="flex-1 min-h-0 relative">
+        <ResponsiveContainer width="100%" height="100%" className="absolute inset-0">
           <ComposedChart data={pivoted} margin={{ top: 8, right: 36, bottom: 4, left: 4 }}>
             <CartesianGrid vertical={false} stroke="#f3f4f6" />
             <XAxis dataKey="date" axisLine={false} tickLine={false}
@@ -403,8 +403,8 @@ export function WeatherByRegionChart({ data, regionLabel }: { data: WeatherRegio
         </div>
       )}
 
-      <div className="flex-1 min-h-0" style={{ height: "100%" }}>
-        <ResponsiveContainer width="100%" height="100%">
+      <div className="flex-1 min-h-0 relative">
+        <ResponsiveContainer width="100%" height="100%" className="absolute inset-0">
           <ComposedChart data={pivoted} margin={{ top: 4, right: 36, bottom: 4, left: 4 }}>
             <CartesianGrid vertical={false} stroke="#f3f4f6" />
             <XAxis dataKey="date" axisLine={false} tickLine={false}
@@ -504,8 +504,8 @@ export function WeatherOverlayChart({ data }: { data: WeatherCorrelationStat[] }
   };
 
   return (
-    <div className="flex-1 min-h-0" style={{ height: "100%" }}>
-      <ResponsiveContainer width="100%" height="100%">
+    <div className="flex-1 min-h-0 relative">
+      <ResponsiveContainer width="100%" height="100%" className="absolute inset-0">
         <ComposedChart data={chartData} margin={{ top: 8, right: 24, bottom: 4, left: 4 }}>
           <CartesianGrid vertical={false} stroke="#f3f4f6" />
           <XAxis dataKey="date" axisLine={false} tickLine={false}
@@ -586,8 +586,8 @@ export function WeatherCorrelationScatter({ data }: { data: WeatherCorrelationSt
   };
 
   return (
-    <div className="flex-1 min-h-0" style={{ height: "100%" }}>
-      <ResponsiveContainer width="100%" height="100%">
+    <div className="flex-1 min-h-0 relative">
+      <ResponsiveContainer width="100%" height="100%" className="absolute inset-0">
         <ScatterChart margin={{ top: 8, right: 8, bottom: 4, left: 4 }}>
           <CartesianGrid stroke="#f3f4f6" />
           <XAxis type="number" dataKey="x" name={t("statsPage.weatherChart.temperatureLabel")} axisLine={false} tickLine={false}

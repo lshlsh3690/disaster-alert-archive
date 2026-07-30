@@ -188,8 +188,8 @@ export function HorizontalBar({ data, onBarClick, labelFormatter }: { data: Regi
   };
 
   return (
-    <div className="flex-1 min-h-0" style={{ height: "100%" }}>
-      <ResponsiveContainer width="100%" height="100%">
+    <div className="flex-1 min-h-0 relative">
+      <ResponsiveContainer width="100%" height="100%" className="absolute inset-0">
         {/* layout="vertical": 막대가 가로 방향으로 그려집니다 */}
         <BarChart layout="vertical" data={data} margin={{ top: 4, right: 16, bottom: 4, left: 4 }}>
           {/* type="number": 가로 축이 숫자 눈금 */}
@@ -251,8 +251,8 @@ export function VerticalBar({
   };
 
   return (
-    <div className="flex-1 min-h-0" style={{ height: "100%" }}>
-      <ResponsiveContainer width="100%" height="100%">
+    <div className="flex-1 min-h-0 relative">
+      <ResponsiveContainer width="100%" height="100%" className="absolute inset-0">
         <BarChart data={data} margin={{ top: 4, right: 4, bottom: 4, left: 4 }}>
           <XAxis dataKey="label" axisLine={false} tickLine={false} interval={0}
             tick={{ fontSize: 10, fill: "#9ca3af" }} tickFormatter={labelFormatter} />
