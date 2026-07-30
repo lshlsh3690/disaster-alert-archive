@@ -50,8 +50,15 @@ export function WeatherByTypeChart({ data }: { data: WeatherTypeStat[] }) {
       setProgress(pct);
       if (pct >= 100) {
         clearInterval(intervalRef.current!);
-        setPinnedSnap(lastPayloadRef.current);
-        setPinned(true);
+        // 차트 컨테이너에 들어오자마자(아직 막대 위를 지나가기 전) 타이머가 끝나면
+        // lastPayloadRef가 비어있을 수 있다 — 그 상태로 고정하면 pinnedSnap이 null인 채
+        // pinned=true가 되어 툴팁이 영영 안 뜨는 상태로 멈춘다. 데이터가 있을 때만 고정한다.
+        if (lastPayloadRef.current) {
+          setPinnedSnap(lastPayloadRef.current);
+          setPinned(true);
+        } else {
+          setProgress(0);
+        }
       }
     }, 50);
   };
@@ -147,7 +154,7 @@ export function WeatherByTypeChart({ data }: { data: WeatherTypeStat[] }) {
         <div style={{ position: "absolute", top: 8, right: 8, zIndex: 20, ...TT_BOX, minWidth: 180, maxWidth: 220, maxHeight: 260, display: "flex", flexDirection: "column" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4, flexShrink: 0 }}>
             <p style={{ ...TT_LABEL, margin: 0 }}>{pinnedSnap.label}</p>
-            <button onClick={handleClose}
+            <button type="button" onClick={handleClose} aria-label={t("notificationBanner.close")}
               style={{ background: "none", border: "none", color: "#94a3b8", cursor: "pointer", fontSize: 14, lineHeight: 1, padding: 0, marginLeft: 12 }}>
               ✕
             </button>

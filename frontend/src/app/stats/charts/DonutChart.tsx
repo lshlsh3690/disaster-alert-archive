@@ -45,10 +45,11 @@ export function DonutChart({
         <circle cx="50" cy="50" r={r} fill="none" stroke="#f3f4f6" strokeWidth="14" />
 
         {data.map((d, i) => {
-          const pct = d.count / total;        // 이 조각의 비율 (0~1)
+          // total이 0이면(모든 count가 0인 경우) 0/0 = NaN이 되어 dash·offset이 깨지므로 방어
+          const pct = total > 0 ? d.count / total : 0; // 이 조각의 비율 (0~1)
           const dash = pct * c;               // 색칠할 호의 길이
           // strokeDashoffset: 시작 위치를 조정합니다 (음수 = 시계방향으로 이동)
-          const offset = -((acc / total) * c);
+          const offset = total > 0 ? -((acc / total) * c) : 0;
           acc += d.count;
           return (
             <circle
@@ -90,7 +91,7 @@ export function DonutChart({
               <span className="w-2 h-2 rounded-sm shrink-0"
                 style={{ background: TYPE_COLORS[i % TYPE_COLORS.length] }} />
               <span className="flex-1 text-gray-700 truncate">{label}</span>
-              <span className="text-gray-400">{Math.round((d.count / total) * 100)}%</span>
+              <span className="text-gray-400">{total > 0 ? Math.round((d.count / total) * 100) : 0}%</span>
               <span className="font-semibold text-gray-900 min-w-[36px] text-right">
                 {d.count.toLocaleString(locale)}
               </span>

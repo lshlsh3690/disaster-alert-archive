@@ -12,7 +12,8 @@ import type { DailyStat } from "@/types/alerts";
 import { EmptyChart } from "../_charts";
 import { useTranslation } from "react-i18next";
 import { useLanguageStore } from "@/store/languageStore";
-import { LANG_LOCALE, TT_BOX, TT_LABEL, TTProps } from "./common";
+import { LANG_LOCALE } from "./common";
+import { useYearComparison, CompareTooltipContent, YoyBadge } from "./useYearComparison";
 
 /**
  * CompareLines
@@ -37,64 +38,9 @@ export function CompareLines({
 }) {
   const { t } = useTranslation();
   const locale = LANG_LOCALE[useLanguageStore((s) => s.language)] ?? "ko-KR";
-  const agg = (data: DailyStat[]) => {
-    const m: Record<string, number> = {};
-    data.forEach(d => {
-      const k = d.date.slice(5, 7);
-      m[k] = (m[k] ?? 0) + d.count;
-    });
-    return m;
-  };
-  const ty = agg(thisYearData), ly = agg(lastYearData);
-
-  // 1~12월 배열 생성 (둘 다 0인 달만 제외)
-  const currentMonth = new Date().getMonth() + 1;
-  const months = Array.from({ length: 12 }, (_, i) => {
-    const key = String(i + 1).padStart(2, "0");
-    return { label: `${i + 1}${t("statsPage.monthSuffix")}`, ty: ty[key] ?? 0, ly: ly[key] ?? 0, monthNum: i + 1 };
-  }).filter(m => m.ty > 0 || m.ly > 0);
+  const { months, currentMonth, yoy } = useYearComparison(thisYearData, lastYearData, t);
 
   if (months.length === 0) return <EmptyChart />;
-
-  // 전체 YoY 증감률 계산 (미래 달 제외)
-  const pastMonths = months.filter(m => !(m.ty === 0 && m.monthNum > currentMonth));
-  const totalTy = pastMonths.reduce((s, m) => s + m.ty, 0);
-  const totalLy = pastMonths.reduce((s, m) => s + m.ly, 0);
-  const yoy = totalLy > 0 ? Math.round(((totalTy - totalLy) / totalLy) * 100) : null;
-
-  const TooltipContent = ({ active, payload, label }: TTProps) => {
-    if (!active || !payload?.length) return null;
-    const lyVal = payload.find(p => p.dataKey === "ly")?.value ?? 0;
-    const tyVal = payload.find(p => p.dataKey === "ty")?.value ?? 0;
-    const monthNum = months.find(m => m.label === label)?.monthNum ?? 0;
-    const isFuture = tyVal === 0 && monthNum > currentMonth;
-    const diff = !isFuture && lyVal > 0 ? Math.round(((tyVal - lyVal) / lyVal) * 100) : null;
-    return (
-      <div style={TT_BOX}>
-        <p style={TT_LABEL}>{label}</p>
-        <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 2 }}>
-          <span style={{ width: 8, height: 8, borderRadius: 2, background: "#cbd5e1", display: "inline-block", flexShrink: 0 }} />
-          <span style={{ color: "#fff", fontSize: 11 }}>
-            {currentYear - 1}: {lyVal.toLocaleString(locale)}{t("statsPage.countUnit")}
-          </span>
-        </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: diff !== null ? 4 : 0 }}>
-          <span style={{ width: 8, height: 8, borderRadius: 2, background: "#2563eb", display: "inline-block", flexShrink: 0 }} />
-          <span style={{ color: "#fff", fontSize: 11 }}>
-            {currentYear}: {tyVal.toLocaleString(locale)}{t("statsPage.countUnit")}
-          </span>
-        </div>
-        {diff !== null && (
-          <p style={{
-            color: tyVal >= lyVal ? "#f87171" : "#60a5fa",
-            fontWeight: 700, fontSize: 11, margin: 0, textAlign: "center",
-          }}>
-            {tyVal >= lyVal ? `↑ +${diff}%` : `↓ ${diff}%`}
-          </p>
-        )}
-      </div>
-    );
-  };
 
   return (
     <div className="flex flex-col gap-2 flex-1 min-h-0">
@@ -106,7 +52,9 @@ export function CompareLines({
               tick={{ fontSize: 10, fill: "#9ca3af" }} />
             <YAxis axisLine={false} tickLine={false}
               tick={{ fontSize: 10, fill: "#9ca3af" }} width={32} />
-            <Tooltip content={<TooltipContent />} wrapperStyle={{ zIndex: 30 }} />
+            <Tooltip
+              content={<CompareTooltipContent months={months} currentMonth={currentMonth} currentYear={currentYear} locale={locale} t={t} />}
+              wrapperStyle={{ zIndex: 30 }} />
             {/* formatter: Recharts 범례의 "ly"/"ty" 키를 연도로 변환 */}
             <Legend wrapperStyle={{ fontSize: 12 }}
               formatter={(value: string) =>
@@ -122,13 +70,7 @@ export function CompareLines({
       </div>
 
       {/* 전체 YoY 증감률 표시 */}
-      {yoy !== null && (
-        <div className="flex justify-end text-xs">
-          <span className={`font-bold ${yoy >= 0 ? "text-red-600" : "text-blue-600"}`}>
-            {yoy >= 0 ? `↑ +${yoy}%` : `↓ ${yoy}%`} (YoY)
-          </span>
-        </div>
-      )}
+      <YoyBadge yoy={yoy} />
     </div>
   );
 }

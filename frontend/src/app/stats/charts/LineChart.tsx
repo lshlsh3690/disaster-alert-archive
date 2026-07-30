@@ -77,7 +77,7 @@ export function LineChart({ data }: { data: DailyStat[] }) {
           {/* 평균값 점선 기준선 */}
           <ReferenceLine y={avg} stroke="#f97316" strokeDasharray="3 2" />
 
-          {/* 30일 초과 시 줌/팬 범위 선택기 표시 */}
+          {/* 7개 초과 시 줌/팬 범위 선택기 표시 (DailyBar와 동일한 기준) */}
           {data.length > 7 && (
             <Brush dataKey="date" height={22} stroke="#93c5fd" fill="#eff6ff" travellerWidth={8}
               tickFormatter={(v: string) => v.slice(5)}
