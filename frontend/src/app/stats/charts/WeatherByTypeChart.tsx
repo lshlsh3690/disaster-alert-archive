@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import {
-  ComposedChart, Bar, Line,
+  ComposedChart, Bar,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend,
   ResponsiveContainer,
 } from "recharts";
@@ -173,18 +173,13 @@ export function WeatherByTypeChart({ data }: { data: WeatherTypeStat[] }) {
             <XAxis dataKey="date" axisLine={false} tickLine={false}
               tick={{ fontSize: 9, fill: "#9ca3af" }} interval={labelStride - 1} />
             <YAxis yAxisId="cnt" axisLine={false} tickLine={false} tick={{ fontSize: 9, fill: "#9ca3af" }} width={32} />
-            <YAxis yAxisId="temp" orientation="right" axisLine={false} tickLine={false}
-              tick={{ fontSize: 9, fill: "#f97316" }} width={36} tickFormatter={(v: number) => `${v}°`} />
             <Tooltip content={<TooltipContent />} wrapperStyle={{ zIndex: 30 }} />
-            <Legend wrapperStyle={{ fontSize: 10 }}
-              formatter={(v: string) => v === "_avgTemp" ? t("statsPage.weatherChart.averageTempLegend") : translateType(v)} />
+            <Legend wrapperStyle={{ fontSize: 10 }} formatter={(v: string) => translateType(v)} />
             {types.map((type, i) => (
               <Bar key={type} yAxisId="cnt" dataKey={type} stackId="s"
                 fill={STACKED_COLORS[i % STACKED_COLORS.length]} maxBarSize={24}
                 radius={i === types.length - 1 ? [2, 2, 0, 0] : [0, 0, 0, 0]} isAnimationActive={false} />
             ))}
-            <Line yAxisId="temp" type="monotone" dataKey="_avgTemp" stroke="#f97316"
-              strokeWidth={2} dot={false} name="_avgTemp" isAnimationActive={false} />
           </ComposedChart>
         </ResponsiveContainer>
       </div>

@@ -1,7 +1,7 @@
 "use client";
 
 import {
-  ComposedChart, Bar, Line, Area,
+  ComposedChart, Bar, Line,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend,
   ResponsiveContainer,
 } from "recharts";
@@ -104,14 +104,9 @@ export function WeatherOverlayChart({ data }: { data: WeatherCorrelationStat[] }
           <Legend wrapperStyle={{ fontSize: 11 }}
             formatter={(v: string) => ({
               count: t("statsPage.weatherChart.occurrenceCountLegend"),
-              avgTemp: t("statsPage.weatherChart.averageTempLegend"),
-              tempRange: t("statsPage.weatherChart.tempRangeLegend"),
               maxPrecip: t("statsPage.weatherChart.maxPrecipLegend"),
             }[v] ?? v)} />
           <Bar yAxisId="cnt" dataKey="count" fill="#3b82f6" fillOpacity={0.7} radius={[2, 2, 0, 0]} maxBarSize={20} isAnimationActive={false} />
-          <Area yAxisId="temp" type="monotone" dataKey="tempRange" stroke="none"
-            fill="#f97316" fillOpacity={0.12} activeDot={false} legendType="none" isAnimationActive={false} />
-          <Line yAxisId="temp" type="monotone" dataKey="avgTemp" stroke="#f97316" strokeWidth={2} dot={false} isAnimationActive={false} />
           <Line yAxisId="temp" type="monotone" dataKey="maxPrecip" stroke="#06b6d4" strokeWidth={1.5} dot={false} strokeDasharray="4 2" isAnimationActive={false} />
         </ComposedChart>
       </ResponsiveContainer>
