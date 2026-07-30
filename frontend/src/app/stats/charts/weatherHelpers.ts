@@ -22,9 +22,12 @@ export function getAggMode(dateCount: number): AggMode {
 export function getAggKey(date: string, mode: AggMode): string {
   if (mode === "daily") return date;
   if (mode === "monthly") return date.slice(0, 7);
-  const d = new Date(date);
-  const dow = d.getDay();
-  d.setDate(d.getDate() - (dow === 0 ? 6 : dow - 1));
+  // new Date("YYYY-MM-DD")는 UTC 자정으로 파싱되지만 getDay/setDate는 로컬 타임존
+  // 기준이라, UTC 음수 오프셋 환경에서는 하루 전날 요일로 계산돼 주 경계가 밀린다.
+  // UTC API로 통일해 브라우저 타임존과 무관하게 동일한 키가 나오게 한다.
+  const d = new Date(`${date}T00:00:00Z`);
+  const dow = d.getUTCDay();
+  d.setUTCDate(d.getUTCDate() - (dow === 0 ? 6 : dow - 1));
   return d.toISOString().slice(0, 10);
 }
 
