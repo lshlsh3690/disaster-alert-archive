@@ -234,7 +234,7 @@ export function WidgetCard({ widget, lib, onVariantChange, onRemove, titleOverri
             <button
               onMouseEnter={() => setHelpOpen(true)}
               onMouseLeave={() => setHelpOpen(false)}
-              title={t("statsPage.widgetHelp")}
+              aria-label={t("statsPage.widgetHelp")}
               className="w-4 h-4 rounded-full border border-[var(--line)] text-[var(--text-subtle)] text-[10px] font-bold leading-none flex items-center justify-center hover:border-[var(--blue)] hover:text-blue-500 transition-colors"
             >
               ?

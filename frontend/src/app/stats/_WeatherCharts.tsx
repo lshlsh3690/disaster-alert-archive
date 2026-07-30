@@ -238,7 +238,7 @@ export function WeatherByTypeChart({ data }: { data: WeatherTypeStat[] }) {
             <YAxis yAxisId="cnt" axisLine={false} tickLine={false} tick={{ fontSize: 9, fill: "#9ca3af" }} width={32} />
             <YAxis yAxisId="temp" orientation="right" axisLine={false} tickLine={false}
               tick={{ fontSize: 9, fill: "#f97316" }} width={36} tickFormatter={(v: number) => `${v}°`} />
-            <Tooltip content={<TooltipContent />} />
+            <Tooltip content={<TooltipContent />} wrapperStyle={{ zIndex: 30 }} />
             <Legend wrapperStyle={{ fontSize: 10 }}
               formatter={(v: string) => v === "_avgTemp" ? t("statsPage.weatherChart.averageTempLegend") : translateType(v)} />
             {types.map((type, i) => (
@@ -412,7 +412,7 @@ export function WeatherByRegionChart({ data, regionLabel }: { data: WeatherRegio
             <YAxis yAxisId="cnt" axisLine={false} tickLine={false} tick={{ fontSize: 9, fill: "#9ca3af" }} width={32} />
             <YAxis yAxisId="temp" orientation="right" axisLine={false} tickLine={false}
               tick={{ fontSize: 9, fill: "#f97316" }} width={36} tickFormatter={(v: number) => `${v}°`} />
-            <Tooltip content={<TooltipContent />} />
+            <Tooltip content={<TooltipContent />} wrapperStyle={{ zIndex: 30 }} />
             <Legend wrapperStyle={{ fontSize: 10 }}
               formatter={(v: string) => v === "_avgTemp" ? t("statsPage.weatherChart.averageTempLegend") : translateRegion(v)} />
             {topRegions.map((r, i) => (
@@ -514,7 +514,7 @@ export function WeatherOverlayChart({ data }: { data: WeatherCorrelationStat[] }
           <YAxis yAxisId="cnt" axisLine={false} tickLine={false} tick={{ fontSize: 9, fill: "#9ca3af" }} width={32} />
           <YAxis yAxisId="temp" orientation="right" axisLine={false} tickLine={false}
             tick={{ fontSize: 9, fill: "#f97316" }} width={36} tickFormatter={(v: number) => `${v}°`} />
-          <Tooltip content={<TooltipContent />} />
+          <Tooltip content={<TooltipContent />} wrapperStyle={{ zIndex: 30 }} />
           <Legend wrapperStyle={{ fontSize: 11 }}
             formatter={(v: string) => ({
               count: t("statsPage.weatherChart.occurrenceCountLegend"),
@@ -596,7 +596,7 @@ export function WeatherCorrelationScatter({ data }: { data: WeatherCorrelationSt
             tick={{ fontSize: 9, fill: "#9ca3af" }} width={32} />
           {/* 버블 크기 범위를 줄여 점들이 서로 덜 겹치도록 함 */}
           <ZAxis type="number" dataKey="z" range={[20, 120]} />
-          <Tooltip content={<TooltipContent />} cursor={{ strokeDasharray: "3 3" }} />
+          <Tooltip content={<TooltipContent />} cursor={{ strokeDasharray: "3 3" }} wrapperStyle={{ zIndex: 30 }} />
           {/* 범례 클릭 시 해당 유형 표시/숨김 토글 (숨긴 유형은 회색 처리) */}
           <Legend wrapperStyle={{ fontSize: 11, cursor: "pointer" }}
             onClick={(e: { value?: string }) => toggleType(String(e.value ?? ""))}

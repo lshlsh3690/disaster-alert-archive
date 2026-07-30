@@ -670,7 +670,7 @@ export function CompareBars({
               tick={{ fontSize: 10, fill: "#9ca3af" }} />
             <YAxis axisLine={false} tickLine={false}
               tick={{ fontSize: 10, fill: "#9ca3af" }} width={32} />
-            <Tooltip content={<TooltipContent />} cursor={{ fill: "#f3f4f6" }} />
+            <Tooltip content={<TooltipContent />} cursor={{ fill: "#f3f4f6" }} wrapperStyle={{ zIndex: 30 }} />
             {/* formatter: Recharts 범례의 "ly"/"ty" 키를 연도로 변환 */}
             <Legend wrapperStyle={{ fontSize: 12 }}
               formatter={(value: string) =>
@@ -789,7 +789,7 @@ export function CompareLines({
               tick={{ fontSize: 10, fill: "#9ca3af" }} />
             <YAxis axisLine={false} tickLine={false}
               tick={{ fontSize: 10, fill: "#9ca3af" }} width={32} />
-            <Tooltip content={<TooltipContent />} />
+            <Tooltip content={<TooltipContent />} wrapperStyle={{ zIndex: 30 }} />
             {/* formatter: Recharts 범례의 "ly"/"ty" 키를 연도로 변환 */}
             <Legend wrapperStyle={{ fontSize: 12 }}
               formatter={(value: string) =>
