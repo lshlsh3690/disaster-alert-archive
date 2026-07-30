@@ -18,6 +18,7 @@ import com.querydsl.core.types.dsl.BooleanExpression;
 import com.querydsl.core.types.dsl.CaseBuilder;
 import com.querydsl.core.types.dsl.DateTemplate;
 import com.querydsl.core.types.dsl.DateTimePath;
+import com.querydsl.core.types.dsl.DateTimeTemplate;
 import com.querydsl.core.types.dsl.Expressions;
 import com.querydsl.core.types.dsl.NumberExpression;
 import com.querydsl.core.types.dsl.NumberPath;
@@ -1001,6 +1002,13 @@ public class DisasterAlertRepositoryImpl implements DisasterAlertRepositoryCusto
         NumberExpression<Integer> month = disasterAlert.createdAt.month();
         NumberExpression<Integer> day   = disasterAlert.createdAt.dayOfMonth();
         NumberExpression<Integer> hour  = disasterAlert.createdAt.hour();
+        // weather_observation은 1시간 단위로만 적재되므로(observed_at이 항상 정각) createdAt을
+        // 정각으로 truncate한 값과 단일 동등비교로 조인할 수 있다. 예전엔 year/month/day/hour를
+        // 4개 함수로 각각 뽑아 비교했는데, 양쪽 다 함수로 감싼 비교라 인덱스를 못 타고
+        // disasterType까지 GROUP BY에 추가되면서 다른 시간별 날씨 API(1~1.4초)보다도 훨씬 느려져
+        // (약 5.8초) 응답이 왔다. date_trunc 단일 비교로 바꾸면 observed_at 인덱스를 탈 수 있다.
+        DateTimeTemplate<LocalDateTime> createdAtHour = Expressions.dateTimeTemplate(
+                LocalDateTime.class, "date_trunc('hour', {0})", disasterAlert.createdAt);
 
         List<Tuple> rows = queryFactory
                 .select(year, month, day, hour,
@@ -1013,10 +1021,7 @@ public class DisasterAlertRepositoryImpl implements DisasterAlertRepositoryCusto
                 .join(disasterAlertRegion.legalDistrict, legalDistrict)
                 .leftJoin(wo).on(
                         wo.legalDistrictCode.eq(legalDistrict.code)
-                        .and(wo.observedAt.year().eq(disasterAlert.createdAt.year()))
-                        .and(wo.observedAt.month().eq(disasterAlert.createdAt.month()))
-                        .and(wo.observedAt.dayOfMonth().eq(disasterAlert.createdAt.dayOfMonth()))
-                        .and(wo.observedAt.hour().eq(disasterAlert.createdAt.hour())))
+                        .and(wo.observedAt.eq(createdAtHour)))
                 .where(byAlertCondition(request), regionFilterOnJoin(request),
                         disasterAlert.disasterType.isNotNull())
                 .groupBy(year, month, day, hour, disasterAlert.disasterType)

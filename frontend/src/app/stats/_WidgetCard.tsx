@@ -16,9 +16,21 @@ import { useState, useRef, useEffect } from "react";
 import type { DailyStat, HourlyStat, MonthlyTypeStat, WeatherCorrelationStat, WeatherTypeStat, WeatherRegionStat } from "@/types/alerts";
 import type { TypeStat, LevelStat, RegionStat, LibItem, WidgetItem } from "./_constants";
 import { EmptyChart, LoadingChart } from "./_charts";
-import { DonutChart, HorizontalBar, VerticalBar, LevelsCard } from "./_DistributionCharts";
-import { LineChart, DailyBar, Heatmap, DayOfWeekBar, HourBar, CompareBars, CompareLines } from "./_TimeCharts";
-import { WeatherCorrelationScatter, WeatherOverlayChart, WeatherByTypeChart, WeatherByRegionChart } from "./_WeatherCharts";
+import { DonutChart } from "./charts/DonutChart";
+import { HorizontalBar } from "./charts/HorizontalBar";
+import { VerticalBar } from "./charts/VerticalBar";
+import { LevelsCard } from "./charts/LevelsCard";
+import { LineChart } from "./charts/LineChart";
+import { DailyBar } from "./charts/DailyBar";
+import { Heatmap } from "./charts/Heatmap";
+import { DayOfWeekBar } from "./charts/DayOfWeekBar";
+import { HourBar } from "./charts/HourBar";
+import { CompareBars } from "./charts/CompareBars";
+import { CompareLines } from "./charts/CompareLines";
+import { WeatherCorrelationScatter } from "./charts/WeatherCorrelationScatter";
+import { WeatherOverlayChart } from "./charts/WeatherOverlayChart";
+import { WeatherByTypeChart } from "./charts/WeatherByTypeChart";
+import { WeatherByRegionChart } from "./charts/WeatherByRegionChart";
 import { useTranslation } from "react-i18next";
 import type { I18nKey } from "@/constants/i18n";
 
@@ -234,7 +246,7 @@ export function WidgetCard({ widget, lib, onVariantChange, onRemove, titleOverri
             <button
               onMouseEnter={() => setHelpOpen(true)}
               onMouseLeave={() => setHelpOpen(false)}
-              title={t("statsPage.widgetHelp")}
+              aria-label={t("statsPage.widgetHelp")}
               className="w-4 h-4 rounded-full border border-[var(--line)] text-[var(--text-subtle)] text-[10px] font-bold leading-none flex items-center justify-center hover:border-[var(--blue)] hover:text-blue-500 transition-colors"
             >
               ?
