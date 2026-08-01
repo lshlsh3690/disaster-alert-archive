@@ -43,14 +43,16 @@ export const useNotificationPermission = () => {
     }
   }, [getFcmToken]);
 
-  // 비로그인 상태에서 관심지역 변경 시 서버 게스트 토큰 동기화
+  // 비로그인 상태에서 토큰 발급 완료 또는 관심지역 변경 시 서버 게스트 토큰 동기화.
+  // 토큰은 비동기로 발급되며(발급 완료가 이 effect의 첫 실행보다 늦을 수 있음), fcmToken 상태를
+  // 의존성에 포함해 토큰이 준비된 뒤에도 반드시 등록이 한 번 실행되게 한다. localStorage 를
+  // 직접 읽으면 값이 늦게 채워져도 재실행되지 않아 등록이 누락된다(첫 방문 게스트 등록 누락 버그).
   useEffect(() => {
     if (isLoggedIn) return;
-    const token = localStorage.getItem("fcm-token");
-    if (!token || guestRegions.length === 0) return;
+    if (!fcmToken || guestRegions.length === 0) return;
     const codes = guestRegions.map((r) => r.legalDistrictCode);
-    registerGuestFcmToken(token, codes);
-  }, [isLoggedIn, guestRegions]);
+    registerGuestFcmToken(fcmToken, codes);
+  }, [isLoggedIn, guestRegions, fcmToken]);
 
   async function retryGetToken(retries: number): Promise<string | null> {
     try {
