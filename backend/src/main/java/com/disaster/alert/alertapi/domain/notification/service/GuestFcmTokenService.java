@@ -39,6 +39,8 @@ public class GuestFcmTokenService {
         }
 
         // fcm_token UPSERT (member_id = null)
+        // token 은 전역 UNIQUE(V114) 이므로 findByToken 은 항상 단건이다. (이전엔 게스트 토큰에
+        // 유니크 제약이 없어 중복 행이 쌓이면 NonUniqueResultException 으로 500 이 났다.)
         fcmTokenRepository.findByToken(token).ifPresentOrElse(
                 existing -> {
                     // 이미 회원에 연결된 토큰이면 게스트 등록 스킵

@@ -20,23 +20,35 @@ public class FcmTokenService {
 
     // 토큰 등록 or 갱신 (UPSERT)
     public void registerToken(Long memberId, FcmTokenDtos.RegisterRequest request) {
-        fcmTokenRepository
+        String token = request.token();
+
+        // 이 회원 + 기기의 기존 토큰 행 (있으면 토큰만 갱신할 대상)
+        FcmToken deviceRow = fcmTokenRepository
                 .findByMemberIdAndDeviceType(memberId, request.deviceType())
-                .ifPresentOrElse(
-                        // 기존 토큰 갱신
-                        existing -> existing.updateToken(request.token()),
-                        // 신규 토큰 등록
-                        () -> {
-                            Member memberRef = entityManager.getReference(Member.class, memberId);
-                            fcmTokenRepository.save(
-                                    FcmToken.builder()
-                                            .member(memberRef)
-                                            .token(request.token())
-                                            .deviceType(request.deviceType())
-                                            .build()
-                            );
-                        }
-                );
+                .orElse(null);
+
+        // 동일 토큰이 다른 행(게스트로 먼저 등록됐거나 다른 기기 행)에 있으면
+        // 전역 UNIQUE(token) 충돌을 피하기 위해 그 행을 먼저 삭제·flush 한다.
+        // (flush 하지 않으면 아래 update/insert 가 먼저 실행돼 순간적으로 토큰이 중복된다.)
+        fcmTokenRepository.findByToken(token)
+                .filter(row -> deviceRow == null || !row.getId().equals(deviceRow.getId()))
+                .ifPresent(row -> {
+                    fcmTokenRepository.delete(row);
+                    fcmTokenRepository.flush();
+                });
+
+        if (deviceRow != null) {
+            deviceRow.updateToken(token);
+        } else {
+            Member memberRef = entityManager.getReference(Member.class, memberId);
+            fcmTokenRepository.save(
+                    FcmToken.builder()
+                            .member(memberRef)
+                            .token(token)
+                            .deviceType(request.deviceType())
+                            .build()
+            );
+        }
     }
 
     // 토큰 삭제 (로그아웃 시)
