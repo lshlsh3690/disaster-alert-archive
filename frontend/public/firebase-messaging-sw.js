@@ -15,33 +15,40 @@ firebase.initializeApp({
 const messaging = firebase.messaging();
 
 messaging.onBackgroundMessage(async (payload) => {
-  const notificationType = payload.data?.notificationType ?? "PUSH";
+  // TEMP DEBUG: payload 원문과 에러를 알림에 그대로 노출해서 원인을 확인한다.
+  try {
+    const notificationType = payload.data?.notificationType ?? "PUSH";
 
-  if (notificationType === "NONE") return;
+    if (notificationType === "NONE") return;
 
-  const title = payload.data?.title || payload.notification?.title || "재난문자 알림";
-  const body = payload.data?.body || payload.notification?.body || "";
-  const alertId = payload.data?.alertId;
+    const title = payload.data?.title || payload.notification?.title || "재난문자 알림";
+    const body = payload.data?.body || payload.notification?.body || "";
+    const alertId = payload.data?.alertId;
 
-  const options = {
-    body,
-    icon: "/icons/icon-192x192.png",
-    badge: "/icons/icon-72x72.png",
-    data: { alertId, url: alertId ? `/alerts/${alertId}` : "/" },
-    ...(notificationType === "ALARM" && {
-      vibrate: [200, 100, 200, 100, 200],
-      requireInteraction: true,
-      silent: false,
-      tag: "disaster-alarm",
-    }),
-    ...(notificationType === "PUSH" && {
-      vibrate: [100],
-      silent: false,
-      tag: "disaster-push",
-    }),
-  };
+    const options = {
+      body,
+      icon: "/icons/icon-192x192.png",
+      badge: "/icons/icon-72x72.png",
+      data: { alertId, url: alertId ? `/alerts/${alertId}` : "/" },
+      ...(notificationType === "ALARM" && {
+        vibrate: [200, 100, 200, 100, 200],
+        requireInteraction: true,
+        silent: false,
+        tag: "disaster-alarm",
+      }),
+      ...(notificationType === "PUSH" && {
+        vibrate: [100],
+        silent: false,
+        tag: "disaster-push",
+      }),
+    };
 
-  await self.registration.showNotification(title, options);
+    await self.registration.showNotification(title, options);
+  } catch (e) {
+    await self.registration.showNotification("SW DEBUG ERROR", {
+      body: `${e?.message || e} | payload=${JSON.stringify(payload)}`,
+    });
+  }
 });
 
 self.addEventListener("notificationclick", (event) => {
