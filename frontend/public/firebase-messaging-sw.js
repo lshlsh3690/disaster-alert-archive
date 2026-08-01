@@ -1,29 +1,34 @@
 // frontend/public/firebase-messaging-sw.js
+//
+// Firebase JS SDK의 messaging().onBackgroundMessage()는 push 이벤트를 못 받거나
+// 씹는 경우가 있어(SDK 내부 라우팅 이슈), SDK를 아예 로드하지 않고 표준 Push API의
+// 'push' 이벤트를 직접 파싱해서 처리한다. 백엔드는 data-only 메시지만 보낸다
+// (FcmSendService 참고 - notification 페이로드를 넣으면 중복 알림 발생).
 
-importScripts("https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js");
-importScripts("https://www.gstatic.com/firebasejs/10.12.0/firebase-messaging-compat.js");
-
-firebase.initializeApp({
-  apiKey: "AIzaSyCsWLhVWPRFZFHmI27xz09qFGp5Lwl8Y9Y",
-  authDomain: "disaster-alert-archive.firebaseapp.com",
-  projectId: "disaster-alert-archive",
-  storageBucket: "disaster-alert-archive.firebasestorage.app",
-  messagingSenderId: "920878537636",
-  appId: "1:920878537636:web:e5825c24678cc9d215ff31",
+self.addEventListener("push", (event) => {
+  event.waitUntil(handlePush(event));
 });
 
-const messaging = firebase.messaging();
-
-messaging.onBackgroundMessage(async (payload) => {
-  // TEMP DEBUG: payload 원문과 에러를 알림에 그대로 노출해서 원인을 확인한다.
+async function handlePush(event) {
+  let raw = {};
   try {
-    const notificationType = payload.data?.notificationType ?? "PUSH";
+    raw = event.data ? event.data.json() : {};
+  } catch (e) {
+    raw = {};
+  }
+
+  // FCM data-only 웹푸시는 event.data.json()이 data 필드 내용을 그대로 최상위로 주기도 하고
+  // { data: {...} } 형태로 감싸서 주기도 해서 둘 다 대응한다.
+  const data = raw.data || raw;
+
+  try {
+    const notificationType = data.notificationType ?? "PUSH";
 
     if (notificationType === "NONE") return;
 
-    const title = payload.data?.title || payload.notification?.title || "재난문자 알림";
-    const body = payload.data?.body || payload.notification?.body || "";
-    const alertId = payload.data?.alertId;
+    const title = data.title || raw.notification?.title || "재난문자 알림";
+    const body = data.body || raw.notification?.body || "";
+    const alertId = data.alertId;
 
     const options = {
       body,
@@ -45,11 +50,12 @@ messaging.onBackgroundMessage(async (payload) => {
 
     await self.registration.showNotification(title, options);
   } catch (e) {
+    // TEMP DEBUG: 원인 확인 후 제거할 것
     await self.registration.showNotification("SW DEBUG ERROR", {
-      body: `${e?.message || e} | payload=${JSON.stringify(payload)}`,
+      body: `${e?.message || e} | raw=${JSON.stringify(raw)}`,
     });
   }
-});
+}
 
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
