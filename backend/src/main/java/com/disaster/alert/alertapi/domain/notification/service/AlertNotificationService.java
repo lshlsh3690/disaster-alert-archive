@@ -115,11 +115,6 @@ public class AlertNotificationService {
 
     private void sendToMember(Long memberId, Long alertId, String title, String body) {
         try {
-            // 중복 발송 방지
-            if (notificationLogRepository.existsByMemberIdAndAlertId(memberId, alertId)) {
-                return;
-            }
-
             // 알림 타입 조회
             String notificationType = preferenceRepository
                     .findByMemberId(memberId)

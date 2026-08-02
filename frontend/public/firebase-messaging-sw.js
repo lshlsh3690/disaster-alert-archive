@@ -39,12 +39,10 @@ async function handlePush(event) {
         vibrate: [200, 100, 200, 100, 200],
         requireInteraction: true,
         silent: false,
-        tag: "disaster-alarm",
       }),
       ...(notificationType === "PUSH" && {
         vibrate: [100],
         silent: false,
-        tag: "disaster-push",
       }),
     };
 
