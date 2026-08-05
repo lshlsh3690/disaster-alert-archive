@@ -1,6 +1,8 @@
 // domain/notification/service/FcmTokenService.java
 package com.disaster.alert.alertapi.domain.notification.service;
 
+import com.disaster.alert.alertapi.domain.common.exception.CustomException;
+import com.disaster.alert.alertapi.domain.common.exception.ErrorCode;
 import com.disaster.alert.alertapi.domain.member.model.Member;
 import com.disaster.alert.alertapi.domain.notification.dto.FcmTokenDtos;
 import com.disaster.alert.alertapi.domain.notification.model.FcmToken;
@@ -56,8 +58,15 @@ public class FcmTokenService {
         }
     }
 
-    // 토큰 삭제 (로그아웃 시)
-    public void deleteToken(String token) {
-        fcmTokenRepository.deleteByToken(token);
+    // 토큰 삭제 (로그아웃 시) — 존재하면 요청자 본인 소유인지 확인 후 삭제.
+    // 이미 없는 토큰은 멱등하게 무시(no-op)한다.
+    public void deleteToken(Long memberId, String token) {
+        fcmTokenRepository.findByToken(token).ifPresent(existing -> {
+            Member owner = existing.getMember();
+            if (owner == null || !owner.getId().equals(memberId)) {
+                throw new CustomException(ErrorCode.FCM_TOKEN_FORBIDDEN);
+            }
+            fcmTokenRepository.delete(existing);
+        });
     }
 }
