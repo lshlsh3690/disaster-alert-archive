@@ -90,7 +90,7 @@ export async function fetchSigungu(sido: string, lang = "ko"): Promise<Sigungu[]
       translatedName: z.string().nullable(),
       code: z.string(),
     })
-  ).parse(res.data);
+  ).parse(res.data.data);
 }
 
 export async function fetchHourlyStats(params: AlertSearchRequest): Promise<HourlyStat[]> {
