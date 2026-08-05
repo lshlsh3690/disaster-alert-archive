@@ -1,5 +1,7 @@
 package com.disaster.alert.alertapi.domain.notification.service;
 
+import com.disaster.alert.alertapi.domain.common.exception.CustomException;
+import com.disaster.alert.alertapi.domain.common.exception.ErrorCode;
 import com.disaster.alert.alertapi.domain.member.model.Member;
 import com.disaster.alert.alertapi.domain.notification.dto.FcmTokenDtos;
 import com.disaster.alert.alertapi.domain.notification.model.FcmToken;
@@ -35,7 +37,7 @@ public class GuestFcmTokenService {
         List<String> codes = request.legalDistrictCodes();
 
         if (codes.size() > MAX_GUEST_REGIONS) {
-            throw new IllegalArgumentException("관심지역은 최대 " + MAX_GUEST_REGIONS + "개까지 등록할 수 있습니다.");
+            throw new CustomException(ErrorCode.GUEST_REGION_LIMIT_EXCEEDED);
         }
 
         // fcm_token UPSERT (member_id = null)

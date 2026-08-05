@@ -61,5 +61,13 @@ export default withPWA({
   disable: process.env.NODE_ENV === "development",
   workboxOptions: {
     disableDevLogs: true,
+    // 기본값(skipWaiting/clientsClaim: true)이면 새 SW가 배포될 때마다 열려있는 탭을
+    // 즉시 강제로 재장악한다. 이 과정에서 firebase-messaging-sw.js가 들고 있는 FCM
+    // push 구독이 세션 도중에 끊겨, 방금 발급한 토큰도 서버에서 곧바로
+    // "NotRegistered/Device unregistered"로 실패하는 문제가 있었다. false로 두면
+    // 새 SW는 설치만 되고, 기존 탭을 다 닫고 다시 열 때(=구독이 끊길 일 없는 시점)
+    // 활성화되어 세션 중 push 구독 안정성이 올라간다.
+    skipWaiting: false,
+    clientsClaim: false,
   },
 })(nextConfig);

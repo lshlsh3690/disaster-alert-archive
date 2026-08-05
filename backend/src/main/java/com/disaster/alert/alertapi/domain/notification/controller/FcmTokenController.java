@@ -30,13 +30,14 @@ public class FcmTokenController {
         return ResponseEntity.ok(ApiResponse.success("FCM 토큰이 등록되었습니다.", null));
     }
 
-    // FCM 토큰 삭제 (로그아웃 시 호출)
+    // FCM 토큰 삭제 (로그아웃 시 호출) — 본인 소유 토큰만 삭제 가능
     @PreAuthorize("isAuthenticated()")
     @DeleteMapping
     public ResponseEntity<ApiResponse<Void>> deleteToken(
+            @AuthenticationPrincipal(expression = "id") Long memberId,
             @RequestParam String token
     ) {
-        fcmTokenService.deleteToken(token);
+        fcmTokenService.deleteToken(memberId, token);
         return ResponseEntity.ok(ApiResponse.success("FCM 토큰이 삭제되었습니다.", null));
     }
 

@@ -2,6 +2,7 @@ package com.disaster.alert.alertapi.domain.legaldistrict.controller;
 
 import com.disaster.alert.alertapi.domain.legaldistrict.dto.SigunguResponse;
 import com.disaster.alert.alertapi.domain.legaldistrict.service.LegalDistrictService;
+import com.disaster.alert.alertapi.global.dto.ApiResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -31,10 +32,10 @@ public class LegalDistrictController {
      *             "ja"/"zh" 는 해당 언어 시드가 없으면 영어로 fallback 한다.
      */
     @GetMapping("/sigungu")
-    public ResponseEntity<List<SigunguResponse>> getSigunguBySido(
+    public ResponseEntity<ApiResponse<List<SigunguResponse>>> getSigunguBySido(
             @RequestParam String sido,
             @RequestParam(defaultValue = "ko") String lang
     ) {
-        return ResponseEntity.ok(legalDistrictService.getSigunguList(sido, lang));
+        return ResponseEntity.ok(ApiResponse.success(legalDistrictService.getSigunguList(sido, lang)));
     }
 }
