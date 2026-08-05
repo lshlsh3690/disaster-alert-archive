@@ -27,7 +27,15 @@ if (!targetPath || !targetPath.startsWith("/")) {
 
 await mkdir(outDir, { recursive: true });
 
-const browser = await chromium.launch();
+let browser;
+try {
+  browser = await chromium.launch();
+} catch (e) {
+  console.error("Chromium 실행 실패 — 이 컴퓨터에 브라우저가 설치되지 않았을 수 있습니다.");
+  console.error("다음을 한 번 실행하세요: npx playwright install chromium");
+  console.error(String(e?.message ?? e));
+  process.exit(1);
+}
 try {
   for (const vp of VIEWPORTS) {
     const context = await browser.newContext({
@@ -38,7 +46,7 @@ try {
     const page = await context.newPage();
     const url = `http://localhost:3000${targetPath}`;
     await page.goto(url, { waitUntil: "networkidle", timeout: 30000 });
-    const fileSafeName = targetPath.replace(/\//g, "_") || "root";
+    const fileSafeName = targetPath === "/" ? "root" : targetPath.replace(/\//g, "_");
     const outPath = path.join(outDir, `${fileSafeName}__${vp.name}.png`);
     await page.screenshot({ path: outPath, fullPage: true });
     console.log(`saved: ${outPath} (${vp.width}x${vp.height})`);

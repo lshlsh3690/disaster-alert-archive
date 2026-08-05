@@ -14,12 +14,24 @@ model: sonnet
 1. 보고받은 문제(페이지, 뷰포트, 증상)를 확인한다. 필요하면 `frontend/.ui-check/`에 남아있는 스크린샷을 `Read`로 직접 봐서 문제를 눈으로 확인한다.
 2. 해당 페이지/컴포넌트를 찾아 원인을 파악한다 — Tailwind 클래스(`min-w`, `overflow`, 고정 `width`/`px` 값, flex/grid 설정 등)나 컨테이너 구조 문제일 가능성이 높다.
 3. 최소한의 변경으로 고친다. 반응형 문제는 보통 고정값을 상대값/breakpoint 유틸리티로 바꾸거나, `overflow-x-auto`/`min-w-0`/`flex-wrap` 같은 걸 빠뜨린 경우가 많다 — 이 저장소 기존 컴포넌트들이 이미 쓰고 있는 패턴(같은 디렉토리의 다른 컴포넌트)을 먼저 참고해서 일관성을 맞춘다.
-4. 고친 뒤 같은 화면을 다시 스크린샷 찍어 검증한다:
-   ```
+4. 고친 뒤 같은 화면을 다시 스크린샷 찍어 검증한다. 먼저 `curl -s -o /dev/null -w "%{http_code}" http://localhost:3000/ --max-time 5`로 dev 서버가 떠 있는지 확인한다.
+   - **떠 있으면**(`200`) 그대로 쓴다 — Next.js Fast Refresh가 코드 저장만으로 반영하므로 재시작 불필요. 이 서버는 건드리지(재시작/종료) 않는다.
+   - **없으면** `ui-checker`와 동일하게 이 agent가 직접 관리형으로 띄운다:
+     ```bash
+     cd frontend
+     npm run dev -- --port 3000 > /tmp/ui-fixer-dev.log 2>&1 &
+     DEV_PID=$!
+     for i in $(seq 1 30); do
+       curl -s -o /dev/null -w "%{http_code}" http://localhost:3000/ --max-time 2 | grep -q 200 && break
+       sleep 1
+     done
+     ```
+     검증이 끝나면 이 agent가 직접 띄운 서버만(`kill $DEV_PID`) 종료한다.
+   ```bash
    cd frontend
    MSYS_NO_PATHCONV=1 node scripts/ui-screenshot.mjs <path>
    ```
-   **`MSYS_NO_PATHCONV=1`을 꼭 붙여라** — 안 붙이면 Git Bash가 경로 인자를 잘못 변환한다. dev 서버(Next.js Fast Refresh)가 이미 떠 있으면 코드 저장만으로 반영되므로 서버를 새로 띄울 필요는 보통 없다 — `curl -s -o /dev/null -w "%{http_code}" http://localhost:3000/`로 살아있는지만 먼저 확인.
+   **`MSYS_NO_PATHCONV=1`을 꼭 붙여라** — 안 붙이면 Git Bash가 경로 인자를 잘못 변환한다. **`Executable doesn't exist` 에러가 나면** `cd frontend && npx playwright install chromium`을 한 번 실행해야 한다(브라우저 바이너리는 git에 포함되지 않아 컴퓨터마다 최초 1회 필요).
 5. 새 스크린샷을 `Read`로 열어서 문제가 실제로 해결됐는지 직접 확인한다. 해결 안 됐으면 다시 시도한다(무한 반복하지 말고, 2~3번 시도해도 안 되면 원인을 못 찾은 것으로 보고 사용자에게 상황을 설명한다).
 6. `npm run build`로 타입/컴파일 에러가 없는지 확인한다.
 

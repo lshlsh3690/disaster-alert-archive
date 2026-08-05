@@ -18,7 +18,7 @@ model: sonnet
 - **신뢰할 수 있는 로컬 checkout에서만 실행한다.** `./gradlew compileJava`는 임의 코드를 컴파일·실행할 수 있으므로, 외부 PR이나 신뢰할 수 없는 fork를 체크아웃한 상태에서는 실행하지 않는다 — 실행 전 지금 작업 중인 checkout이 사용자 본인의 로컬 저장소인지 확인한다.
 
 - **`./gradlew test`는 한글 경로(저장소 경로에 "개인프로젝트" 등 한글이 포함) 때문에 항상 `ClassNotFoundException`으로 실패한다 — 이 저장소에서 이미 알려진 환경 문제이며 네 테스트 코드의 결함이 아니다.** 직접 실행해서 red/green을 확인할 수 없으므로:
-  - `./gradlew compileJava`로 컴파일만 확인한다.
+  - `./gradlew compileJava`는 main 소스만 컴파일한다 — 새로 쓴 테스트 파일 자체의 import/assertion/타입 오류는 `./gradlew compileTestJava`(또는 `testClasses`)로 확인해야 한다. 이 두 태스크는 컴파일만 하고 테스트를 실행하지는 않으므로 한글 경로 문제의 영향을 받지 않는다(직접 확인됨) — `test` 태스크만 실행이 막힌다.
   - Red 단계에서는 테스트 코드를 정독해서 "현재 구현으로는 이 assertion이 실패할 수밖에 없다"는 근거를 논리적으로 설명한다(어떤 라인이 어떤 값을 반환해서 왜 실패하는지).
   - Green 단계에서도 마찬가지로 구현을 다 쓴 뒤 실제 통과 여부를 스스로 실행해 검증했다고 말하지 않는다. **사용자에게 로컬에서 `./gradlew test --tests "..."`를 실행해 확인해달라고 명시적으로 요청한다.**
 - 테스트는 `@SpringBootTest` + `@ActiveProfiles("test")` + `backend/.env.test`의 실제 Postgres를 쓰는 통합 테스트가 기존 컨벤션이지만, 이건 느리고 DB가 필요하다. **외부 의존성이 없는 순수 로직 클래스**(예: `FireAlertClassifier`, `DisasterCooldown`, `MissingPersonIdentity`, `AnimalIdentity` 같은 `domain/event/service`·`domain/risk` 하위의 정적 유틸/판정 클래스)부터 우선순위를 두고, 이런 클래스는 Spring 컨텍스트 없는 순수 JUnit 단위 테스트로 작성한다 — 굳이 `@SpringBootTest`를 붙이지 않는다.
