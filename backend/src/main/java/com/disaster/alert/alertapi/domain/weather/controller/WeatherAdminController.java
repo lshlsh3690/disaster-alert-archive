@@ -4,6 +4,7 @@ import com.disaster.alert.alertapi.domain.weather.service.WeatherCollectService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -20,13 +21,13 @@ import java.util.Map;
  *   <li>배포 직후 검증용</li>
  * </ul>
  *
- * <p><b>인증</b>: 현재는 임시로 open. 운영 배포 전 {@code @PreAuthorize("hasRole('ADMIN')")}
- * 또는 별도 admin 인증 추가 필요.
+ * <p><b>인증</b>: {@code @PreAuthorize("hasRole('ADMIN')")}로 ADMIN 권한 회원만 호출 가능.
  */
 @RestController
 @RequestMapping("/api/v1/admin/weather")
 @RequiredArgsConstructor
 @Slf4j
+@PreAuthorize("hasRole('ADMIN')")
 public class WeatherAdminController {
 
     private final WeatherCollectService weatherCollectService;
