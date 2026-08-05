@@ -17,7 +17,7 @@ quickstart.md)은 코드에서 역추출 가능한 핵심 내용을 본 문서�
 Spring 애플리케이션 이벤트를 커밋 후 비동기로 수신하여 3단계 파이프라인
 (이벤트→법정동 영향 기록 → 시군구 자기 위험도(source) 재계산 → 인접 그래프 확산으로
 effective 위험도 산출)을 실행한다. 점수는 `weight[유형] × intensity[강도] ×
-severity[정부등급]`으로 합성되고, half-life 기반 지수 감쇠와 인접 시군구로의 계수형
+severity[위급단계]`으로 합성되고, half-life 기반 지수 감쇠와 인접 시군구로의 계수형
 공간 확산(BFS, MAX 결합)을 거쳐 0~1로 정규화된 `region_risk_index.risk_score`가 된다.
 클러스터링 도메인은 위험도 계산 방식을 전혀 알지 못하며, 위험도 모듈도 클러스터링
 임계값/병합 방식을 전혀 알지 못한다 — 둘은 `AlertClusteredEvent(eventId, alertId)`라는
@@ -49,10 +49,9 @@ JPQL(`@Query`) 또는 네이티브 SQL(`@Modifying @Query(nativeQuery=true)`,
 
 **대상 플랫폼**: Docker Compose 기반 배포되는 Spring Boot 백엔드 API 서버(Linux 컨테이너).
 
-**성능 목표**: 코드/설정에 공식적으로 선언된 목표치는 없다. `RiskCalculationService`
-주석은 전체 그래프 전파(`propagateEffective`)가 "시군구 ~230개, 인접 ~1.3k" 규모에서
-"ms 단위"로 완료된다고 주장하지만(`RiskCalculationService.java:191`), 이는 실측
-벤치마크가 아닌 설계자 주석이다.
+**성능 목표**: 코드/설정에 공식적으로 선언된 목표치는 없다. 전체 그래프 전파
+(`propagateEffective`)의 "ms 단위" 완료 주장과 그 근거(비검증 상태)는
+`spec.md`의 SC-003을 canonical 출처로 삼는다 — 이 문서에서는 반복하지 않는다.
 
 **제약사항**: 위험도 재계산은 클러스터링 트랜잭션과 별도 스레드 풀(`riskTaskExecutor`,
 core=2/max=4/queue=500)에서 비동기 실행되어야 하며, 실패해도 클러스터링/수집
@@ -73,18 +72,21 @@ core=2/max=4/queue=500)에서 비동기 실행되어야 하며, 실패해도 클
 
 | 원칙 | 결과 | 근거 |
 |---|---|---|
-| I. 가독성과 단순성 우선 | 대체로 준수 | 대부분 메서드가 30~50줄 내외(`recomputeEventRisk` 약 60줄, `propagateEffective` 약 55줄로 헌법 권장 범위를 다소 초과하지만 BFS 전파라는 단일 응집된 알고리즘을 쪼개면 오히려 가독성이 떨어지는 경우). 불필요한 라이브러리 도입 없이 JDK 표준 컬렉션 + JPA만 사용. `RiskCalculationService`가 "3경로 분리"를 클래스 주석에 명시해 YAGNI 위반 없이 실제 트랜잭션 제약(자기호출 프록시 문제)에서 나온 설계임을 밝히고 있음(`RiskCalculationService.java:43-55`). |
-| II. 계층형 아키텍처 준수 | **일부 위반** | 컨트롤러→서비스→리포지토리 계층은 잘 지켜짐(`RegionRiskController` → `RegionRiskQueryService`/`RiskCalculationService` → `*Repository`), `ApiResponse` 포맷도 일관 사용(`RegionRiskController.java:26,33,41,50,57`). 그러나 **`LlmRiskProfiler`가 `CustomException`/`ErrorCode`가 아닌 `IllegalStateException`을 직접 던진다**("기타" 시드 프로파일 누락 시) — `LlmRiskProfiler.java:51,73`. 이는 "예외는 CustomException + ErrorCode로만 던진다"는 원칙 II 규정 위반이다. |
+| I. 가독성과 단순성 우선 | **일부 위반** | 위험도 도메인 핵심 서비스 클래스(`RiskCalculationService`, `RiskMaintenanceService`, `LlmRiskProfiler`, `RegionRiskQueryService` 등) 중 30~50줄 권장 범위를 벗어나는 메서드는 2개뿐이다: `recomputeEventRisk`(`RiskCalculationService.java:85-147`, 약 63줄)와 `propagateEffective`(`RiskCalculationService.java:193-247`, 약 55줄). 나머지 메서드는 모두 범위 이내. 두 메서드 모두 불필요한 라이브러리 도입 없이 JDK 표준 컬렉션 + JPA만 사용하며, `RiskCalculationService`가 "3경로 분리"를 클래스 주석에 명시해 YAGNI 위반이 아니라 실제 트랜잭션 제약(자기호출 프록시 문제, spec.md FR-034)에서 나온 설계임을 밝히고 있다(`RiskCalculationService.java:43-55`) — 정당화는 되지만 원칙 문면(30~50줄) 기준으로는 위반이므로 "일부 위반"으로 기록하고, 근거는 아래 복잡도 추적 표에 남긴다. |
+| II. 계층형 아키텍처 준수 | **일부 위반(2건)** | 컨트롤러→서비스→리포지토리 계층은 잘 지켜짐(`RegionRiskController` → `RegionRiskQueryService`/`RiskCalculationService` → `*Repository`). **(1) `ApiResponse` 포맷 미준수**: 5개 엔드포인트 중 4개는 `ApiResponse`로 일관 포장하지만(`RegionRiskController.java:26,33,41,50`), **`GET /alerts/{alertId}/risk`(`alertRisk`, `RegionRiskController.java:61-66`)는 `ApiResponse<AlertRiskResponse>`로 감싸지 않고 `ResponseEntity<AlertRiskResponse>`를 그대로 반환한다** — 204 분기는 정상이나 200 분기의 페이로드가 미포장이라 "모든 API 응답은 공용 ApiResponse/ApiErrorResponse 포맷을 사용한다"는 규정을 위반한다. **(2) 예외 처리 미준수**: `LlmRiskProfiler`가 `CustomException`/`ErrorCode`가 아닌 `IllegalStateException`을 직접 던진다("기타" 시드 프로파일 누락 시) — `LlmRiskProfiler.java:51,73`. 이는 "예외는 CustomException + ErrorCode로만 던진다"는 규정 위반이다. |
 | III. 검증 가능한 변경 | **위반** | 헌법이 "비즈니스 로직(위험도 계산...)은 외부 의존성을 목킹한 단위 테스트로 우선 검증한다"고 명시적으로 위험도 계산을 예시로 들고 있음에도, `backend/src/test`에는 `RiskCalculationService`/`RiskScore`(순수 값 객체라 단위 테스트가 특히 쉬움에도 불구)/`LlmRiskProfiler`/`RiskMaintenanceService`를 대상으로 한 테스트가 전혀 없다. |
 | IV. 정직한 문서화 | 준수(본 문서 작성 과정에서) | 본 spec.md/plan.md는 실제 코드를 직접 읽고 작성되었으며, 발견된 결함(테스트 부재, 고아 메서드 `applyOperatorOverride`, stale 주석 `findHistoricalEvents`의 "7일" vs 실제 30일)을 숨기지 않고 "가정" 섹션에 남김. |
 | V. 한글 커밋 컨벤션 | 해당 없음 | 본 계획 문서 자체는 커밋/PR 메시지가 아니므로 직접 해당하지 않음. 관련 기존 커밋 이력은 별도 확인 대상 아님(본 작업 범위 밖). |
 
-**결론**: 원칙 II·III에서 실제 위반이 발견되었다. 이번 문서화 작업(retroactive spec)
-자체는 코드를 변경하지 않으므로 즉시 수정하지는 않지만, 향후 위험도 도메인을
-수정하는 PR에서는 (a) `LlmRiskProfiler`의 예외를 `CustomException`+전용
-`ErrorCode`로 교체하고, (b) 최소한 `RiskScore`(순수 함수 값 객체)와
-`RiskCalculationService`의 핵심 경로(감쇠, MAX 결합, BFS 전파 가지치기)에 대한
-단위 테스트를 추가하는 것을 권장한다.
+**결론**: 원칙 I(메서드 길이 초과 2건, 근거는 있으나 문면상 위반)·II(2건: `alertRisk`
+엔드포인트의 `ApiResponse` 미포장, `LlmRiskProfiler`의 비표준 예외)·III(테스트
+부재)에서 실제 위반이 발견되었다. 이번 문서화 작업(retroactive spec) 자체는 코드를
+변경하지 않으므로 즉시 수정하지는 않지만, 향후 위험도 도메인을 수정하는 PR에서는
+(a) `RegionRiskController.alertRisk`가 `ApiResponse<AlertRiskResponse>`를
+반환하도록 수정하고, (b) `LlmRiskProfiler`의 예외를 `CustomException`+전용
+`ErrorCode`로 교체하고, (c) 최소한 `RiskScore`(순수 함수 값 객체)와
+`RiskCalculationService`의 핵심 경로(감쇠, MAX 결합, BFS 전파 가지치기, 동점 처리)에
+대한 단위 테스트를 추가하는 것을 권장한다.
 
 ## 프로젝트 구조
 
@@ -175,5 +177,5 @@ backend/src/main/java/com/disaster/alert/alertapi/domain/event/service/
 
 | 위반 사항 | 필요한 이유 | 더 단순한 대안을 거부한 이유 |
 |-----------|------------|-------------------------------------|
-| `RiskCalculationService`가 3개 public 메서드(`recomputeEventRisk`/`recomputeRegionSource`/`propagateEffective`)로 계산을 분리하고, 호출 순서를 리스너/스케줄러에 위임 — 단일 메서드로 합치면 더 간단해 보일 수 있음 | Spring `@Transactional`은 같은 빈 내부의 self-invocation에는 적용되지 않는다(프록시 우회). `recomputeEventRisk` 안에서 `recomputeRegionSource`를 직접 호출하면 감쇠 재계산이 별도 트랜잭션으로 커밋되지 않는다 | 단일 메서드로 합치면 즉시 감쇠 반영은 되지만 트랜잭션 경계가 깨져 부분 실패 시 정합성이 깨진다. 현재 구조는 리스너(외부 빈)가 프록시를 통해 호출하므로 각 단계가 독립 트랜잭션으로 커밋된다(`RiskCalculationService.java:44-55` 클래스 주석에 이 근거가 명시됨) |
+| [원칙 I 위반 항목 — 위 헌법 검사 표 참고] `RiskCalculationService`가 3개 public 메서드(`recomputeEventRisk`/`recomputeRegionSource`/`propagateEffective`)로 계산을 분리하고, 호출 순서를 리스너/스케줄러에 위임 — 단일 메서드로 합치면 더 간단해 보일 수 있음 | Spring `@Transactional`은 같은 빈 내부의 self-invocation에는 적용되지 않는다(프록시 우회). `recomputeEventRisk` 안에서 `recomputeRegionSource`를 직접 호출하면 감쇠 재계산이 별도 트랜잭션으로 커밋되지 않는다(spec.md FR-034) | 단일 메서드로 합치면 즉시 감쇠 반영은 되지만 트랜잭션 경계가 깨져 부분 실패 시 정합성이 깨진다. 현재 구조는 리스너(외부 빈)가 프록시를 통해 호출하므로 각 단계가 독립 트랜잭션으로 커밋된다(`RiskCalculationService.java:44-55` 클래스 주석에 이 근거가 명시됨) |
 | `LlmRiskProfiler`가 `CustomException`이 아닌 `IllegalStateException`을 던짐(원칙 II 위반) | 정당화 없음 — 실수/누락으로 판단됨 | 해당 사항 없음(정당화 대상이 아니라 개선 대상). 향후 PR에서 `ErrorCode.RISK_PROFILE_SEED_MISSING` 같은 전용 코드로 교체 권장 |

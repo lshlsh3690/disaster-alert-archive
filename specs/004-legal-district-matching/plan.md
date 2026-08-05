@@ -8,7 +8,7 @@
 
 ## 요약
 
-법정동(10자리 한국 행정구역 코드) 매칭은 `legaldistrict` 도메인 패키지가 마스터 데이터(`legal_district`)와 다국어 번역(`legal_district_translation`), 그리고 시/군/구 드롭다운 조회 API(`GET /api/v1/districts/sigungu`) 하나를 소유하는 얇은 서브시스템이다. 실제 "지역 매칭" 규칙(시도 전체 등록자 포함, 시군구 단위 클러스터링 hard 필터, 시군구 단위 위험도 집계, 시도 단위 통계 그룹핑)은 이 패키지 밖의 소비처(`notification`, `member`, `event`, `risk`, `disasteralert`)에 각각 독립적으로 구현되어 있고, "시도/시군구 코드를 앞 N자리로 파생한다"는 동일한 아이디어가 최소 5곳에서 서로 다른 방식(Java `substring`, QueryDSL `LEFT()`, 프론트 하드코딩 맵)으로 재구현되어 있다. 이 문서의 핵심 산출물은 그 중복 지점을 정확히 지도화하는 것이다.
+법정동(10자리 한국 행정구역 코드) 매칭은 `legaldistrict` 도메인 패키지가 마스터 데이터(`legal_district`)와 다국어 번역(`legal_district_translation`), 그리고 시/군/구 드롭다운 조회 API(`GET /api/v1/districts/sigungu`) 하나를 소유하는 얇은 서브시스템이다. 실제 "지역 매칭" 규칙(시도 전체 등록자 포함, 시군구 단위 클러스터링 hard 필터, 시군구 단위 위험도 집계, 시도 단위 통계 그룹핑)은 이 패키지 밖의 소비처(`notification`, `member`, `event`, `risk`, `disasteralert`)에 각각 독립적으로 구현되어 있고, "시도/시군구 코드를 앞 N자리로 파생한다"는 동일한 아이디어가 6개 지점(백엔드 5 + 프론트엔드 1)에서 서로 다른 방식(Java `substring`, QueryDSL `LEFT()`, 프론트 하드코딩 맵)으로 재구현되어 있다. 이 문서의 핵심 산출물은 그 중복 지점을 정확히 지도화하는 것이다.
 
 ## 기술 컨텍스트
 
@@ -35,7 +35,7 @@
 이 서브시스템은 이미 구현되어 운영 중이므로, 아래는 "게이트 통과 여부"가 아니라 **현재 코드가 각 원칙을 실제로 지키고 있는지에 대한 사후 감사**다.
 
 - **원칙 I (가독성과 단순성 우선) — 부분 위반, 실제 중복 확인됨.**
-  "법정동 코드에서 시도/시군구 상위 레벨을 파생한다"는 동일한 목적의 로직이 최소 5개 지점에서 각자 재구현되어 있고, `LegalDistrict` 엔티티나 `LegalDistrictService`에는 이를 위한 공용 헬퍼(예: `sidoCodeOf(code)`, `sigunguCodeOf(code)`)가 전혀 없다:
+  "법정동 코드에서 시도/시군구 상위 레벨을 파생한다"는 동일한 목적의 로직이 6개 지점(백엔드 5 + 프론트엔드 1)에서 각자 재구현되어 있고, `LegalDistrict` 엔티티나 `LegalDistrictService`에는 이를 위한 공용 헬퍼(예: `sidoCodeOf(code)`, `sigunguCodeOf(code)`)가 전혀 없다:
   1. `AlertNotificationService.java:60` — `code.substring(0,2) + "00000000"` (시도 10자리 코드 조합, 관심지역 매칭용)
   2. `EventClusteringService.java:682` (`sidoPrefix`) — `code.substring(0,2)` (2자리, 브로드캐스트 분류용)
   3. `EventClusteringService.java:735` (`sigunguPrefixes`) — `code.substring(0,5)` (5자리, 클러스터링 hard 필터용)
@@ -46,8 +46,8 @@
   각 사이트는 목적(시도 매칭 vs 시군구 매칭)과 언어(Java vs SQL)가 다르므로 "세 줄짜리 비슷한 코드는 섣부른 공통화보다 낫다"는 원칙 문구로 일부는 정당화될 수 있다. 그러나 **①과 ⑤는 같은 목적(시도 코드)·같은 언어(2자리 truncation)인데도 서로 다르게 구현**되어 있고, 실제로 ⑥(프론트 하드코딩 맵)은 2026-07-01 행정구역 개편(광주·전남 → 전남광주통합특별시, `12xx`) 이후에도 업데이트되지 않아 `"12"` 키가 누락된 채로 남아있다(spec.md 예외 상황 참고) — **중앙화되지 않은 파생 로직이 실제로 코드 드리프트(drift)를 만든 사례**로, 이 원칙이 방지하려는 문제가 실제로 발생했다고 봐야 한다.
   - **권고(문서화 목적, 이번 변경 범위 아님)**: `LegalDistrict` 또는 `LegalDistrictService`에 `sidoCode(String code)`/`sigunguCode(String code)` 정적 헬퍼를 두고 위 5개 백엔드 사이트를 교체하는 리팩터링을 별도 이슈로 고려할 만하다. 프론트 하드코딩 맵은 `GET /api/v1/districts/sigungu`가 이미 시도 코드를 내려주므로, 별도 상수 대신 API 응답을 캐시해 재사용하는 방향이 더 안전하다.
 
-- **원칙 II (계층형 아키텍처 준수) — 준수.**
-  `LegalDistrictController → LegalDistrictService → LegalDistrictRepository` 3계층이 명확히 분리되어 있다. 예외는 `CustomException`+`ErrorCode`(`LEGAL_DISTRICT_NOT_FOUND` 등)로만 던져진다. `SigunguResponse`는 응답 형태별 단일 record이고 리스트는 별도 타입 없이 `List<SigunguResponse>`로 내부 필드 없이 반환된다(컨트롤러가 `ApiResponse` 래퍼를 쓰지 않고 `ResponseEntity<List<...>>`를 직접 반환하는 점은 다른 컨트롤러들의 공용 `ApiResponse` 관례와 다르지만, 이는 명세 범위상 이 문서에서 다루는 지역 매칭 로직 자체의 위반은 아니라 별도 확인이 필요한 지점으로만 남긴다).
+- **원칙 II (계층형 아키텍처 준수) — 부분 위반, 확인됨.**
+  `LegalDistrictController → LegalDistrictService → LegalDistrictRepository` 3계층 분리, 예외의 `CustomException`+`ErrorCode`(`LEGAL_DISTRICT_NOT_FOUND` 등) 사용, DTO 설계(응답 형태별 단일 record, `SigunguResponse`)는 모두 준수한다. 그러나 `LegalDistrictController.getSigunguBySido`(`LegalDistrictController.java:33-39`)는 공용 `ApiResponse` 래퍼 없이 `ResponseEntity<List<SigunguResponse>>`를 직접 반환한다 — "모든 API 응답은 공용 ApiResponse/ApiErrorResponse 포맷을 사용"(MUST)이라는 헌법 원칙 II 문구에 대한 **확인된 위반**이다. 같은 서브시스템의 `MemberFavoriteRegionController`(`MemberFavoriteRegionController.java:26-55`)는 `GET`/`POST`/`DELETE` 3개 엔드포인트 전부를 `ApiResponse.success(...)`로 감싸고 있어, 이 위반이 코드베이스 전반의 관례가 아니라 `LegalDistrictController`에 고립된 결함임이 확인된다. spec.md 예외 상황 절에도 동일 내용을 남겼다.
 
 - **원칙 III (검증 가능한 변경) — 위반(테스트 공백 확인).**
   `backend/src/test`에 `LegalDistrict*`/`MemberFavoriteRegion*` 관련 테스트가 전혀 없다. 시도 전체 코드 파생(FR-010), 시군구 hard 필터(FR-012), 위험도 지역 키 축약(FR-015) 같은 핵심 규칙이 전부 코드 리딩으로만 검증 가능한 상태다.
@@ -92,6 +92,7 @@ backend/src/main/java/com/disaster/alert/alertapi/
 ├── domain/notification/service/AlertNotificationService.java   # 시도 레벨 코드 파생(회원+게스트 타겟팅)
 ├── domain/notification/model/GuestFcmRegion.java                # 게스트 지역-토큰 매핑
 ├── domain/event/service/EventClusteringService.java              # 시군구/시도 prefix 파생(클러스터링 hard 필터·브로드캐스트 분류)
+├── domain/event/service/EventClusteringBackfillTool.java         # 현재 클러스터링 설정으로 과거 알림 재처리(수동 백필 도구, spec.md US4 독립 테스트 방법 참고)
 ├── domain/risk/service/RiskCalculationService.java                # 시군구 5자리 축약(위험도 지역 키)
 ├── domain/disasteralert/repository/DisasterAlertRepositoryImpl.java  # QueryDSL LEFT(code,2)(통계 그룹핑)
 └── domain/useralert/service/UserDisasterAlertService.java         # LegalDistrictCache로 코드 존재 검증
@@ -121,5 +122,5 @@ frontend/src/
 
 | 위반 사항 | 필요한 이유 | 더 단순한 대안을 거부한 이유 |
 |-----------|------------|-------------------------------------|
-| 시도/시군구 코드 파생 로직이 5개 이상 지점(Java 4곳 + QueryDSL 1곳)에 중복 구현됨 (원칙 I) | 각 소비처가 요구하는 자리수(2 vs 5)와 실행 환경(JVM vs SQL)이 달라, 최초 구현 시점마다 국지적으로 가장 빠른 방법을 택한 것으로 보인다(코드/커밋에 의도적 정당화 근거는 남아있지 않음 — 추정) | 이미 프로덕션에 배포되어 각기 다른 이력(클러스터링 임계값 튜닝, 위험도 전파, 통계 성능 최적화 주석 등)을 가진 코드라 이번 as-built 문서화 범위에서 일괄 리팩터링하지 않았다. 공용 헬퍼로의 통합은 별도 리팩터링 이슈로 분리하는 것을 권고한다(위 헌법 검사 원칙 I 참고). |
+| 시도/시군구 코드 파생 로직이 6개 지점(Java 4곳 + QueryDSL 1곳 + 프론트엔드 1곳)에 중복 구현됨 (원칙 I) | 각 소비처가 요구하는 자리수(2 vs 5)와 실행 환경(JVM vs SQL vs 브라우저)이 달라, 최초 구현 시점마다 국지적으로 가장 빠른 방법을 택한 것으로 보인다(코드/커밋에 의도적 정당화 근거는 남아있지 않음 — 추정) | 이미 프로덕션에 배포되어 각기 다른 이력(클러스터링 임계값 튜닝, 위험도 전파, 통계 성능 최적화 주석 등)을 가진 코드라 이번 as-built 문서화 범위에서 일괄 리팩터링하지 않았다. 공용 헬퍼로의 통합은 별도 리팩터링 이슈로 분리하는 것을 권고한다(위 헌법 검사 원칙 I 참고). |
 | 이 서브시스템에 전용 자동 테스트가 없음 (원칙 III) | 기존 코드베이스 전반의 테스트 커버리지가 낮다는 이미 알려진 상태(`CLAUDE.md`/`docs/TEST_CASE.md` 참고)의 연장선이다 | 이번 작업은 문서화이며 신규 테스트 작성은 범위 밖이다. 테스트 부재 자체를 숨기지 않고 spec.md SC-004에 명시했다. |

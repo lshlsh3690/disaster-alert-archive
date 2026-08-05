@@ -29,7 +29,7 @@
 
 **대상 플랫폼**: 백엔드 서버 프로세스 내부 백그라운드 파이프라인(HTTP API 아님) — `@Scheduled` 스케줄러(10분 주기)와 `ApplicationRunner`(백필, `backfill` 프로파일 전용)로만 트리거됨. 사용자에게 직접 노출되는 컨트롤러 엔드포인트는 없다(조회는 `EventQueryService`/`EventController`가 담당하며 이 파이프라인의 산출물을 읽기만 함 — 별도 스코프).
 
-**성능 목표**: 코드/설정에 명시된 목표치 없음. 백필 도구 주석에 "OpenAI 임베딩 배치 200건씩, 전체 4.3만 건이 분 단위" 라는 실측 경험치가 있을 뿐, SLA로 정의된 값은 아니다 (`EventClusteringBackfillTool.java:31`).
+**성능 목표**: 코드/설정에 명시된 목표치 없음. 백필 도구 주석에 "OpenAI 임베딩 배치 200건씩, 전체 4.3만 건이 분 단위"(일화적 관찰치, SLA 아님)라는 실측 경험치가 있을 뿐, SLA로 정의된 값은 아니다 (`EventClusteringBackfillTool.java:31`).
 
 **제약사항**: LLM 폴백/cross-region은 호출당 비용이 발생해(`gpt-4o-mini`) 기본 비활성. 임베딩은 알림당 1회만 생성해 재사용(재클러스터링 비용 절감). 클러스터링 실패가 재난문자 수집·번역·FCM 발송 사이클을 막아서는 안 된다(각 진입점 try/catch 격리).
 
@@ -43,11 +43,13 @@
 
 | 원칙 | 결과 | 근거 |
 |---|---|---|
-| **I. 가독성과 단순성 우선** (메서드 30~50줄, 과도한 추상화 금지) | ⚠️ 부분 위반 | `EventClusteringService.doCluster()`가 179~255행으로 약 76줄이며(공백/주석 포함), 인물→전국유형→지역앵커유형→광역→임베딩→LLM폴백까지 6단계 분기를 한 메서드가 순차 처리한다(`EventClusteringService.java:179-255`). 그 외 개별 헬퍼 메서드(`tryLlmFallback` 42줄, `clusterRegionalType` 38줄, `clusterBroadcast` 40줄 등)는 대체로 가이드라인 안에 든다. 새 라이브러리 도입은 없음(Spring AI는 이미 risk 모듈과 공유하는 기존 의존성) — 이 부분은 원칙에 부합. |
+| **I. 가독성과 단순성 우선** (메서드 30~50줄, 과도한 추상화 금지) | ⚠️ 부분 위반 | `EventClusteringService.doCluster()`가 179~255행으로 약 76줄이며(공백/주석 포함), 인물→전국유형→지역앵커유형→광역→임베딩→LLM폴백까지 6단계 분기를 한 메서드가 순차 처리한다(`EventClusteringService.java:179-255`). `EventCrossRegionService.linkAnimal()`도 133~199행으로 약 67줄이며(종 게이트·인접 게이트·시간 게이트·LLM 호출·span-cap 체크가 한 메서드에 순차 누적) 같은 방식으로 가이드라인을 초과한다(`EventCrossRegionService.java:133-199`). 그 외 개별 헬퍼 메서드(`tryLlmFallback` 42줄, `clusterRegionalType` 38줄, `clusterBroadcast` 40줄 등)는 가이드라인 안에 든다. 새 라이브러리 도입은 없음(Spring AI는 이미 risk 모듈과 공유하는 기존 의존성) — 이 부분은 원칙에 부합. |
 | **II. 계층형 아키텍처 준수** (controller→service→repository, ApiResponse/ErrorCode, setter 대신 엔티티 메서드) | ⚠️ 부분 위반 | (1) 이 파이프라인에는 controller가 없다(스케줄러/ApplicationRunner 트리거) — 계층 자체가 원칙이 상정한 API 요청-응답 흐름과 다른 형태라 `ApiResponse`/`CustomException`+`ErrorCode` 패턴이 애초에 적용 대상이 아니다(정상적인 예외; 실제로 `domain/event` 전체에서 `CustomException`을 쓰는 곳은 조회 전용인 `EventQueryService`뿐이다). (2) **엔티티 메서드 원칙은 실질적으로 위반**: `DisasterEvent.recordMergedAlert(LocalDateTime)`이라는 엔티티 메서드가 정의돼 있지만(`DisasterEvent.java:262-267`) 어디서도 호출되지 않는 죽은 코드이고, 실제 `last_alert_at`/`alert_count` 갱신은 서비스가 아니라 리포지토리의 네이티브 SQL `UPDATE`(`incrementOnMerge`, `recomputeAggregates`, `updateTitleIfEquals`)가 수행한다(`DisasterEventRepository.java:267-291`, `465-477`). JPA 영속성 컨텍스트를 우회하는 이 방식은 동시성/명시성 이유로 의도된 선택이라는 주석(`DisasterEventRepository.java:264-266`)이 있어 실용적 트레이드오프로 보이나, "도메인 상태 변경은 setter가 아닌 엔티티 메서드로"라는 원칙의 문언과는 어긋난다. |
 | **III. 검증 가능한 변경** (비즈니스 로직 단위 테스트, DB 경계 통합 테스트) | ❌ 위반 | `backend/src/test/java/com/disaster/alert/alertapi/domain/event/` 디렉터리가 존재하지 않는다 — 유사도 임계값 판정, cooldown 분류, 안내성/사건 분류(`FireAlertClassifier`), 신원 추출(`MissingPersonIdentity`/`AnimalIdentity`) 등 순수 함수 로직조차 목킹 없는 단위 테스트가 전무하다. 실측 검증은 `EventClusteringBackfillTool`을 통한 수동 재클러스터링 + 로그 관찰로 대체되고 있다(코드 주석에 다수의 실측 사례가 남아있음). 이는 원칙 III("비즈니스 로직은 단위 테스트로 우선 검증")과 명백히 배치된다. |
 | **IV. 정직한 문서화** | N/A (이 문서 자체가 원칙 준수 시도) | 이 spec.md/plan.md 작성 과정에서 `CLAUDE.md`가 기술한 `EventFragmentMergeService`, `ClusteringProperties`, `incident-specific-check`, "BFS 확산 hop" 등이 실제로는 존재하지 않거나 다른 모듈(risk) 소관임을 코드 대조로 확인해 spec.md "발견된 문서-코드 불일치" 절에 기록했다. |
 | **V. 한글 커밋 컨벤션** | 해당 없음 | 이 문서화 작업 자체는 커밋 메시지를 생성하지 않음(작업 지시 범위 밖). |
+
+> **참고(브랜치 명명 규칙 불일치)**: 이 문서의 브랜치명 `001-event-clustering-pipeline`은 constitution.md 개발 워크플로우가 요구하는 `feature/`/`fix/`/`chore/`/`docs/`/`ci/` 접두사 중 어느 것도 쓰지 않는다 — speckit 도구의 번호-슬러그 명명 규칙을 그대로 따른 것으로, 실제 git 브랜치로 만들어지지 않는 스펙 문서 식별자이기 때문에 이 문서 작성 시점에는 별도로 맞추지 않았다. 이 기능에 대한 실제 구현 브랜치를 팔 때는 기존 접두사 규칙(`feature/`/`fix/` 등)을 따라야 한다.
 
 **결론**: 게이트를 "통과/차단"하는 문서가 아니라 실태 보고이므로 진행을 막지 않는다. 다만 원칙 III(테스트 부재)과 원칙 II(엔티티 메서드 우회)는 향후 이 파이프라인에 변경을 가할 때 우선 해소를 고려할 가치가 있는 실질적 부채로 기록해 둔다.
 

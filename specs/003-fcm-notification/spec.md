@@ -56,6 +56,16 @@
 6. **Given** 회원이 등록한 FCM 토큰이 1개면, **When** 발송하면, **Then** 단건 발송 API
    (`FirebaseMessaging.send`)를, 2개 이상이면 멀티캐스트 발송 API(`sendEachForMulticast`)를
    사용한다 (`AlertNotificationService.java:142-146`, `FcmSendService.java:19-46,49-72`).
+7. **Given** 회원이 로그인한 브라우저에서 알림 권한을 허용하면, **When** 프론트엔드가
+   `POST /api/v1/fcm-token`으로 FCM 토큰과 `deviceType`을 등록하면, **Then** 서버는
+   (memberId, deviceType) 단위로 토큰을 UPSERT한다 — 동일 디바이스로 재등록하면 토큰 값만
+   갱신된다(FR-027, `FcmTokenService.java:22-40`). 회원이 로그아웃 등으로
+   `DELETE /api/v1/fcm-token?token=...`을 호출하면 해당 토큰 값이 삭제되며, 요청자가 그
+   토큰의 소유 회원인지는 별도로 검증하지 않는다(FR-028, `FcmTokenController.java:34-41`).
+8. **Given** 관리자(또는 운영자)가 특정 alertId에 대해 알림을 수동으로 재발송하려 하면,
+   **When** `POST /api/v1/admin/trigger-notification/{alertId}`를 호출하면(인증 불필요,
+   FR-002), **Then** 위 시나리오 1~6과 동일한 `triggerNotification` 로직이 그대로
+   실행된다 — 단 이 엔드포인트는 별도 인가 없이 누구나 호출할 수 있다.
 
 ---
 
@@ -173,15 +183,21 @@
 - 게스트가 관심지역을 6개 이상 등록하려 하면 `IllegalArgumentException`을 던져 등록을
   거부한다 (`GuestFcmTokenService.java:37-39`, `MAX_GUEST_REGIONS = 5`).
 - `notificationType`이 `NONE`이면 서비스워커/포그라운드 핸들러 모두 알림을 표시하지 않고
-  조기 반환한다 (`firebase-messaging-sw.js:20`, `useForegroundMessage.ts:14`) — 다만 서버가
-  이 값으로 `NONE`을 보내는 경로는 게스트 발송(`NotificationType.PUSH.name()` 고정,
-  `AlertNotificationService.java:106,109`)에는 없고, 회원 발송도 이미 `NONE`이면 서버 단에서
-  발송 자체를 하지 않으므로(`AlertNotificationService.java:130`) 클라이언트의 `NONE` 분기는
-  현재 코드 경로상 도달하지 않는 방어 코드로 보인다.
+  조기 반환한다 (`firebase-messaging-sw.js:20`, `useForegroundMessage.ts:14`). 서버가 이
+  값으로 `NONE`을 실제 발송하는 경로는 현재 코드에 없다 — 게스트 발송은
+  `NotificationType.PUSH.name()`으로 고정되어 있고(`AlertNotificationService.java:106,109`),
+  회원 발송도 `NONE`이면 서버 단에서 발송 자체를 하지 않는다(`AlertNotificationService.java:130`).
+  따라서 클라이언트의 `NONE` 분기는 두 발신 경로 모두에서 현재 도달하지 않는 방어 코드임을
+  코드 추적으로 확인했다(추측이 아님).
 
 ## 요구사항 *(필수)*
 
 ### 기능 요구사항
+
+<!-- 아래 요구사항은 기본적으로 MUST(필수)로 서술한다. FR-020만 예외적으로 MAY(허용)를
+사용하는데, 이는 실제 코드에서 webpush data-only 제약(FR-019, MUST NOT)과 Android
+네이티브 채널 설정(AndroidConfig.setNotification)이 서로 다른 층위의 규칙이라, 후자를
+"금지되지 않은 선택 사항"으로 정확히 구분해 서술하기 위함이다. -->
 
 - **FR-001**: 시스템은 재난문자 공공데이터를 10분 주기로 수집한 직후, 새로 저장된 각
   재난문자마다 알림 발송을 비동기로 트리거해야 한다(MUST)
@@ -217,9 +233,9 @@
 - **FR-011**: 시스템은 알림 발송 파이프라인(트리거 전체, 회원 단위, 게스트 단위)에서 발생하는
   예외를 각 단계별로 잡아 로깅만 하고 상위 스케줄러의 나머지 처리(번역, 클러스터링 등)를
   중단시키지 않아야 한다(MUST) (`AlertNotificationService.java:36-37,84-86,111-113,116,158-160`).
-- **FR-012**: 시스템은 비로그인 사용자가 인증 없이 FCM 토큰과 최대 5개의 관심지역 코드를
-  등록할 수 있게 해야 한다(MUST) (`GuestFcmTokenService.java:23,33-39`,
-  `SecurityConfig.java:61`).
+- **FR-012**: 시스템은 비로그인 사용자가 FCM 토큰과 관심지역 코드를 최대 5개까지 등록할
+  수 있게 해야 한다(MUST) (`GuestFcmTokenService.java:23,33-39`). 이 등록 엔드포인트가
+  인증 없이 접근 가능하다는 사실은 FR-017 참고.
 - **FR-013**: 시스템은 게스트 토큰 등록 시, 등록하려는 토큰이 이미 회원에 연결되어 있으면
   게스트 등록(재사용)을 건너뛰어야 한다(MUST) (`GuestFcmTokenService.java:42-46`).
 - **FR-014**: 시스템은 게스트 관심지역 등록을 부분 추가가 아닌 전체 교체(기존 삭제 후
@@ -254,8 +270,8 @@
   `MAX` 우선순위, 진동 패턴(`[0,200,100,200]`)을 사용하고, 그 외에는 `disaster_push` 채널을
   사용해야 한다(MUST) (`FcmSendService.java:75-96`).
 - **FR-022**: 시스템은 FCM 발송 실패 시 `UNREGISTERED`/`INVALID_ARGUMENT` 에러코드를 만료/
-  무효 토큰으로 판별해 로그를 남겨야 한다(MUST). 다만 해당 토큰을 DB에서 자동 삭제하는
-  로직은 구현되어 있지 않다(로그만 남기고 반환) (`FcmSendService.java:35-45`).
+  무효 토큰으로 판별해 로그를 남겨야 한다(MUST) (`FcmSendService.java:35-45`). 자동 삭제
+  로직의 부재 등 상세 동작은 예외 상황 섹션 참고.
 - **FR-023**: 프론트엔드 서비스워커(`firebase-messaging-sw.js`)의 `onBackgroundMessage`
   핸들러는 `self.registration.showNotification()` 호출을 반드시 `await`해야 한다(MUST)
   (`firebase-messaging-sw.js:17,44`). **근거**: await하지 않으면 서비스워커가 알림 표시
@@ -278,6 +294,12 @@
 
 ### 주요 엔티티 *(데이터가 관련된 경우 포함)*
 
+- **DisasterAlert / DisasterAlertRegion**: 재난문자 원본 데이터와 그에 연결된 법정동 코드
+  목록. 알림 대상 지역 코드 집합(FR-003) 계산의 입력이 되는 근원 엔티티다. 이 엔티티
+  자체의 수집·저장·클러스터링 로직은 이 스펙(003-fcm-notification)의 범위 밖이며, 별도
+  서브시스템 문서(`specs/001-event-clustering-pipeline/`)에서 다룬다
+  (`domain/disasteralert/model/DisasterAlert.java`,
+  `domain/disasteralert/model/DisasterAlertRegionId.java`).
 - **FcmToken** (`fcm_token`): 회원 또는 게스트(‘member’ 컬럼 null 허용)의 디바이스 FCM
   토큰. `deviceType`(WEB/ANDROID/IOS)별로 회원당 최대 1개 UPSERT (`FcmToken.java`).
 - **GuestFcmRegion** (`guest_fcm_region`): 비로그인 FCM 토큰과 법정동 코드의 다대다 매핑
@@ -333,8 +355,8 @@
   — `NotificationPreference.minRiskScore` 필드가 존재하지만 미사용임을 확인했다(주요 엔티티
   섹션 참고).
 - 게스트 알림 경로는 회원 알림 경로보다 기능이 적다(알림 타입 선택 불가, 발송 이력 없음,
-  중복 방지 없음)는 것이 의도된 단순화인지, 향후 보강 대상인지는 코드만으로는 판단할 수
-  없다.
+  중복 방지 없음). [NEEDS CLARIFICATION: 게스트 알림 경로의 기능 축소가 의도된 설계인지
+  미구현 상태인지]
 - 알림 트리거는 클러스터링 이전, 원본 `DisasterAlert` 저장 시점에 개별 재난문자 단위로
   발생한다(`DisasterFetchScheduler.java:39-47`의 순서: 저장 → 번역 → **알림 트리거** →
   클러스터링 → cross-region). 즉 "이벤트(`DisasterEvent`)" 단위가 아니라 "원본 알림
@@ -342,5 +364,5 @@
   (클러스터링으로 나중에 하나의 이벤트로 합쳐지더라도) 관심지역이 일치하는 사용자는 그
   각각의 원본 알림마다 별도로 알림을 받을 수 있다. 이는 `alertId` 단위 중복 방지(FR-005)와는
   별개의 특성이다.
-- `/api/v1/admin/**`가 `permitAll`인 것(FR-002)은 이 기능 문서화 과정에서 발견한 기존
-  보안 설정이며, 이 스펙 작성 범위에서 수정하지 않았다 — 별도 이슈로 남긴다.
+- `/api/v1/admin/**`의 `permitAll` 설정에 대한 상세는 FR-002 참고 — 이 스펙 작성 범위에서
+  수정하지 않았다.

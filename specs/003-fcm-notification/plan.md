@@ -95,8 +95,8 @@ Firebase Cloud Messaging. 코드 내 `deviceType` 값으로 `WEB`/`ANDROID`/`IOS
   확인해 다음과 같은 미구현/고아 요소를 숨기지 않고 spec.md에 기록했다: (1)
   `NotificationPreference.minRiskScore` 미사용 필드, (2) `NotificationLog` 고아 엔티티
   (저장 호출 0건, 실제로는 `UserNotificationLog` 사용), (3) 만료 FCM 토큰 자동 정리 로직
-  없음, (4) 회원 토큰 삭제 API의 소유권 검증 없음, (5) `/api/v1/admin/**` 전체가
-  `permitAll`이라 알림 수동 트리거 엔드포인트가 인증 없이 열려 있음.
+  없음, (4) 회원 토큰 삭제 API의 소유권 검증 없음, (5) 관리자 수동 트리거 엔드포인트의
+  인증 누락(spec.md FR-002 참고).
 - **V. 한글 커밋 컨벤션** — 관련 최근 커밋(`9273c99 fix(security): 게스트 FCM 토큰
   등록/삭제 엔드포인트 401 오류 수정`)이 `type(scope): 한글 설명` 형식을 정확히 따른다 —
   **준수**.
