@@ -256,17 +256,6 @@ public class DisasterEvent {
     }
 
     /**
-     * 기존 이벤트에 새 알림이 머지될 때 호출.
-     * lastAlertAt 은 단조 증가 가정이지만, 백필에서 순서가 어긋날 수 있으므로 max() 로 보호.
-     */
-    public void recordMergedAlert(LocalDateTime alertAt) {
-        if (alertAt != null && alertAt.isAfter(this.lastAlertAt)) {
-            this.lastAlertAt = alertAt;
-        }
-        this.alertCount++;
-    }
-
-    /**
      * 진행 중 여부 파생 계산 — 마지막 알림 후 cooldown 시간 이내면 true.
      *
      * @param now 기준 시각 (KST 주입). 보통 {@code LocalDateTime.now(ZoneId.of("Asia/Seoul"))}.

@@ -65,11 +65,4 @@ public class DisasterRiskProfile {
                 .operatorConfirmed(false)
                 .build();
     }
-
-    /** 운영자 보정. */
-    public void applyOperatorOverride(double baseWeight, int halfLifeHours) {
-        this.baseWeight = baseWeight;
-        this.halfLifeHours = halfLifeHours;
-        this.operatorConfirmed = true;
-    }
 }

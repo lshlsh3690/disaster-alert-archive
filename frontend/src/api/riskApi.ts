@@ -14,12 +14,11 @@ export async function fetchAlertRisk(alertId: number): Promise<AlertRisk | null>
     headers: { "X-Auth-Required": "false" },
   });
   if (res.status === 204 || !res.data) return null;
-  return ZAlertRisk.parse(res.data);
+  return ZAlertRisk.parse(res.data.data);
 }
 
 /**
  * 시군구 현재 위험도 (감쇠·확산 반영 0~1).
- * 주: alertRisk 와 달리 ApiResponse({success, data, ...})로 래핑되어 내려옴.
  */
 export async function fetchRegionRisk(regionCode: string): Promise<RegionRiskDetail> {
   const res = await instance.get(`/api/v1/regions/${regionCode}/risk`, {

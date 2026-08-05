@@ -1,5 +1,7 @@
 package com.disaster.alert.alertapi.domain.risk.service;
 
+import com.disaster.alert.alertapi.domain.common.exception.CustomException;
+import com.disaster.alert.alertapi.domain.common.exception.ErrorCode;
 import com.disaster.alert.alertapi.domain.event.model.DisasterEvent;
 import com.disaster.alert.alertapi.domain.risk.model.DisasterRiskProfile;
 import com.disaster.alert.alertapi.domain.risk.repository.DisasterRiskProfileRepository;
@@ -48,7 +50,7 @@ public class LlmRiskProfiler {
             // 즉시 '기타' 프로파일로 폴백(fallback) 처리한다.
             log.debug("UNKNOWN 타입은 LLM을 호출하지 않고 '기타' 프로파일로 폴백합니다.");
             return profileRepo.findById("기타")
-                    .orElseThrow(() -> new IllegalStateException("seed '기타' 프로파일 누락"));
+                    .orElseThrow(() -> new CustomException(ErrorCode.DEFAULT_RISK_PROFILE_MISSING));
         }
 
         try {
@@ -70,7 +72,7 @@ public class LlmRiskProfiler {
         } catch (Exception ex) {
             log.warn("LLM 위험 프로파일 산출 실패 type={} — '기타' default 사용", type, ex);
             return profileRepo.findById("기타")
-                    .orElseThrow(() -> new IllegalStateException("seed '기타' 프로파일 누락"));
+                    .orElseThrow(() -> new CustomException(ErrorCode.DEFAULT_RISK_PROFILE_MISSING));
         }
     }
 

@@ -7,7 +7,7 @@ import { useAuthStore } from "@/store/authStore";
 import { useLanguageStore } from "@/store/languageStore";
 import { useEffect, useRef, useState } from "react";
 import { logoutApi } from "@/api/authApi";
-import { deleteGuestFcmToken } from "@/api/guestFcmApi";
+import { deleteFcmToken } from "@/api/fcmTokenApi";
 import { useRouter } from "next/navigation";
 import { useInitAuth } from "@/hooks/useInitAuth";
 import { LANGUAGES, LangCode } from "@/constants/language";
@@ -55,12 +55,15 @@ export default function Header() {
   };
 
   const handleLogout = () => {
-    logoutApi()
+    // 아직 인증이 살아있는 동안(로그아웃 API 호출 전) 회원 FCM 토큰을 먼저 삭제해야
+    // DELETE /api/v1/fcm-token의 isAuthenticated() 검사를 통과한다.
+    const token = localStorage.getItem("fcm-token");
+    const cleanup = token ? deleteFcmToken(token) : Promise.resolve();
+    cleanup
+      .then(() => logoutApi())
       .then(() => {
         logout();
-        const token = localStorage.getItem("fcm-token");
         localStorage.removeItem("fcm-token");
-        if (token) deleteGuestFcmToken(token);
         setOpen(false);
         router.push("/");
       })

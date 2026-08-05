@@ -54,7 +54,8 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/api/v1/events/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/v1/regions/**").permitAll()
                         .requestMatchers("/api/v1/districts/**").permitAll()
-                        .requestMatchers("/api/v1/admin/**").permitAll()
+                        // /api/v1/admin/**은 인증만 여기서 요구하고(anyRequest().authenticated()),
+                        // ADMIN 권한 검증은 각 컨트롤러의 @PreAuthorize("hasRole('ADMIN')")에서 수행한다.
                         // 게스트(비로그인) FCM 토큰 등록/삭제 — FcmTokenController에 @PreAuthorize 없이
                         // 공개로 의도된 엔드포인트인데, 필터 체인엔 permitAll이 빠져있어 anyRequest().authenticated()에
                         // 걸려 401이 나던 문제. /guest/link는 로그인 후에만 쓰는 별도 경로라 여기 포함 안 함.
