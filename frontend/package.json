@@ -45,6 +45,7 @@
     "eslint-config-next": "15.2.4",
     "jest": "^30.4.2",
     "jest-environment-node": "^30.4.1",
+    "playwright": "^1.62.1",
     "tailwindcss": "^4",
     "typescript": "^5",
     "webpack": "^5.106.2"
