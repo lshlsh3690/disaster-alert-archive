@@ -17,8 +17,10 @@ public enum ErrorCode {
     UNAUTHORIZED(401, "A107", "인증되지 않은 사용자입니다."),
     FORBIDDEN(403, "A108", "권한이 없습니다."),
 
-    USER_ALERT_NOT_FOUND(404, "A108", "사용자 재난 알림을 찾을 수 없습니다."),
+    USER_ALERT_NOT_FOUND(404, "A109", "사용자 재난 알림을 찾을 수 없습니다."),
     NOTIFICATION_LOG_NOT_FOUND(404, "NL404", "알림 내역을 찾을 수 없습니다."),
+    GUEST_REGION_LIMIT_EXCEEDED(400, "FCM400", "관심 지역은 최대 5개까지 등록할 수 있습니다."),
+    FCM_TOKEN_FORBIDDEN(403, "FCM403", "본인 소유의 FCM 토큰만 삭제할 수 있습니다."),
 
     DISASTER_ALERT_NOT_FOUND(404, "D404", "공식 재난문자를 찾을 수 없습니다."),
     EVENT_NOT_FOUND(404, "EV404", "재난 이벤트를 찾을 수 없습니다."),
@@ -31,6 +33,8 @@ public enum ErrorCode {
     MEMBER_NOT_FOUND(404, "M404", "회원을 찾을 수 없습니다."),
 
     LEGAL_DISTRICT_NOT_FOUND(404, "LD404", "존재하지 않는 지역 코드입니다."),
+
+    DEFAULT_RISK_PROFILE_MISSING(500, "RK500", "기본('기타') 위험도 프로파일 시드 데이터가 누락되었습니다."),
 
     OPEN_API_TOKEN_NOT_FOUND(404, "OA404", "OpenAPI Token을 찾을 수 없습니다."),
     INVALID_OPEN_API_TOKEN(401, "OA401", "OpenAPI Token이 유효하지 않습니다."),
