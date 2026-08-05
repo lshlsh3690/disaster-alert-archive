@@ -18,7 +18,7 @@ Disaster Alert Archive(재난 안전 문자 아카이브) — 한국 정부의 �
 ./gradlew test --tests "*.AuthServiceTest.someMethod"                                       # 단일 테스트 메서드
 ```
 
-테스트는 `@SpringBootTest` + `@ActiveProfiles("test")`를 사용하며 `backend/.env.test`를 통해 실제(테스트용) Postgres에 접속합니다 — 슬라이스/목킹된 단위 테스트가 아니므로, dev docker-compose와 동일한 구성의 DB에 접속 가능해야 합니다.
+DB/Spring 컨텍스트에 의존하는 통합 테스트는 `@SpringBootTest` + `@ActiveProfiles("test")`를 사용하며 `backend/.env.test`를 통해 실제(테스트용) Postgres에 접속합니다 — 슬라이스/목킹된 단위 테스트가 아니므로, dev docker-compose와 동일한 구성의 DB에 접속 가능해야 합니다. 반면 외부 의존성이 없는 순수 로직 클래스(예: `FireAlertClassifier`, `DisasterCooldown`, `MissingPersonIdentity`, `AnimalIdentity` 같은 `domain/event/service`·`domain/risk` 하위의 정적 유틸/판정 클래스)는 `@SpringBootTest` 없이 순수 JUnit 단위 테스트로 작성합니다 — DB 연결이나 Spring 컨텍스트 부트스트랩이 필요 없어 훨씬 빠릅니다.
 
 QueryDSL Q-클래스는 컴파일 시 `backend/src/main/generated`에 생성됩니다 — 리포지토리 쿼리 메서드가 인식되지 않으면 `./gradlew compileJava`로 재생성하세요.
 
@@ -98,4 +98,4 @@ docker compose -f docker-compose.dev.yml up postgres redis   # Postgres(pgvector
 - 백엔드: controller → service → repository 계층 구조. DTO는 응답 형태별로 1개 타입, 리스트는 별도 타입이 아니라 내부에 중첩. 모든 응답은 공용 `ApiResponse`/`ApiErrorResponse` 포맷 사용. 요청 DTO는 `@Valid`로 검증. 도메인 상태 변경은 서비스에서 setter가 아닌 엔티티 메서드를 통해서만 수행. 예외는 `CustomException` + `ErrorCode`로 던지고 임의 방식 금지.
 - 메서드는 가독성을 위해 대략 30~50줄 이내로 유지하고, 사소한 필요로 새 라이브러리를 들이지 않기.
 - 프론트엔드: React Query 키는 tuple로 구성. 특별한 필요가 없다면 낙관적 업데이트는 지양. DTO 필드명은 백엔드와 정확히 일치시키기.
-- **테스트가 있는 로직을 변경하거나 새 순수 로직을 추가할 때는 Red-Green 방식으로 진행**: 먼저 실패하는 테스트를 작성해 커밋(Red)하고, 그다음 그 테스트를 통과시키는 최소 구현을 작성해 별도로 커밋(Green)한다. 두 단계를 한 커밋에 합치지 않는다. 단, 이 저장소의 `./gradlew test`는 한글 경로 문제로 항상 `ClassNotFoundException`이 나서 로컬에서 실제 테스트 실행으로 red/green을 직접 확인할 수 없다 — `compileJava`로 컴파일만 확인하고, 실제 통과 여부는 사용자에게 로컬 실행을 요청해 확인받는다.
+- **테스트가 있는 로직을 변경하거나 새 순수 로직을 추가할 때는 Red-Green 방식으로 진행**: 먼저 실패하는 테스트를 작성해(Red) 그 테스트를 통과시키는 최소 구현을 작성한다(Green). 두 단계를 한 커밋에 합치지 않는다. 단, 이 저장소의 `./gradlew test`는 한글 경로 문제로 항상 `ClassNotFoundException`이 나서 로컬에서 실제 테스트 실행으로 red/green을 직접 확인할 수 없다 — `compileJava`로 컴파일만 확인하고, 실제 통과 여부는 사용자에게 로컬 실행을 요청해 확인받는다. **커밋은 다른 작업과 마찬가지로 사용자가 명시적으로 요청한 경우에만 한다** — Red-Green 워크플로 자체가 두 단계 커밋을 전제하지만, 그 워크플로 수행이 곧 커밋 승인은 아니다.

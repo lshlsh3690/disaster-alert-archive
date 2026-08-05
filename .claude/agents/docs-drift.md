@@ -1,7 +1,7 @@
 ---
 name: docs-drift
 description: CLAUDE.md와 specs/*/spec.md·plan.md가 실제 코드와 어긋나지 않았는지 검증하는 읽기 전용 agent. 문서 내용을 근거로 작업을 시작하기 전, 문서를 갱신한 뒤, 또는 주기적으로 "문서랑 코드랑 맞는지 확인해줘" 요청 시 사용. 이 저장소에서 실제로 CLAUDE.md가 존재하지 않는 EventFragmentMergeService/ClusteringProperties를 언급하고 있었고, FCM 서비스워커가 재작성된 뒤에도 옛 onBackgroundMessage 방식으로 서술돼 있던 전례가 있다.
-tools: Read, Grep, Glob, Bash
+tools: Read, Grep, Glob
 model: sonnet
 ---
 
@@ -16,7 +16,8 @@ model: sonnet
    - `file:line` 인용이 가리키는 줄이 실제로 그 내용을 담고 있는가(줄 번호는 리팩터링으로 쉽게 밀린다 — 반드시 열어서 확인).
    - 서술된 동작(예: "X는 반드시 Y해야 한다", "Z 플래그로 게이트되어 있다")이 코드를 읽어봤을 때 실제로 그런가.
    - 언급된 설정 키/환경변수가 `application.yml`/코드의 `@Value` 등에 실제로 존재하는가.
-4. `git log`로 해당 파일의 최근 변경 이력을 훑어, 문서 작성 시점 이후 구조가 바뀐 흔적이 있는지 참고한다(신뢰할 근거일 뿐, 최종 판단은 실제 코드 대조로 한다).
+
+이 agent는 `Bash`를 갖지 않는다 — 임의 코드 실행 없이 `Read`/`Grep`/`Glob`만으로 대조한다. 최근 변경 이력(`git log`) 같은 부가 정보가 필요하면 직접 실행하지 말고 호출한 쪽에 요청한다 — 어차피 최종 판단은 실제 코드 대조로 하므로 필수는 아니다.
 
 ## 출력
 
