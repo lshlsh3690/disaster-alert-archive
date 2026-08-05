@@ -52,13 +52,13 @@
    (`AlertNotificationService.java:116-156`에 더 이상 dedup 체크 없음; 과거에는 존재했다 —
    FR-005 참고).
 4. **Given** 회원의 알림 설정이 `NONE`이면, **When** 관심지역 알림 대상에 포함되더라도,
-   **Then** FCM 발송을 하지 않는다 (`AlertNotificationService.java:124-130`).
+   **Then** FCM 발송을 하지 않는다 (`AlertNotificationService.java:119-125`).
 5. **Given** 회원이 알림 설정을 한 번도 저장한 적이 없으면(`NotificationPreference` 레코드
    없음), **When** 알림 대상이 되면, **Then** 기본값 `PUSH`로 취급해 발송한다
-   (`AlertNotificationService.java:124-127`, `NotificationPreference.java:32`).
+   (`AlertNotificationService.java:119-122`, `NotificationPreference.java:32`).
 6. **Given** 회원이 등록한 FCM 토큰이 1개면, **When** 발송하면, **Then** 단건 발송 API
    (`FirebaseMessaging.send`)를, 2개 이상이면 멀티캐스트 발송 API(`sendEachForMulticast`)를
-   사용한다 (`AlertNotificationService.java:142-146`, `FcmSendService.java:19-46,49-72`).
+   사용한다 (`AlertNotificationService.java:137-141`, `FcmSendService.java:19-46,49-72`).
 7. **Given** 회원이 로그인한 브라우저에서 알림 권한을 허용하면, **When** 프론트엔드가
    `POST /api/v1/fcm-token`으로 FCM 토큰과 `deviceType`을 등록하면, **Then** 서버는
    (memberId, deviceType) 단위로 토큰을 UPSERT하되, 동일 토큰 값이 다른 행(예: 게스트로
@@ -202,7 +202,7 @@
   조기 반환한다 (`firebase-messaging-sw.js:27`, `useForegroundMessage.ts:14`). 서버가 이
   값으로 `NONE`을 실제 발송하는 경로는 현재 코드에 없다 — 게스트 발송은
   `NotificationType.PUSH.name()`으로 고정되어 있고(`AlertNotificationService.java:106,109`),
-  회원 발송도 `NONE`이면 서버 단에서 발송 자체를 하지 않는다(`AlertNotificationService.java:130`).
+  회원 발송도 `NONE`이면 서버 단에서 발송 자체를 하지 않는다(`AlertNotificationService.java:125`).
   따라서 클라이언트의 `NONE` 분기는 두 발신 경로 모두에서 현재 도달하지 않는 방어 코드임을
   코드 추적으로 확인했다(추측이 아님).
 
@@ -253,7 +253,7 @@
   `SENT`/`FAILED` 상태로 기록해야 한다(MUST) (`AlertNotificationService.java:143-151`).
 - **FR-011**: 시스템은 알림 발송 파이프라인(트리거 전체, 회원 단위, 게스트 단위)에서 발생하는
   예외를 각 단계별로 잡아 로깅만 하고 상위 스케줄러의 나머지 처리(번역, 클러스터링 등)를
-  중단시키지 않아야 한다(MUST) (`AlertNotificationService.java:36-37,84-86,111-113,116,158-160`).
+  중단시키지 않아야 한다(MUST) (`AlertNotificationService.java:36-37,84-86,111-113,116,153-155`).
 - **FR-012**: 시스템은 비로그인 사용자가 FCM 토큰과 관심지역 코드를 최대 5개까지 등록할
   수 있게 해야 한다(MUST) (`GuestFcmTokenService.java:23,33-39`). 이 등록 엔드포인트가
   인증 없이 접근 가능하다는 사실은 FR-017 참고.
