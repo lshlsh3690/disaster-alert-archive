@@ -46,8 +46,11 @@
    (`AlertNotificationService.java:58-65`) 이 회원도 알림을 받는다.
 3. **Given** 동일 회원이 이미 동일 `alertId`에 대해 알림을 받은 이력이 있으면(`UserNotificationLog`
    존재), **When** `triggerNotification`이 같은 alertId로 다시 호출되면(예: 관리자 수동
-   재트리거), **Then** `existsByMemberIdAndAlertId` 체크에 의해 중복 발송을 하지 않고 조용히
-   반환한다 (`AlertNotificationService.java:118-121`).
+   재트리거), **Then** 중복 체크 없이 다시 발송된다 — 이 중복 방지 로직은
+   `V115__drop_user_notification_log_dedup_unique.sql`에서 "테스트/재발송 시나리오에서
+   동일 alertId 재발송이 막히던 문제 해소"를 이유로 의도적으로 제거되었다
+   (`AlertNotificationService.java:116-156`에 더 이상 dedup 체크 없음; 과거에는 존재했다 —
+   FR-005 참고).
 4. **Given** 회원의 알림 설정이 `NONE`이면, **When** 관심지역 알림 대상에 포함되더라도,
    **Then** FCM 발송을 하지 않는다 (`AlertNotificationService.java:124-130`).
 5. **Given** 회원이 알림 설정을 한 번도 저장한 적이 없으면(`NotificationPreference` 레코드
@@ -58,8 +61,10 @@
    사용한다 (`AlertNotificationService.java:142-146`, `FcmSendService.java:19-46,49-72`).
 7. **Given** 회원이 로그인한 브라우저에서 알림 권한을 허용하면, **When** 프론트엔드가
    `POST /api/v1/fcm-token`으로 FCM 토큰과 `deviceType`을 등록하면, **Then** 서버는
-   (memberId, deviceType) 단위로 토큰을 UPSERT한다 — 동일 디바이스로 재등록하면 토큰 값만
-   갱신된다(FR-027, `FcmTokenService.java:22-40`). 회원이 로그아웃 등으로
+   (memberId, deviceType) 단위로 토큰을 UPSERT하되, 동일 토큰 값이 다른 행(예: 게스트로
+   먼저 등록된 행)에 이미 있으면 `fcm_token.token` 전역 UNIQUE 제약(FR-027,
+   `V114__add_fcm_token_unique_and_dedup.sql`) 충돌을 피하기 위해 그 행을 먼저 삭제·flush한
+   뒤 UPSERT를 진행한다 (`FcmTokenService.java:24-57`). 회원이 로그아웃 등으로
    `DELETE /api/v1/fcm-token?token=...`을 호출하면 해당 토큰 값이 삭제되며, 요청자가 그
    토큰의 소유 회원인지는 별도로 검증하지 않는다(FR-028, `FcmTokenController.java:34-41`).
 8. **Given** 관리자(또는 운영자)가 특정 alertId에 대해 알림을 수동으로 재발송하려 하면,
@@ -149,15 +154,21 @@
 
 **인수 시나리오**:
 
-1. **Given** 서비스워커가 background 상태에서 FCM data 메시지를 수신하면, **When**
-   `onBackgroundMessage` 핸들러가 실행되면, **Then** `alertId`가 있으면
-   `/alerts/{alertId}`, 없으면 `/`를 `data.url`로 담아 `showNotification()`을 **반드시
-   await하여** 표시한다 (`frontend/public/firebase-messaging-sw.js:17-45`) — await하지
-   않으면 서비스워커가 알림 표시 전에 종료되어 알림이 아예 뜨지 않을 수 있다.
+1. **Given** 서비스워커가 background 상태에서 웹 push 이벤트를 수신하면, **When** 표준 Push
+   API의 `push` 이벤트 리스너가 `event.waitUntil(handlePush(event))`로 실행되면, **Then**
+   `alertId`가 있으면 `/alerts/{alertId}`, 없으면 `/`를 `data.url`로 담아
+   `showNotification()`을 호출한다 (`frontend/public/firebase-messaging-sw.js:8-49`).
+   **과거에는** Firebase JS SDK의 `messaging().onBackgroundMessage()`를 사용했으나, 이
+   SDK가 push 이벤트를 못 받거나 씹는 라우팅 이슈가 있어 SDK를 아예 로드하지 않고 표준
+   `push` 이벤트를 직접 파싱하는 방식으로 재작성되었다(코드 주석 참고,
+   `firebase-messaging-sw.js:3-6`). payload 파싱 실패 시 catch되어, 원인 파악용으로
+   원본 payload와 에러 메시지를 담은 "SW DEBUG ERROR" 알림을 대신 표시한다 — 코드에
+   "TEMP DEBUG: 원인 확인 후 제거할 것"으로 명시된 임시 디버그 코드다
+   (`firebase-messaging-sw.js:50-55`, FR-023a).
 2. **Given** 사용자가 알림을 클릭하면, **When** `notificationclick` 이벤트가 발생하면,
    **Then** 이미 열려 있는 탭이 있으면 `client.navigate()`로 대상 URL로 이동 후 포커스,
    실패 시 `client.focus()`로 폴백, 열린 탭이 없으면 `clients.openWindow()`로 새 창을 연다
-   (`firebase-messaging-sw.js:47-78`).
+   (`firebase-messaging-sw.js:58-89`).
 3. **Given** 앱이 포그라운드(활성 탭)에 있는 상태에서 FCM 메시지를 수신하면, **When**
    `onMessage` 콜백이 실행되면, **Then** 브라우저 알림 권한이 `granted`일 때만 서비스워커의
    `showNotification()`(가능하면) 또는 `Notification` 생성자로 동일하게 알림을 표시한다
@@ -173,7 +184,7 @@
   나머지 파이프라인(클러스터링 등)에 영향을 주지 않는다 (`AlertNotificationService.java:36-37,84-86`,
   호출부는 `@Async`이므로 실패가 `DisasterFetchScheduler`를 멈추지 않는다).
 - 개별 회원 발송 중 예외가 발생해도 다른 회원 발송은 계속 진행된다 — 회원 단위로
-  `try/catch`가 걸려 있다 (`AlertNotificationService.java:116-161`).
+  `try/catch`가 걸려 있다 (`AlertNotificationService.java:116-156`).
 - 게스트 발송 전체가 예외를 던지면(예: 토큰 조회 실패) 로그만 남기고 트리거 자체는
   실패로 처리되지 않는다 (`AlertNotificationService.java:89,111-113`).
 - FCM 발송이 `UNREGISTERED`/`INVALID_ARGUMENT` 에러로 실패(만료/무효 토큰)해도 해당
@@ -182,8 +193,13 @@
   등록(UPSERT)하기 전까지 계속 발송 대상에 남는다.
 - 게스트가 관심지역을 6개 이상 등록하려 하면 `IllegalArgumentException`을 던져 등록을
   거부한다 (`GuestFcmTokenService.java:37-39`, `MAX_GUEST_REGIONS = 5`).
+- 게스트 지역 전체 교체(`deleteByFcmToken`) 시 파생(derived) delete 대신 즉시 실행되는
+  `@Modifying` bulk JPQL delete를 사용한다 — `GuestFcmRegion`이 IDENTITY 전략이라 파생
+  delete는 flush 시점까지 지연되는데, 뒤이은 `save()`가 즉시 INSERT되면서 "삭제 전
+  재삽입"으로 `UNIQUE(fcm_token, legal_district_code)` 충돌이 나던 실제 버그(같은 토큰으로
+  지역 재등록 시 500)가 있었다 (`GuestFcmRegionRepository.java:21-27`).
 - `notificationType`이 `NONE`이면 서비스워커/포그라운드 핸들러 모두 알림을 표시하지 않고
-  조기 반환한다 (`firebase-messaging-sw.js:20`, `useForegroundMessage.ts:14`). 서버가 이
+  조기 반환한다 (`firebase-messaging-sw.js:27`, `useForegroundMessage.ts:14`). 서버가 이
   값으로 `NONE`을 실제 발송하는 경로는 현재 코드에 없다 — 게스트 발송은
   `NotificationType.PUSH.name()`으로 고정되어 있고(`AlertNotificationService.java:106,109`),
   회원 발송도 `NONE`이면 서버 단에서 발송 자체를 하지 않는다(`AlertNotificationService.java:130`).
@@ -215,21 +231,26 @@
 - **FR-004**: 시스템은 파생 코드를 포함한 지역 코드 집합과 일치하는 `MemberFavoriteRegion`을
   가진 모든 회원 ID를 조회해야 한다(MUST) (`AlertNotificationService.java:67-72`,
   `MemberFavoriteRegionRepository.findByIdLegalDistrictCodeIn`).
-- **FR-005**: 시스템은 회원별로 동일한 `alertId`에 대해 두 번 이상 발송하지 않아야 한다(MUST)
-  — `UserNotificationLog`에 (memberId, alertId) 존재 여부로 판정한다
-  (`AlertNotificationService.java:118-121`, `UserNotificationLogRepository.existsByMemberIdAndAlertId`).
+- **FR-005**: ~~시스템은 회원별로 동일한 `alertId`에 대해 두 번 이상 발송하지 않아야
+  한다~~ — **2026-08-03 `V115__drop_user_notification_log_dedup_unique.sql`로 이 요구사항
+  자체가 제거되었다.** `AlertNotificationService.sendToMember`는 더 이상
+  (memberId, alertId) 존재 여부를 판정하지 않으며(`AlertNotificationService.java:116-156`
+  전체에 dedup 체크 없음), DB의 `user_notification_log_member_id_alert_id_key` UNIQUE
+  제약도 삭제되었다 — "테스트/재발송 시나리오에서 동일 alertId 재발송이 막히던 문제 해소"가
+  명시된 사유다. 즉 동일 alertId로 트리거가 두 번 호출되면 회원은 동일 알림을 두 번
+  받는다. 이 사실을 요구사항이 아니라 현재 동작으로 기록한다(가정 섹션도 참고).
 - **FR-006**: 시스템은 회원의 `NotificationPreference.notificationType`이 `NONE`이면 해당
-  회원에게 발송하지 않아야 한다(MUST) (`AlertNotificationService.java:124-130`).
+  회원에게 발송하지 않아야 한다(MUST) (`AlertNotificationService.java:119-125`).
 - **FR-007**: 시스템은 회원의 알림 설정 레코드가 없으면 기본값 `PUSH`로 간주해 발송해야
-  한다(MUST) (`AlertNotificationService.java:124-127`; 엔티티 기본값도 `PUSH`,
+  한다(MUST) (`AlertNotificationService.java:119-122`; 엔티티 기본값도 `PUSH`,
   `NotificationPreference.java:32`).
 - **FR-008**: 시스템은 회원에게 등록된 FCM 토큰이 없으면 발송을 건너뛰어야 한다(MUST)
-  (`AlertNotificationService.java:132-139`).
+  (`AlertNotificationService.java:128-134`).
 - **FR-009**: 시스템은 토큰 수에 따라 단건(`FirebaseMessaging.send`) 또는 멀티캐스트
   (`sendEachForMulticast`, 최대 500개) API를 선택해 사용해야 한다(MUST)
-  (`AlertNotificationService.java:142-146`, `FcmSendService.java:19-72`).
+  (`AlertNotificationService.java:137-141`, `FcmSendService.java:19-72`).
 - **FR-010**: 시스템은 회원 발송 결과(성공/실패)와 알림 타입을 `UserNotificationLog`에
-  `SENT`/`FAILED` 상태로 기록해야 한다(MUST) (`AlertNotificationService.java:148-156`).
+  `SENT`/`FAILED` 상태로 기록해야 한다(MUST) (`AlertNotificationService.java:143-151`).
 - **FR-011**: 시스템은 알림 발송 파이프라인(트리거 전체, 회원 단위, 게스트 단위)에서 발생하는
   예외를 각 단계별로 잡아 로깅만 하고 상위 스케줄러의 나머지 처리(번역, 클러스터링 등)를
   중단시키지 않아야 한다(MUST) (`AlertNotificationService.java:36-37,84-86,111-113,116,158-160`).
@@ -237,16 +258,20 @@
   수 있게 해야 한다(MUST) (`GuestFcmTokenService.java:23,33-39`). 이 등록 엔드포인트가
   인증 없이 접근 가능하다는 사실은 FR-017 참고.
 - **FR-013**: 시스템은 게스트 토큰 등록 시, 등록하려는 토큰이 이미 회원에 연결되어 있으면
-  게스트 등록(재사용)을 건너뛰어야 한다(MUST) (`GuestFcmTokenService.java:42-46`).
+  게스트 등록(재사용)을 건너뛰어야 한다(MUST) (`GuestFcmTokenService.java:44-49`). 토큰이
+  `fcm_token.token` 전역 UNIQUE(FR-027) 대상이므로 `findByToken`은 항상 단건을 반환한다
+  (`GuestFcmTokenService.java:41-43` 주석 — 과거엔 게스트 토큰에 유니크 제약이 없어 중복
+  행이 쌓이면 `NonUniqueResultException`으로 500이 났었다).
 - **FR-014**: 시스템은 게스트 관심지역 등록을 부분 추가가 아닌 전체 교체(기존 삭제 후
-  재삽입) 방식으로 처리해야 한다(MUST) (`GuestFcmTokenService.java:57-66`).
+  재삽입) 방식으로 처리해야 한다(MUST) (`GuestFcmTokenService.java:59-68`).
 - **FR-015**: 시스템은 로그인 시 게스트 FCM 토큰을 인증된 회원과 연결하고, 연결된 토큰의
   게스트 지역 레코드를 삭제해야 한다(MUST) (`FcmTokenController.java:53-61`,
-  `GuestFcmTokenService.java:72-80`).
+  `GuestFcmTokenService.java:74-82`).
 - **FR-016**: 시스템은 (파생 시도코드를 포함한) 지역 코드 집합과 일치하는 `guest_fcm_region`
-  레코드의 토큰들에게 FCM을 발송해야 한다(MUST) — 이 경로는 회원 경로와 달리 알림 타입
-  설정이나 중복 발송 방지를 거치지 않고 항상 `NotificationType.PUSH`로 발송한다
-  (`AlertNotificationService.java:82,89-114`).
+  레코드의 토큰들에게 FCM을 발송해야 한다(MUST) — 항상 `NotificationType.PUSH`로 발송하며
+  알림 타입 설정을 거치지 않는다(`AlertNotificationService.java:82,89-114`). 중복 발송
+  방지 부재는 더 이상 게스트 경로만의 특징이 아니다 — FR-005가 제거되어 회원 경로도
+  동일하게 dedup 체크가 없다.
 - **FR-017**: 시스템은 게스트 FCM 토큰 등록(`POST /api/v1/fcm-token/guest`)과 삭제
   (`DELETE /api/v1/fcm-token/guest`) 엔드포인트를 인증 없이 접근 가능하게 해야 한다(MUST)
   (`SecurityConfig.java:58-62`; 컨트롤러 메서드에도 `@PreAuthorize`가 없음,
@@ -272,21 +297,35 @@
 - **FR-022**: 시스템은 FCM 발송 실패 시 `UNREGISTERED`/`INVALID_ARGUMENT` 에러코드를 만료/
   무효 토큰으로 판별해 로그를 남겨야 한다(MUST) (`FcmSendService.java:35-45`). 자동 삭제
   로직의 부재 등 상세 동작은 예외 상황 섹션 참고.
-- **FR-023**: 프론트엔드 서비스워커(`firebase-messaging-sw.js`)의 `onBackgroundMessage`
-  핸들러는 `self.registration.showNotification()` 호출을 반드시 `await`해야 한다(MUST)
-  (`firebase-messaging-sw.js:17,44`). **근거**: await하지 않으면 서비스워커가 알림 표시
-  완료 전에 종료(terminate)될 수 있어 알림이 아예 표시되지 않는 문제가 발생할 수 있다.
+- **FR-023**: 프론트엔드 서비스워커(`firebase-messaging-sw.js`)는 표준 Push API의 `push`
+  이벤트를 `event.waitUntil(handlePush(event))`로 처리하여, 이벤트 핸들러가 반환된 뒤에도
+  서비스워커가 비동기 처리(payload 파싱 + `showNotification()`)를 마칠 때까지 살아있음을
+  보장해야 한다(MUST) (`firebase-messaging-sw.js:8-49`). **근거**: 이 보장이 없으면
+  서비스워커가 알림 표시 완료 전에 종료(terminate)되어 알림이 아예 표시되지 않을 수 있다.
+  Firebase JS SDK `onBackgroundMessage()`는 이 SDK 자체의 push 이벤트 라우팅 이슈로 못
+  받거나 씹는 경우가 있어(코드 주석, `firebase-messaging-sw.js:3-6`) 표준 Push API 직접
+  처리 방식으로 재작성되었다(과거에는 SDK의 `onBackgroundMessage(async payload => {...
+  await showNotification(...) })` 패턴을 사용했었다).
+- **FR-023a**: payload 파싱 또는 표시 중 예외가 발생하면, 정상 알림 대신 원본 payload와
+  에러 메시지를 본문에 그대로 담은 "SW DEBUG ERROR" 알림을 표시한다(현재 동작)
+  (`firebase-messaging-sw.js:50-55`). 코드에 "TEMP DEBUG: 원인 확인 후 제거할 것"으로
+  명시된 임시 디버그 코드이며, 정식 요구사항이 아니라 현재 남아있는 상태를 기록한다.
 - **FR-024**: 시스템은 `notificationType`이 `NONE`인 메시지를 수신하면 서비스워커/포그라운드
-  핸들러 모두 알림을 표시하지 않아야 한다(MUST) (`firebase-messaging-sw.js:18-20`,
+  핸들러 모두 알림을 표시하지 않아야 한다(MUST) (`firebase-messaging-sw.js:25-27`,
   `useForegroundMessage.ts:13-14`).
 - **FR-025**: 시스템은 알림 클릭 시, 이미 열려 있는 앱 탭이 있으면 그 탭을 대상 URL로
-  이동시켜 포커스하고, 없으면 새 창을 열어야 한다(MUST) (`firebase-messaging-sw.js:47-78`).
+  이동시켜 포커스하고, 없으면 새 창을 열어야 한다(MUST) (`firebase-messaging-sw.js:58-89`).
 - **FR-026**: 시스템은 앱이 포그라운드(활성 탭)에 있을 때도 FCM `onMessage` 콜백으로 알림을
   표시해야 한다(MUST), 단 브라우저 알림 권한이 `granted`가 아니면 표시하지 않는다(MUST)
   (`useForegroundMessage.ts:12,20-40`).
 - **FR-027**: 회원 FCM 토큰 등록은 (memberId, deviceType) 단위로 UPSERT되어야 한다(MUST) —
-  동일 디바이스 타입으로 재등록 시 새 토큰 값으로 갱신한다 (`FcmTokenService.java:22-40`,
-  `FcmTokenRepository.findByMemberIdAndDeviceType`).
+  동일 디바이스 타입으로 재등록 시 새 토큰 값으로 갱신한다. 추가로 `fcm_token.token`에
+  전역 UNIQUE 제약이 있어(`V114__add_fcm_token_unique_and_dedup.sql`), 동일 토큰 값이
+  다른 행(게스트로 먼저 등록된 행 등)에 있으면 그 행을 먼저 삭제하고 `flush()`한 뒤(flush
+  없이는 삭제 전 재삽입으로 순간적으로 토큰이 중복돼 UNIQUE 위반이 난다) UPSERT를
+  진행해야 한다(MUST) — 게스트 행이었다면 `guest_fcm_region` 매핑도 함께 삭제한다(안
+  지우면 회원용으로 전환된 뒤에도 게스트 발송 경로에 걸려 중복 푸시가 된다)
+  (`FcmTokenService.java:24-57`, `FcmTokenRepository.findByMemberIdAndDeviceType`).
 - **FR-028**: 회원 FCM 토큰 삭제(`DELETE /api/v1/fcm-token`)는 토큰 값만으로 삭제되며,
   요청자가 해당 토큰의 소유 회원인지 별도로 검증하지 않는다 — 실제 구현된 동작을 그대로
   기록한다 (`FcmTokenController.java:34-41`, `FcmTokenService.java:43-45`,
@@ -339,30 +378,35 @@
   (`DisasterFetchScheduler.java:29`), 발송 자체는 `@Async`로 비동기 실행되어 스케줄러의
   다음 작업(클러스터링 등)을 블로킹하지 않는다(`AlertNotificationService.java:34-35`) — 이는
   실측 지연시간이 아니라 코드 구조상의 설계 사실이다.
-- **SC-003**: 회원 경로는 (memberId, alertId) 단위로 중복 발송이 발생하지 않음을 코드
-  로직으로 보장한다(`AlertNotificationService.java:118-121`) — 단, 게스트 경로에는 동일한
-  중복 방지 로직이 없다(FR-016).
+- **SC-003**: 회원 경로와 게스트 경로 모두 (memberId/토큰, alertId) 단위 중복 발송 방지
+  로직을 갖고 있지 않다 — 회원 경로는 과거 `existsByMemberIdAndAlertId` 체크로 보장했으나
+  2026-08-03 `V115` 마이그레이션으로 의도적으로 제거되었고(FR-005), 게스트 경로는 애초에
+  없었다(FR-016). 따라서 동일 alertId로 트리거가 반복 호출되면(수동 재트리거 등) 두
+  경로 모두 중복 알림이 발송될 수 있다 — 이를 요구사항이 아니라 현재 동작으로 기록한다.
 
 ## 가정
 
 - FCM 메시지는 항상 data-only여야 한다는 것이 이 서브시스템 전체의 하드 제약이다(FR-019).
   이 제약을 깨는 변경(최상위 `notification` 필드 재도입)은 과거 실제로 발생했던 중복 알림
   버그를 재발시킨다.
-- 서비스워커의 `showNotification()` 호출은 반드시 `await`되어야 한다는 것도 하드 제약이다
-  (FR-023). 이를 어기면 알림이 아예 표시되지 않을 수 있다.
-- 회원 알림 대상 판정은 `MemberFavoriteRegion`(관심지역)만을 기준으로 하며, 위험도 점수
-  (`domain/risk`)나 재난 유형별 구독 설정 등 다른 조건은 발송 여부에 전혀 반영되지 않는다
-  — `NotificationPreference.minRiskScore` 필드가 존재하지만 미사용임을 확인했다(주요 엔티티
-  섹션 참고).
-- 게스트 알림 경로는 회원 알림 경로보다 기능이 적다(알림 타입 선택 불가, 발송 이력 없음,
-  중복 방지 없음). [NEEDS CLARIFICATION: 게스트 알림 경로의 기능 축소가 의도된 설계인지
+- 서비스워커가 `push` 이벤트를 `event.waitUntil()`로 감싸 비동기 처리(파싱+표시)가 끝날
+  때까지 살아있게 하는 것도 하드 제약이다(FR-023). 이를 어기면 알림이 아예 표시되지
+  않을 수 있다. 이 서비스워커는 한때 Firebase JS SDK의 `onBackgroundMessage()`(내부에서
+  `showNotification()`을 `await`하는 방식)를 사용했으나, SDK의 push 이벤트 누락/오라우팅
+  이슈로 표준 Push API 직접 처리로 재작성되었다 — 과거 CLAUDE.md 등 문서에 남아있던
+  "onBackgroundMessage 핸들러는 반드시 await해야 한다"는 서술은 더 이상 실제 코드를
+  가리키지 않는다.
+- 게스트 알림 경로는 회원 알림 경로보다 기능이 적다(알림 타입 선택 불가, 발송 이력 없음).
+  중복 방지 부재는 더 이상 이 차이에 포함되지 않는다 — FR-005 제거로 회원 경로도 동일하게
+  없다(SC-003 참고). [NEEDS CLARIFICATION: 게스트 알림 경로의 기능 축소가 의도된 설계인지
   미구현 상태인지]
 - 알림 트리거는 클러스터링 이전, 원본 `DisasterAlert` 저장 시점에 개별 재난문자 단위로
   발생한다(`DisasterFetchScheduler.java:39-47`의 순서: 저장 → 번역 → **알림 트리거** →
   클러스터링 → cross-region). 즉 "이벤트(`DisasterEvent`)" 단위가 아니라 "원본 알림
   (`DisasterAlert`)" 단위로 알림이 나가며, 같은 사건이 여러 건의 원본 알림으로 신고되면
   (클러스터링으로 나중에 하나의 이벤트로 합쳐지더라도) 관심지역이 일치하는 사용자는 그
-  각각의 원본 알림마다 별도로 알림을 받을 수 있다. 이는 `alertId` 단위 중복 방지(FR-005)와는
-  별개의 특성이다.
+  각각의 원본 알림마다 별도로 알림을 받을 수 있다. 이는 (과거 존재했던, 지금은 제거된)
+  `alertId` 단위 중복 방지(FR-005)와는 별개의 특성으로, dedup 유무와 무관하게 항상
+  성립한다 — 서로 다른 alertId이기 때문이다.
 - `/api/v1/admin/**`의 `permitAll` 설정에 대한 상세는 FR-002 참고 — 이 스펙 작성 범위에서
   수정하지 않았다.

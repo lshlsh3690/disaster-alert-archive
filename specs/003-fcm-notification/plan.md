@@ -15,14 +15,18 @@
 재난문자가 수집될 때마다(10분 주기 스케줄러 또는 관리자 수동 트리거), 해당 재난문자의
 법정동 코드(및 시도 전체 파생 코드)와 일치하는 관심지역을 등록한 회원과, 동일 지역을
 등록한 비로그인(게스트) FCM 토큰에게 Firebase Admin SDK로 **data-only** 푸시 메시지를
-비동기 발송한다. 회원 경로는 알림 설정(`NONE`/`PUSH`/`ALARM`)과 (memberId, alertId) 단위
-중복 방지, 발송 이력(`UserNotificationLog`)을 거치는 반면, 게스트 경로는 이 세 가지가
-없는 더 단순한 구조다. 프론트엔드는 서비스워커(`firebase-messaging-sw.js`)의
-`onBackgroundMessage`와 포그라운드 `onMessage` 두 경로 모두에서 알림을 직접
-`showNotification()`으로 표시하며, 알림 클릭 시 재난문자 상세 페이지로 라우팅한다.
-FCM 메시지가 data-only여야 한다는 것과, 서비스워커의 `showNotification()`을 반드시
-`await`해야 한다는 것은 과거 실제 버그(중복 알림, 알림 미표시)를 낳았던 하드 제약으로
-코드 주석에도 명시되어 있다.
+비동기 발송한다. 회원 경로는 알림 설정(`NONE`/`PUSH`/`ALARM`)과 발송 이력
+(`UserNotificationLog`)을 거치는 반면, 게스트 경로는 이 두 가지가 없는 더 단순한 구조다.
+(memberId, alertId) 단위 중복 발송 방지는 2026-08-03 `V115` 마이그레이션으로 회원 경로에서도
+제거되어, 현재는 두 경로 모두 dedup이 없다. 프론트엔드 포그라운드(`onMessage`, Firebase JS
+SDK)는 알림을 직접 `showNotification()`으로 표시하며, 백그라운드는 서비스워커
+(`firebase-messaging-sw.js`)가 표준 Push API의 `push` 이벤트를 `event.waitUntil()`로
+직접 처리한다 — Firebase JS SDK의 `onBackgroundMessage()`는 SDK 내부 라우팅 이슈로 push
+이벤트를 못 받거나 씹는 문제가 있어 SDK를 아예 로드하지 않는 방식으로 재작성되었다. 알림
+클릭 시 재난문자 상세 페이지로 라우팅한다. FCM 메시지가 data-only여야 한다는 것과,
+서비스워커가 `push` 이벤트 처리를 `waitUntil()`로 감싸 비동기 작업이 끝날 때까지 살아있게
+해야 한다는 것은 과거 실제 버그(중복 알림, 알림 미표시)를 낳았던 하드 제약으로 코드
+주석에도 명시되어 있다.
 
 ## 기술 컨텍스트
 
@@ -59,12 +63,14 @@ Firebase Cloud Messaging. 코드 내 `deviceType` 값으로 `WEB`/`ANDROID`/`IOS
 제약상 최대 500 토큰/요청으로 제한된다(`FcmSendService.java:48` 주석).
 
 **제약사항**: FCM 메시지는 반드시 data-only여야 함(webpush `notification` 필드 금지),
-서비스워커 `showNotification()`은 반드시 `await`해야 함 — 둘 다 spec.md FR-019/FR-023에
-근거를 명시한 하드 제약.
+서비스워커는 `push` 이벤트 처리를 `event.waitUntil()`로 감싸야 함 — 둘 다 spec.md
+FR-019/FR-023에 근거를 명시한 하드 제약. `fcm_token.token`은 전역 UNIQUE(V114)이므로
+UPSERT 시 다른 행과의 토큰 충돌을 먼저 정리해야 함(FR-027).
 
 **규모/범위**: 회원당 관심지역 최대 5개(관리자는 무제한, `MemberFavoriteRegionService.java:21`),
 게스트 토큰당 관심지역 최대 5개(`GuestFcmTokenService.java:23`), 회원당 FCM 토큰은
-디바이스 타입당 1개로 사실상 제한(UPSERT 키가 memberId+deviceType).
+디바이스 타입당 1개로 사실상 제한(UPSERT 키가 memberId+deviceType, 물리 토큰 값 자체는
+전역 1행).
 
 ## 헌법 검사
 
@@ -87,8 +93,9 @@ Firebase Cloud Messaging. 코드 내 `deviceType` 값으로 `WEB`/`ANDROID`/`IOS
   핸들러가 없어 `@ExceptionHandler(Exception.class)`(`GlobalExceptionHandler.java:54-60`,
   "처리되지 않은 예외 — Sentry로 전송" 주석) catch-all로 떨어져 정당한 입력 검증 실패임에도
   `500 INTERNAL_SERVER_ERROR`로 응답하고 미처리 예외로 오탐(Sentry 상 버그로 분류)된다.
-- **III. 검증 가능한 변경** — **미준수**. FCM 알림 발송 로직(지역 코드 파생, 중복 방지,
-  알림 설정 분기 등 비즈니스 로직)에 대한 단위 테스트가 전무하다. 위 "테스트" 항목 참고.
+- **III. 검증 가능한 변경** — **미준수**. FCM 알림 발송 로직(지역 코드 파생, UPSERT 시
+  토큰 충돌 정리, 알림 설정 분기 등 비즈니스 로직)에 대한 단위 테스트가 전무하다. 위
+  "테스트" 항목 참고.
   기존 `docs/TEST_CASE.md` 기준으로도 낮은 커버리지가 알려진 상태이며, 이 서브시스템도
   예외가 아니다.
 - **IV. 정직한 문서화** — 이 문서 자체가 이 원칙을 적용해 작성됐다. 실제 코드를 직접
@@ -178,4 +185,4 @@ frontend/
 | 위반 사항 | 실제 동작 | 비고 |
 |-----------|------------|-------------------------------------|
 | 원칙 II: 임의 예외 사용 | `GuestFcmTokenService.registerGuestToken`이 관심지역 5개 초과 시 `CustomException`+`ErrorCode`가 아닌 원시 `IllegalArgumentException`을 던져, `GlobalExceptionHandler`의 catch-all(`Exception.class`)로 떨어지고 500 + Sentry 오탐으로 처리됨 (`GuestFcmTokenService.java:37-39`, `GlobalExceptionHandler.java:54-60`) | 이 spec 범위에서 수정하지 않음. 별도 fix 작업 후보로 남김 |
-| 원칙 III: 테스트 부재 | `AlertNotificationService`/`FcmSendService`/`FcmTokenService`/`GuestFcmTokenService`에 단위 테스트 없음 | 지역 코드 파생(FR-003), 중복 방지(FR-005), 알림 설정 분기(FR-006/007) 등 순수 로직부터 우선 테스트 추가가 유효한 후속 과제 |
+| 원칙 III: 테스트 부재 | `AlertNotificationService`/`FcmSendService`/`FcmTokenService`/`GuestFcmTokenService`에 단위 테스트 없음 | 지역 코드 파생(FR-003), UPSERT 토큰 충돌 정리(FR-027), 알림 설정 분기(FR-006/007) 등 순수 로직부터 우선 테스트 추가가 유효한 후속 과제 |
