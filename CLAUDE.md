@@ -98,3 +98,4 @@ docker compose -f docker-compose.dev.yml up postgres redis   # Postgres(pgvector
 - 백엔드: controller → service → repository 계층 구조. DTO는 응답 형태별로 1개 타입, 리스트는 별도 타입이 아니라 내부에 중첩. 모든 응답은 공용 `ApiResponse`/`ApiErrorResponse` 포맷 사용. 요청 DTO는 `@Valid`로 검증. 도메인 상태 변경은 서비스에서 setter가 아닌 엔티티 메서드를 통해서만 수행. 예외는 `CustomException` + `ErrorCode`로 던지고 임의 방식 금지.
 - 메서드는 가독성을 위해 대략 30~50줄 이내로 유지하고, 사소한 필요로 새 라이브러리를 들이지 않기.
 - 프론트엔드: React Query 키는 tuple로 구성. 특별한 필요가 없다면 낙관적 업데이트는 지양. DTO 필드명은 백엔드와 정확히 일치시키기.
+- **테스트가 있는 로직을 변경하거나 새 순수 로직을 추가할 때는 Red-Green 방식으로 진행**: 먼저 실패하는 테스트를 작성해 커밋(Red)하고, 그다음 그 테스트를 통과시키는 최소 구현을 작성해 별도로 커밋(Green)한다. 두 단계를 한 커밋에 합치지 않는다. 단, 이 저장소의 `./gradlew test`는 한글 경로 문제로 항상 `ClassNotFoundException`이 나서 로컬에서 실제 테스트 실행으로 red/green을 직접 확인할 수 없다 — `compileJava`로 컴파일만 확인하고, 실제 통과 여부는 사용자에게 로컬 실행을 요청해 확인받는다.
