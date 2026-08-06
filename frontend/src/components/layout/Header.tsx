@@ -108,13 +108,13 @@ export default function Header() {
             "/", "/alerts"는 force-dynamic + 서버 prefetchQuery(axios)라 기본 prefetch가
             어느 페이지를 보든 백그라운드에서 그 데이터 페칭을 통째로 실행해버려 백엔드에
             불필요한 요청이 계속 발생했음(캐디 로그에서 axios UA 중복 호출로 확인). */}
-        <nav className="hidden md:flex items-center gap-1 text-sm">
+        <nav className="hidden lg:flex items-center gap-1 text-sm">
           {menu.map(({ name, href }) => (
             <Link
               key={href}
               href={href}
               prefetch={false}
-              className={`px-3 py-2 rounded-[var(--radius-control)] transition-colors hover:text-[var(--blue)] hover:bg-[var(--blue-soft)] ${
+              className={`px-3 py-2 rounded-[var(--radius-control)] whitespace-nowrap transition-colors hover:text-[var(--blue)] hover:bg-[var(--blue-soft)] ${
                 isActive(href) ? "font-semibold text-[var(--blue)] bg-[var(--blue-soft)]" : "text-[var(--text-body)]"
               }`}
             >
@@ -128,14 +128,14 @@ export default function Header() {
             <>
               <Link
                 href="/user/settings/regions"
-                className="px-3 py-2 rounded-[var(--radius-control)] text-[var(--text-muted)] transition-colors hover:text-[var(--blue)] hover:bg-[var(--blue-soft)]"
+                className="px-3 py-2 rounded-[var(--radius-control)] whitespace-nowrap text-[var(--text-muted)] transition-colors hover:text-[var(--blue)] hover:bg-[var(--blue-soft)]"
               >
                 {t("nav.favoriteRegions")}
               </Link>
               <div className="relative" ref={dropdownRef}>
                 <button
                   onClick={() => setOpen((prev) => !prev)}
-                  className="px-3 py-2 rounded-[var(--radius-control)] font-medium text-[var(--blue)] transition-colors hover:bg-[var(--blue-soft)]"
+                  className="px-3 py-2 rounded-[var(--radius-control)] whitespace-nowrap font-medium text-[var(--blue)] transition-colors hover:bg-[var(--blue-soft)]"
                 >
                   {nickname ?? t("nav.user")} ▾
                 </button>
@@ -158,11 +158,11 @@ export default function Header() {
             <>
               <Link
                 href="/user/settings/regions"
-                className="px-3 py-2 rounded-[var(--radius-control)] text-[var(--text-muted)] transition-colors hover:text-[var(--blue)] hover:bg-[var(--blue-soft)]"
+                className="px-3 py-2 rounded-[var(--radius-control)] whitespace-nowrap text-[var(--text-muted)] transition-colors hover:text-[var(--blue)] hover:bg-[var(--blue-soft)]"
               >
                 {t("nav.favoriteRegions")}
               </Link>
-              <Link href="/login" className="px-3 py-2 rounded-[var(--radius-control)] font-medium text-[var(--blue)] transition-colors hover:bg-[var(--blue-soft)]">
+              <Link href="/login" className="px-3 py-2 rounded-[var(--radius-control)] whitespace-nowrap font-medium text-[var(--blue)] transition-colors hover:bg-[var(--blue-soft)]">
                 {t("nav.login")}
               </Link>
             </>
@@ -171,7 +171,7 @@ export default function Header() {
 
         {/* 모바일 햄버거 버튼 */}
         <button
-          className="md:hidden p-2 rounded-[var(--radius-control)] text-[var(--text-muted)] hover:bg-[var(--blue-soft)] hover:text-[var(--blue)]"
+          className="lg:hidden p-2 rounded-[var(--radius-control)] text-[var(--text-muted)] hover:bg-[var(--blue-soft)] hover:text-[var(--blue)]"
           onClick={() => setMobileMenuOpen((prev) => !prev)}
           aria-label={t("nav.openMenu")}
         >
@@ -189,7 +189,7 @@ export default function Header() {
 
       {/* 모바일 드롭다운 메뉴 */}
       {mobileMenuOpen && (
-        <nav className="md:hidden mt-3 pb-2 border-t border-[var(--line)] pt-3 space-y-1 text-sm">
+        <nav className="lg:hidden mt-3 pb-2 border-t border-[var(--line)] pt-3 space-y-1 text-sm">
           {menu.map(({ name, href }) => (
             <Link
               key={href}

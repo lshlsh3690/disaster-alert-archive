@@ -38,6 +38,10 @@ const nextConfig: NextConfig = {
       },
     ];
   },
+  // 개발 모드에서만 렌더링되는 Next.js Dev Tools 인디케이터(좌하단 고정 배지).
+  // 프로덕션 빌드에는 포함되지 않지만, 로컬 개발/스크린샷 점검 시 화면 하단
+  // 콘텐츠(폼 입력창, footer 문구 등)와 겹쳐 보이는 문제가 있어 비활성화한다.
+  devIndicators: false,
   compiler: {
     removeConsole: process.env.NODE_ENV === "production" ? { exclude: ["error", "warn"] } : false,
     reactRemoveProperties: process.env.NODE_ENV === "production" ? { properties: ["^data-testid$"] } : false,
