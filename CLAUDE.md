@@ -45,7 +45,7 @@ docker compose -f docker-compose.dev.yml up postgres redis   # Postgres(pgvector
 ### 백엔드 도메인 구조
 
 `backend/src/main/java/com/disaster/alert/alertapi/`
-- `domain/*` — bounded context별 패키지 (`disasteralert`, `event`, `risk`, `weather`, `notification`, `member`, `auth`, `legaldistrict`, `missingperson`, `community`, `comment`, `useralert`, `openapi`). 각각 `controller → service → repository` 구조를 따르며, `model/`(JPA 엔티티)과 `dto/`(엔드포인트별 응답 DTO 1개 타입, 리스트는 별도 타입이 아니라 내부에 중첩)로 구성됩니다.
+- `domain/*` — bounded context별 패키지 (`disasteralert`, `event`, `risk`, `weather`, `notification`, `member`, `auth`, `legaldistrict`, `community`, `comment`, `useralert`, `openapi`). 각각 `controller → service → repository` 구조를 따르며, `model/`(JPA 엔티티)과 `dto/`(엔드포인트별 응답 DTO 1개 타입, 리스트는 별도 타입이 아니라 내부에 중첩)로 구성됩니다.
 - `global/` — 공통 관심사: `security/jwt`(JWT 인증 필터/프로바이더), `exception`(`GlobalExceptionHandler` + `CustomException`/`ErrorCode` 패턴 — 항상 ErrorCode를 통해 예외를 던지고 임의로 에러 바디를 만들지 말 것), `dto`(모든 컨트롤러가 사용하는 `ApiResponse`/`ApiErrorResponse` 응답 포맷), `translation`(DeepL 기반), `redis`, `config`.
 - `scheduler/` 및 도메인별 `*/scheduler/` 패키지 — `@Scheduled` 작업들 (재난문자 수집, 날씨 수집/집계, 위험도 감쇠). 백그라운드 파이프라인의 진입점이므로 "왜 X가 실행되지 않았는지" 디버깅할 때 가장 먼저 확인할 곳입니다.
 - `api/DisasterOpenApiClient.java` — 재난문자 공공데이터포털 API 클라이언트.
