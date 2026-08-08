@@ -4,6 +4,10 @@ import path from "node:path";
 
 const ACCESS = process.env.UI_ACCESS_TOKEN;
 const REFRESH = process.env.UI_REFRESH_TOKEN;
+if (!ACCESS || !REFRESH) {
+  console.error("UI_ACCESS_TOKEN과 UI_REFRESH_TOKEN을 설정해야 합니다.");
+  process.exit(1);
+}
 
 const PROFILES = [
   { name: "iphone-se", ...devices["iPhone SE"] },
@@ -46,6 +50,9 @@ try {
     const page = await context.newPage();
     const url = `http://localhost:3000${targetPath}`;
     await page.goto(url, { waitUntil: "networkidle", timeout: 30000 });
+    if (new URL(page.url()).pathname !== new URL(url).pathname) {
+      throw new Error(`예상 경로와 다른 페이지로 이동했습니다: ${page.url()}`);
+    }
     const fileSafeName = targetPath.replace(/\//g, "_");
     const outPath = path.join(outDir, `${fileSafeName}__${name}.png`);
     await page.screenshot({ path: outPath, fullPage: true });

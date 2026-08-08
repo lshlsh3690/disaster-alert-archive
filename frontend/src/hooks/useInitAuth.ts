@@ -12,28 +12,37 @@ import { AxiosError } from "axios";
  * 호출 위치: 루트 레이아웃(layout.tsx) 또는 최상위 클라이언트 컴포넌트.
  *
  * 동작 원리:
- * - Zustand에 user가 없을 때(= OAuth 리다이렉트 직후, 새로고침 등)
- *   /api/v1/members/me 를 호출해 사용자 정보를 채운다.
- * - 이미 user가 있으면 재호출하지 않는다.
- * - 로그인되지 않은 상태(401)라면 조용히 무시한다.
+ * - 마운트 시 딱 한 번 /api/v1/members/me 를 호출해 서버 세션을 검증한다.
+ *   authStore에 영속화(persist)된 user가 있어도 검증을 건너뛰지 않는다 —
+ *   쿠키 만료나 서버 세션 종료 후에도 localStorage에는 이전 user가 그대로
+ *   남아있을 수 있어, 그 상태를 곧바로 신뢰하면 /user/settings 등이 만료된
+ *   사용자 정보를 보여줄 수 있다.
+ * - 로그인 직후(useLogin이 setUser를 직접 호출한 경우)에는 이 훅이 이미
+ *   같은 세션에서 한 번 실행된 뒤이므로(initCalledRef가 마운트당 1회로
+ *   막아줌) 중복 호출되지 않는다.
+ * - 로그인되지 않은 상태(401)라면, 영속화된 stale user가 남아있을 수 있으므로
+ *   logout()으로 정리한다.
+ * - 검증 요청이 진행되는 동안 logout()이 호출되면(레이스), 응답이 늦게
+ *   도착해도 로그아웃 상태를 되돌리지 않는다.
  */
 export function useInitAuth() {
-  const user = useAuthStore((state) => state.user);
   const setUser = useAuthStore((state) => state.setUser);
-  const isInitializing = useAuthStore((state) => state.isInitializing);
+  const logout = useAuthStore((state) => state.logout);
   const setInitializing = useAuthStore((state) => state.setInitializing);
-  // 중복 호출 방지용 ref (Strict Mode 이중 실행 방어)
+  // 중복 호출 방지용 ref (Strict Mode 이중 실행 및 재로그인 방지)
   const initCalledRef = useRef(false);
 
   useEffect(() => {
-    // 이미 user가 있으면(예: 로그인 직후) 복원할 필요 없음 — 바로 완료 처리
-    if (user !== null) {
-      if (isInitializing) setInitializing(false);
-      return;
-    }
-
     if (initCalledRef.current) return;
     initCalledRef.current = true;
+
+    // 이 요청이 진행되는 동안 로그아웃되면 늦게 도착한 응답을 무시하기 위한 플래그
+    let loggedOutMeanwhile = false;
+    const unsubscribe = useAuthStore.subscribe((state, prevState) => {
+      if (prevState.user !== null && state.user === null) {
+        loggedOutMeanwhile = true;
+      }
+    });
 
     (async () => {
       try {
@@ -44,8 +53,8 @@ export function useInitAuth() {
         // ApiResponse 래퍼 안의 실제 데이터를 꺼낸다
         const member = response?.data ?? response;
 
-        if (!member || !member.email) {
-          // 유효한 사용자 정보가 없으면 설정하지 않음
+        if (loggedOutMeanwhile || !member || !member.email) {
+          // 유효한 사용자 정보가 없거나, 응답이 오는 사이 로그아웃됐으면 반영하지 않음
           return;
         }
 
@@ -56,8 +65,10 @@ export function useInitAuth() {
           role: member.role ?? null,
         });
       } catch (error: unknown) {
-        // 401 = 로그인 안 된 상태 → 정상, 무시
+        // 401 = 로그인 안 된 상태(또는 세션 만료) → 영속화된 stale user가 남아있을 수
+        // 있으므로 제거한다. 로그아웃 레이스 중이면 logout()이 이미 호출됐으므로 스킵.
         if (error instanceof AxiosError && error.response?.status === 401) {
+          if (!loggedOutMeanwhile) logout();
           return;
         }
         // 그 외 에러는 개발 환경에서만 출력
@@ -67,8 +78,11 @@ export function useInitAuth() {
         // initCalledRef를 false로 되돌려 재시도 가능하게 하지 않는다
         // (실패 시 반복 요청을 막기 위해 그냥 둔다)
       } finally {
+        unsubscribe();
         setInitializing(false);
       }
     })();
-  }, [user, setUser, isInitializing, setInitializing]);
+
+    return () => unsubscribe();
+  }, [setUser, logout, setInitializing]);
 }
