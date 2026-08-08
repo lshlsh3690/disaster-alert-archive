@@ -98,7 +98,12 @@ export default function EmailInput<T extends FieldValues>({ formMethods, showVer
           className="input flex-1"
         />
         {showVerificationUI && (
-          <Button type="button" onClick={handleSendVerification} isLoading={isEmailCodeSending}>
+          <Button
+            type="button"
+            onClick={handleSendVerification}
+            isLoading={isEmailCodeSending}
+            className="whitespace-nowrap"
+          >
             {t("form.requestCode")}
           </Button>
         )}

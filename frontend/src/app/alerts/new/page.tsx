@@ -218,14 +218,14 @@ export default function RegisterAlertsPage() {
           <label className="block text-sm font-medium mb-1">{t("alertReport.regionSelectLabel")}</label>
           <div className="flex gap-2">
             <input
-              className="input w-full"
+              className="input flex-1"
               readOnly
               value={selectedRegionName ? `${selectedRegionName} (${selectedRegionCode})` : t("alertReport.regionPlaceholder")}
               onClick={() => setIsAddrModalOpen(true)}
             />
-            <button type="button" className="px-3 py-2 rounded bg-gray-100" onClick={() => setIsAddrModalOpen(true)}>{t("alertReport.search")}</button>
+            <button type="button" className="px-3 py-2 rounded bg-gray-100 whitespace-nowrap" onClick={() => setIsAddrModalOpen(true)}>{t("alertReport.search")}</button>
             {selectedRegionName && (
-              <button type="button" className="px-3 py-2 rounded bg-gray-100" onClick={() => { setSelectedRegionName(""); setSelectedRegionCode(""); }}>{t("alertReport.reset")}</button>
+              <button type="button" className="px-3 py-2 rounded bg-gray-100 whitespace-nowrap" onClick={() => { setSelectedRegionName(""); setSelectedRegionCode(""); }}>{t("alertReport.reset")}</button>
             )}
           </div>
           <p className="text-xs text-gray-500 mt-1">{t("alertReport.regionHint")}</p>
@@ -245,12 +245,12 @@ export default function RegisterAlertsPage() {
           <h3 className="text-lg font-semibold">{t("alertReport.addrModalTitle")}</h3>
           <div className="flex gap-2">
             <input
-              className="input w-full"
+              className="input flex-1"
               value={addrQuery}
               onChange={(e) => setAddrQuery(e.target.value)}
               placeholder={t("alertReport.addrPlaceholderExample")}
             />
-            <button type="button" className="px-3 py-2 rounded bg-blue-600 text-white" onClick={searchJuso}>
+            <button type="button" className="px-3 py-2 rounded bg-blue-600 text-white whitespace-nowrap" onClick={searchJuso}>
               {t("alertReport.search")}
             </button>
           </div>

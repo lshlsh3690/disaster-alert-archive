@@ -26,7 +26,7 @@ export default function OAuthButton({
     <button
       type="button"
       onClick={handleOAuth}
-      className={`relative flex h-11 w-full items-center justify-center rounded-[var(--radius-control)] px-12 text-sm font-medium transition focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[var(--blue)] ${cfg.className}`}
+      className={`relative flex h-11 w-full items-center justify-center whitespace-nowrap rounded-[var(--radius-control)] px-6 text-sm font-medium transition focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[var(--blue)] sm:px-12 ${cfg.className}`}
     >
       <span className="absolute left-3.5 flex h-[18px] w-[18px] items-center justify-center" aria-hidden="true">
         {provider === "google" && (
