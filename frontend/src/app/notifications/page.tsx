@@ -73,7 +73,7 @@ export default function NotificationsPage() {
     });
   };
 
-  if (!user) return null;
+  if (isInitializing || !user) return null;
 
   return (
     <main className="bg-[var(--canvas)] min-h-[calc(100vh-48px)]">
