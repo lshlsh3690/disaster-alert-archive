@@ -42,18 +42,21 @@ try {
   process.exit(0);
 }
 
+// lastSha는 "이 HEAD를 이미 보고했는지" 중복 방지용일 뿐, diff 기준으로
+// 쓰지 않는다 — 브랜치를 넘나들면 마지막 확인 시점의 sha가 지금과 무관한
+// 브랜치의 커밋일 수 있어, 그 둘을 직접 diff하면 "이 커밋이 바꾼 파일"이
+// 아니라 "두 브랜치의 차이"가 나와버려 오탐이 난다. 대신 항상 이 커밋
+// 자신의 첫 부모와만 비교한다.
 const lastSha = existsSync(stateFile) ? readFileSync(stateFile, "utf8").trim() : "";
 
 if (headSha === lastSha) process.exit(0);
 writeFileSync(stateFile, headSha);
 
-// 최초 실행: 비교 기준(lastSha)이 없으므로 이번엔 건너뛰고 다음 커밋부터 동작.
-if (!lastSha) process.exit(0);
-
 let diffOutput;
 try {
-  diffOutput = execSync(`git diff --name-only ${lastSha} ${headSha}`, { cwd: repoRoot, encoding: "utf8" });
+  diffOutput = execSync(`git diff --name-only ${headSha}^ ${headSha}`, { cwd: repoRoot, encoding: "utf8" });
 } catch {
+  // 부모가 없는 최초 커밋(루트 커밋) 등 — 조용히 종료.
   process.exit(0);
 }
 
