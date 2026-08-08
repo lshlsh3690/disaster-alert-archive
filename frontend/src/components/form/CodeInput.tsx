@@ -81,10 +81,16 @@ export default function CodeInput<T extends FieldValues>({ formMethods }: CodeIn
           placeholder={t("form.codePlaceholder")}
           {...formMethods.register("verificationCode" as Path<T>)}
           disabled={isEmailVerified}
-          className={`input ${isEmailVerified ? "bg-[#f1f3f6] text-[var(--text-subtle)]" : ""}`}
+          className={`input flex-1 ${isEmailVerified ? "bg-[#f1f3f6] text-[var(--text-subtle)]" : ""}`}
         />
 
-        <Button type="button" onClick={handleVerifyCode} isLoading={isCodeVerifying} disabled={isEmailVerified}>
+        <Button
+          type="button"
+          onClick={handleVerifyCode}
+          isLoading={isCodeVerifying}
+          disabled={isEmailVerified}
+          className="whitespace-nowrap"
+        >
           {t("form.codeVerify")}
         </Button>
       </div>
