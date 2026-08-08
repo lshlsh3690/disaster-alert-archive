@@ -21,9 +21,9 @@ public class MemberController {
 
     @PreAuthorize("hasAnyRole('USER', 'ADMIN')")
     @GetMapping("/me")
-    public ResponseEntity<MemberInfoResponse> getMyInfo(@AuthenticationPrincipal MemberDetails memberDetails) {
+    public ResponseEntity<ApiResponse<MemberInfoResponse>> getMyInfo(@AuthenticationPrincipal MemberDetails memberDetails) {
         MemberInfoResponse response = memberService.getMemberInfo(memberDetails.member().getId());
-        return ResponseEntity.ok(response);
+        return ResponseEntity.ok(ApiResponse.success(response));
     }
 
     @GetMapping("/check-nickname")

@@ -11,12 +11,13 @@ export default function AccountSettingsPage() {
   const { t } = useTranslation();
   const router = useRouter();
   const user = useAuthStore((s) => s.user);
+  const isInitializing = useAuthStore((s) => s.isInitializing);
 
   useEffect(() => {
-    if (!user) router.push("/login");
-  }, [user, router]);
+    if (!isInitializing && !user) router.push("/login");
+  }, [user, isInitializing, router]);
 
-  if (!user) return null;
+  if (isInitializing || !user) return null;
 
   return (
     <main className="bg-[var(--canvas)] min-h-[calc(100vh-48px)]">
