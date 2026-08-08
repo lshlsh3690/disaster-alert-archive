@@ -37,16 +37,17 @@ export default function NotificationsPage() {
   const locale = LANG_LOCALE[useLanguageStore((s) => s.language)] ?? "ko-KR";
   const router = useRouter();
   const user = useAuthStore((s) => s.user);
+  const isInitializing = useAuthStore((s) => s.isInitializing);
 
   const [data, setData] = useState<NotificationLogPage | null>(null);
   const [loading, setLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(0);
 
   useEffect(() => {
-    if (!user) {
+    if (!isInitializing && !user) {
       router.push("/login");
     }
-  }, [user, router]);
+  }, [user, isInitializing, router]);
 
   useEffect(() => {
     if (!user) return;

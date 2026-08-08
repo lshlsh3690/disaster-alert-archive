@@ -20,13 +20,19 @@ import { AxiosError } from "axios";
 export function useInitAuth() {
   const user = useAuthStore((state) => state.user);
   const setUser = useAuthStore((state) => state.setUser);
+  const isInitializing = useAuthStore((state) => state.isInitializing);
+  const setInitializing = useAuthStore((state) => state.setInitializing);
   // 중복 호출 방지용 ref (Strict Mode 이중 실행 방어)
   const initCalledRef = useRef(false);
 
   useEffect(() => {
-    // 이미 user가 있거나 초기화를 시도했으면 스킵
-    if (user !== null || initCalledRef.current) return;
+    // 이미 user가 있으면(예: 로그인 직후) 복원할 필요 없음 — 바로 완료 처리
+    if (user !== null) {
+      if (isInitializing) setInitializing(false);
+      return;
+    }
 
+    if (initCalledRef.current) return;
     initCalledRef.current = true;
 
     (async () => {
@@ -60,7 +66,9 @@ export function useInitAuth() {
         }
         // initCalledRef를 false로 되돌려 재시도 가능하게 하지 않는다
         // (실패 시 반복 요청을 막기 위해 그냥 둔다)
+      } finally {
+        setInitializing(false);
       }
     })();
-  }, [user, setUser]);
+  }, [user, setUser, isInitializing, setInitializing]);
 }
