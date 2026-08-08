@@ -26,7 +26,8 @@ try {
 }
 
 const command = payload?.tool_input?.command ?? "";
-if (!/\bgit\s+commit\b/.test(command)) process.exit(0);
+// 뒤에 하이픈이 오는 git commit-tree 같은 plumbing 커맨드는 제외.
+if (!/\bgit\s+commit(?:\s|$)/.test(command)) process.exit(0);
 
 let repoRoot;
 try {
@@ -49,14 +50,32 @@ try {
 // 브랜치의 커밋일 수 있어, 그 둘을 직접 diff하면 "이 커밋이 바꾼 파일"이
 // 아니라 "두 브랜치의 차이"가 나와버려 오탐이 난다. 대신 항상 이 커밋
 // 자신의 첫 부모와만 비교한다.
-const lastSha = existsSync(stateFile) ? readFileSync(stateFile, "utf8").trim() : "";
+let lastSha = "";
+try {
+  lastSha = existsSync(stateFile) ? readFileSync(stateFile, "utf8").trim() : "";
+} catch {
+  // 상태 파일을 못 읽어도 훅 자체는 계속 진행 — 최초 실행처럼 취급.
+}
 
 if (headSha === lastSha) process.exit(0);
-writeFileSync(stateFile, headSha);
+
+const isFirstRun = lastSha === "";
+
+try {
+  writeFileSync(stateFile, headSha);
+} catch {
+  // 상태 파일을 못 써도(권한 등) 감지 자체는 계속 진행 — 다음 실행에서
+  // 중복 보고될 수 있지만 커밋을 막는 것보단 낫다.
+}
+
+// 최초 실행(상태 파일이 아직 없음)은 비교 기준이 없으므로 건너뛴다 —
+// 그렇지 않으면 "git commit"이 매칭됐지만 실제로 새 커밋이 생기지 않은
+// 경우(거부된 커밋 등)에도 기존 HEAD를 "방금 커밋"으로 오인할 수 있다.
+if (isFirstRun) process.exit(0);
 
 let diffOutput;
 try {
-  diffOutput = execSync(`git diff --name-only ${headSha}^ ${headSha}`, { cwd: repoRoot, encoding: "utf8" });
+  diffOutput = execSync(`git diff --name-only ${headSha}~1 ${headSha}`, { cwd: repoRoot, encoding: "utf8" });
 } catch {
   // 부모가 없는 최초 커밋(루트 커밋) 등 — 조용히 종료.
   process.exit(0);
