@@ -25,12 +25,12 @@ export default function MePage() {
   if (
     isSuccess &&
     data &&
-    (myInfo.email !== data.data.email ||    // ← data → data.data
+    (myInfo.email !== data.data.email ||
      myInfo.nickname !== data.data.nickname ||
      myInfo.role !== data.data.role)
   ) {
     setMyInfo({
-      email: data.data.email,       // ← data → data.data
+      email: data.data.email,
       nickname: data.data.nickname,
       role: data.data.role,
     });
