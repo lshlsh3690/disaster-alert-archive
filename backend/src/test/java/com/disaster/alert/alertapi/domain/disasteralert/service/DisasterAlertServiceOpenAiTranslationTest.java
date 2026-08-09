@@ -44,6 +44,22 @@ class DisasterAlertServiceOpenAiTranslationTest {
         assertTranslated("zh");
     }
 
+    // VI/TH 는 라틴·알파시라빅 스크립트라 한글 대비 팽창률이 EN/JA/ZH 보다 크다. 번역문 길이
+    // 가드(OpenAiTranslationClient.isSuspiciouslyLong)에 정상 번역이 걸리면 예외 → 원문 폴백이
+    // 되어 translatedMessage 가 null 로 남으므로, assertTranslated 의 assertNotNull 이 잡아낸다.
+
+    @Test
+    @Transactional
+    void getLatestAlert_lang이_vi이면_실제로_베트남어로_번역된다() {
+        assertTranslated("vi");
+    }
+
+    @Test
+    @Transactional
+    void getLatestAlert_lang이_th이면_실제로_태국어로_번역된다() {
+        assertTranslated("th");
+    }
+
     private void assertTranslated(String lang) {
         List<LatestAlertResponse> result = disasterAlertService.getLatestAlert(5, lang);
         log.info("====결과 (lang={})====", lang);
