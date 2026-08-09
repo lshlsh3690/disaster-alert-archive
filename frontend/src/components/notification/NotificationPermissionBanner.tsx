@@ -39,7 +39,13 @@ export default function NotificationPermissionBanner() {
         >
           {isLoading ? t("notificationBanner.processing") : t("notificationBanner.allow")}
         </button>
-        <button className="text-white/70 hover:text-white text-sm" onClick={() => setDismissed(true)} aria-label={t("notificationBanner.close")}>
+        {/* 터치 타겟 최소 44px 확보 — 글리프 크기 그대로 두면 실측 히트 영역이 11×20px 남짓이라
+            모바일에서 탭이 잘 안 된다. 시각적 크기는 그대로 두고 패딩으로만 넓힌다. */}
+        <button
+          className="text-white/70 hover:text-white text-sm min-w-11 min-h-11 flex items-center justify-center -mr-2"
+          onClick={() => setDismissed(true)}
+          aria-label={t("notificationBanner.close")}
+        >
           ✕
         </button>
       </div>
