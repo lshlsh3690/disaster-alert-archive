@@ -536,7 +536,7 @@ public class DisasterAlertService {
      * <p>다국어 동작:
      * <ul>
      *   <li>한국어 요청 ("ko"/null): 번역 필드 모두 null</li>
-     *   <li>지원 언어 요청 ("en"/"ja"/"zh"): 캐시 없으면 DeepL 호출 → 저장 후 응답</li>
+     *   <li>지원 언어 요청 ("en"/"ja"/"zh"): 캐시 없으면 번역 API 호출 → 저장 후 응답</li>
      * </ul>
      */
     @Transactional
@@ -549,7 +549,7 @@ public class DisasterAlertService {
         dto.setEventId(eventAlertMappingRepository.findEventIdByAlertId(id));
 
         SupportedLanguage.fromRequestParam(lang).ifPresent(language -> {
-            // 1) 메시지/유형 번역 (없으면 lazy DeepL 호출)
+            // 1) 메시지/유형 번역 (없으면 lazy 번역 호출)
             translationService.ensureTranslated(id, language);
             translationRepository.findByIdAlertIdAndIdLanguageCode(id, language.getDbCode())
                     .ifPresent(t -> {
@@ -686,7 +686,7 @@ public class DisasterAlertService {
      *
      * <p>흐름:
      * <ol>
-     *   <li>누락된 (alertId, lang) 조합을 DeepL 로 일괄 번역 (lazy)</li>
+     *   <li>누락된 (alertId, lang) 조합을 OpenAI 로 일괄 번역 (lazy)</li>
      *   <li>번역 결과를 Map 으로 조회</li>
      *   <li>법정동 코드들을 legal_district_translation 에서 일괄 조회</li>
      *   <li>각 DTO 에 번역 필드 채우기</li>

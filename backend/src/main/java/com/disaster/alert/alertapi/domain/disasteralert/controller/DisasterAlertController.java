@@ -28,7 +28,7 @@ public class DisasterAlertController {
      *
      * @param lang 응답 언어 — "ko"(기본)/"en"/"ja"/"zh".
      *             "ko" 또는 미지정 시 번역 필드는 모두 null.
-     *             다른 값은 해당 언어로 번역 (캐시 없으면 DeepL 호출).
+     *             다른 값은 해당 언어로 번역 (캐시 없으면 번역 API 호출).
      */
     @GetMapping("/search")
     public ResponseEntity<Page<DisasterAlertResponseDto>> searchAlerts(
@@ -122,7 +122,7 @@ public class DisasterAlertController {
     /**
      * 재난문자 상세 조회.
      *
-     * @param lang 응답 언어. 캐시 없으면 lazy 번역 (DeepL 호출).
+     * @param lang 응답 언어. 캐시 없으면 lazy 번역 (번역 API 호출).
      */
     @GetMapping("/{id}")
     public ResponseEntity<DisasterAlertDetailDto> getDisasterAlert(

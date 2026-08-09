@@ -4,7 +4,7 @@ import com.disaster.alert.alertapi.domain.event.model.DisasterEvent;
 import com.disaster.alert.alertapi.domain.event.model.DisasterEventTranslation;
 import com.disaster.alert.alertapi.domain.event.repository.DisasterEventRepository;
 import com.disaster.alert.alertapi.domain.event.repository.DisasterEventTranslationRepository;
-import com.disaster.alert.alertapi.global.translation.DeepLTranslationClient;
+import com.disaster.alert.alertapi.global.translation.OpenAiTranslationClient;
 import com.disaster.alert.alertapi.global.translation.SupportedLanguage;
 import com.disaster.alert.alertapi.global.translation.TranslationProperties;
 import lombok.RequiredArgsConstructor;
@@ -19,7 +19,7 @@ import java.util.stream.Collectors;
 /**
  * 이벤트 제목 다국어 번역 — alert {@code TranslationService} 패턴 복제(제목만).
  *
- * <p>조회 시 lazy: 해당 언어 캐시 없으면 {@code event_title} 을 DeepL 로 번역해 저장.
+ * <p>조회 시 lazy: 해당 언어 캐시 없으면 {@code event_title} 을 OpenAI 로 번역해 저장.
  * 지역/유형은 별도 필드로 안 줌(제목 안에 포함). 타임라인 알림 번역은 alert 쪽 재사용.
  */
 @Slf4j
@@ -29,10 +29,15 @@ public class EventTranslationService {
 
     private final DisasterEventRepository disasterEventRepository;
     private final DisasterEventTranslationRepository translationRepository;
-    private final DeepLTranslationClient deepLClient;
+    private final OpenAiTranslationClient translationClient;
     private final TranslationProperties properties;
 
-    /** 상세 조회 lazy 번역 — 단건. */
+    /**
+     * 상세 조회 lazy 번역 — 단건.
+     *
+     * <p>alert 쪽 {@code TranslationService.ensureTranslated} 와 같은 이유로 실패를 삼킨다 —
+     * 제목 번역이 안 됐다고 이벤트 상세 조회 전체를 500 으로 떨어뜨릴 이유가 없다.
+     */
     @Transactional
     public void ensureTranslated(Long eventId, SupportedLanguage language) {
         if (!properties.isEnabled()) {
@@ -41,10 +46,15 @@ public class EventTranslationService {
         if (translationRepository.findByIdEventIdAndIdLanguageCode(eventId, language.getDbCode()).isPresent()) {
             return;
         }
-        translateAndSaveInternal(eventId, language);
+        try {
+            translateAndSaveInternal(eventId, language);
+        } catch (Exception e) {
+            log.warn("이벤트 제목 lazy 번역 실패(원문 폴백): eventId={}, lang={}, reason={}",
+                    eventId, language.getDbCode(), e.getMessage());
+        }
     }
 
-    /** 목록 조회 lazy 번역 — 페이지 내 미번역분만 일괄 DeepL. */
+    /** 목록 조회 lazy 번역 — 페이지 내 미번역분만 일괄 번역. */
     @Transactional
     public void ensureTranslatedBatch(List<Long> eventIds, SupportedLanguage language) {
         if (!properties.isEnabled() || eventIds == null || eventIds.isEmpty()) {
@@ -77,7 +87,7 @@ public class EventTranslationService {
             return;
         }
         String targetLang = language.getDbCode();
-        String translatedTitle = deepLClient.translate(event.getEventTitle(), targetLang);
+        String translatedTitle = translationClient.translate(event.getEventTitle(), targetLang);
         translationRepository.save(DisasterEventTranslation.of(eventId, targetLang, translatedTitle));
         log.info("이벤트 제목 번역 완료: eventId={}, lang={}", eventId, targetLang);
     }

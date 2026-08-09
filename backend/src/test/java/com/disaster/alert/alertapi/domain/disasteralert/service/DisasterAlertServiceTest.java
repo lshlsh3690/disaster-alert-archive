@@ -4,7 +4,7 @@ import com.disaster.alert.alertapi.domain.disasteralert.dto.LatestAlertResponse;
 import com.disaster.alert.alertapi.domain.disasteralert.model.DisasterAlert;
 import com.disaster.alert.alertapi.domain.disasteralert.repository.DisasterAlertRepository;
 import com.disaster.alert.alertapi.global.testsupport.IntegrationTest;
-import com.disaster.alert.alertapi.global.translation.DeepLTranslationClient;
+import com.disaster.alert.alertapi.global.translation.OpenAiTranslationClient;
 import jakarta.transaction.Transactional;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -22,9 +22,9 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
 /**
- * lang="en" 실제 번역(진짜 영어 텍스트가 오는지)은 real DeepL 호출이 필요하므로
- * {@link DisasterAlertServiceDeepLTranslationTest} 에서 별도로 검증한다.
- * 이 클래스는 DeepL을 mock 처리해 "번역 로직이 아예 안 타야 하는 경우(lang=ko)"의 배선만 검증.
+ * lang="en" 실제 번역(진짜 영어 텍스트가 오는지)은 real OpenAI 호출이 필요하므로
+ * {@link DisasterAlertServiceOpenAiTranslationTest} 에서 별도로 검증한다.
+ * 이 클래스는 번역 클라이언트를 mock 처리해 "번역 로직이 아예 안 타야 하는 경우(lang=ko)"의 배선만 검증.
  */
 @IntegrationTest
 class DisasterAlertServiceTest {
@@ -36,11 +36,11 @@ class DisasterAlertServiceTest {
     private DisasterAlertRepository disasterAlertRepository;
 
     @MockitoBean
-    private DeepLTranslationClient deepLTranslationClient;
+    private OpenAiTranslationClient translationClient;
 
     @Test
     @Transactional
-    void getLatestAlert_lang이_ko면_번역필드는_null이고_DeepL을_호출하지_않는다() {
+    void getLatestAlert_lang이_ko면_번역필드는_null이고_번역API를_호출하지_않는다() {
         // when
         List<LatestAlertResponse> result = disasterAlertService.getLatestAlert(5, "ko");
 
@@ -52,7 +52,7 @@ class DisasterAlertServiceTest {
         assertNull(alert.getTranslatedMessage());
         assertNull(alert.getTranslatedDisasterType());
 
-        verify(deepLTranslationClient, never()).translate(anyString(), anyString());
+        verify(translationClient, never()).translate(anyString(), anyString());
     }
 
     @Test

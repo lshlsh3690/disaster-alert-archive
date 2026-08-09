@@ -11,7 +11,7 @@ import java.util.Optional;
  *
  * <p>한국어("ko")는 번역 대상이 아니라 원본이므로 이 enum에 포함하지 않는다.
  *
- * <p>새 언어 추가 시 이 enum에만 항목을 추가하면 DeepL 호출, DB 조회, 응답 매핑이
+ * <p>새 언어 추가 시 이 enum에만 항목을 추가하면 번역 API 호출, DB 조회, 응답 매핑이
  * 모두 일관되게 동작한다.
  */
 public enum SupportedLanguage {
@@ -32,7 +32,7 @@ public enum SupportedLanguage {
         return code;
     }
 
-    /** DB 저장 / DeepL API target_lang 으로 쓰이는 대문자 표기 */
+    /** DB 저장 / 번역 대상 언어 코드로 쓰이는 대문자 표기 */
     public String getDbCode() {
         return name();
     }

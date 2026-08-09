@@ -95,11 +95,12 @@ oauth:
     redirectUri: ${NAVER_OAUTH_REDIRECT_URI:http://localhost:8080/api/v1/auth/oauth/naver/callback}
 
 
-deepl:
-  api-key: ${DEEPL_API_KEY}
-  api-key2: ${DEEPL_API_KEY2:}
-  api-url: https://api-free.deepl.com/v2/translate
-  enabled: true
+# 재난문자 본문/유형·이벤트 제목 번역. 엔진은 OpenAI(gpt-4o-mini) — spring.ai.openai 자격증명을
+# 임베딩·LLM 판정과 공유하므로 별도 API 키 설정이 없다.
+# DeepL(Free)에서 옮겨왔다: 계정당 평생 누적 한도라 소진 후 리셋되지 않아 예비 키까지 막히면
+# 번역이 영구 정지되고(운영에서 실제 발생), 재난문자 특유 표기에 번역 지시를 줄 수 없었다.
+translation:
+  enabled: ${TRANSLATION_ENABLED:true}
 
 # Spring AI — OpenAI Embedding + Chat
 # 컨테이너 추가 없음. 기존 backend Spring Boot 프로세스 안에서 라이브러리로 동작.

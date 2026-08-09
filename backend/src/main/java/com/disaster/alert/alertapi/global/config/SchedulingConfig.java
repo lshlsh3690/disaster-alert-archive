@@ -10,7 +10,7 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 //
 // 원래 BackendApplication에 @EnableScheduling이 있었는데, 로컬 bootRun이 .env.dev로
 // 실제 운영 RDS에 붙은 채로 뜨면 재난문자 수집·번역·클러스터링 스케줄러가 진짜로 돌아버려서
-// (DeepL 쿼터 소모, OpenAI 임베딩 호출 등 실제 부수효과 발생 — 로컬 검증 중 실제로 겪음)
+// (OpenAI 번역·임베딩 호출 등 실제 부수효과 발생 — 로컬 검증 중 실제로 겪음)
 // 여기로 분리해 운영에서만 켜지게 했다.
 @Configuration
 @Profile("prod")

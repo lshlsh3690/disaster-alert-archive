@@ -12,15 +12,16 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 /**
- * DeepL을 mock 처리하지 않고 실제로 호출해, lang별로 진짜 번역문이 오는지 검증한다.
- * DEEPL_API_KEY가 없거나 유효하지 않으면 이 테스트가 그대로 실패해야 한다 — 배선만 확인하는
+ * 번역 클라이언트를 mock 처리하지 않고 실제 OpenAI 를 호출해, lang별로 진짜 번역문이 오는지 검증한다.
+ * OPENAI_API_KEY 가 없거나 유효하지 않으면 이 테스트가 그대로 실패해야 한다 — 배선만 확인하는
  * {@link DisasterAlertServiceTest} 와 달리 실제 번역 품질(적어도 "한글이 아님")까지 확인하는 목적.
  */
 @IntegrationTest
 @Slf4j
-class DisasterAlertServiceDeepLTranslationTest {
+class DisasterAlertServiceOpenAiTranslationTest {
 
     @Autowired
     private DisasterAlertService disasterAlertService;
@@ -55,6 +56,9 @@ class DisasterAlertServiceDeepLTranslationTest {
         LatestAlertResponse alert = result.get(0);
 
         assertEquals(lang, alert.getLanguage());
+        // translation.enabled=false 이거나 번역이 실패하면 null 이 되는데, 아래 assertNotEquals·
+        // containsHangul 은 null 을 통과시켜 테스트가 조용히 성공해버린다 — 먼저 null 을 막는다.
+        assertNotNull(alert.getTranslatedMessage(), "번역문이 null 이면 안 됩니다(번역이 아예 안 탔는지 확인).");
         assertNotEquals(alert.getMessage(), alert.getTranslatedMessage(), "번역본이 원본과 같으면 안 됩니다.");
         assertFalse(containsHangul(alert.getTranslatedMessage()),
                 "번역된 메시지에 한글이 남아있으면 안 됩니다: " + alert.getTranslatedMessage());
