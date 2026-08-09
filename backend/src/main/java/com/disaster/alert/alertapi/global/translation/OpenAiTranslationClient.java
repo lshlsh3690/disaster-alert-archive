@@ -79,13 +79,32 @@ public class OpenAiTranslationClient {
         }
 
         String result = translated.trim();
-        int limit = Math.max(MIN_LENGTH_ALLOWANCE, text.length() * MAX_LENGTH_RATIO);
-        if (result.length() > limit) {
+        if (isSuspiciouslyLong(text, result)) {
             throw new IllegalStateException(
                     "번역문이 원문 대비 비정상적으로 김(설명 혼입 의심): targetLang=" + targetLang
                             + ", 원문=" + text.length() + "자, 번역=" + result.length() + "자");
         }
         return result;
+    }
+
+    /**
+     * 번역문이 원문 대비 비정상적으로 길어 설명·주석이 섞였다고 볼 수 있는지.
+     *
+     * <p>외부 의존성 없는 순수 판정이라 분리해 둔다 — 언어별 팽창률 경계는 네트워크 호출 없이
+     * 단위 테스트로 검증한다.
+     *
+     * <p>한글 1음절이 목표 언어에서 몇 글자가 되는지는 언어마다 크게 다르다. 한자·간지를 쓰는
+     * ZH/JA 는 원문보다 짧아지기도 하지만, 라틴 문자 계열은 확실히 길어진다(실측: 한국어 95자
+     * 재난문자 → 영어 약 235자, 2.5배). 베트남어는 음절을 공백 포함 3~7자로 풀어 쓰기 때문에
+     * 영어보다 더 팽창한다. 그래서 배수를 넉넉히 잡는다 — 정상 번역을 잘못 버리면 그 언어
+     * 사용자에게만 조용히 원문(한국어)이 노출돼 알아채기 어렵기 때문이다.
+     */
+    static boolean isSuspiciouslyLong(String source, String translated) {
+        if (source == null || translated == null) {
+            return false;
+        }
+        int limit = Math.max(MIN_LENGTH_ALLOWANCE, source.length() * MAX_LENGTH_RATIO);
+        return translated.length() > limit;
     }
 
     private String buildPrompt(String text, String languageName) {
