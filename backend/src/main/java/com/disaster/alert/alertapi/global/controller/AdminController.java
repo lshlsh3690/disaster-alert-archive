@@ -15,7 +15,9 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/api/v1/admin")
-@PreAuthorize("hasRole('ADMIN')")
+// [시연용 임시] 무인증 호출을 허용하려고 잠시 끈다. 촬영 후 아래 주석을 해제하고
+// SecurityConfig의 /api/v1/admin/** permitAll도 함께 제거할 것.
+// @PreAuthorize("hasRole('ADMIN')")
 public class AdminController {
 
     private final DisasterFetchScheduler disasterFetchScheduler;
