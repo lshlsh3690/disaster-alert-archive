@@ -3,19 +3,21 @@
 import { useState } from "react";
 import { useNotificationPermission } from "@/hooks/useNotificationPermission";
 import { useAuthStore } from "@/store/authStore";
-import { useGuestFavoriteRegionsStore } from "@/store/guestFavoriteRegionsStore";
 import { useTranslation } from "react-i18next";
 
 export default function NotificationPermissionBanner() {
   const { t } = useTranslation();
   const user = useAuthStore((state) => state.user);
-  const guestRegions = useGuestFavoriteRegionsStore((s) => s.regions);
   const { permission, isLoading, requestPermission } = useNotificationPermission();
   const [dismissed, setDismissed] = useState(false);
 
   const isLoggedIn = !!user;
-  // 비로그인은 관심지역이 있을 때만 배너 표시
-  const shouldShow = permission === "default" && (isLoggedIn || guestRegions.length > 0) && !dismissed;
+  // 로그인 여부·관심지역 유무와 무관하게 진입 직후 한 번 노출한다. 예전에는 게스트만 관심지역이
+  // 있을 때 표시해서 두 경로의 권한 요청 시점이 어긋났다. 권한 허용 시점에 관심지역이 없어도
+  // useNotificationPermission 의 동기화 effect 들이 나중에 지역이 채워지면 등록해주므로 문제없다.
+  // requestPermission 은 반드시 버튼 클릭(사용자 제스처)으로만 호출한다 — 자동 호출은
+  // Firefox/Safari 에서 무시된다.
+  const shouldShow = permission === "default" && !dismissed;
 
   if (!shouldShow) return null;
 
