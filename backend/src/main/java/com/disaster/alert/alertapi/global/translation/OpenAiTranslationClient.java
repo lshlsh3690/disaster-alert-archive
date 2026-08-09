@@ -102,6 +102,12 @@ public class OpenAiTranslationClient {
      * 재난문자 → 영어 약 235자, 2.5배). 베트남어는 음절을 공백 포함 3~7자로 풀어 쓰기 때문에
      * 영어보다 더 팽창한다. 그래서 배수를 넉넉히 잡는다 — 정상 번역을 잘못 버리면 그 언어
      * 사용자에게만 조용히 원문(한국어)이 노출돼 알아채기 어렵기 때문이다.
+     *
+     * <p><b>한계</b>: EN 2.5배는 실측, VI 는 표기 방식에서 온 추정이고, TH(공백 없는 알파시라빅)와
+     * "이상 응답은 보통 10배 이상"은 실측 근거가 없는 가정이다. TH 는 {@code
+     * DisasterAlertServiceOpenAiTranslationTest} 의 th 케이스(실제 OpenAI 호출)로만 검증되는데,
+     * 그 테스트는 OPENAI_API_KEY 가 있어야 돌아 키 없는 환경에서는 회귀가 걸리지 않는다.
+     * 실측치가 쌓이면 배수를 다시 조정할 것.
      */
     static boolean isSuspiciouslyLong(String source, String translated) {
         if (source == null || translated == null) {
