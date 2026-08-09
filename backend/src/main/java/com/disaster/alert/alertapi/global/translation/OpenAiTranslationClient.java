@@ -35,8 +35,12 @@ public class OpenAiTranslationClient {
     /**
      * 번역문이 원문 길이의 이 배수를 넘으면 모델이 설명·주석을 덧붙인 것으로 보고 버린다.
      * 재난문자는 안전 정보라, 원문에 없는 내용이 섞이는 것이 번역 실패보다 위험하다.
+     *
+     * <p>배수를 넉넉히(6배) 잡은 이유는 {@link #isSuspiciouslyLong} 주석 참고 — 라틴 문자 계열
+     * (특히 VI)의 정상 팽창을 잘못 걸러내면 그 언어 사용자에게만 조용히 원문이 노출된다.
+     * 설명이 덧붙은 응답은 보통 10배 이상이라 6배로도 걸러진다.
      */
-    private static final int MAX_LENGTH_RATIO = 4;
+    private static final int MAX_LENGTH_RATIO = 6;
 
     /**
      * 길이 가드의 하한. "호우" 같은 짧은 재난 유형은 배수만 적용하면 정상 번역
