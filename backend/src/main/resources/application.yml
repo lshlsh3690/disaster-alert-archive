@@ -95,8 +95,11 @@ oauth:
     redirectUri: ${NAVER_OAUTH_REDIRECT_URI:http://localhost:8080/api/v1/auth/oauth/naver/callback}
 
 
-# 재난문자 본문/유형·이벤트 제목 번역. 엔진은 OpenAI(gpt-4o-mini) — spring.ai.openai 자격증명을
+# 재난문자 본문/유형·이벤트 제목 번역. 엔진은 OpenAI 이며 spring.ai.openai 자격증명을
 # 임베딩·LLM 판정과 공유하므로 별도 API 키 설정이 없다.
+# 모델은 아래 spring.ai.openai.chat 기본값(gpt-4o-mini)이 아니라 OpenAiTranslationClient.MODEL
+# 이 per-call 로 오버라이드한다 — 한국어 지명 음차 품질 때문에 번역만 상위 모델을 쓴다(사유는
+# OpenAiTranslationClient.MODEL javadoc 참고).
 # DeepL(Free)에서 옮겨왔다: 계정당 평생 누적 한도라 소진 후 리셋되지 않아 예비 키까지 막히면
 # 번역이 영구 정지되고(운영에서 실제 발생), 재난문자 특유 표기에 번역 지시를 줄 수 없었다.
 translation:
