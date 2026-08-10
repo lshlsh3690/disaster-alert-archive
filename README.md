@@ -31,7 +31,7 @@ AI 기반 이벤트 클러스터링으로 중복 알림을 제거하고, 기상 
 | 재난 통계 대시보드 | 지역별·유형별·기간별 통계 및 기상 상관 분석 시각화 |
 | 위험도 분석 | 지역별 위험도 지수 산출 (유형 가중치 × 강도 × 시간 감쇠) 및 지도 표시 |
 | 날씨 연계 | 기상청 관측 데이터 수집 및 재난 발령 시점 날씨 조회 |
-| 다국어 지원 | DeepL API 기반 재난 문자 번역 (원본 KO → EN/JA/ZH/VI/TH) |
+| 다국어 지원 | OpenAI 기반 재난 문자·이벤트 제목 번역 (원본 KO → EN/JA/ZH/VI/TH). 법정동 명칭은 별도 시드 테이블 조회(EN/JA/ZH) |
 | 소셜 로그인 | Google / Naver / Kakao OAuth2 |
 | 재난 제보 / 댓글 | 재난 현장 제보 작성 및 재난 문자별 댓글 |
 | 실종아동 | 실종아동 데이터 적재 및 조회 |
@@ -66,7 +66,7 @@ AI 기반 이벤트 클러스터링으로 중복 알림을 제거하고, 기상 
 | 인증/인가 | Spring Security + JWT + OAuth2 (Google·Naver·Kakao) |
 | 캐시 | Redis |
 | AI | Spring AI — GPT-4o-mini (이벤트 판정), text-embedding-3-small (클러스터링) |
-| 번역 | DeepL API (KO/EN/ZH/JA) |
+| 번역 | OpenAI `gpt-4o` (KO → EN/JA/ZH/VI/TH) |
 | 푸시 알림 | Firebase Admin SDK (FCM) |
 | 모니터링 | Spring Actuator |
 | API 문서 | SpringDoc OpenAPI (Swagger UI) |
@@ -85,7 +85,7 @@ AI 기반 이벤트 클러스터링으로 중복 알림을 제거하고, 기상 
 |-----|------|
 | 행정안전부 재난문자 API | 재난 안전 문자 수집 |
 | 기상청 기상 API | 관측·요약 데이터 수집 |
-| DeepL API | 재난 문자 다국어 번역 |
+| OpenAI API | 임베딩(이벤트 클러스터링), LLM 판정(위험도·cross-region), 재난 문자 다국어 번역 |
 | Firebase Cloud Messaging | 웹 푸시 알림 |
 | OpenAI GPT-4o-mini | 이벤트 요약 및 판정 |
 | Kakao Maps API | 지도·히트맵·법정동 좌표 |
@@ -193,7 +193,7 @@ npm run dev
 | `DISASTER_ALERT_SERVICE_KEY` | 행안부 Open API 키 |
 | `KMA_ASOS_API_KEY` | 기상청 Open API 키 |
 | `TIMELY_API_KEY` | Spring AI(Timely GMS 프록시) — 임베딩/챗 API 키 |
-| `DEEPL_API_KEY` / `DEEPL_API_KEY2` | DeepL 번역 API 키 (1번 키 쿼터 초과 시 2번 키로 자동 폴백) |
+| `TRANSLATION_ENABLED` | 번역 기능 on/off (미설정 시 `true`). 번역 엔진은 OpenAI 이며 `OPENAI_API_KEY` 를 임베딩·LLM 판정과 공유하므로 번역 전용 키가 없다 |
 | `GOOGLE_OAUTH_CLIENT_ID` / `_SECRET` | Google OAuth2 |
 | `KAKAO_OAUTH_CLIENT_ID` / `_SECRET` | Kakao OAuth2 |
 | `NAVER_OAUTH_CLIENT_ID` / `_SECRET` | Naver OAuth2 |

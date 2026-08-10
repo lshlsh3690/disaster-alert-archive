@@ -65,7 +65,12 @@
 별도의 외부 실종자 API(경찰청 등) 연동 없이, 수집된 재난 안전 문자 중 실종 관련 문자에서 추출한 정보만으로 `MissingPersonIdentity`를 구성해 추적한다. 동일 인물의 재신고는 이름+나이+키 등 신원 정보로 클러스터링(임베딩/지역 기반이 아님).
 
 ### 3.6 다국어 번역
-OpenAI(gpt-4o-mini) 기반. 재난 문자(`DisasterEventTranslation`)와 법정동 명칭 번역을 스케줄러로 자동 처리(한/영/중/일).
+경로가 둘로 나뉘며 서로 무관하다.
+
+- **재난문자 본문·유형, 이벤트 제목** — OpenAI 런타임 번역(`OpenAiTranslationClient`, 모델 `gpt-4o`) 후 `disaster_alert_translation`·`disaster_event_translation` 에 캐시. 지원 언어 EN/JA/ZH/VI/TH. 수집 스케줄러가 저장 직후 전 언어를 비동기로 사전 번역하고, 캐시 미스는 조회 시점 lazy 번역으로 메운다.
+- **법정동 명칭** — 런타임 번역 대상이 **아니다**. Flyway 로 시딩된 `legal_district_translation` 테이블을 조회할 뿐이며, 시드 언어는 EN/JA/ZH 3개다. 요청 언어에 시드가 없으면(VI/TH) 영어로 폴백한다.
+
+상세는 `specs/005-translation-pipeline/spec.md`(런타임 번역)와 `specs/004-legal-district-matching/spec.md` FR-017·FR-018(법정동 시드)을 정본으로 한다.
 
 ## 4. 신규 요구사항 기술 설계 — 사용자 제재 (PRD 5.7)
 
@@ -92,7 +97,7 @@ OpenAI(gpt-4o-mini) 기반. 재난 문자(`DisasterEventTranslation`)와 법정�
 | 알림 지연 최소화 | 재난문자 수집 스케줄러 주기 단축, 클러스터링 LLM 호출을 사전 필터(키워드/유형)로 최소화해 처리 지연 감소 |
 | 중복 알림 방지 | `DisasterCooldown` + 이벤트 클러스터링으로 동일 사건 재알림 억제 |
 | 알림 발송 실패 최소화 | FCM 발송 실패(UNREGISTERED) 토큰 감지 — 자동 정리 로직은 별도 구현 필요(현재 감지만 하고 삭제는 미구현) |
-| 번역 품질 | OpenAI gpt-4o-mini 사용(재난문자 표기 규칙을 프롬프트로 지정), 번역 실패 시 원문 유지 |
+| 번역 품질 | OpenAI `gpt-4o` 사용(재난문자 표기 규칙을 프롬프트로 지정), 번역 실패 시 원문 유지. 법정동 명칭은 이 경로가 아니라 시드 테이블 조회(3.6 참고) |
 
 ## 7. 참고
 - [PRD.md](./PRD.md)
