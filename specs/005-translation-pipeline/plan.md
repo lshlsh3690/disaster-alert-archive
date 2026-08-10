@@ -20,7 +20,7 @@
 
 **저장소**: PostgreSQL — `disaster_alert_translation`(V3), `disaster_event_translation`(V40). 둘 다 `(원본 ID, language_code)` 복합 PK의 캐시 테이블이다.
 
-**테스트**: 두 종류. 길이 가드는 순수 JUnit 단위 테스트(`OpenAiTranslationClientTest`, Spring 컨텍스트·네트워크 불필요), 실제 번역 품질은 실제 OpenAI를 호출하는 통합 테스트(`OpenAiTranslationClientRealApiTest`, `@IntegrationTest`, 고정 원문 1건 × 지원 언어 5개). 후자는 헌법 원칙 III과 충돌한다(아래 헌법 검사 참고).
+**테스트**: 두 종류. 길이 가드는 순수 JUnit 단위 테스트(`OpenAiTranslationClientTest`, Spring 컨텍스트·네트워크 불필요), 실제 번역 품질은 실제 OpenAI를 호출하는 통합 테스트(`OpenAiTranslationClientRealApiTest`, `@IntegrationTest` + `@Tag("realApi")`, 고정 원문 1건 × 지원 언어 5개, 기본 `test` 에서 제외). 후자는 헌법 원칙 III과 충돌한다(아래 헌법 검사 참고).
 
 **대상 플랫폼**: 웹(Spring Boot REST API). 번역 결과는 `?lang=` 쿼리 파라미터로 요청한 클라이언트에 응답 DTO 필드로 전달된다.
 
@@ -47,11 +47,11 @@
   2. **패키지 배치 비대칭(확인됨).** 재난문자 번역은 `global/translation/TranslationService`에 있으면서 `domain/disasteralert`의 엔티티·리포지토리를 직접 임포트한다(`TranslationService.java:3-6`) — `global` → `domain` 방향 의존이다. 반면 이벤트 제목 번역은 `domain/event/service/EventTranslationService`에 있어 `domain` → `global` 방향으로 정상이다. 같은 성격의 두 서비스가 서로 반대 방향의 의존을 갖는다. `controller → service → repository` 계층 자체를 건너뛰지는 않으므로 헌법 문언의 직접 위반은 아니지만, `global`이 특정 도메인을 아는 구조는 패키지 경계 관점에서 일관적이지 않다.
   - 응답 포맷(`ApiResponse`), DTO 설계는 이 서브시스템이 컨트롤러를 소유하지 않으므로(번역 필드는 소비처 DTO에 실려 나간다) 해당 없음.
 
-- **원칙 III (검증 가능한 변경) — 확인된 위반 2건.**
-  1. **외부 AI API 실제 호출.** 헌법은 "외부 AI API 호출(임베딩 등)은 테스트에서 실제 호출 대신 고정된 픽스처를 사용해 결정적으로 검증한다"고 규정하지만, `OpenAiTranslationClientRealApiTest`는 목킹 없이 **실제 `gpt-4o-mini`를 호출한다**(지원 언어 5개). `OPENAI_API_KEY`가 없으면 이 테스트는 스킵이 아니라 실패한다.
-  2. **CI 테스트 단계 부재.** 헌법은 "테스트는 항상 빌드 이전의 별도 CI 단계에서 수행한다"고 규정하지만, `.github/workflows/backend-deploy.yml`에는 테스트 잡이 없고 `backend/dockerfile`은 `./gradlew clean bootJar -x test`로 빌드한다. 즉 **배포 파이프라인에서 어떤 테스트도 실행되지 않는다**. 헌법이 "docker build 단계에서 테스트를 실행하지 않는다"고 한 것은 지켜지지만, 그 대안으로 요구한 "빌드 이전 별도 CI 단계"가 존재하지 않는다.
-  - 반면 길이 가드는 원칙 III에 부합한다 — `OpenAiTranslationClientTest`가 외부 의존성 없는 순수 JUnit 단위 테스트로 배수(6배)·하한(60자) 경계를 결정적으로 고정한다.
-  - **권고**: 실제 호출 테스트를 JUnit 태그로 분리해 기본 실행에서 제외하고, 목킹된 결정적 테스트를 기본 경로에 두는 것. 그 위에 빌드 이전 CI 테스트 잡을 추가해야 원칙 III을 온전히 만족한다.
+- **원칙 III (검증 가능한 변경) — 위반 1건 잔존, 1건은 완화됨.**
+  1. **외부 AI API 실제 호출 — 완화(잔존).** 헌법은 "외부 AI API 호출(임베딩 등)은 테스트에서 실제 호출 대신 고정된 픽스처를 사용해 결정적으로 검증한다"고 규정하는데, `OpenAiTranslationClientRealApiTest`는 목킹 없이 실제 `gpt-4o-mini`를 호출한다(지원 언어 5개). 프롬프트가 요구하는 표기 규칙(FR-014)의 준수 여부는 모델 응답 자체가 검증 대상이라 목킹으로 대체할 수 없다는 것이 이 테스트를 유지하는 근거다. 대신 `@Tag("realApi")`로 표시하고 `backend/build.gradle`의 기본 `test` 태스크에서 `excludeTags`로 제외해, **키가 없는 환경에서도 나머지 테스트가 온전히 돌게** 했다(실행은 `./gradlew realApiTest`). 헌법 문언상 "실제 호출"이라는 사실은 남으므로 위반으로 계속 기록한다.
+  2. **CI 테스트 단계 부재 — 잔존.** 헌법은 "테스트는 항상 빌드 이전의 별도 CI 단계에서 수행한다"고 규정하지만, `.github/workflows/backend-deploy.yml`에는 테스트 잡이 없고 `backend/dockerfile`은 `./gradlew clean bootJar -x test`로 빌드한다. 즉 **배포 파이프라인에서 어떤 테스트도 실행되지 않는다**. 헌법이 "docker build 단계에서 테스트를 실행하지 않는다"고 한 것은 지켜지지만, 그 대안으로 요구한 "빌드 이전 별도 CI 단계"가 존재하지 않는다.
+  - 반면 길이 가드는 원칙 III에 부합한다 — `OpenAiTranslationClientTest`가 외부 의존성 없는 순수 JUnit 단위 테스트로 배수(6배)·하한(60자) 경계를 결정적으로 고정한다. 서비스→DTO 배선도 번역 클라이언트를 목킹한 `DisasterAlertServiceTest`가 결정적으로 검증한다.
+  - **남은 권고**: 빌드 이전 CI 테스트 잡을 추가해야 원칙 III을 온전히 만족한다.
 
 - **원칙 IV (정직한 문서화) — 이 문서화 과정에서 발견한 문서 결함 1건 + 코드 결함 2건.**
   1. `docs/PRD.md:66`과 `docs/TRD.md:68`이 법정동 명칭을 번역 API의 스케줄러 번역 대상으로 서술한다. 실제로는 `legal_district_translation`이 Flyway 시드 테이블이며 런타임 번역 호출이 없다(`specs/004-legal-district-matching/spec.md` FR-017). 2026-08-09 DeepL→OpenAI 교체 시 문구만 바꾸면서 이 오류가 그대로 옮겨졌다. spec.md FR-012가 이 경계를 `MUST NOT`으로 못박았다.
@@ -96,7 +96,8 @@ backend/src/main/resources/
 
 backend/src/test/java/com/disaster/alert/alertapi/
 ├── global/translation/OpenAiTranslationClientTest.java              # 순수 단위(길이 가드 경계)
-└── global/translation/OpenAiTranslationClientRealApiTest.java                   # 통합(실제 OpenAI 호출, 고정 원문)
+├── global/translation/OpenAiTranslationClientRealApiTest.java                   # 통합(실제 OpenAI 호출, 고정 원문, @Tag("realApi"))
+└── domain/disasteralert/service/DisasterAlertServiceTest.java                   # 통합(번역 클라이언트 목킹, lang→DTO 배선)
 ```
 
 **구조 결정**: 번역 클라이언트와 재난문자 번역 서비스는 `global/translation`에, 이벤트 제목 번역은 `domain/event`에 배치되어 있다. 소비처(`DisasterAlertService`, `EventQueryService`)는 번역 서비스를 주입받아 조회 로직 안에서 직접 호출하며, 번역 전용 컨트롤러나 엔드포인트는 존재하지 않는다 — 번역은 항상 기존 조회 API의 `?lang=` 파라미터에 얹혀 동작한다.
@@ -158,7 +159,7 @@ DeepL Free는 계정당 **월간이 아니라 평생 누적** 쿼터라 소진 �
 | 1 | **동시 요청 PK 충돌 → HTTP 500.** "존재 확인 → 저장"이 원자적이지 않아 같은 `(alertId, languageCode)`를 동시 저장하면 커밋 시점에 충돌하고, 호출자 트랜잭션이 rollback-only가 되어 원문 폴백 대신 500이 난다. PostgreSQL `ON CONFLICT DO NOTHING` UPSERT를 리포지토리에 추가하거나 저장을 `REQUIRES_NEW`로 격리해야 한다. | `global/translation/TranslationService.java:81-95,112-144,170-173`, `domain/disasteralert/repository/DisasterAlertTranslationRepository.java`(UPSERT 메서드 신설), `domain/event/service/EventTranslationService.java:41-53,58-80,91`, `domain/event/repository/DisasterEventTranslationRepository.java` |
 | 2 | **`SupportedLanguage` ↔ `LANGUAGE_NAMES` 이원화.** enum에만 언어를 추가하면 런타임 `IllegalArgumentException`이 난다. 언어명을 enum 필드로 올리고 `translate()` 시그니처를 `SupportedLanguage`로 바꾸면 예외 경로가 사라진다. | `global/translation/SupportedLanguage.java:14,18-22`, `global/translation/OpenAiTranslationClient.java:51-57,69-73`, 호출부 `TranslationService.java:160,165`·`EventTranslationService.java:90` |
 | 3 | **번역 대상 언어(5개) vs 법정동 시드 언어(3개) 불일치.** VI/TH 사용자는 본문은 모국어, 지역명은 영어로 본다. VI/TH 법정동 시드 마이그레이션을 추가하거나, 지원 언어를 시드 범위로 좁히거나, 혼합 표시를 의도된 동작으로 문서화하는 세 선택지가 있다. | `backend/src/main/resources/db/migration/`(VI/TH 시드 신설 시), `global/translation/SupportedLanguage.java:18-22`(범위 축소 시), `domain/legaldistrict/service/LegalDistrictTranslationService.java`(폴백 정책) |
-| 4 | **실제 OpenAI 호출 테스트가 기본 실행에 포함 + CI 테스트 단계 부재.** 헌법 원칙 III 위반 2건(위 헌법 검사 참고). | `backend/src/test/java/.../OpenAiTranslationClientRealApiTest.java`(태그 분리), `backend/build.gradle`(태그 제외 설정), `.github/workflows/backend-deploy.yml`(빌드 이전 테스트 잡 신설) |
+| 4 | **CI 테스트 단계 부재.** 배포 파이프라인에서 어떤 테스트도 실행되지 않는다(헌법 원칙 III). 실 API 테스트를 기본 실행에서 분리하는 절반은 `@Tag("realApi")` + `excludeTags` 로 처리됐고, 남은 절반이 이 항목이다. | `.github/workflows/backend-deploy.yml`(빌드 이전 테스트 잡 신설 — `./gradlew test` 는 `realApi` 태그를 제외하므로 API 키 없이 실행 가능하다) |
 | 5 | **`translated_region_names` 컬럼이 항상 `null`.** 사실상 미사용 컬럼이다. 제거하려면 Flyway 마이그레이션이 필요하고, 남겨두려면 "의도적으로 비워둠"을 스키마 주석에 남기는 편이 낫다. | `backend/src/main/resources/db/migration/`(새 마이그레이션), `domain/disasteralert/model/DisasterAlertTranslation.java` |
 
 ## 이 파이프라인이 건드리지 않는 경계
