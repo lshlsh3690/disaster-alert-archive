@@ -36,7 +36,11 @@
 
 ## 검증 이력
 
-- 2026-08-10 1차: 인용한 `file:line` 전량을 실제 소스와 대조해 확인. `OpenAiTranslationClient.java` buildPrompt 범위를 `120-137` → `120-136`(규칙 목록 `124-131`)으로 정정.
+- 2026-08-10 1차: 인용한 `file:line` 전량을 실제 소스와 대조해 확인. `OpenAiTranslationClient.java` buildPrompt 범위를 `120-137` → `120-136`으로 정정.
+- 2026-08-10 2차: 번역 모델 상향(`gpt-4o`)과 `TEMPERATURE` javadoc 확장으로 `OpenAiTranslationClient.java` 앵커가 두 차례 밀려 전량 재계산. 현재 기준 `MODEL`=44, `TEMPERATURE`=53, `MAX_LENGTH_RATIO`=63, `MIN_LENGTH_ALLOWANCE`=69, `LANGUAGE_NAMES`=71-77, `translate` 예외=92·102·107, 모델 호출=95-99, `isSuspiciouslyLong`=132-137, `buildPrompt`=163-180(규칙 목록 168-176).
+- 2026-08-10 3차: CodeRabbit 리뷰로 FR-003·FR-008·FR-009·FR-013 이 실제 동작과 어긋난 MUST 였음이 드러나 전부 현실에 맞게 한정. 이 항목의 "모든 기능 요구사항에 명확한 인수 기준이 있음"도 부분 충족으로 내렸다.
+
+> **앵커 유지보수 주의**: 이 명세는 `file:line` 을 근거로 삼는데, 인용 대상 파일의 주석 한 줄만 바뀌어도 뒤 앵커가 전부 밀린다. 실제로 2026-08-10 하루에만 두 번 재계산했다. 인용 대상 코드를 수정할 때는 이 문서의 앵커도 함께 확인할 것.
 
 ## 참고
 

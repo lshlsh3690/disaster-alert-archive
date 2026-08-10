@@ -114,7 +114,7 @@ backend/src/test/java/com/disaster/alert/alertapi/
 
 **①의 실행 순서**: 수집 스케줄러는 신규 알림 ID마다 번역 → FCM 알림 → 클러스터링 → cross-region을 순서대로 호출한다(`DisasterFetchScheduler.java:41-50`). 번역이 `@Async`라 뒤 세 단계를 블로킹하지 않는다. `translationExecutor`는 core 5 / max 10 / queue 100이다(`global/config/AsyncConfig.java:22-27`).
 
-**②③의 트랜잭션 합류가 만드는 문제**: `getAlertDetail`이 `@Transactional`이므로(`DisasterAlertService.java:541`) `ensureTranslated`의 `@Transactional`은 새 트랜잭션을 열지 않고 바깥에 합류한다. 그 결과 번역 캐시 저장이 **커밋 시점**에 실패하면(복합 PK 충돌 등) `ensureTranslated` 내부의 `catch`를 이미 벗어난 뒤이고, 트랜잭션은 rollback-only로 마킹되어 상세 조회 전체가 `UnexpectedRollbackException`(HTTP 500)으로 끝난다. 즉 **spec.md 시나리오 4-1의 원문 폴백은 단일 요청에서만 성립하고 동시 요청에서는 성립하지 않는다.**
+**②③의 트랜잭션 합류가 만드는 문제**: `getAlertDetail`이 `@Transactional`이므로(`DisasterAlertService.java:542`) `ensureTranslated`의 `@Transactional`은 새 트랜잭션을 열지 않고 바깥에 합류한다. 그 결과 번역 캐시 저장이 **커밋 시점**에 실패하면(복합 PK 충돌 등) `ensureTranslated` 내부의 `catch`를 이미 벗어난 뒤이고, 트랜잭션은 rollback-only로 마킹되어 상세 조회 전체가 `UnexpectedRollbackException`(HTTP 500)으로 끝난다. 즉 **spec.md 시나리오 4-1의 원문 폴백은 단일 요청에서만 성립하고 동시 요청에서는 성립하지 않는다.**
 
 ## 데이터 모델
 
