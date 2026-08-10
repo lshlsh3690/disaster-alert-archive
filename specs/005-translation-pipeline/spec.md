@@ -146,8 +146,9 @@ lazy 번역(P2)은 캐시 미스 보정용으로만 쓰인다. 이 경로가 막
 
 - **SC-001**: 코드에 명시된 유일한 정량 임계값은 번역문 길이 가드(원문 대비 6배, 하한 60자)이며, 이 값은 `OpenAiTranslationClientTest`의 경계 테스트로 고정되어 있다 (`OpenAiTranslationClient.java:43,49`; `backend/src/test/java/com/disaster/alert/alertapi/global/translation/OpenAiTranslationClientTest.java`).
 - **SC-002**: 번역 응답 시간·처리량·비용 상한에 대한 SLA는 코드·설정 어디에도 정의되어 있지 않다 — 측정되지 않음. 목록 lazy 번역의 순차 호출 횟수(미번역 건수 × 최대 2)에 대한 상한도 없다.
-- **SC-003**: 자동화 검증은 두 종류뿐이다. 길이 가드는 순수 단위 테스트(`OpenAiTranslationClientTest`)로, 실제 번역 품질(EN/JA/ZH/VI/TH 응답에 한글이 남지 않는지)은 실제 API를 호출하는 통합 테스트(`DisasterAlertServiceOpenAiTranslationTest`)로 검증한다. 후자는 `OPENAI_API_KEY`가 없으면 실패하며, `backend/dockerfile`이 `bootJar -x test`로 빌드하고 별도 CI 테스트 잡이 없어 **배포 파이프라인에서는 어떤 테스트도 실행되지 않는다**.
-- **SC-004**: 프롬프트가 요구하는 표기 규칙(FR-014)의 실제 준수율은 측정되지 않는다 — 통합 테스트는 "한글이 남아있지 않음"만 검증하고 대괄호·기호 보존 여부는 검증하지 않는다.
+- **SC-003**: 자동화 검증은 두 종류뿐이다. 길이 가드는 순수 단위 테스트(`OpenAiTranslationClientTest`)로, 실제 번역 품질은 실제 API를 호출하는 통합 테스트(`OpenAiTranslationClientRealApiTest`)로 검증한다. 후자는 `OPENAI_API_KEY`가 없으면 실패하며, `backend/dockerfile`이 `bootJar -x test`로 빌드하고 별도 CI 테스트 잡이 없어 **배포 파이프라인에서는 어떤 테스트도 실행되지 않는다**.
+- **SC-004**: 프롬프트 표기 규칙(FR-014) 중 자동 검증되는 항목은 세 가지다 — 지원 언어 5개 전체에서 ①번역문에 한글이 남지 않을 것 ②대괄호 발신 기관 표기가 보존될 것 ③`▲` 불릿 개수가 원문과 같을 것(`OpenAiTranslationClientRealApiTest`). "발효"의 경보 의미 해석, 붙여 쓴 행정 용어 인식, 원문에 없는 내용 미추가는 **자동 검증되지 않는다** — 길이 가드(FR-015)가 극단적인 설명 혼입만 걸러낼 뿐이다.
+- **SC-005**: 이 통합 테스트는 고정 원문 1건을 사용해 실행마다 같은 입력을 보낸다. 다만 LLM 응답 자체가 완전히 결정적이지는 않아(temperature 0도 보장은 아님) 간헐적 실패 가능성이 남는다 — 실제로 실 DB의 최신 재난문자를 쓰던 이전 버전에서는 목록에 `[태안군]`이 들어온 회차에만 TH가 실패했다.
 
 ## 가정
 
