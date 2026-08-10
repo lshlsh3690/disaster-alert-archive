@@ -97,7 +97,7 @@ lazy 번역(P2)은 캐시 미스 보정용으로만 쓰인다. 이 경로가 막
 **인수 시나리오**:
 
 1. **Given** 번역 클라이언트가 예외를 던짐, **When** 상세 조회가 `ensureTranslated`를 호출함, **Then** 예외를 삼키고 `warn` 로그만 남긴 뒤 번역 필드 `null`(원문 노출)로 200 응답한다 — `TranslationService.java:89-94`
-2. **Given** 번역문이 원문 길이의 6배를 초과함(설명 혼입 의심), **When** 길이 가드가 판정함, **Then** 해당 번역을 저장하지 않고 예외를 던져 원문 폴백시킨다 — `backend/src/main/java/com/disaster/alert/alertapi/global/translation/OpenAiTranslationClient.java:43,49,85-90,112-117`
+2. **Given** 번역문이 원문 길이의 6배를 초과함(설명 혼입 의심), **When** 길이 가드가 판정함, **Then** 해당 번역을 저장하지 않고 예외를 던져 원문 폴백시킨다 — `backend/src/main/java/com/disaster/alert/alertapi/global/translation/OpenAiTranslationClient.java:57,63,100-103,126-131`
 3. **Given** 본문 번역은 성공했으나 재난 유형 번역만 실패, **When** 유형 번역 예외가 발생함, **Then** 유형만 `null`로 두고 본문 번역은 정상 저장한다(부분 번역 허용) — `TranslationService.java:162-168`
 
 ---
@@ -105,9 +105,9 @@ lazy 번역(P2)은 캐시 미스 보정용으로만 쓰인다. 이 경로가 막
 ### 예외 상황
 
 - **동시 요청 시 상세 조회가 500이 된다 (알려진 결함).** `ensureTranslated`는 "존재 확인 → 저장"이 원자적이지 않다. 같은 `(alertId, languageCode)`를 동시 요청 두 개가 모두 미존재로 판단한 뒤 저장하면 복합 PK 충돌이 **flush/commit 시점**에 발생하는데, 이는 `ensureTranslated`의 `catch` 블록을 이미 벗어난 뒤다. 게다가 호출부 `getAlertDetail`이 `@Transactional`이라(`DisasterAlertService.java:541`) 트랜잭션이 rollback-only로 마킹되어, 커밋 시 `UnexpectedRollbackException` → HTTP 500이 된다. 즉 시나리오 4-1의 원문 폴백이 **동시 요청 상황에서는 성립하지 않는다**. 목록 경로(`ensureTranslatedBatch`)도 같은 구조다. UPSERT(`ON CONFLICT`) 또는 저장 트랜잭션 격리가 필요하다 (`TranslationService.java:81-95,112-144`; `V3__create_disaster_alert_translation.sql:8-9`).
-- **enum에만 언어를 추가하면 런타임 예외가 난다 (알려진 결함).** `SupportedLanguage`의 주석은 "새 언어 추가 시 이 enum에만 항목을 추가하면 된다"고 기술하지만(`SupportedLanguage.java:14`), 실제로는 `OpenAiTranslationClient.LANGUAGE_NAMES`(`OpenAiTranslationClient.java:51-57`)도 함께 갱신해야 한다. 누락하면 `translate()`가 `IllegalArgumentException`을 던진다(`OpenAiTranslationClient.java:70-73`). 두 곳이 이원화되어 있고 컴파일 타임에 강제되지 않는다.
+- **enum에만 언어를 추가하면 런타임 예외가 난다 (알려진 결함).** `SupportedLanguage`의 주석은 "새 언어 추가 시 이 enum에만 항목을 추가하면 된다"고 기술하지만(`SupportedLanguage.java:14`), 실제로는 `OpenAiTranslationClient.LANGUAGE_NAMES`(`OpenAiTranslationClient.java:65-71`)도 함께 갱신해야 한다. 누락하면 `translate()`가 `IllegalArgumentException`을 던진다(`OpenAiTranslationClient.java:84-87`). 두 곳이 이원화되어 있고 컴파일 타임에 강제되지 않는다.
 - **VI/TH 사용자는 지역명만 영어로 보게 된다.** 재난문자 본문은 EN/JA/ZH/VI/TH 5개 언어로 번역되지만(`SupportedLanguage.java:18-22`), 법정동 명칭 시드는 EN/JA/ZH 3개뿐이다(`V7__seed_legal_district_translation_en.sql`, `V15__…_ja.sql`, `V16__…_zh.sql`, `V113__…`). 법정동 번역 조회는 요청 언어에 시드가 없으면 영어로 폴백하므로(`domain/legaldistrict/service/LegalDistrictTranslationService.java`), 베트남어·태국어 사용자는 본문은 모국어, 지역명은 영어인 혼합 응답을 받는다. 이는 두 파이프라인이 **별개**이기 때문에 생기는 구조적 결과다(FR-012 참고).
-- 번역 API가 빈 문자열을 반환하면 저장하지 않고 예외를 던진다 — `OpenAiTranslationClient.java:80-83`.
+- 번역 API가 빈 문자열을 반환하면 저장하지 않고 예외를 던진다 — `OpenAiTranslationClient.java:94-97`.
 - `translation.enabled=false`이면 사전 번역·lazy 번역 3개 경로 모두 즉시 반환하며, 응답은 항상 원문이 된다 — `TranslationService.java:59,83,114`; `EventTranslationService.java:43,60`.
 - 목록 lazy 번역은 미번역 건수만큼 번역 API를 **순차 호출**한다. 알림 1건당 최대 2회(본문 + 유형)이므로 20건 페이지의 첫 외국어 조회는 최대 40회 왕복이 응답 시간에 그대로 더해진다 — `TranslationService.java:135-141,160,165`. 타임아웃·상한 건수 제한은 코드에 없다.
 
@@ -127,10 +127,10 @@ lazy 번역(P2)은 캐시 미스 보정용으로만 쓰인다. 이 경로가 막
 - **FR-010**: 재난 유형(`disasterType`) 번역 실패는 본문 번역 결과를 무효화하지 않아야 한다(MUST) — 유형만 `null`로 저장하고 본문은 정상 저장한다 (`TranslationService.java:162-168`).
 - **FR-011**: 시스템은 `translation.enabled` 설정으로 번역 기능 전체를 비활성화할 수 있어야 한다(MUST). 비활성화 시 모든 진입점이 즉시 반환해야 한다(MUST) (`application.yml`의 `translation.enabled: ${TRANSLATION_ENABLED:true}`; `global/translation/TranslationProperties.java`; `TranslationService.java:59,83,114`).
 - **FR-012**: **법정동 명칭 번역은 이 파이프라인의 대상이 아니다**(MUST NOT). 지역명은 Flyway로 시드된 `legal_district_translation` 테이블을 조회할 뿐 런타임 번역 API 호출이 없다. 이 명세의 대상은 재난문자 `message`/`disasterType`과 이벤트 `event_title` 세 필드로 한정된다 (`TranslationService.java:23-31` 클래스 주석; `V6__create_legal_district_translation.sql`; 상세는 `specs/004-legal-district-matching/spec.md` FR-017·FR-018).
-- **FR-013**: 번역 엔진은 OpenAI 계열 모델을 사용하며(MUST), 같은 원문에 같은 번역이 나오도록 결정적으로(temperature 0) 호출해야 한다(MUST) (`OpenAiTranslationClient.java:30,33,74-79`).
-- **FR-014**: 번역 프롬프트는 재난문자 표기 규칙을 명시해야 한다(MUST): 대괄호 발신 기관 표기의 대괄호 유지, `▲ · ※` 기호·줄 구조 보존, "발효/해제/특보/주의보/경보"를 경보 용어로 해석, 붙여 쓴 행정 용어를 단일 용어로 인식, 원문에 없는 내용 추가 금지, 번역문만 출력 (`OpenAiTranslationClient.java:120-136`, 규칙 목록은 `124-131`).
-- **FR-015**: 시스템은 번역문이 원문 대비 비정상적으로 길면(6배 초과, 단 60자까지는 무조건 허용) 설명 혼입으로 간주해 폐기하고 원문 폴백시켜야 한다(MUST) — 재난문자는 안전 정보라 원문에 없는 내용이 섞이는 것이 번역 실패보다 위험하다 (`OpenAiTranslationClient.java:43,49,112-117`).
-- **FR-016**: 번역 API가 빈 응답을 반환하면 저장하지 않아야 한다(MUST) (`OpenAiTranslationClient.java:80-83`).
+- **FR-013**: 번역 엔진은 OpenAI 계열 모델을 사용하며(MUST), 같은 원문에 같은 번역이 나오도록 결정적으로(temperature 0) 호출해야 한다(MUST) (`OpenAiTranslationClient.java:44,47,89-93`).
+- **FR-014**: 번역 프롬프트는 재난문자 표기 규칙을 명시해야 한다(MUST): 대괄호 발신 기관 표기의 대괄호 유지, `▲ · ※` 기호·줄 구조 보존, "발효/해제/특보/주의보/경보"를 경보 용어로 해석, 붙여 쓴 행정 용어를 단일 용어로 인식, 원문에 없는 내용 추가 금지, 번역문만 출력 (`OpenAiTranslationClient.java:157-174`, 규칙 목록은 `162-170`).
+- **FR-015**: 시스템은 번역문이 원문 대비 비정상적으로 길면(6배 초과, 단 60자까지는 무조건 허용) 설명 혼입으로 간주해 폐기하고 원문 폴백시켜야 한다(MUST) — 재난문자는 안전 정보라 원문에 없는 내용이 섞이는 것이 번역 실패보다 위험하다 (`OpenAiTranslationClient.java:57,63,126-131`).
+- **FR-016**: 번역 API가 빈 응답을 반환하면 저장하지 않아야 한다(MUST) (`OpenAiTranslationClient.java:94-97`).
 - **FR-017**: **번역은 임베딩·클러스터링·위험도에 영향을 주지 않아야 한다**(MUST NOT). 이벤트 클러스터링은 한국어 원문(`disaster_alert.message`)만 임베딩하므로, 번역 엔진 교체나 번역 실패가 벡터·코사인 유사도·이벤트 구성·위험도 점수를 바꾸지 않는다 (`domain/event/service/EventClusteringService.java:172,205`).
 
 ### 주요 엔티티
@@ -144,7 +144,7 @@ lazy 번역(P2)은 캐시 미스 보정용으로만 쓰인다. 이 경로가 막
 
 ### 측정 가능한 결과
 
-- **SC-001**: 코드에 명시된 유일한 정량 임계값은 번역문 길이 가드(원문 대비 6배, 하한 60자)이며, 이 값은 `OpenAiTranslationClientTest`의 경계 테스트로 고정되어 있다 (`OpenAiTranslationClient.java:43,49`; `backend/src/test/java/com/disaster/alert/alertapi/global/translation/OpenAiTranslationClientTest.java`).
+- **SC-001**: 코드에 명시된 유일한 정량 임계값은 번역문 길이 가드(원문 대비 6배, 하한 60자)이며, 이 값은 `OpenAiTranslationClientTest`의 경계 테스트로 고정되어 있다 (`OpenAiTranslationClient.java:57,63`; `backend/src/test/java/com/disaster/alert/alertapi/global/translation/OpenAiTranslationClientTest.java`).
 - **SC-002**: 번역 응답 시간·처리량·비용 상한에 대한 SLA는 코드·설정 어디에도 정의되어 있지 않다 — 측정되지 않음. 목록 lazy 번역의 순차 호출 횟수(미번역 건수 × 최대 2)에 대한 상한도 없다.
 - **SC-003**: 자동화 검증은 두 종류뿐이다. 길이 가드는 순수 단위 테스트(`OpenAiTranslationClientTest`)로, 실제 번역 품질은 실제 API를 호출하는 통합 테스트(`OpenAiTranslationClientRealApiTest`)로 검증한다. 후자는 `@Tag("realApi")` 로 기본 `test` 태스크에서 제외되어 있어 `./gradlew realApiTest` 로 명시 실행해야 하며, `OPENAI_API_KEY` 가 없으면 실패한다. 한편 `backend/dockerfile` 이 `bootJar -x test` 로 빌드하고 별도 CI 테스트 잡이 없어 **배포 파이프라인에서는 어떤 테스트도 실행되지 않는다**.
 - **SC-004**: 프롬프트 표기 규칙(FR-014) 중 자동 검증되는 항목은 세 가지다 — 지원 언어 5개 전체에서 ①번역문에 한글이 남지 않을 것 ②대괄호 발신 기관 표기가 보존될 것 ③`▲` 불릿 개수가 원문과 같을 것(`OpenAiTranslationClientRealApiTest`). "발효"의 경보 의미 해석, 붙여 쓴 행정 용어 인식, 원문에 없는 내용 미추가는 **자동 검증되지 않는다** — 길이 가드(FR-015)가 극단적인 설명 혼입만 걸러낼 뿐이다.
