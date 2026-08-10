@@ -4,8 +4,8 @@ import com.disaster.alert.alertapi.domain.disasteralert.model.DisasterAlert;
 import com.disaster.alert.alertapi.domain.disasteralert.model.DisasterAlertTranslation;
 import com.disaster.alert.alertapi.domain.disasteralert.repository.DisasterAlertRepository;
 import com.disaster.alert.alertapi.domain.disasteralert.repository.DisasterAlertTranslationRepository;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -15,6 +15,8 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executor;
 import java.util.stream.Collectors;
 
 /**
@@ -39,13 +41,32 @@ import java.util.stream.Collectors;
  */
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class TranslationService {
 
     private final DisasterAlertRepository disasterAlertRepository;
     private final DisasterAlertTranslationRepository translationRepository;
     private final OpenAiTranslationClient translationClient;
     private final TranslationProperties properties;
+
+    /**
+     * 번역 API 호출 병렬화에 쓰는 풀. {@code Executor} 빈이 둘(translationExecutor,
+     * riskTaskExecutor)이라 {@code @Qualifier} 로 명시해야 하는데, 이 저장소에는 lombok.config 가
+     * 없어 {@code @RequiredArgsConstructor} 가 애너테이션을 생성자로 복사하지 못한다. 그래서
+     * {@code LlmRiskProfiler} 와 같이 생성자를 직접 작성한다.
+     */
+    private final Executor translationExecutor;
+
+    public TranslationService(DisasterAlertRepository disasterAlertRepository,
+                              DisasterAlertTranslationRepository translationRepository,
+                              OpenAiTranslationClient translationClient,
+                              TranslationProperties properties,
+                              @Qualifier("translationExecutor") Executor translationExecutor) {
+        this.disasterAlertRepository = disasterAlertRepository;
+        this.translationRepository = translationRepository;
+        this.translationClient = translationClient;
+        this.properties = properties;
+        this.translationExecutor = translationExecutor;
+    }
 
     /**
      * 스케줄러용 — 새 재난문자 저장 시 {@link SupportedLanguage}에 등록된 모든 언어로
@@ -103,8 +124,18 @@ public class TranslationService {
      *   <li>누락된 alertId 만 OpenAI 로 번역 → 저장</li>
      * </ol>
      *
-     * <p>주의: 누락 건수가 많을수록 응답이 느려진다 (번역 API 호출 N회).
-     * 사용자가 한국어 → 일본어 전환 첫 요청 시 가장 느림. 이후 캐시 적중.
+     * <p><b>번역 API 호출만 병렬로 수행한다.</b> 예전에는 누락 건을 순차 for 루프로 돌아
+     * 10건짜리 페이지의 첫 외국어 조회가 20초를 넘었다(실측: 5건 12초, 건당 약 2.4초 — 본문·유형
+     * 2회 호출). 느린 구간이 전부 네트워크 대기라 {@code translationExecutor} 로 병렬화하면
+     * 체감이 크게 줄어든다.
+     *
+     * <p><b>DB 작업은 호출 스레드에 남긴다.</b> 이 메서드는 호출자(조회 서비스)의 트랜잭션에
+     * 합류하는데, 트랜잭션·영속성 컨텍스트는 스레드에 묶여 있어 다른 스레드로 넘길 수 없다.
+     * 그래서 ①원문 로드 ②저장은 호출 스레드에서 하고, 그 사이의 ②번역 호출만 풀에 위임한다.
+     * 워커 스레드에는 엔티티가 아니라 문자열만 복사해 넘긴다(Hibernate 세션은 thread-safe 하지 않다).
+     *
+     * <p>단건 실패 격리(spec.md FR-009)는 유지된다 — 각 future 를 개별적으로 join 해 실패한
+     * 건만 건너뛴다.
      *
      * @param alertIds 페이지에 포함된 재난문자 ID 리스트
      * @param language 대상 언어
@@ -132,16 +163,84 @@ public class TranslationService {
         }
 
         log.info("일괄 lazy 번역 시작: lang={}, missing={}건", language.getDbCode(), missing.size());
-        for (Long alertId : missing) {
+        List<PendingTranslation> pending = loadPending(missing);
+        translateInParallel(pending, language).forEach(this::save);
+    }
+
+    /**
+     * 번역 대상 원문을 한 번에 로드해 <b>불변 데이터로 복사</b>한다.
+     *
+     * <p>예전에는 건당 {@code findById} 를 호출해 N+1 쿼리가 났다(실측 건당 15~200ms).
+     * 엔티티가 아니라 문자열만 뽑는 이유는 워커 스레드에 Hibernate 엔티티를 넘기지 않기 위해서다.
+     */
+    private List<PendingTranslation> loadPending(List<Long> alertIds) {
+        List<PendingTranslation> pending = new ArrayList<>();
+        for (DisasterAlert alert : disasterAlertRepository.findAllById(alertIds)) {
+            if (alert.getMessage() == null || alert.getMessage().isBlank()) {
+                continue;
+            }
+            pending.add(new PendingTranslation(alert.getId(), alert.getMessage(), alert.getDisasterType()));
+        }
+        return pending;
+    }
+
+    /**
+     * 번역 API 호출만 {@code translationExecutor} 로 병렬 수행하고, 실패한 건은 결과에서 제외한다.
+     *
+     * <p>이 풀은 스케줄러의 사전 번역({@code @Async("translationExecutor")})과 공유한다. 워커가
+     * 하는 일이 네트워크 호출뿐이고 다시 같은 풀에 작업을 넣지 않으므로 교착은 생기지 않는다 —
+     * 다만 수집 직후처럼 풀이 붐비는 순간에는 사용자 요청이 큐에서 대기할 수 있다
+     * (core 5 / max 10 / queue 100, {@code AsyncConfig}).
+     */
+    private List<TranslatedAlert> translateInParallel(List<PendingTranslation> pending, SupportedLanguage language) {
+        List<CompletableFuture<TranslatedAlert>> futures = pending.stream()
+                .map(p -> CompletableFuture.supplyAsync(() -> translate(p, language), translationExecutor))
+                .toList();
+
+        List<TranslatedAlert> results = new ArrayList<>();
+        for (int i = 0; i < futures.size(); i++) {
             try {
-                translateAndSaveInternal(alertId, language);
+                results.add(futures.get(i).join());
             } catch (Exception e) {
                 // 한 건이 실패해도 나머지는 계속 진행 (번역 API 일시 오류 등)
                 log.warn("일괄 번역 중 단건 실패 (스킵): alertId={}, lang={}, reason={}",
-                        alertId, language.getDbCode(), e.getMessage());
+                        pending.get(i).alertId(), language.getDbCode(), e.getMessage());
             }
         }
+        return results;
     }
+
+    /** 워커 스레드에서 실행 — 네트워크 호출만 하고 DB 는 건드리지 않는다. */
+    private TranslatedAlert translate(PendingTranslation p, SupportedLanguage language) {
+        String targetLang = language.getDbCode();
+        String translatedMessage = translationClient.translate(p.message(), targetLang);
+
+        String translatedType = null;
+        if (p.disasterType() != null && !p.disasterType().isBlank()) {
+            try {
+                translatedType = translationClient.translate(p.disasterType(), targetLang);
+            } catch (Exception e) {
+                // 유형 번역 실패는 본문 번역을 무효화하지 않는다 (spec.md FR-010)
+                log.warn("유형 번역 실패: alertId={}, lang={}, reason={}", p.alertId(), targetLang, e.getMessage());
+            }
+        }
+        return new TranslatedAlert(p.alertId(), targetLang, translatedMessage, translatedType);
+    }
+
+    /** 호출 스레드에서 실행 — 호출자의 트랜잭션 안에서 캐시에 적재한다. */
+    private void save(TranslatedAlert t) {
+        // 지역명(region_names)은 legal_district_translation 에서 처리하므로 여기서는 null 로 저장.
+        translationRepository.save(
+                DisasterAlertTranslation.of(t.alertId(), t.languageCode(), t.message(), t.disasterType(), null)
+        );
+        log.info("번역 완료: alertId={}, lang={}", t.alertId(), t.languageCode());
+    }
+
+    /** 워커 스레드로 넘기는 입력 — 엔티티가 아니라 문자열 복사본이다. */
+    private record PendingTranslation(Long alertId, String message, String disasterType) {}
+
+    /** 워커 스레드가 돌려주는 번역 결과. */
+    private record TranslatedAlert(Long alertId, String languageCode, String message, String disasterType) {}
 
     /**
      * 실제 번역 + 저장 로직 (내부 공용).
