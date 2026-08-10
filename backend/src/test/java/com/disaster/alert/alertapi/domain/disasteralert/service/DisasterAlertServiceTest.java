@@ -22,8 +22,8 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
 /**
- * lang="en" 실제 번역(진짜 영어 텍스트가 오는지)은 real OpenAI 호출이 필요하므로
- * {@link DisasterAlertServiceOpenAiTranslationTest} 에서 별도로 검증한다.
+ * 실제 번역 품질(한글이 남지 않는지, 기호가 보존되는지)은 real OpenAI 호출이 필요하므로
+ * {@code OpenAiTranslationClientRealApiTest} 에서 별도로 검증한다.
  * 이 클래스는 번역 클라이언트를 mock 처리해 "번역 로직이 아예 안 타야 하는 경우(lang=ko)"의 배선만 검증.
  */
 @IntegrationTest

@@ -9,7 +9,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * {@link OpenAiTranslationClient#isSuspiciouslyLong(String, String)} 순수 단위 테스트.
  *
  * <p>이 판정은 외부 의존성이 없어 Spring 컨텍스트·DB·OpenAI 호출 없이 검증한다
- * (실제 번역 품질은 {@code DisasterAlertServiceOpenAiTranslationTest} 가 통합 테스트로 확인).
+ * (실제 번역 품질은 {@code OpenAiTranslationClientRealApiTest} 가 통합 테스트로 확인).
  *
  * <p>이 가드가 잘못 좁으면 정상 번역이 버려지고 해당 언어 사용자에게만 조용히 한국어 원문이
  * 노출된다 — 로그 한 줄 외에는 티가 안 나므로 경계값을 테스트로 못박아 둔다.
@@ -63,7 +63,7 @@ class OpenAiTranslationClientTest {
         // 성조 부호와 다음절 표기가 더해지면 4배를 넘길 수 있어, 가드가 4배면 정상 번역이 버려진다.
         //
         // 태국어(TH)는 공백 없는 알파시라빅 문자라 팽창 양상이 VI 와 다른데, 실측치를 확보하지
-        // 못했다 — 여기서는 근거 없는 숫자를 넣지 않고, DisasterAlertServiceOpenAiTranslationTest
+        // 못했다 — 여기서는 근거 없는 숫자를 넣지 않고, OpenAiTranslationClientRealApiTest
         // 의 th 케이스(실제 OpenAI 호출)로만 검증한다. 그 통합 테스트는 OPENAI_API_KEY 가 있어야
         // 돌기 때문에, 키가 없는 환경에서는 TH 회귀가 걸리지 않는다는 한계가 있다.
         String source = "가".repeat(40);
