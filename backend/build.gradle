@@ -125,6 +125,24 @@ clean {
     delete file(generated)
 }
 
+// 'realApi' 태그가 붙은 테스트는 실제 외부 AI API 를 호출한다 — 키가 필요하고, 실행마다 요금이
+// 발생하며, 응답이 완전히 결정적이지 않아 간헐적 실패가 가능하다. 기본 test 태스크에서 제외해
+// 키가 없는 환경에서도 나머지 테스트가 온전히 돌게 한다.
+// (헌법 원칙 III: "외부 AI API 호출은 고정된 픽스처를 사용해 결정적으로 검증한다")
 tasks.named('test') {
-    useJUnitPlatform()
+    useJUnitPlatform {
+        excludeTags 'realApi'
+    }
+}
+
+// 실제 OpenAI 를 호출하는 테스트만 실행한다. OPENAI_API_KEY 가 필요하며, 프롬프트 규칙을
+// 바꿨을 때 수동으로 돌려 확인하는 용도다: ./gradlew realApiTest
+tasks.register('realApiTest', Test) {
+    group = 'verification'
+    description = '실제 외부 AI API 를 호출하는 테스트(@Tag("realApi"))만 실행한다. API 키와 요금이 필요하다.'
+    testClassesDirs = sourceSets.test.output.classesDirs
+    classpath = sourceSets.test.runtimeClasspath
+    useJUnitPlatform {
+        includeTags 'realApi'
+    }
 }
