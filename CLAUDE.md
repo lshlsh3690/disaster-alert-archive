@@ -12,13 +12,17 @@ Disaster Alert Archive(재난 안전 문자 아카이브) — 한국 정부의 �
 
 ```bash
 ./gradlew compileJava        # 컴파일만 (빠른 확인용)
+./gradlew compileTestJava     # 테스트 소스 컴파일만
 ./gradlew build               # 전체 빌드 + 테스트
-./gradlew test                 # 전체 테스트 실행
+./gradlew test                 # 전체 테스트 실행 (realApi 태그 제외)
 ./gradlew test --tests "com.disaster.alert.alertapi.domain.auth.service.AuthServiceTest"   # 단일 테스트 클래스
 ./gradlew test --tests "*.AuthServiceTest.someMethod"                                       # 단일 테스트 메서드
+./gradlew realApiTest          # 실제 OpenAI 를 호출하는 테스트만 (@Tag("realApi"))
 ```
 
-DB/Spring 컨텍스트에 의존하는 통합 테스트는 `@SpringBootTest` + `@ActiveProfiles("test")`를 사용하며 `backend/.env.test`를 통해 실제(테스트용) Postgres에 접속합니다 — 슬라이스/목킹된 단위 테스트가 아니므로, dev docker-compose와 동일한 구성의 DB에 접속 가능해야 합니다. 반면 외부 의존성이 없는 순수 로직 클래스(예: `FireAlertClassifier`, `DisasterCooldown`, `MissingPersonIdentity`, `AnimalIdentity` 같은 `domain/event/service`·`domain/risk` 하위의 정적 유틸/판정 클래스)는 `@SpringBootTest` 없이 순수 JUnit 단위 테스트로 작성합니다 — DB 연결이나 Spring 컨텍스트 부트스트랩이 필요 없어 훨씬 빠릅니다.
+`@Tag("realApi")` 가 붙은 테스트(현재 `OpenAiTranslationClientRealApiTest`)는 실제 OpenAI API 를 호출하므로 `OPENAI_API_KEY` 가 필요하고 실행마다 요금이 발생하며 응답이 완전히 결정적이지 않습니다. `build.gradle`에서 기본 `test` 태스크는 이 태그를 제외하고, 별도 `realApiTest` 태스크로만 실행하도록 분리되어 있습니다 — 프롬프트 규칙을 바꿨을 때 수동으로 돌려 확인하는 용도입니다.
+
+DB/Spring 컨텍스트에 의존하는 통합 테스트는 `@SpringBootTest` + `@ActiveProfiles("test")` + `backend/.env.test` 로딩을 한 번에 묶은 `@IntegrationTest`(`global/testsupport/IntegrationTest.java`, `DotenvExtension` 포함)를 붙여 작성합니다 — 슬라이스/목킹된 단위 테스트가 아니므로, dev docker-compose와 동일한 구성의 DB에 접속 가능해야 합니다. 반면 외부 의존성이 없는 순수 로직 클래스(`domain/event/model`의 `FireAlertClassifier`·`DisasterCooldown`·`MissingPersonIdentity`·`AnimalIdentity`, `domain/risk/service`의 `IntensityExtractor` 같은 정적 유틸/판정 클래스)는 `@SpringBootTest` 없이 순수 JUnit 단위 테스트로 작성합니다 — DB 연결이나 Spring 컨텍스트 부트스트랩이 필요 없어 훨씬 빠릅니다.
 
 QueryDSL Q-클래스는 컴파일 시 `backend/src/main/generated`에 생성됩니다 — 리포지토리 쿼리 메서드가 인식되지 않으면 `./gradlew compileJava`로 재생성하세요.
 
@@ -29,6 +33,7 @@ npm run dev      # next dev --turbopack
 npm run build    # next build --webpack (빌드는 turbopack이 아닌 webpack 사용)
 npm run start
 npm run lint
+npm test         # jest (testEnvironment: node). 현재 src/api/alertApi.test.ts 만 존재
 ```
 
 ### 로컬 인프라
@@ -38,17 +43,22 @@ docker compose -f docker-compose.dev.yml up postgres redis   # Postgres(pgvector
 ```
 `docker-compose.dev.yml`의 `frontend`/`backend` 서비스는 `docker` 프로필에 묶여 있습니다 — 로컬 개발 시에는 Postgres/Redis만 compose로 띄우고 백엔드/프론트엔드는 직접 실행하세요 (`./gradlew bootRun`, `npm run dev`).
 
-스키마는 Flyway로 관리합니다 (`backend/src/main/resources/db/migration/V*.sql`, `ddl-auto: validate`) — 이미 적용된 마이그레이션은 절대 수정하지 말고 새 `V{n}__description.sql`을 추가하세요. 법정동 번역 시딩과 여러 분기에 걸친 날씨 이력 백필용 시드 마이그레이션이 다수 존재합니다.
+스키마는 Flyway로 관리합니다 (`backend/src/main/resources/db/migration/V*.sql`, `ddl-auto: validate`) — 이미 적용된 마이그레이션은 절대 수정하지 말고 새 `V{n}__description.sql`을 추가하세요. 법정동 번역 시딩과 여러 분기에 걸친 날씨 이력 백필용 시드 마이그레이션이 다수 존재합니다. `flyway.out-of-order: true`라 번호가 어긋난 미적용 마이그레이션도 실행됩니다.
+
+`.env.example`은 일부 항목이 실제 코드와 어긋나 있습니다 — Spring AI 자격증명은 `OPENAI_API_KEY`인데 템플릿에는 (더 이상 어디에서도 읽지 않는) `TIMELY_API_KEY`가 남아 있고, `FRAGMENT_MERGE_ENABLED`/`INCIDENT_SPECIFIC_CHECK_ENABLED`도 대응하는 코드가 없습니다. 환경변수를 채울 때는 템플릿이 아니라 `application.yml`의 `${...}` 참조를 기준으로 삼으세요.
 
 ## 아키텍처
 
 ### 백엔드 도메인 구조
 
 `backend/src/main/java/com/disaster/alert/alertapi/`
-- `domain/*` — bounded context별 패키지 (`disasteralert`, `event`, `risk`, `weather`, `notification`, `member`, `auth`, `legaldistrict`, `community`, `comment`, `useralert`, `openapi`). 각각 `controller → service → repository` 구조를 따르며, `model/`(JPA 엔티티)과 `dto/`(엔드포인트별 응답 DTO 1개 타입, 리스트는 별도 타입이 아니라 내부에 중첩)로 구성됩니다.
-- `global/` — 공통 관심사: `security/jwt`(JWT 인증 필터/프로바이더), `exception`(`GlobalExceptionHandler` + `CustomException`/`ErrorCode` 패턴 — 항상 ErrorCode를 통해 예외를 던지고 임의로 에러 바디를 만들지 말 것), `dto`(모든 컨트롤러가 사용하는 `ApiResponse`/`ApiErrorResponse` 응답 포맷), `translation`(OpenAI `gpt-4o-mini` 기반 — DeepL Free는 계정당 평생 누적 쿼터라 예비 키까지 소진돼 2026-08-09 교체), `redis`, `config`.
-- `scheduler/` 및 도메인별 `*/scheduler/` 패키지 — `@Scheduled` 작업들 (재난문자 수집, 날씨 수집/집계, 위험도 감쇠). 백그라운드 파이프라인의 진입점이므로 "왜 X가 실행되지 않았는지" 디버깅할 때 가장 먼저 확인할 곳입니다.
+- `domain/*` — bounded context별 패키지 (`disasteralert`, `event`, `risk`, `weather`, `notification`, `member`, `auth`, `legaldistrict`, `community`, `comment`, `useralert`, `openapi`, `common`). 각각 `controller → service → repository` 구조를 따르며, `model/`(JPA 엔티티)과 `dto/`(엔드포인트별 응답 DTO 1개 타입, 리스트는 별도 타입이 아니라 내부에 중첩)로 구성됩니다. 모든 컨트롤러는 `/api/v1/*` 아래에 매핑됩니다. **실종자 전용 도메인 패키지는 없습니다** — 실종자는 재난문자에서 파생되는 개념이라 `domain/event/model/MissingPersonIdentity`(동일 실종 사건 판정)와 `domain/disasteralert` 조회 필터로 구현되어 있습니다.
+- `global/` — 공통 관심사: `security/jwt`(JWT 인증 필터/프로바이더), `exception`(`GlobalExceptionHandler` + `CustomException`/`ErrorCode` 패턴 — 항상 ErrorCode를 통해 예외를 던지고 임의로 에러 바디를 만들지 말 것), `dto`(모든 컨트롤러가 사용하는 `ApiResponse`/`ApiErrorResponse` 응답 포맷), `translation`(OpenAI 기반 — DeepL Free는 계정당 평생 누적 쿼터라 예비 키까지 소진돼 2026-08-09 교체), `logtrace`(김영한 LogTrace 스타일 AOP 호출 로깅 — controller/service 계층에 트랜잭션 ID + 들여쓰기 로그 자동 부착), `service`(`EmailService`, `LegalDistrictCache`), `controller/AdminController`, `util/CookieUtil`, `redis`, `config`.
+- `scheduler/DisasterFetchScheduler` 및 도메인별 `*/scheduler/` 패키지(`weather/scheduler/WeatherCollectScheduler`·`WeatherDailySummaryScheduler`, `risk/scheduler/RiskDecayScheduler`) — `@Scheduled` 작업들. 백그라운드 파이프라인의 진입점이므로 "왜 X가 실행되지 않았는지" 디버깅할 때 가장 먼저 확인할 곳입니다.
 - `api/DisasterOpenApiClient.java` — 재난문자 공공데이터포털 API 클라이언트.
+- `*/tool/*BackfillTool` — 과거 데이터를 현재 로직으로 재처리하는 수동 실행 도구 (`EventClusteringBackfillTool`, `RiskBackfillTool`, `DisasterAlertRegionBackfillTool`).
+
+에러 트래킹은 Sentry(`sentry-spring-boot-starter-jakarta` + `sentry-logback`)를 사용합니다. 스타터만으로는 `GlobalExceptionHandler`가 이미 처리한 예외와 스케줄러 실패(= HTTP 요청이 아님)를 못 잡기 때문에 `log.error(msg, e)`를 이벤트로 승격시키는 logback 연동 모듈이 필수입니다 — `build.gradle`의 주석 참고. `SENTRY_DSN`을 비워두면 SDK가 자동으로 no-op이 됩니다.
 
 인증: httpOnly 쿠키 기반 JWT access+refresh 토큰 (`application.yml`의 `cookie.secure`/`cookie.domain` 참고), Google/Kakao/Naver OAuth2 로그인은 `domain/auth/oauth`에 직접 구현되어 있습니다 (`build.gradle`의 Spring `oauth2-client` 스타터 의존성은 주석 처리되어 있으며, 각 프로바이더는 수작업으로 구현됨).
 
@@ -80,9 +90,21 @@ docker compose -f docker-compose.dev.yml up postgres redis   # Postgres(pgvector
 
 ### 법정동
 
-한국 행정구역 코드가 알림, 관심지역, 위험도 등 지역 매칭 전반을 구동합니다. 코드 구조: 1-2번째 자리 = 시도, 3-5번째 자리 = 시군구, 6-8번째 자리 = 읍면동, 9-10번째 자리 = 리. 시도 전체 선택("전체")은 시도 코드 뒤를 0으로 채운 형태로 저장됩니다 (예: 광주광역시 전체 = `2900000000`). 지역 매칭 로직은 알림의 시군구 코드를 단순 일치시키는 것이 아니라 이 시도 레벨 코드를 파생해서 함께 확인해야 합니다. 이 시도 코드 파생(`substring(0,2)`)은 `AlertNotificationService`/`EventClusteringService`/`DisasterAlertRepositoryImpl`에 각각 별도로 구현되어 있어 공용 헬퍼가 없습니다 — 새 시도 코드가 추가되면(예: 2026-07-01 광주·전남 통합) 프론트엔드의 하드코딩된 시도 매핑처럼 갱신이 누락되기 쉬우니 지역 매칭 관련 변경 시 이 중복 지점들을 함께 확인하세요.
+한국 행정구역 코드가 알림, 관심지역, 위험도 등 지역 매칭 전반을 구동합니다. 코드 구조: 1-2번째 자리 = 시도, 3-5번째 자리 = 시군구, 6-8번째 자리 = 읍면동, 9-10번째 자리 = 리. 시도 전체 선택("전체")은 시도 코드 뒤를 0으로 채운 형태로 저장됩니다 (예: 전남광주통합특별시 전체 = `1200000000`). 지역 매칭 로직은 알림의 시군구 코드를 단순 일치시키는 것이 아니라 이 시도 레벨 코드를 파생해서 함께 확인해야 합니다. 이 시도 코드 파생(`substring(0,2)`)은 `AlertNotificationService`/`EventClusteringService`/`DisasterAlertRepositoryImpl`에 각각 별도로 구현되어 있어 공용 헬퍼가 없습니다 — 새 시도 코드가 추가되면 프론트엔드의 하드코딩된 시도 매핑(`frontend/src/ui/metros.ts`)처럼 갱신이 누락되기 쉬우니 지역 매칭 관련 변경 시 이 중복 지점들을 함께 확인하세요.
+
+2026-07-01 광주광역시(`29xx`)·전라남도(`46xx`)가 **전남광주통합특별시(`12xx`)로 통합**되며 법정동코드가 전면 재발급되었습니다 (V108 신규 코드 시딩, V111 기존 데이터 이관). 옛 `29`/`46` 시도 코드는 더 이상 조회되지 않으므로 새 코드를 기준으로 작업하세요 — 이관 전 수집분 보정용으로 `DisasterAlertRegionBackfillTool`이 있습니다.
 
 이 서브시스템의 as-built 상세 동작은 `specs/004-legal-district-matching/spec.md`·`plan.md` 참고.
+
+### 번역 파이프라인
+
+`global/translation/` — 재난문자 본문/유형과 이벤트 제목을 KO → EN/JA/ZH/VI/TH 로 번역합니다. 수집 스케줄러가 새 알림을 저장하면 `translateAndSaveAsync`가 `@Async("translationExecutor")`로 5개 언어를 미리 번역해 캐시(`disaster_alert_translation`)에 적재하고, 캐시 미스는 조회 시점 lazy 번역(`ensureTranslated`/`ensureTranslatedBatch`)이 동기로 보정합니다.
+
+모델은 `application.yml`의 `spring.ai.openai.chat` 기본값(`gpt-4o-mini`)이 아니라 `OpenAiTranslationClient.MODEL`이 per-call로 **`gpt-4o`를 오버라이드**합니다 — `gpt-4o-mini`로는 한국어 지명의 태국어 음차가 안정적이지 않았기 때문이며, 사유는 해당 상수의 javadoc에 있습니다. 임베딩·LLM 판정은 그대로 `gpt-4o-mini`를 씁니다.
+
+**법정동 명칭 번역은 이 파이프라인의 대상이 아닙니다** — `domain/legaldistrict`의 시드 테이블(`legal_district_translation`, EN/JA/ZH) 조회로 처리됩니다. `docs/PRD.md`·`docs/TRD.md`가 두 경로를 하나로 묶어 서술해 온 전례가 있으니 혼동하지 마세요.
+
+이 서브시스템의 as-built 상세 동작은 `specs/005-translation-pipeline/spec.md`·`plan.md` 참고.
 
 ### 프론트엔드 구조
 
@@ -90,8 +112,12 @@ docker compose -f docker-compose.dev.yml up postgres redis   # Postgres(pgvector
 - `api/*.ts` — 백엔드 도메인별 파일 하나씩, 얇은 axios 래퍼. `api/axios.ts`에 401 → `/auth/reissue` 리프레시 인터셉터가 포함된 공용 인스턴스가 있습니다 (리프레시 중 들어온 동시 요청은 큐잉했다가 각각 1회만 재시도하며, reissue/login 요청 자체는 재시도하지 않음).
 - `lib/queries/`, `lib/mutations/` — `api/*` 위에 구축된 React Query 훅.
 - `store/` — Zustand 스토어 (`authStore`, 비로그인 사용자용 `guestFavoriteRegionsStore`, `languageStore`, `signupStore`).
-- `app/` — Next.js App Router 페이지 (alerts, community, dashboard, events, missing-persons, stats, user settings/regions 등).
+- `app/` — Next.js App Router 페이지: `alerts`(+`[id]`/`map`/`new`), `community`(+`[id]`), `events`(+`[id]`), `stats`(+`charts`), `user`(+`me`/`settings`/`delete`/`[id]`), `login`, `signup`, `notifications`, `missing`, `test`. `missing`은 아직 정적 플레이스홀더이고, `components/MissingPerson.tsx`도 하드코딩 목업이라 어디에서도 사용되지 않습니다 — 실종자 화면을 실제로 구현할 때 이 둘을 먼저 확인하세요.
+- `ui/` — 재난 유형/등급 표시용 상수 테이블(`disasterType`, `disasterTypeChip`, `disasterTypeColor`, `level`, `metros`). 컴포넌트가 아니라 매핑 데이터입니다. `metros.ts`가 시도 목록을 하드코딩하고 있어 법정동 절에서 말한 "갱신 누락되기 쉬운 지점" 중 하나입니다.
+- 다국어는 `lib/i18n.ts`(i18next + react-i18next)가 `constants/i18n`의 인라인 리소스로 초기화합니다 — 로케일 JSON 파일이 아니라 TS 상수이며, 보간 구분자가 기본 `{{ }}`가 아니라 `{ }`로 설정돼 있습니다.
+- `next.config.ts` — `/api/:path*`를 `BASE_API_URL`(미설정 시 운영 API)로 rewrite 하고, `sw.js`/`manifest.json`에 `must-revalidate`를 강제해 PWA 업데이트가 구버전 캐시에 막히지 않게 합니다.
 - PWA 지원(`@ducanh2912/next-pwa`)이며 푸시 알림을 위한 Firebase Messaging 서비스워커가 있습니다.
+- `scripts/ui-screenshot.mjs`·`auth-screenshot.mjs` — Playwright 기반 화면 점검 스크립트 (ui-checker/ui-fixer agent 가 사용).
 
 ## 팀 컨벤션 (`prompts/PROMPTS.md` 기반)
 
