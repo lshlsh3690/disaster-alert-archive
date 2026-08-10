@@ -8,7 +8,7 @@
 
 ## 요약
 
-번역 파이프라인은 재난문자 본문(`message`)·재난 유형(`disasterType`)·이벤트 제목(`event_title`) 세 필드를 EN/JA/ZH/VI/TH로 번역해 DB에 캐시하는 서브시스템이다. 번역 실행 시점은 **세 갈래**로 나뉜다 — 수집 스케줄러가 새 알림마다 전 언어를 미리 번역하는 비동기 경로, 상세 조회가 캐시 미스를 그 자리에서 메우는 동기 단건 경로, 목록/검색이 페이지 내 미번역분만 메우는 동기 일괄 경로. 엔진은 2026-08-09에 DeepL에서 OpenAI로 교체되었고, 번역 모델은 `gpt-4o` 다(임베딩·LLM 판정은 `gpt-4o-mini` 유지 — 한국어 지명 음차 품질 때문에 번역만 상위 모델을 쓴다).
+번역 파이프라인은 재난문자 본문(`message`)·재난 유형(`disasterType`)·이벤트 제목(`event_title`) 세 필드를 EN/JA/ZH/VI/TH로 번역해 DB에 캐시하는 서브시스템이다. 번역 실행 시점은 **세 갈래**로 나뉜다 — 수집 스케줄러가 새 알림마다 전 언어를 미리 번역하는 비동기 경로, 상세 조회가 캐시 미스를 그 자리에서 메우는 동기 단건 경로, 목록/검색이 페이지 내 미번역분만 메우는 동기 일괄 경로. 엔진은 2026-08-09에 DeepL에서 OpenAI로 교체되었고, 번역 모델은 `gpt-4o` 다(임베딩·LLM 판정은 `gpt-4o-mini` 유지 — 한국어 지명 음차 품질 때문에 번역만 상위 모델을 쓴다). 호출은 `temperature 0`으로 결정성을 요청하지만 그것이 출력 재현성을 보장하지는 않는다 — 같은 원문에 같은 번역이 나오는 것은 결과를 DB에 캐시해 재호출하지 않기 때문이다.
 
 이 문서의 핵심 산출물은 두 가지다. (1) 세 트리거 경로의 **트랜잭션 경계**를 명시하는 것 — 특히 `getAlertDetail`이 `@Transactional`이라 lazy 번역이 바깥 트랜잭션에 합류하고, 이 때문에 동시 요청 시 원문 폴백이 실패하고 HTTP 500이 나는 구조적 결함이 존재한다. (2) **법정동 명칭 번역이 이 파이프라인의 대상이 아니라는 경계**를 못박는 것 — `docs/PRD.md`·`docs/TRD.md`가 두 경로를 하나로 서술해 온 것이 이 문서화의 직접적 동기다.
 
@@ -38,11 +38,11 @@
 
 - **원칙 I (가독성과 단순성 우선) — 대체로 준수, 이원화 1건.**
   `TranslationService`와 `EventTranslationService`는 동일한 3메서드 패턴(`translateAndSaveAsync`는 alert 쪽만 / `ensureTranslated` / `ensureTranslatedBatch` + private `translateAndSaveInternal`)을 의도적으로 복제한 구조다. `EventTranslationService` 클래스 주석이 "alert `TranslationService` 패턴 복제(제목만)"라고 그 의도를 명시하고 있어(`domain/event/service/EventTranslationService.java:20`), "세 줄의 비슷한 코드가 섣부른 공통화보다 낫다"는 원칙 문구에 부합한다. 각 메서드도 30~50줄 이내다.
-  다만 **지원 언어 정의가 두 곳으로 갈라져 있다**: `SupportedLanguage` enum(`global/translation/SupportedLanguage.java:18-22`)과 `OpenAiTranslationClient.LANGUAGE_NAMES` 맵(`global/translation/OpenAiTranslationClient.java:65-71`). enum 주석은 "이 enum에만 항목을 추가하면 된다"고 말하지만(`SupportedLanguage.java:14`) 실제로는 맵도 갱신해야 하며, 누락 시 컴파일이 아니라 **런타임 `IllegalArgumentException`**으로 드러난다(`OpenAiTranslationClient.java:84-87`). 004에서 지적한 "중앙화되지 않은 파생 로직이 드리프트를 만든다"와 같은 유형의 위험이다.
+  다만 **지원 언어 정의가 두 곳으로 갈라져 있다**: `SupportedLanguage` enum(`global/translation/SupportedLanguage.java:18-22`)과 `OpenAiTranslationClient.LANGUAGE_NAMES` 맵(`global/translation/OpenAiTranslationClient.java:71-77`). enum 주석은 "이 enum에만 항목을 추가하면 된다"고 말하지만(`SupportedLanguage.java:14`) 실제로는 맵도 갱신해야 하며, 누락 시 컴파일이 아니라 **런타임 `IllegalArgumentException`**으로 드러난다(`OpenAiTranslationClient.java:90-93`). 004에서 지적한 "중앙화되지 않은 파생 로직이 드리프트를 만든다"와 같은 유형의 위험이다.
   - **권고(문서화 목적, 이번 범위 아님)**: 언어명을 `SupportedLanguage`의 필드로 올리고 `LANGUAGE_NAMES`를 제거한다. `translate()` 시그니처를 `String targetLang` 대신 `SupportedLanguage`로 바꾸면 호출부 2곳(`TranslationService.java:160,165`, `EventTranslationService.java:90`)이 이미 enum을 들고 있으므로 변경 비용이 낮고, 예외 경로 자체가 사라진다.
 
 - **원칙 II (계층형 아키텍처 준수) — 부분 위반 2건, 둘 다 영향은 제한적.**
-  1. **예외 규약 위반(확인됨).** `OpenAiTranslationClient`가 `CustomException` + `ErrorCode`가 아니라 raw `IllegalArgumentException`/`IllegalStateException`을 던진다(`OpenAiTranslationClient.java:86,96,101`). 헌법 원칙 II는 "예외는 `CustomException` + `ErrorCode`로만 던진다"고 규정한다.
+  1. **예외 규약 위반(확인됨).** `OpenAiTranslationClient`가 `CustomException` + `ErrorCode`가 아니라 raw `IllegalArgumentException`/`IllegalStateException`을 던진다(`OpenAiTranslationClient.java:92,102,107`). 헌법 원칙 II는 "예외는 `CustomException` + `ErrorCode`로만 던진다"고 규정한다.
      **다만 실제 영향은 없다**: 이 예외들은 전부 호출 측에서 잡힌다 — `TranslationService.translateAndSaveInternal`이 broad `catch`로 로그를 남기고 재던지면(`global/translation/TranslationService.java:177-180`), 그 상위 세 진입점이 모두 삼킨다(`TranslationService.java:63-69,89-94,136-140`). 이벤트 쪽도 동일하다(`EventTranslationService.java:49-53,75-79`). 따라서 이 예외가 `GlobalExceptionHandler`에 도달해 임의 형식의 에러 바디를 만드는 경로는 **존재하지 않는다**. `ErrorCode`는 API 응답 포맷을 위한 규약인데 여기는 내부 제어 흐름이므로, 규약의 문언에는 어긋나지만 규약이 방지하려는 문제(비표준 에러 응답)는 발생하지 않는다.
   2. **패키지 배치 비대칭(확인됨).** 재난문자 번역은 `global/translation/TranslationService`에 있으면서 `domain/disasteralert`의 엔티티·리포지토리를 직접 임포트한다(`TranslationService.java:3-6`) — `global` → `domain` 방향 의존이다. 반면 이벤트 제목 번역은 `domain/event/service/EventTranslationService`에 있어 `domain` → `global` 방향으로 정상이다. 같은 성격의 두 서비스가 서로 반대 방향의 의존을 갖는다. `controller → service → repository` 계층 자체를 건너뛰지는 않으므로 헌법 문언의 직접 위반은 아니지만, `global`이 특정 도메인을 아는 구조는 패키지 경계 관점에서 일관적이지 않다.
   - 응답 포맷(`ApiResponse`), DTO 설계는 이 서브시스템이 컨트롤러를 소유하지 않으므로(번역 필드는 소비처 DTO에 실려 나간다) 해당 없음.
@@ -54,7 +54,7 @@
   - **남은 권고**: 빌드 이전 CI 테스트 잡을 추가해야 원칙 III을 온전히 만족한다.
 
 - **원칙 IV (정직한 문서화) — 이 문서화 과정에서 발견한 문서 결함 1건 + 코드 결함 2건.**
-  1. `docs/PRD.md:66`과 `docs/TRD.md:68`이 법정동 명칭을 번역 API의 스케줄러 번역 대상으로 서술한다. 실제로는 `legal_district_translation`이 Flyway 시드 테이블이며 런타임 번역 호출이 없다(`specs/004-legal-district-matching/spec.md` FR-017). 2026-08-09 DeepL→OpenAI 교체 시 문구만 바꾸면서 이 오류가 그대로 옮겨졌다. spec.md FR-012가 이 경계를 `MUST NOT`으로 못박았다.
+  1. `docs/PRD.md:66`과 `docs/TRD.md:68`이 법정동 명칭을 번역 API의 스케줄러 번역 대상으로 서술한다. 실제로는 `legal_district_translation`이 Flyway 시드 테이블이며 런타임 번역 호출이 없다(`specs/004-legal-district-matching/spec.md` FR-017). 2026-08-09 DeepL→OpenAI 교체 시 문구만 바꾸면서 이 오류가 그대로 옮겨졌다. spec.md FR-012가 이 경계를 `MUST NOT`으로 못박았고, **저장소에 상충하는 두 계약이 남지 않도록 이번 문서화와 함께 `docs/PRD.md`·`docs/TRD.md`도 정정했다** — 두 문서는 이제 재난문자·이벤트 제목 번역(OpenAI 런타임)과 법정동 명칭 번역(Flyway 시드 조회)을 분리해 서술하고, 상세는 이 명세와 `specs/004`에 위임한다.
   2. 동시 요청 시 HTTP 500(아래 "미해결 항목" 참고) — 상세 조회의 원문 폴백이 동시 요청 상황에서 성립하지 않는다.
   3. 지원 언어 범위 불일치 — 본문은 5개 언어, 법정동 시드는 3개 언어(EN/JA/ZH). VI/TH 사용자는 본문은 모국어, 지역명은 영어인 혼합 응답을 받는다.
   셋 다 숨기지 않고 spec.md 예외 상황 절에 남겼다.
@@ -100,7 +100,7 @@ backend/src/test/java/com/disaster/alert/alertapi/
 └── domain/disasteralert/service/DisasterAlertServiceTest.java                   # 통합(번역 클라이언트 목킹, lang→DTO 배선)
 ```
 
-**구조 결정**: 번역 클라이언트와 재난문자 번역 서비스는 `global/translation`에, 이벤트 제목 번역은 `domain/event`에 배치되어 있다. 소비처(`DisasterAlertService`, `EventQueryService`)는 번역 서비스를 주입받아 조회 로직 안에서 직접 호출하며, 번역 전용 컨트롤러나 엔드포인트는 존재하지 않는다 — 번역은 항상 기존 조회 API의 `?lang=` 파라미터에 얹혀 동작한다.
+**구조 결정**: 번역 클라이언트와 재난문자 번역 서비스는 `global/translation`에, 이벤트 제목 번역은 `domain/event`에 배치되어 있다. 번역 전용 컨트롤러나 엔드포인트는 존재하지 않는다. 다만 진입 경로는 둘로 갈린다 — **조회 시점 lazy 번역**은 소비처(`DisasterAlertService`, `EventQueryService`)가 기존 조회 API의 `?lang=` 파라미터를 받아 조회 로직 안에서 직접 호출하고, **수집 시점 사전 번역**은 `DisasterFetchScheduler`가 `saveData(raw)` 직후 요청 파라미터 없이 `translateAndSaveAsync`를 호출하는 내부 경로다(`DisasterFetchScheduler.java:39-43`). 즉 `?lang=`은 사용자 응답과 lazy 번역만 제어하며, 사전 번역은 그와 무관하게 지원 언어 전체로 실행된다.
 
 ## 트리거 경로와 트랜잭션 경계
 
@@ -172,7 +172,7 @@ DeepL Free는 계정당 **월간이 아니라 평생 누적** 쿼터라 소진 �
 | # | 항목 | 고쳐야 할 위치 |
 |---|------|----------------|
 | 1 | **동시 요청 PK 충돌 → HTTP 500.** "존재 확인 → 저장"이 원자적이지 않아 같은 `(alertId, languageCode)`를 동시 저장하면 커밋 시점에 충돌하고, 호출자 트랜잭션이 rollback-only가 되어 원문 폴백 대신 500이 난다. PostgreSQL `ON CONFLICT DO NOTHING` UPSERT를 리포지토리에 추가하거나 저장을 `REQUIRES_NEW`로 격리해야 한다. | `global/translation/TranslationService.java:81-95,112-144,170-173`, `domain/disasteralert/repository/DisasterAlertTranslationRepository.java`(UPSERT 메서드 신설), `domain/event/service/EventTranslationService.java:41-53,58-80,91`, `domain/event/repository/DisasterEventTranslationRepository.java` |
-| 2 | **`SupportedLanguage` ↔ `LANGUAGE_NAMES` 이원화.** enum에만 언어를 추가하면 런타임 `IllegalArgumentException`이 난다. 언어명을 enum 필드로 올리고 `translate()` 시그니처를 `SupportedLanguage`로 바꾸면 예외 경로가 사라진다. | `global/translation/SupportedLanguage.java:14,18-22`, `global/translation/OpenAiTranslationClient.java:65-71,83-87`, 호출부 `TranslationService.java:160,165`·`EventTranslationService.java:90` |
+| 2 | **`SupportedLanguage` ↔ `LANGUAGE_NAMES` 이원화.** enum에만 언어를 추가하면 런타임 `IllegalArgumentException`이 난다. 언어명을 enum 필드로 올리고 `translate()` 시그니처를 `SupportedLanguage`로 바꾸면 예외 경로가 사라진다. | `global/translation/SupportedLanguage.java:14,18-22`, `global/translation/OpenAiTranslationClient.java:71-77,89-93`, 호출부 `TranslationService.java:160,165`·`EventTranslationService.java:90` |
 | 3 | **번역 대상 언어(5개) vs 법정동 시드 언어(3개) 불일치.** VI/TH 사용자는 본문은 모국어, 지역명은 영어로 본다. VI/TH 법정동 시드 마이그레이션을 추가하거나, 지원 언어를 시드 범위로 좁히거나, 혼합 표시를 의도된 동작으로 문서화하는 세 선택지가 있다. | `backend/src/main/resources/db/migration/`(VI/TH 시드 신설 시), `global/translation/SupportedLanguage.java:18-22`(범위 축소 시), `domain/legaldistrict/service/LegalDistrictTranslationService.java`(폴백 정책) |
 | 4 | **CI 테스트 단계 부재.** 배포 파이프라인에서 어떤 테스트도 실행되지 않는다(헌법 원칙 III). 실 API 테스트를 기본 실행에서 분리하는 절반은 `@Tag("realApi")` + `excludeTags` 로 처리됐고, 남은 절반이 이 항목이다. | `.github/workflows/backend-deploy.yml`(빌드 이전 테스트 잡 신설 — `./gradlew test` 는 `realApi` 태그를 제외하므로 API 키 없이 실행 가능하다) |
 | 5 | **`translated_region_names` 컬럼이 항상 `null`.** 사실상 미사용 컬럼이다. 제거하려면 Flyway 마이그레이션이 필요하고, 남겨두려면 "의도적으로 비워둠"을 스키마 주석에 남기는 편이 낫다. | `backend/src/main/resources/db/migration/`(새 마이그레이션), `domain/disasteralert/model/DisasterAlertTranslation.java` |

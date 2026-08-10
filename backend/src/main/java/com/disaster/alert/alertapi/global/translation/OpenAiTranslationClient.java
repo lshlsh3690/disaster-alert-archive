@@ -43,7 +43,13 @@ public class OpenAiTranslationClient {
      */
     private static final String MODEL = "gpt-4o";
 
-    /** 번역은 창작이 아니므로 결정적으로 — 같은 원문이면 항상 같은 번역이 나오게 한다. */
+    /**
+     * 번역은 창작이 아니므로 모델에 결정성을 요청한다.
+     *
+     * <p>다만 이것이 출력 재현성을 <b>보장하지는 않는다</b> — {@code temperature 0} 에서도 같은
+     * 원문이 다른 번역을 낼 수 있다. 같은 원문에 같은 번역이 보이는 것은 결과를 DB
+     * ({@code disaster_alert_translation} 등)에 캐시해 같은 키를 다시 호출하지 않기 때문이다.
+     */
     private static final double TEMPERATURE = 0.0;
 
     /**

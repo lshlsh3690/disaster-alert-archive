@@ -63,7 +63,9 @@
 - 별도의 외부 실종자 API(경찰청 등) 연계 없이, 재난 안전 문자 중 실종 관련 문자에서 추출한 정보만으로 실종자를 추적·조회
 
 ### 5.9 다국어 지원
-- 한국어/영어/중국어/일본어 번역 (OpenAI gpt-4o-mini 기반, 재난 문자 및 법정동 명칭 포함)
+- 다국어 지원 — 경로가 둘로 나뉜다.
+  - **재난문자 본문·유형, 이벤트 제목**: OpenAI 런타임 번역 후 DB 캐시. 지원 언어 EN/JA/ZH/VI/TH (`specs/005-translation-pipeline/spec.md` 참고)
+  - **법정동 명칭**: 런타임 번역 대상이 아니며 Flyway 로 시딩된 `legal_district_translation` 테이블을 조회한다. 시드 언어는 EN/JA/ZH 3개뿐이라 VI/TH 요청 시 영어로 폴백한다 (`specs/004-legal-district-matching/spec.md` FR-017 참고)
 
 ### 5.10 계정 및 인증
 - 이메일 회원가입/로그인
