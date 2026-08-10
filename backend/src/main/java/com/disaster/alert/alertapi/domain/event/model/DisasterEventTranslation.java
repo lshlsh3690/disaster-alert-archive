@@ -11,7 +11,7 @@ import java.time.LocalDateTime;
 
 /**
  * 이벤트 제목 다국어 번역 캐시 (disaster_alert_translation 패턴).
- * 조회 시 lazy 번역(DeepL) → 저장. (event_id, language_code) 당 1행.
+ * 조회 시 lazy 번역(OpenAI) → 저장. (event_id, language_code) 당 1행.
  */
 @Entity
 @Table(name = "disaster_event_translation")

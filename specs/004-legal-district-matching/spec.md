@@ -137,7 +137,7 @@
 ### 주요 엔티티
 
 - **LegalDistrict**: 법정동 마스터. `code`(PK, 10자 문자열), `name`(전체 한글명, 예: "서울특별시 종로구 신교동"), `isActive`(존재/폐지), `isActiveString`(원본 CSV 문자열 "존재"/"폐지"). 다른 도메인은 이 엔티티를 FK로 참조하거나 `code` 문자열만 원시값으로 들고 다닌다.
-- **LegalDistrictTranslation**: 법정동 코드별 언어별 번역명. PK=(`code`,`languageCode`). DeepL 실시간 호출 대신 캐시 성격의 시드 테이블.
+- **LegalDistrictTranslation**: 법정동 코드별 언어별 번역명. PK=(`code`,`languageCode`). 번역 API 실시간 호출 대신 캐시 성격의 시드 테이블.
 - **MemberFavoriteRegion**: 회원-관심지역 매핑. PK=(`memberId`,`legalDistrictCode`). 회원당 최대 5개(ADMIN 무제한).
 - **GuestFcmRegion**: 게스트(비로그인) FCM 토큰-관심지역 매핑. `id`(surrogate PK), `fcmToken`, `legalDistrictCode`.
 - **(참조 소비처, 이 서브시스템이 소유하지 않음)**: `DisasterAlertRegion`(재난문자-지역 다대다), `UserDisasterAlertRegion`(사용자 제보-지역), `EventRegionImpact`(이벤트-영향지역), `RegionRiskIndex`/`RegionRiskDaily`/`RegionRiskHistory`(지역 키가 10자리가 아닌 5자리 시군구 코드 — FK 아님, 문자열로만 참조).

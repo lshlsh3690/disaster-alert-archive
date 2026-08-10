@@ -9,7 +9,7 @@
 - **리버스 프록시**: Caddy — `api.disaster-alert-archive.co.kr` → `backend:8080` 라우팅, Let's Encrypt 인증서 자동 발급/갱신
 - **DB**: PostgreSQL + pgvector 확장 (이벤트 임베딩 저장·유사도 검색)
 - **캐시**: Redis (인증 코드, 캐시)
-- **외부 연동**: 행정안전부 재난문자 API, 기상청 API, DeepL 번역 API, Firebase Cloud Messaging, OpenAI 임베딩/챗 API, Kakao Map API, Google/Kakao/Naver OAuth
+- **외부 연동**: 행정안전부 재난문자 API, 기상청 API, Firebase Cloud Messaging, OpenAI 임베딩·챗·번역 API, Kakao Map API, Google/Kakao/Naver OAuth
 
 시스템 아키텍처 다이어그램: [system_architecture.png](./system_architecture.png)
 
@@ -65,7 +65,7 @@
 별도의 외부 실종자 API(경찰청 등) 연동 없이, 수집된 재난 안전 문자 중 실종 관련 문자에서 추출한 정보만으로 `MissingPersonIdentity`를 구성해 추적한다. 동일 인물의 재신고는 이름+나이+키 등 신원 정보로 클러스터링(임베딩/지역 기반이 아님).
 
 ### 3.6 다국어 번역
-DeepL API 기반. 재난 문자(`DisasterEventTranslation`)와 법정동 명칭 번역을 스케줄러로 자동 처리(한/영/중/일).
+OpenAI(gpt-4o-mini) 기반. 재난 문자(`DisasterEventTranslation`)와 법정동 명칭 번역을 스케줄러로 자동 처리(한/영/중/일).
 
 ## 4. 신규 요구사항 기술 설계 — 사용자 제재 (PRD 5.7)
 
@@ -92,7 +92,7 @@ DeepL API 기반. 재난 문자(`DisasterEventTranslation`)와 법정동 명칭 
 | 알림 지연 최소화 | 재난문자 수집 스케줄러 주기 단축, 클러스터링 LLM 호출을 사전 필터(키워드/유형)로 최소화해 처리 지연 감소 |
 | 중복 알림 방지 | `DisasterCooldown` + 이벤트 클러스터링으로 동일 사건 재알림 억제 |
 | 알림 발송 실패 최소화 | FCM 발송 실패(UNREGISTERED) 토큰 감지 — 자동 정리 로직은 별도 구현 필요(현재 감지만 하고 삭제는 미구현) |
-| 번역 품질 | DeepL API 사용, 번역 실패 시 원문 유지 |
+| 번역 품질 | OpenAI gpt-4o-mini 사용(재난문자 표기 규칙을 프롬프트로 지정), 번역 실패 시 원문 유지 |
 
 ## 7. 참고
 - [PRD.md](./PRD.md)

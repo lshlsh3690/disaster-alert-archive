@@ -2,9 +2,11 @@ package com.disaster.alert.alertapi.domain.disasteralert.service;
 
 import com.disaster.alert.alertapi.domain.disasteralert.dto.LatestAlertResponse;
 import com.disaster.alert.alertapi.domain.disasteralert.model.DisasterAlert;
+import com.disaster.alert.alertapi.domain.disasteralert.model.DisasterAlertTranslation;
 import com.disaster.alert.alertapi.domain.disasteralert.repository.DisasterAlertRepository;
+import com.disaster.alert.alertapi.domain.disasteralert.repository.DisasterAlertTranslationRepository;
 import com.disaster.alert.alertapi.global.testsupport.IntegrationTest;
-import com.disaster.alert.alertapi.global.translation.DeepLTranslationClient;
+import com.disaster.alert.alertapi.global.translation.OpenAiTranslationClient;
 import jakarta.transaction.Transactional;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -18,16 +20,23 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 /**
- * lang="en" 실제 번역(진짜 영어 텍스트가 오는지)은 real DeepL 호출이 필요하므로
- * {@link DisasterAlertServiceDeepLTranslationTest} 에서 별도로 검증한다.
- * 이 클래스는 DeepL을 mock 처리해 "번역 로직이 아예 안 타야 하는 경우(lang=ko)"의 배선만 검증.
+ * 실제 번역 품질(한글이 남지 않는지, 기호가 보존되는지)은 real OpenAI 호출이 필요하므로
+ * {@code OpenAiTranslationClientRealApiTest} 에서 별도로 검증한다.
+ * 이 클래스는 번역 클라이언트를 mock 처리해 <b>배선</b>만 검증한다 — 번역을 아예 타지 않아야 하는
+ * 경우(lang=ko)와, 실제로 타야 하는 경우(지원 언어)가 각각 DTO 까지 올바르게 이어지는지.
  */
 @IntegrationTest
 class DisasterAlertServiceTest {
+
+    /** mock 번역 클라이언트가 돌려줄 고정 문자열 — DTO 까지 이 값이 그대로 실려 오는지로 배선을 확인한다. */
+    private static final String STUB_TRANSLATION = "STUB_TRANSLATION";
 
     @Autowired
     private DisasterAlertService disasterAlertService;
@@ -35,12 +44,15 @@ class DisasterAlertServiceTest {
     @Autowired
     private DisasterAlertRepository disasterAlertRepository;
 
+    @Autowired
+    private DisasterAlertTranslationRepository translationRepository;
+
     @MockitoBean
-    private DeepLTranslationClient deepLTranslationClient;
+    private OpenAiTranslationClient translationClient;
 
     @Test
     @Transactional
-    void getLatestAlert_lang이_ko면_번역필드는_null이고_DeepL을_호출하지_않는다() {
+    void getLatestAlert_lang이_ko면_번역필드는_null이고_번역API를_호출하지_않는다() {
         // when
         List<LatestAlertResponse> result = disasterAlertService.getLatestAlert(5, "ko");
 
@@ -52,7 +64,36 @@ class DisasterAlertServiceTest {
         assertNull(alert.getTranslatedMessage());
         assertNull(alert.getTranslatedDisasterType());
 
-        verify(deepLTranslationClient, never()).translate(anyString(), anyString());
+        verify(translationClient, never()).translate(anyString(), anyString());
+    }
+
+    @Test
+    @Transactional
+    void getLatestAlert_lang이_지원언어면_lazy번역결과가_DTO에_실린다() {
+        // given: 최신 알림들의 EN 번역 캐시를 비워 lazy 번역 경로를 반드시 타게 한다.
+        //        캐시가 남아 있으면 ensureTranslatedBatch 가 번역을 건너뛰어 배선 검증이 무의미해진다.
+        //        @Transactional 이라 테스트 종료 시 삭제도 롤백된다.
+        List<Long> latestIds = disasterAlertService.getLatestAlert(5, "ko").stream()
+                .map(LatestAlertResponse::getId)
+                .toList();
+        List<DisasterAlertTranslation> cached =
+                translationRepository.findByIdAlertIdInAndIdLanguageCode(latestIds, "EN");
+        translationRepository.deleteAll(cached);
+        translationRepository.flush();
+
+        when(translationClient.translate(anyString(), eq("EN"))).thenReturn(STUB_TRANSLATION);
+
+        // when
+        List<LatestAlertResponse> result = disasterAlertService.getLatestAlert(5, "en");
+
+        // then
+        assertFalse(result.isEmpty(), "결과가 있어야 합니다.");
+        LatestAlertResponse alert = result.get(0);
+
+        assertEquals("en", alert.getLanguage());
+        assertEquals(STUB_TRANSLATION, alert.getTranslatedMessage(),
+                "번역 클라이언트 결과가 DTO 의 translatedMessage 까지 이어져야 합니다.");
+        verify(translationClient, atLeastOnce()).translate(anyString(), eq("EN"));
     }
 
     @Test

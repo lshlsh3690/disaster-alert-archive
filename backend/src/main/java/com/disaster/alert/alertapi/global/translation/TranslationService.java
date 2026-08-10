@@ -18,7 +18,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
- * 재난문자 번역 서비스 (DeepL API 호출 + DB 캐시).
+ * 재난문자 번역 서비스 (OpenAI 번역 호출 + DB 캐시).
  *
  * <p><b>번역 대상 필드</b>
  * <ul>
@@ -44,14 +44,14 @@ public class TranslationService {
 
     private final DisasterAlertRepository disasterAlertRepository;
     private final DisasterAlertTranslationRepository translationRepository;
-    private final DeepLTranslationClient deepLClient;
+    private final OpenAiTranslationClient translationClient;
     private final TranslationProperties properties;
 
     /**
      * 스케줄러용 — 새 재난문자 저장 시 {@link SupportedLanguage}에 등록된 모든 언어로
      * 즉시 비동기 번역 (EN/JA/ZH/VI/TH).
      *
-     * <p>언어 하나가 DeepL 오류 등으로 실패해도 나머지 언어는 계속 진행한다.
+     * <p>언어 하나가 번역 API 오류 등으로 실패해도 나머지 언어는 계속 진행한다.
      */
     @Async("translationExecutor")
     @Transactional
@@ -71,7 +71,12 @@ public class TranslationService {
 
     /**
      * 상세 조회 lazy 번역 — 특정 재난문자가 해당 언어로 번역되어 있지 않으면
-     * DeepL 호출 → 저장 후 반환. 이미 있으면 그대로 반환.
+     * 번역 API 호출 → 저장 후 반환. 이미 있으면 그대로 반환.
+     *
+     * <p>번역 실패는 삼킨다. 예외를 그대로 올리면 상세 조회 전체가 500 이 되는데, 번역은 표시
+     * 부가 기능일 뿐이라 실패해도 원문으로 폴백해 보여주는 게 맞다. 실제로 DeepL 쿼터가
+     * 소진됐을 때 외국어 상세 조회가 전부 500 으로 떨어지고 Sentry 가 도배됐다
+     * ({@link #ensureTranslatedBatch}는 원래부터 단건 실패를 삼켜 목록만 멀쩡했다).
      */
     @Transactional
     public void ensureTranslated(Long alertId, SupportedLanguage language) {
@@ -81,7 +86,12 @@ public class TranslationService {
         if (translationRepository.findByIdAlertIdAndIdLanguageCode(alertId, language.getDbCode()).isPresent()) {
             return;
         }
-        translateAndSaveInternal(alertId, language);
+        try {
+            translateAndSaveInternal(alertId, language);
+        } catch (Exception e) {
+            log.warn("상세 조회 lazy 번역 실패(원문 폴백): alertId={}, lang={}, reason={}",
+                    alertId, language.getDbCode(), e.getMessage());
+        }
     }
 
     /**
@@ -90,10 +100,10 @@ public class TranslationService {
      * <p>호출 흐름:
      * <ol>
      *   <li>이미 번역된 alertId 를 DB 에서 조회 (1쿼리)</li>
-     *   <li>누락된 alertId 만 DeepL 로 번역 → 저장</li>
+     *   <li>누락된 alertId 만 OpenAI 로 번역 → 저장</li>
      * </ol>
      *
-     * <p>주의: 누락 건수가 많을수록 응답이 느려진다 (DeepL 호출 N회).
+     * <p>주의: 누락 건수가 많을수록 응답이 느려진다 (번역 API 호출 N회).
      * 사용자가 한국어 → 일본어 전환 첫 요청 시 가장 느림. 이후 캐시 적중.
      *
      * @param alertIds 페이지에 포함된 재난문자 ID 리스트
@@ -126,7 +136,7 @@ public class TranslationService {
             try {
                 translateAndSaveInternal(alertId, language);
             } catch (Exception e) {
-                // 한 건이 실패해도 나머지는 계속 진행 (DeepL 일시 오류 등)
+                // 한 건이 실패해도 나머지는 계속 진행 (번역 API 일시 오류 등)
                 log.warn("일괄 번역 중 단건 실패 (스킵): alertId={}, lang={}, reason={}",
                         alertId, language.getDbCode(), e.getMessage());
             }
@@ -147,12 +157,12 @@ public class TranslationService {
 
             String targetLang = language.getDbCode();
 
-            String translatedMessage = deepLClient.translate(alert.getMessage(), targetLang);
+            String translatedMessage = translationClient.translate(alert.getMessage(), targetLang);
 
             String translatedType = null;
             if (alert.getDisasterType() != null && !alert.getDisasterType().isBlank()) {
                 try {
-                    translatedType = deepLClient.translate(alert.getDisasterType(), targetLang);
+                    translatedType = translationClient.translate(alert.getDisasterType(), targetLang);
                 } catch (Exception e) {
                     log.warn("유형 번역 실패: alertId={}, lang={}, reason={}", alertId, targetLang, e.getMessage());
                 }

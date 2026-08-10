@@ -38,7 +38,7 @@ import java.util.stream.Collectors;
  * 이벤트 조회 서비스.
  *
  * <p>{@code active}(진행중/지난사건)는 저장값이 아니라 조회 시점 KST 기준 파생값.
- * <p>{@code lang} 지정 시 제목은 {@link EventTranslationService}(DeepL), 상세 타임라인의 알림은
+ * <p>{@code lang} 지정 시 제목은 {@link EventTranslationService}(OpenAI), 상세 타임라인의 알림은
  * 기존 alert 번역({@link TranslationService} + 법정동 번역)을 재사용한다.
  */
 @Service
