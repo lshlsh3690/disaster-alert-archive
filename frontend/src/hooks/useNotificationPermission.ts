@@ -7,7 +7,14 @@ import { useAuthStore } from "@/store/authStore";
 export type NotificationPermissionStatus = "default" | "granted" | "denied" | "unsupported";
 
 export const useNotificationPermission = () => {
-  const [permission, setPermission] = useState<NotificationPermissionStatus>("default");
+  // 초기값을 "default"로 고정하면 실제로는 granted/denied 인 경우에도 첫 렌더에서
+  // 배너가 잠깐 노출됐다가 아래 effect 가 진짜 값을 읽어온 뒤에야 사라지는 깜빡임이
+  // 생긴다. lazy initializer 로 마운트 시점에 바로 실제 권한을 읽어 그 깜빡임을 없앤다.
+  const [permission, setPermission] = useState<NotificationPermissionStatus>(() => {
+    if (typeof window === "undefined") return "default";
+    if (!("Notification" in window)) return "unsupported";
+    return Notification.permission as NotificationPermissionStatus;
+  });
   const [fcmToken, setFcmToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 

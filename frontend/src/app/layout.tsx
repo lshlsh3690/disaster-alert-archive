@@ -4,7 +4,7 @@ import "./globals.css";
 import Header from "@/components/layout/Header";
 import ReactQueryProvider from "@/lib/reactQueryProvider";
 import Footer from "@/components/layout/Footer";
-import NotificationPermissionBanner from "@/components/notification/NotificationPermissionBanner";
+import NotificationPermissionBanner from "@/components/notification/NotificationPermissionBannerLoader";
 import I18nSync from "@/components/providers/I18nSync";
 
 
