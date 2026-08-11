@@ -28,7 +28,12 @@ import java.util.Optional;
  *       마이그레이션({@code V113})이 다루는 {@code 12xx} 범위도 빠뜨리지 말 것</li>
  *   <li>프론트엔드 세 곳 — {@code src/constants/language.ts}(선택지),
  *       {@code src/constants/i18n.ts}(UI 문자열 리소스),
- *       {@code src/lib/i18n.ts}(i18next 리소스 등록). 앞 둘만 고치면 등록이 남아 빌드가 깨진다</li>
+ *       {@code src/lib/i18n.ts}(i18next 리소스 등록).
+ *       <b>앞 둘만 고치고 등록을 빠뜨려도 타입 검사는 통과한다</b> — {@code LangCode} 와
+ *       i18next {@code resources} 의 키를 엮어주는 장치가 없기 때문이다
+ *       ({@code declare module "i18next"} / {@code CustomTypeOptions} 미사용).
+ *       빌드가 깨지는 대신 런타임에 {@code fallbackLng: "ko"} 로 조용히 폴백하므로
+ *       오히려 발견이 늦다. 세 곳을 함께 확인할 것</li>
  * </ol>
  * 시드를 만들 때는 <b>표기 구조</b>도 기존 언어와 맞추는 편이 좋다 — 한국어와 같이 공백으로
  * 구분하고 큰 단위에서 작은 단위 순({@code 忠清南道 牙山市}, {@code Chungcheongnam-do Asan-si})

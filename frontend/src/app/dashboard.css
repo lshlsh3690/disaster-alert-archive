@@ -79,7 +79,7 @@
   display: grid;
   width: clamp(460px, 33vw, 520px);
   min-width: 0;
-  /* auto 트랙은 짧은 뷰포트/2줄로 줄바꿈되는 번역(ja/th 등)에서 콘텐츠 높이가 이 컨테이너의
+  /* auto 트랙은 짧은 뷰포트/2줄로 줄바꿈되는 번역(ja·en 등)에서 콘텐츠 높이가 이 컨테이너의
      고정 높이(top/bottom 18px)를 넘으면 자기 컨텐츠보다 더 눌려서, 아래쪽 정렬된 h1의
      윗부분이 overflow:hidden에 잘려 보이는 문제가 있었다(글자 상단이 잘려 탁점이 사라진
      것처럼 보임). max-content로 고정해 헤딩/통계/TOP3 행은 절대 안 줄어들게 하고, 부족한
@@ -87,10 +87,13 @@
   grid-template-rows: max-content max-content minmax(220px, 1fr) max-content;
   gap: 12px;
   padding: 18px;
-  /* feed-card가 최소 220px까지 줄어도 여전히 못 들어갈 만큼 짧은 뷰포트에서는(특히 vi/th처럼
-     번역이 긴 언어) overflow:hidden이면 언어마다 잘리는 양이 달라져(33~98px) 보이는 카드가
+  /* feed-card가 최소 220px까지 줄어도 여전히 못 들어갈 만큼 짧은 뷰포트에서는(특히 en 처럼
+     원문보다 길어지는 언어) overflow:hidden이면 언어마다 잘리는 양이 달라져 보이는 카드가
      달라진다. overflow-y:auto로 바꿔 그런 경우 내용이 사라지지 않고 스크롤되게 한다 —
-     border-radius 모서리 클리핑은 overflow-x:hidden으로 그대로 유지된다. */
+     border-radius 모서리 클리핑은 overflow-x:hidden으로 그대로 유지된다.
+     당시 실측한 편차 33~98px 는 vi/th 가 지원 언어였을 때의 값이라 지금은 더 좁을 것이다
+     (2026-08-11 EN/JA/ZH 로 축소). 다시 재려면 en 기준으로 볼 것 — ja/zh 는 한자 표기라
+     원문보다 짧아지는 경우가 많아 이 문제를 재현하지 못한다. */
   overflow-x: hidden;
   overflow-y: auto;
   border: 1px solid rgba(224, 228, 236, 0.9);
