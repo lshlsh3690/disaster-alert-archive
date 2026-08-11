@@ -136,8 +136,15 @@ Q-클래스는 컴파일 시 `src/main/generated` 에 생성된다 (`build.gradl
   이유가 한국어 주석으로 달려 있다. 바꾸기 전에 반드시 읽을 것.
 - **클러스터링 기능 플래그는 기본 `false`** — `CLUSTERING_ENABLED`, `LLM_FALLBACK_ENABLED`,
   `CROSS_REGION_ENABLED`. 어떤 코드 경로가 실제로 도는지는 대상 환경의 플래그를 확인해야 안다.
-- **번역만 상위 모델을 쓴다** — `spring.ai.openai.chat` 기본값은 `gpt-4o-mini` 지만
-  `OpenAiTranslationClient.MODEL` 이 per-call 로 `gpt-4o` 를 오버라이드한다 (한국어 지명의 태국어 음차 품질).
+- **번역 대상 언어는 EN/JA/ZH 세 개다** — 법정동 명칭 시드와 같은 범위로 맞춘 것이다. VI/TH 는
+  2026-08-11 에 제거했다(시드가 없어 지역명이 영어로 나오는 반쪽 상태였고 오역 검증 수단도 없었다).
+  새 언어를 추가할 땐 `SupportedLanguage`, `OpenAiTranslationClient.LANGUAGE_NAMES`, 법정동 시드
+  마이그레이션, 프론트 `constants/language.ts`·`i18n.ts` 를 함께 늘려야 한다.
+- **번역만 상위 모델(`gpt-4o`)을 쓴다** — `spring.ai.openai.chat` 기본값은 `gpt-4o-mini` 지만
+  `OpenAiTranslationClient.MODEL` 이 per-call 로 오버라이드한다. **mini 로 내리지 말 것** —
+  TH 제거로 최초 상향 사유는 소멸했지만 실제로 되돌려 보니 JA 에서 발신기관 한자 표기 7/10→5/10,
+  `폭염`→`猛暑` 6/6→2/6 로 후퇴했다(수치는 해당 상수 javadoc). 지명·용어를 시드/대조표로
+  떼어낸 뒤에야 재검토 대상이다.
 - **시도 코드 파생(`substring(0,2)`)에 공용 헬퍼가 없다** — `AlertNotificationService`,
   `EventClusteringService`, `DisasterAlertRepositoryImpl` 에 각각 구현돼 있다. 지역 매칭을 건드릴 때 셋을 함께 본다.
 - **Sentry 는 logback 연동 모듈이 필수** — 스타터의 `SentryExceptionResolver` 는 MVC에서 완전히 미처리된

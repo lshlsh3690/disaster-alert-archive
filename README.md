@@ -31,7 +31,7 @@ AI 기반 이벤트 클러스터링으로 중복 알림을 제거하고, 기상 
 | 재난 통계 대시보드 | 지역별·유형별·기간별 통계 및 기상 상관 분석 시각화 |
 | 위험도 분석 | 지역별 위험도 지수 산출 (유형 가중치 × 강도 × 시간 감쇠) 및 지도 표시 |
 | 날씨 연계 | 기상청 관측 데이터 수집 및 재난 발령 시점 날씨 조회 |
-| 다국어 지원 | OpenAI 기반 재난 문자·이벤트 제목 번역 (원본 KO → EN/JA/ZH/VI/TH). 법정동 명칭은 별도 시드 테이블 조회(EN/JA/ZH) |
+| 다국어 지원 | OpenAI 기반 재난 문자·이벤트 제목 번역 (원본 KO → EN/JA/ZH). 법정동 명칭은 별도 시드 테이블 조회(EN/JA/ZH) |
 | 소셜 로그인 | Google / Naver / Kakao OAuth2 |
 | 재난 제보 / 커뮤니티 | 사용자 재난 제보 알림 작성, 커뮤니티 게시판(공지·자유), 재난 문자·제보별 댓글 |
 | 실종자 알림 병합 | 실종자 관련 재난 문자를 동일 인물 기준으로 판정해 지역을 넘어 하나의 이벤트로 병합 |
@@ -52,7 +52,7 @@ AI 기반 이벤트 클러스터링으로 중복 알림을 제거하고, 기상 
 | 폼 | React Hook Form + Zod |
 | 스타일링 | TailwindCSS 4 |
 | 차트 | Recharts |
-| 다국어 | i18next + react-i18next (KO/EN/JA/ZH/VI/TH) |
+| 다국어 | i18next + react-i18next (KO/EN/JA/ZH) |
 | 알림 | Firebase SDK (FCM) + PWA (`@ducanh2912/next-pwa`) |
 | 지도 | Kakao Map API |
 | 테스트 | Jest (`npm test`), Playwright 스크린샷 스크립트 (`scripts/`) |
@@ -68,7 +68,7 @@ AI 기반 이벤트 클러스터링으로 중복 알림을 제거하고, 기상 
 | 인증/인가 | Spring Security + JWT + OAuth2 (Google·Naver·Kakao) |
 | 캐시 | Redis |
 | AI | Spring AI 1.0.0 — `gpt-4o-mini` (이벤트/위험도 판정), `text-embedding-3-small` 1536차원 (클러스터링) |
-| 번역 | OpenAI `gpt-4o` (KO → EN/JA/ZH/VI/TH) — 지명 음차 품질 때문에 번역만 상위 모델을 per-call 오버라이드 |
+| 번역 | OpenAI `gpt-4o` (KO → EN/JA/ZH) — 번역만 상위 모델을 per-call 오버라이드. 대상 언어는 법정동 시드 언어와 일치 |
 | 푸시 알림 | Firebase Admin SDK (FCM) |
 | 로깅 | LogTrace 스타일 AOP 호출 추적 (`global/logtrace`) |
 | 모니터링 | Spring Actuator + Sentry (`sentry-spring-boot-starter-jakarta` + `sentry-logback`) |

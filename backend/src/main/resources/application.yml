@@ -96,10 +96,13 @@ oauth:
 
 
 # 재난문자 본문/유형·이벤트 제목 번역. 엔진은 OpenAI 이며 spring.ai.openai 자격증명을
-# 임베딩·LLM 판정과 공유하므로 별도 API 키 설정이 없다.
+# 임베딩·LLM 판정과 공유하므로 별도 API 키 설정이 없다. 대상 언어는 EN/JA/ZH 세 개다
+# (VI/TH 는 2026-08-11 제거 — 법정동 명칭 시드가 없어 지역명이 영어로 나오는 반쪽 상태였고
+# 오역을 검증할 수단도 없었다. SupportedLanguage javadoc 참고).
 # 모델은 아래 spring.ai.openai.chat 기본값(gpt-4o-mini)이 아니라 OpenAiTranslationClient.MODEL
-# 이 per-call 로 오버라이드한다 — 한국어 지명 음차 품질 때문에 번역만 상위 모델을 쓴다(사유는
-# OpenAiTranslationClient.MODEL javadoc 참고).
+# 이 per-call 로 gpt-4o 를 오버라이드한다. 최초 상향 사유는 태국어 음차였고 TH 제거로 그 사유는
+# 소멸했지만, mini 복귀를 실측해 보니 JA 에서 지명 표기(7/10→5/10)와 폭염→猛暑(6/6→2/6)가
+# 후퇴해 gpt-4o 로 유지한다 (수치·조건은 OpenAiTranslationClient.MODEL javadoc 참고).
 # DeepL(Free)에서 옮겨왔다: 계정당 평생 누적 한도라 소진 후 리셋되지 않아 예비 키까지 막히면
 # 번역이 영구 정지되고(운영에서 실제 발생), 재난문자 특유 표기에 번역 지시를 줄 수 없었다.
 translation:

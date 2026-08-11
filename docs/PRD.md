@@ -64,8 +64,8 @@
 
 ### 5.9 다국어 지원
 - 다국어 지원 — 경로가 둘로 나뉜다.
-  - **재난문자 본문·유형, 이벤트 제목**: OpenAI 런타임 번역 후 DB 캐시. 지원 언어 EN/JA/ZH/VI/TH (`specs/005-translation-pipeline/spec.md` 참고)
-  - **법정동 명칭**: 런타임 번역 대상이 아니며 Flyway 로 시딩된 `legal_district_translation` 테이블을 조회한다. 시드 언어는 EN/JA/ZH 3개뿐이라 VI/TH 요청 시 영어로 폴백한다 (`specs/004-legal-district-matching/spec.md` FR-017 참고)
+  - **재난문자 본문·유형, 이벤트 제목**: OpenAI 런타임 번역 후 DB 캐시. 지원 언어 EN/JA/ZH (`specs/005-translation-pipeline/spec.md` 참고)
+  - **법정동 명칭**: 런타임 번역 대상이 아니며 Flyway 로 시딩된 `legal_district_translation` 테이블을 조회한다. 시드 언어도 EN/JA/ZH 로, 2026-08-11 VI/TH 제거 이후 본문 번역 언어와 범위가 일치한다 (`specs/004-legal-district-matching/spec.md` FR-017 참고)
 
 ### 5.10 계정 및 인증
 - 이메일 회원가입/로그인
