@@ -62,7 +62,7 @@ public class EventQueryService {
      * 이벤트 목록 (유형/지역/기간/키워드 + active 필터). 정렬은 last_alert_at DESC 고정.
      *
      * @param req  검색 조건 ({@link EventSearchRequest}). 모든 필드 선택적(null=조건 스킵)
-     * @param lang ko(기본)/en/ja/zh/vi/th — 제목 번역
+     * @param lang ko(기본)/en/ja/zh — 제목 번역
      */
     @Transactional
     public Page<EventListResponse> list(EventSearchRequest req, Pageable pageable, String lang) {
@@ -98,7 +98,7 @@ public class EventQueryService {
     /**
      * 이벤트 상세 + 타임라인.
      *
-     * @param lang ko(기본)/en/ja/zh/vi/th — 제목 + 타임라인 알림 번역
+     * @param lang ko(기본)/en/ja/zh — 제목 + 타임라인 알림 번역
      */
     @Transactional
     public EventDetailResponse detail(Long id, String lang) {

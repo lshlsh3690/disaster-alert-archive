@@ -49,7 +49,7 @@ public class TranslationService {
 
     /**
      * 스케줄러용 — 새 재난문자 저장 시 {@link SupportedLanguage}에 등록된 모든 언어로
-     * 즉시 비동기 번역 (EN/JA/ZH/VI/TH).
+     * 즉시 비동기 번역 (EN/JA/ZH).
      *
      * <p>언어 하나가 번역 API 오류 등으로 실패해도 나머지 언어는 계속 진행한다.
      */

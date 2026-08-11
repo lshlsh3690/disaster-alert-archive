@@ -10,8 +10,6 @@ i18next.use(initReactI18next).init({
     en: { translation: translations.en },
     ja: { translation: translations.ja },
     zh: { translation: translations.zh },
-    vi: { translation: translations.vi },
-    th: { translation: translations.th },
   },
   lng: useLanguageStore.getState().language,
   fallbackLng: "ko",

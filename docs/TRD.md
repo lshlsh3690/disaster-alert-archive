@@ -67,8 +67,8 @@
 ### 3.6 다국어 번역
 경로가 둘로 나뉘며 서로 무관하다.
 
-- **재난문자 본문·유형, 이벤트 제목** — OpenAI 런타임 번역(`OpenAiTranslationClient`, 모델 `gpt-4o`) 후 `disaster_alert_translation`·`disaster_event_translation` 에 캐시. 지원 언어 EN/JA/ZH/VI/TH. 수집 스케줄러가 저장 직후 전 언어를 비동기로 사전 번역하고, 캐시 미스는 조회 시점 lazy 번역으로 메운다.
-- **법정동 명칭** — 런타임 번역 대상이 **아니다**. Flyway 로 시딩된 `legal_district_translation` 테이블을 조회할 뿐이며, 시드 언어는 EN/JA/ZH 3개다. 요청 언어에 시드가 없으면(VI/TH) 영어로 폴백한다.
+- **재난문자 본문·유형, 이벤트 제목** — OpenAI 런타임 번역(`OpenAiTranslationClient`, 모델 `gpt-4o`) 후 `disaster_alert_translation`·`disaster_event_translation` 에 캐시. 지원 언어 EN/JA/ZH. 수집 스케줄러가 저장 직후 전 언어를 비동기로 사전 번역하고, 캐시 미스는 조회 시점 lazy 번역으로 메운다.
+- **법정동 명칭** — 런타임 번역 대상이 **아니다**. Flyway 로 시딩된 `legal_district_translation` 테이블을 조회할 뿐이며, 시드 언어는 EN/JA/ZH 3개다. 2026-08-11 VI/TH 제거로 본문 번역 언어와 범위가 일치한다.
 
 상세는 `specs/005-translation-pipeline/spec.md`(런타임 번역)와 `specs/004-legal-district-matching/spec.md` FR-017·FR-018(법정동 시드)을 정본으로 한다.
 

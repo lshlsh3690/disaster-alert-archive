@@ -98,9 +98,15 @@ docker compose -f docker-compose.dev.yml up postgres redis   # Postgres(pgvector
 
 ### 번역 파이프라인
 
-`global/translation/` — 재난문자 본문/유형과 이벤트 제목을 KO → EN/JA/ZH/VI/TH 로 번역합니다. 수집 스케줄러가 새 알림을 저장하면 `translateAndSaveAsync`가 `@Async("translationExecutor")`로 5개 언어를 미리 번역해 캐시(`disaster_alert_translation`)에 적재하고, 캐시 미스는 조회 시점 lazy 번역(`ensureTranslated`/`ensureTranslatedBatch`)이 동기로 보정합니다.
+`global/translation/` — 재난문자 본문/유형과 이벤트 제목을 KO → EN/JA/ZH 로 번역합니다. 수집 스케줄러가 새 알림을 저장하면 `translateAndSaveAsync`가 `@Async("translationExecutor")`로 3개 언어를 미리 번역해 캐시(`disaster_alert_translation`)에 적재하고, 캐시 미스는 조회 시점 lazy 번역(`ensureTranslated`/`ensureTranslatedBatch`)이 동기로 보정합니다.
 
-모델은 `application.yml`의 `spring.ai.openai.chat` 기본값(`gpt-4o-mini`)이 아니라 `OpenAiTranslationClient.MODEL`이 per-call로 **`gpt-4o`를 오버라이드**합니다 — `gpt-4o-mini`로는 한국어 지명의 태국어 음차가 안정적이지 않았기 때문이며, 사유는 해당 상수의 javadoc에 있습니다. 임베딩·LLM 판정은 그대로 `gpt-4o-mini`를 씁니다.
+VI/TH 는 2026-08-11 에 제거했습니다 — 법정동 명칭 시드가 EN/JA/ZH 뿐이라 본문만 모국어이고 지역명은 영어로 나오는 반쪽 상태였고, 오역을 검증할 수단도 없었습니다(한글 잔존·기호 개수 같은 기계적 검사는 오역이어도 전부 통과합니다). 이제 번역 대상 언어와 법정동 시드 언어가 **일치**합니다 — 새 언어를 추가할 때 이 둘을 함께 늘리지 않으면 그 불일치가 다시 생깁니다.
+
+모델은 `application.yml`의 `spring.ai.openai.chat` 기본값(`gpt-4o-mini`)이 아니라 `OpenAiTranslationClient.MODEL`이 per-call로 **`gpt-4o`를 오버라이드**합니다. 임베딩·LLM 판정은 그대로 `gpt-4o-mini`를 씁니다.
+
+**`gpt-4o-mini`로 내리지 마세요 — 이미 시도했다가 되돌렸습니다.** 최초 상향 사유는 태국어 음차였고 TH 제거(2026-08-11)로 그 사유는 소멸했지만, mini 복귀를 실측하니 JA에서 발신기관 통용 한자 표기가 7/10 → 5/10으로(곡성군 `谷城郡`→`ゴクソン郡`), `폭염`→`猛暑`가 6/6 → 2/6으로(나머지는 `熱波`) 후퇴했고 지연시간도 줄지 않았습니다. 수치와 조건은 해당 상수의 javadoc에 있습니다.
+
+이 두 지표는 각각 **지명을 `legal_district_translation` 시드에서 주입·치환**하고 **재난 용어 대조표를 프롬프트에 주입**하면 결정론적으로 해결됩니다. 그 둘이 들어가 모델 능력 의존이 사라진 뒤에야 mini 재검토가 의미를 갖습니다 — 요금만 보고 내리지 마세요. (`gpt-4o`도 모르는 지명은 한자를 날조합니다: 수락→`修楽`, 염치→`廉置`.)
 
 **법정동 명칭 번역은 이 파이프라인의 대상이 아닙니다** — `domain/legaldistrict`의 시드 테이블(`legal_district_translation`, EN/JA/ZH) 조회로 처리됩니다. `docs/PRD.md`·`docs/TRD.md`가 두 경로를 하나로 묶어 서술해 온 전례가 있으니 혼동하지 마세요.
 

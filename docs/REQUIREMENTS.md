@@ -24,8 +24,8 @@
 | FR-16 | 관리자는 허위·장난성 콘텐츠를 반복 작성한 사용자 계정에 경고 또는 이용 정지(일시/영구)를 적용할 수 있어야 한다 | High | 신규 |
 | FR-17 | 이용 정지된 계정은 제보/댓글 작성이 차단되어야 한다 | High | 신규, FR-16과 연동 |
 | FR-18 | 시스템은 실종 관련 재난 문자에서 추출한 정보로 실종자를 조회할 수 있게 해야 한다 | Medium | 외부 실종자 API 미연동, 재난 문자만으로 추적 |
-| FR-19 | 시스템은 재난 문자 본문·유형과 이벤트 제목을 EN/JA/ZH/VI/TH 로 번역해 제공해야 한다 (OpenAI 런타임 번역 + DB 캐시, `specs/005-translation-pipeline`) | Medium | |
-| FR-19-1 | 시스템은 법정동 명칭을 EN/JA/ZH 로 제공해야 한다 — FR-19 와 **별개 경로**이며 런타임 번역이 아니라 Flyway 시드 테이블(`legal_district_translation`) 조회다. 요청 언어에 시드가 없으면(VI/TH) 영어로 폴백한다 (`specs/004-legal-district-matching`) | Medium | |
+| FR-19 | 시스템은 재난 문자 본문·유형과 이벤트 제목을 EN/JA/ZH 로 번역해 제공해야 한다 (OpenAI 런타임 번역 + DB 캐시, `specs/005-translation-pipeline`) | Medium | |
+| FR-19-1 | 시스템은 법정동 명칭을 EN/JA/ZH 로 제공해야 한다 — FR-19 와 **별개 경로**이며 런타임 번역이 아니라 Flyway 시드 테이블(`legal_district_translation`) 조회다. 2026-08-11 VI/TH 제거로 FR-19 와 언어 범위가 일치하며, 폴백은 시드가 누락된 코드에 대해서만 발생한다 (`specs/004-legal-district-matching`) | Medium | |
 | FR-20 | 사용자는 이메일 또는 Google/Kakao/Naver 소셜 계정으로 회원가입·로그인할 수 있어야 한다 | High | |
 | FR-21 | 외부 개발자는 토큰 인증을 거쳐 재난 문자 데이터를 JSON/CSV로 제공받을 수 있어야 한다 | Low | 공개 OpenAPI |
 

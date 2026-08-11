@@ -23,7 +23,7 @@ class OpenAiTranslationClientTest {
         // "호우"(2자)에 배수만 적용하면 12자 제한이라 "Heavy rain"(10자)은 통과해도
         // 조금만 길어지면 정상 번역이 걸린다. 하한이 이를 구제한다.
         assertThat(OpenAiTranslationClient.isSuspiciouslyLong("호우", "Heavy rain")).isFalse();
-        assertThat(OpenAiTranslationClient.isSuspiciouslyLong("폭염", "Cảnh báo nắng nóng")).isFalse();
+        assertThat(OpenAiTranslationClient.isSuspiciouslyLong("폭염", "Heat wave warning")).isFalse();
     }
 
     @Test
@@ -57,15 +57,15 @@ class OpenAiTranslationClientTest {
     }
 
     @Test
-    @DisplayName("라틴 문자 계열의 팽창(원문의 4.75배)도 정상으로 본다")
-    void latinScriptExpansionIsAccepted() {
-        // 베트남어는 한글 1음절을 공백 포함 3~7자로 풀어 쓴다. 영어가 이미 2.5배인데 여기에
-        // 성조 부호와 다음절 표기가 더해지면 4배를 넘길 수 있어, 가드가 4배면 정상 번역이 버려진다.
+    @DisplayName("실측 팽창률(EN 2.5배)보다 한참 큰 4.75배도 정상으로 본다 — 의도한 여유")
+    void expansionWellAboveMeasuredEnglishRatioIsAccepted() {
+        // 지원 언어 중 팽창하는 것은 EN(실측 2.5배)뿐이고 JA/ZH 는 오히려 짧아진다. 그럼에도
+        // 가드를 2.5배 근처로 좁히지 않고 6배로 두는 쪽을 택했으므로, 그 여유를 테스트로 못박는다.
+        // 좁혀서 얻는 것(설명 혼입 탐지)보다 잘못 좁혔을 때 잃는 것 — 정상 번역이 버려지고 해당
+        // 언어 사용자에게만 조용히 한국어 원문이 노출되는 것 — 이 크기 때문이다.
         //
-        // 태국어(TH)는 공백 없는 알파시라빅 문자라 팽창 양상이 VI 와 다른데, 실측치를 확보하지
-        // 못했다 — 여기서는 근거 없는 숫자를 넣지 않고, OpenAiTranslationClientRealApiTest
-        // 의 th 케이스(실제 OpenAI 호출)로만 검증한다. 그 통합 테스트는 OPENAI_API_KEY 가 있어야
-        // 돌기 때문에, 키가 없는 환경에서는 TH 회귀가 걸리지 않는다는 한계가 있다.
+        // (2026-08-11 VI/TH 제거 전에는 이 케이스가 "베트남어의 정상 팽창"을 근거로 삼았다.
+        //  VI 가 빠지면서 근거는 사라졌지만, 여유 자체를 고정하는 값으로 남긴다.)
         String source = "가".repeat(40);
         String translated = "a".repeat(190); // 4.75배
 
