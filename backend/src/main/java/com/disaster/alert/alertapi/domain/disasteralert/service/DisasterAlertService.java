@@ -480,7 +480,7 @@ public class DisasterAlertService {
     /**
      * 재난문자 검색 (페이지네이션).
      *
-     * @param lang 응답 언어 ("ko"/null = 한국어, "en"/"ja"/"zh"/"vi"/"th" = 번역본)
+     * @param lang 응답 언어 ("ko"/null = 한국어, "en"/"ja"/"zh" = 번역본)
      */
     public Page<DisasterAlertResponseDto> searchAlerts(AlertSearchRequest cond, Pageable pageable, String lang) {
         Page<DisasterAlert> result = disasterAlertRepository.searchAlerts(cond, pageable);
@@ -536,7 +536,7 @@ public class DisasterAlertService {
      * <p>다국어 동작:
      * <ul>
      *   <li>한국어 요청 ("ko"/null): 번역 필드 모두 null</li>
-     *   <li>지원 언어 요청 ("en"/"ja"/"zh"/"vi"/"th"): 캐시 없으면 번역 API 호출 → 저장 후 응답</li>
+     *   <li>지원 언어 요청 ("en"/"ja"/"zh"): 캐시 없으면 번역 API 호출 → 저장 후 응답</li>
      * </ul>
      */
     @Transactional
@@ -582,7 +582,7 @@ public class DisasterAlertService {
     /**
      * 최신 재난문자 N건을 조회합니다.
      *
-     * @param lang 응답 언어 ("ko"/null = 한국어, "en"/"ja"/"zh"/"vi"/"th" = 번역본)
+     * @param lang 응답 언어 ("ko"/null = 한국어, "en"/"ja"/"zh" = 번역본)
      */
     @Transactional
     public List<LatestAlertResponse> getLatestAlert(int limit, String lang) {

@@ -26,7 +26,7 @@ public class DisasterAlertController {
     /**
      * 재난문자 검색 (페이지네이션).
      *
-     * @param lang 응답 언어 — "ko"(기본)/"en"/"ja"/"zh"/"vi"/"th".
+     * @param lang 응답 언어 — "ko"(기본)/"en"/"ja"/"zh".
      *             "ko" 또는 미지정 시 번역 필드는 모두 null.
      *             다른 값은 해당 언어로 번역 (캐시 없으면 번역 API 호출).
      */

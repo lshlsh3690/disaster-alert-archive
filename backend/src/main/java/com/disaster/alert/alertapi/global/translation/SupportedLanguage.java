@@ -12,8 +12,10 @@ import java.util.Optional;
  * <p>한국어("ko")는 번역 대상이 아니라 원본이므로 이 enum에 포함하지 않는다.
  *
  * <p><b>EN/JA/ZH 로 한정한다.</b> 2026-08-11 에 VI/TH 를 제거했다. 이 셋만이 법정동 명칭 시드
- * ({@code legal_district_translation}, V7/V15/V16)를 갖고 있어, 본문과 지역명 표기가 함께
- * 번역되는 유일한 조합이기 때문이다. VI/TH 는 본문만 번역되고 지역명은 영어로 나오는 반쪽
+ * ({@code legal_district_translation})를 갖고 있어, 본문과 지역명 표기가 함께 번역되는 유일한
+ * 조합이기 때문이다. 시드는 두 갈래다 — {@code V7}(EN)·{@code V15}(JA)·{@code V16}(ZH)가
+ * 전국 법정동의 기본 시드이고, {@code V113}은 2026-07-01 전남광주 통합으로 신설된 {@code 12xx}
+ * 코드에 대해 같은 세 언어를 옛 코드에서 파생해 채우는 보충 마이그레이션이다. VI/TH 는 본문만 번역되고 지역명은 영어로 나오는 반쪽
  * 상태로 운영됐고, 육안 검증이 가능한 사람도 없어 오역이 나도 발견되지 않았다
  * (기계적 검사 — 한글 잔존·기호 개수 — 는 오역이어도 전부 통과한다).
  *
@@ -22,12 +24,15 @@ import java.util.Optional;
  *   <li>{@link OpenAiTranslationClient} 의 {@code LANGUAGE_NAMES} — 빠뜨리면 런타임에
  *       {@code IllegalArgumentException}</li>
  *   <li>법정동 명칭 시드 마이그레이션 — 없으면 지역명만 영어로 폴백해 본문과 어긋난다
- *       (VI/TH 를 제거한 사유가 바로 이것이다)</li>
- *   <li>프론트엔드 {@code constants/language.ts}·{@code constants/i18n.ts}</li>
+ *       (VI/TH 를 제거한 사유가 바로 이것이다). 기본 시드와 함께, 통합 코드 보충
+ *       마이그레이션({@code V113})이 다루는 {@code 12xx} 범위도 빠뜨리지 말 것</li>
+ *   <li>프론트엔드 세 곳 — {@code src/constants/language.ts}(선택지),
+ *       {@code src/constants/i18n.ts}(UI 문자열 리소스),
+ *       {@code src/lib/i18n.ts}(i18next 리소스 등록). 앞 둘만 고치면 등록이 남아 빌드가 깨진다</li>
  * </ol>
  * 시드를 만들 때는 <b>표기 구조</b>도 기존 언어와 맞추는 편이 좋다 — 한국어와 같이 공백으로
  * 구분하고 큰 단위에서 작은 단위 순({@code 忠清南道 牙山市}, {@code Chungcheongnam-do Asan-si})
- * 이다. EN/JA/ZH 시드(V7/V15/V16/V113)가 모두 이 구조를 따른다.
+ * 이다. 현재 시드가 모두 이 구조를 따른다.
  */
 public enum SupportedLanguage {
     EN("en"),
