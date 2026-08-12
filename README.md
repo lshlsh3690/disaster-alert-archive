@@ -71,7 +71,7 @@ AI 기반 이벤트 클러스터링으로 중복 알림을 제거하고, 기상 
 | 번역 | OpenAI `gpt-4o` (KO → EN/JA/ZH) — 번역만 상위 모델을 per-call 오버라이드. 대상 언어는 법정동 시드 언어와 일치 |
 | 푸시 알림 | Firebase Admin SDK (FCM) |
 | 로깅 | LogTrace 스타일 AOP 호출 추적 (`global/logtrace`) |
-| 모니터링 | Spring Actuator + Sentry (`sentry-spring-boot-starter-jakarta` + `sentry-logback`) |
+| 모니터링 | Spring Actuator |
 | API 문서 | SpringDoc OpenAPI (Swagger UI) |
 | 배포 | AWS EC2 + Docker Compose + Caddy, GHCR 이미지 |
 
@@ -211,7 +211,6 @@ npm run dev
 | `KAKAO_OAUTH_CLIENT_ID` / `_SECRET` | Kakao OAuth2 |
 | `NAVER_OAUTH_CLIENT_ID` / `_SECRET` | Naver OAuth2 |
 | `GMAIL_USERNAME` / `GMAIL_PASSWORD` | 메일 발송(SMTP) 계정 |
-| `SENTRY_DSN` / `SENTRY_ENVIRONMENT` | Sentry 에러 트래킹 (DSN 을 비워두면 SDK가 자동 no-op) |
 
 > FCM 발송용 서비스 계정 키는 환경변수가 아니라 클래스패스 파일로 읽는다 —
 > `backend/src/main/resources/firebase-service-account.json` 에 두어야 알림 발송이 동작한다.

@@ -147,9 +147,10 @@ Q-클래스는 컴파일 시 `src/main/generated` 에 생성된다 (`build.gradl
   떼어낸 뒤에야 재검토 대상이다.
 - **시도 코드 파생(`substring(0,2)`)에 공용 헬퍼가 없다** — `AlertNotificationService`,
   `EventClusteringService`, `DisasterAlertRepositoryImpl` 에 각각 구현돼 있다. 지역 매칭을 건드릴 때 셋을 함께 본다.
-- **Sentry 는 logback 연동 모듈이 필수** — 스타터의 `SentryExceptionResolver` 는 MVC에서 완전히 미처리된
-  예외만 잡는데, 이 프로젝트는 `GlobalExceptionHandler` 가 모두 처리하고 스케줄러 실패는 애초에 HTTP 요청이
-  아니다. `sentry-logback` 이 있어야 `log.error(msg, e)` 가 이벤트로 올라간다.
+- **자동 알림 경로가 없다** — 2026-08-12 에 Sentry 를 제거해서, 장애를 알아채는 수단은 로그뿐이다.
+  그래서 로그 레벨이 유일한 신호 구분자다: 사람이 조치할 것만 `log.error` 로 남기고, 정상 흐름에서
+  늘 나는 것(4xx 비즈니스 예외, 죽은 FCM 토큰 등)은 `warn` 이하로 둔다. 이 구분이 무너지면
+  `error` 가 노이즈에 묻혀 진짜 장애를 못 찾는다.
 
 ---
 

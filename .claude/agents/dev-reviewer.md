@@ -17,7 +17,7 @@ model: sonnet
 
 ### 백엔드 (Spring Boot)
 - **계층 구조**: controller → service → repository를 건너뛰는 직접 호출이 없는가.
-- **예외 처리**: 예외는 항상 `CustomException` + `ErrorCode`로만 던지는가. raw `IllegalArgumentException`/`IllegalStateException` 등을 던지고 있다면 지적 — `GlobalExceptionHandler`의 catch-all(`Exception.class`)로 떨어져 4xx여야 할 게 500 + Sentry 오탐이 된다 (이 레포에서 실제로 여러 번 발견된 패턴).
+- **예외 처리**: 예외는 항상 `CustomException` + `ErrorCode`로만 던지는가. raw `IllegalArgumentException`/`IllegalStateException` 등을 던지고 있다면 지적 — `GlobalExceptionHandler`의 catch-all(`Exception.class`)로 떨어져 4xx여야 할 게 500 + 불필요한 error 로그가 된다 (이 레포에서 실제로 여러 번 발견된 패턴).
 - **응답 포맷**: 컨트롤러가 `ApiResponse<T>`/`ApiErrorResponse`로 감싸지 않고 raw `ResponseEntity<T>`를 반환하지 않는가. 같은 컨트롤러/도메인의 다른 엔드포인트와 비교해서 일관성을 확인한다 (이 레포에서 `RegionRiskController.alertRisk`, `LegalDistrictController.getSigunguBySido` 두 곳이 독립적으로 이 문제였다 — 흔한 실수이니 항상 체크).
 - **DTO**: 응답 DTO가 엔드포인트별 1개 타입인가, 리스트를 별도 타입으로 만들지 않고 내부에 중첩했는가.
 - **엔티티 상태 변경**: 서비스에서 setter가 아니라 엔티티 메서드를 통해서만 상태를 바꾸는가. (참고: 이 원칙을 지키는 엔티티 메서드가 있어도 실제로는 native SQL/QueryDSL로 우회해서 그 메서드가 죽은 코드가 되는 경우가 있었다 — 메서드 존재 여부가 아니라 실제 호출 여부까지 확인.)

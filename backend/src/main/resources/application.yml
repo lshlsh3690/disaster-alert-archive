@@ -169,22 +169,6 @@ clustering:
     mover-keywords: "찾습니다|실종|수배|가출|배회|탈출|출몰|멧돼지|들개|늑대"   # 게이트(전체 이동신호)
     animal-keywords: "탈출|출몰|멧돼지|들개|늑대"   # 인물(이름+나이) 아닌 동물·비정형만 임베딩+LLM
 
-# Sentry 에러 트래킹 — event/risk/weather 의 @Scheduled 파이프라인(수집/클러스터링/위험도 감쇠/fragment-merge)이
-# 트래픽과 무관하게 조용히 실패해도 알 수 있도록 도입. 각 스케줄러/서비스가 이미 log.error(msg, e) 로 잡아둔
-# 실패를 로그백 연동이 그대로 이벤트로 전송하므로 스케줄러 코드는 건드리지 않음.
-# 무료 티어(월 5,000 에러/1 프로젝트) 한도 고려해 성능 트레이싱은 끄고 에러만 수집.
-# enabled 기본값은 false — 로컬 bootRun이 .env.dev로 실제 운영 RDS에 붙어 스케줄러/API 호출이
-# 실제로 발생했을 때(SchedulingConfig 참고) 그 과정에서 난 에러가 운영과 같은 Sentry 프로젝트로
-# 섞여 들어간 적이 있어서(OpenAI 임베딩 401 등), DSN이 실수로 채워져 있어도 prod 프로필이
-# 아니면 무조건 꺼지도록 이중 안전장치를 둠 — 실제 활성화는 application-prod.yml 에서만.
-sentry:
-  enabled: false
-  dsn: ${SENTRY_DSN:}
-  environment: ${SENTRY_ENVIRONMENT:local}
-  traces-sample-rate: 0.0
-  logging:
-    minimum-event-level: error
-
 springdoc:
   swagger-ui:
     path: /swagger-ui.html

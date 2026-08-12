@@ -5,11 +5,3 @@
 logging:
   level:
     org.springframework.web: info
-
-# Sentry는 base application.yml에서 기본 꺼져있음(enabled: false) — 실제 운영 트래픽의
-# 에러만 여기서 켠다. environment도 여기서 prod로 기본값을 바꿔둔다 — EC2 .env에
-# SENTRY_ENVIRONMENT를 깜빡하고 안 넣으면 base 기본값(local)으로 찍혀서 운영 에러가
-# local 태그로 분류되는 걸 방지.
-sentry:
-  enabled: true
-  environment: ${SENTRY_ENVIRONMENT:prod}

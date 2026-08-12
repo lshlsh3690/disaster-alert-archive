@@ -11,8 +11,13 @@
 <!--
 본 문서는 새 기능을 요청하는 명세가 아니라, 이미 배포되어 동작 중인 코드를 근거로 작성한
 소급(as-built) 명세다. 모든 사용자 스토리·인수 시나리오·기능 요구사항은 실제 코드 동작을
-`파일경로:줄번호` 형식으로 인용하여 뒷받침한다. 향후 speckit으로 이 기능을 변경할 때
-기준선(baseline)으로 사용한다.
+인용하여 뒷받침한다. 향후 speckit으로 이 기능을 변경할 때 기준선(baseline)으로 사용한다.
+
+인용 형식은 `파일경로:줄번호`를 기본으로 하되, **편집으로 위치가 자주 밀리는 지점은
+`클래스.메서드명`으로 인용한다.** 줄번호 인용은 그 파일을 몇 줄만 고쳐도 조용히 썩는데
+갱신을 강제할 수단이 없다 — 실제로 2026-08-12에 이 문서의 FR-020/FR-021이 `buildAndroidConfig`
+대신 전혀 무관한 코드를 가리키고 있는 것이 발견됐고, 같은 날 고친 인용이 주석 몇 줄을
+지우자 또 어긋났다. 메서드명은 이름이 바뀌면 컴파일이 깨져 최소한 드러난다.
 -->
 
 ## 사용자 시나리오 및 테스트 *(필수)*
@@ -187,10 +192,36 @@
   `try/catch`가 걸려 있다 (`AlertNotificationService.java:116-156`).
 - 게스트 발송 전체가 예외를 던지면(예: 토큰 조회 실패) 로그만 남기고 트리거 자체는
   실패로 처리되지 않는다 (`AlertNotificationService.java:89,111-113`).
-- FCM 발송이 `UNREGISTERED`/`INVALID_ARGUMENT` 에러로 실패(만료/무효 토큰)해도 해당
-  토큰을 DB에서 자동으로 삭제하는 정리 로직은 없다 — 로그만 남긴다
-  (`FcmSendService.java:35-45`). 만료된 토큰은 사용자가 재로그인/재방문해 토큰을 갱신
-  등록(UPSERT)하기 전까지 계속 발송 대상에 남는다.
+- FCM 발송이 `UNREGISTERED` 에러로 실패하면(등록 해제된 토큰) 해당 토큰을 `fcm_token`과
+  `guest_fcm_region` **양쪽에서 자동 삭제한다** (`DeadTokenCleanupService.cleanUp`,
+  단건은 `FcmSendService.sendToToken`, 배치는 `collectDeadTokens`를 거쳐 호출). 정리 실패가
+  발송 이력을 되돌리지 않는 것은 두 장치가 함께 작동한 결과다: `REQUIRES_NEW` 는 정리
+  트랜잭션이 발송 트랜잭션을 rollback-only 로 오염시키는 것을 막고, `FcmSendService` 쪽의
+  `try/catch` 는 `cleanUp()` 이 던지는 예외 자체가 호출부로 전파되어 발송 결과 반환을
+  가로막지 않게 한다 (`FcmSendService.sendToToken`/`sendToTokens` 의 `cleanUp` 호출을 감싼
+  `try/catch`). `REQUIRES_NEW` 만으로는 예외 전파까지 막지 못한다.
+- 배치 경로의 삭제 대상 선정은 **인덱스 대응**에 전적으로 의존한다. `BatchResponse.getResponses()`
+  의 `i` 번째 결과는 요청 토큰 목록의 `i` 번째 토큰에 대응하며, 그 결과가 실패이고 에러코드가
+  `UNREGISTERED` 인 토큰만 정리 대상에 넣는다 (`FcmSendService.collectDeadTokens`). 실패 건수를
+  세거나 순서를 재정렬하는 방식으로 구현하면 **살아있는 토큰을 지우게 되어** 정상 구독자의
+  푸시가 영구히 끊긴다. 토큰 수와 응답 수가 어긋나면 인덱스 대응 자체를 신뢰할 수 없으므로
+  아무것도 반환하지 않는다 — 지울 것을 놓치는 쪽이 잘못 지우는 쪽보다 안전하다.
+- 그 `try/catch` 가 잡는 범위는 `DataAccessException` 과 `TransactionException` **두 계층**이다.
+  둘은 부모-자식이 아니라 형제라서 한쪽만 잡으면 다른 쪽이 그대로 빠져나간다. 특히
+  `REQUIRES_NEW` 가 커넥션을 하나 더 빌리므로 풀이 고갈되면 트랜잭션 생성 단계에서
+  `CannotCreateTransactionException`(`TransactionException` 계열)이 나는데, 이는
+  `DeadTokenCleanupService` javadoc 이 "발송 규모가 커지면 먼저 의심하라"고 지목한 상황과
+  같다 — `DataAccessException` 만 잡으면 **가장 위험한 상황에서만 정확히 방어가 뚫린다.**
+  그 밖의 런타임 예외(코드 버그 등)는 의도적으로 잡지 않는다.
+  (2026-08-12 도입 — 그 전에는 로그만 남기고 삭제하지 않았다.)
+- 반면 `INVALID_ARGUMENT` 는 **삭제 대상이 아니다.** 이 코드는 토큰 형식 오류뿐 아니라
+  메시지 페이로드(제목·본문·`data`·`AndroidConfig`) 오류에도 반환되므로, 이걸로 토큰을
+  지우면 발송 코드/설정 변경으로 페이로드가 깨졌을 때 멀쩡한 구독자를 전량 삭제하게 된다
+  (`FcmSendService.isDeadTokenError`). 대신 배치가 통째로 `INVALID_ARGUMENT` 로 죽으면
+  `isSuspectedPayloadFailure` 가 이를 감지해 "토큰이 아니라 페이로드 문제"라고 로그로
+  짚어준다 — 삭제를 막는 게이트가 아니라 진단이다.
+- 따라서 형식이 깨진 토큰은 사용자가 재로그인/재방문해 토큰을 갱신 등록(UPSERT)하기
+  전까지 계속 발송 대상에 남고, 매 발송마다 실패하며 error 로그를 남긴다.
 - 게스트가 관심지역을 6개 이상 등록하려 하면 `IllegalArgumentException`을 던져 등록을
   거부한다 (`GuestFcmTokenService.java:37-39`, `MAX_GUEST_REGIONS = 5`).
 - 게스트 지역 전체 교체(`deleteByFcmToken`) 시 파생(derived) delete 대신 즉시 실행되는
@@ -290,13 +321,15 @@
 - **FR-020**: 시스템은 예외적으로 `AndroidConfig.setNotification()`(채널ID, 사운드, 진동,
   우선순위)은 사용해도 된다(MAY) — 이는 최상위 webpush notification 페이로드와는 별개로
   Android 네이티브 FCM SDK가 자체적으로 알림을 표시할 때 쓰는 채널 설정이라 FR-019가 막는
-  "중복 표시" 문제와 무관하다 (`FcmSendService.java:74-97`).
+  "중복 표시" 문제와 무관하다 (`FcmSendService.buildAndroidConfig`).
 - **FR-021**: 시스템은 `notificationType`이 `ALARM`이면 Android 채널 `disaster_alarm`,
   `MAX` 우선순위, 진동 패턴(`[0,200,100,200]`)을 사용하고, 그 외에는 `disaster_push` 채널을
-  사용해야 한다(MUST) (`FcmSendService.java:75-96`).
-- **FR-022**: 시스템은 FCM 발송 실패 시 `UNREGISTERED`/`INVALID_ARGUMENT` 에러코드를 만료/
-  무효 토큰으로 판별해 로그를 남겨야 한다(MUST) (`FcmSendService.java:35-45`). 자동 삭제
-  로직의 부재 등 상세 동작은 예외 상황 섹션 참고.
+  사용해야 한다(MUST) (`FcmSendService.buildAndroidConfig`).
+- **FR-022**: 시스템은 FCM 발송이 `UNREGISTERED` 로 실패하면 해당 토큰을 `fcm_token`과
+  `guest_fcm_region` 양쪽에서 자동 삭제해야 한다(MUST) (`FcmSendService.isDeadTokenError`
+  → `collectDeadTokens` → `DeadTokenCleanupService.cleanUp`). `INVALID_ARGUMENT` 는 토큰
+  오류와 메시지 페이로드 오류를 구분할 수 없으므로 삭제해서는 안 된다(MUST NOT).
+  판정 기준·배치 인덱스 매핑·페이로드 버그 진단 등 상세 동작은 예외 상황 섹션 참고.
 - **FR-023**: 프론트엔드 서비스워커(`firebase-messaging-sw.js`)는 표준 Push API의 `push`
   이벤트를 `event.waitUntil(handlePush(event))`로 처리하여, 이벤트 핸들러가 반환된 뒤에도
   서비스워커가 비동기 처리(payload 파싱 + `showNotification()`)를 마칠 때까지 살아있음을
