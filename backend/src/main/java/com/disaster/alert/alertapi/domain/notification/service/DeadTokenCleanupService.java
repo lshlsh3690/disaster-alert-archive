@@ -41,6 +41,19 @@ public class DeadTokenCleanupService {
      */
     @Transactional
     public int cleanUp(List<String> deadTokens) {
-        return 0;
+        if (deadTokens == null || deadTokens.isEmpty()) {
+            return 0;
+        }
+
+        int deletedTokenCount = fcmTokenRepository.deleteAllByTokenIn(deadTokens);
+        int deletedGuestRegionCount = guestFcmRegionRepository.deleteAllByFcmTokenIn(deadTokens);
+        int totalDeleted = deletedTokenCount + deletedGuestRegionCount;
+
+        if (totalDeleted > 0) {
+            log.info("죽은 FCM 토큰 정리 - fcm_token: {}건, guest_fcm_region: {}건",
+                    deletedTokenCount, deletedGuestRegionCount);
+        }
+
+        return totalDeleted;
     }
 }
