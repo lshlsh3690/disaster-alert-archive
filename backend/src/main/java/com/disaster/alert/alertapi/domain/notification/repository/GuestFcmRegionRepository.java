@@ -32,8 +32,8 @@ public interface GuestFcmRegionRepository extends JpaRepository<GuestFcmRegion, 
     // 토큰이 무효가 되면 그 토큰에 매달린 지역 구독도 전부 의미를 잃는다.
     //
     // 호출부 제약은 FcmTokenRepository.deleteAllByTokenIn 과 동일하다 — 빈 리스트로 호출하지 말고
-    // (가드는 DeadTokenCleanupService.cleanUp 에 있다), 같은 트랜잭션에서 삭제 대상 GuestFcmRegion 을
-    // managed 상태로 붙들고 있지 말 것. clearAutomatically 를 쓰지 않은 이유도 그쪽 주석 참고.
+    // (가드는 DeadTokenCleanupService.cleanUp 에 있다), 로드해둔 GuestFcmRegion 을 수정하거나
+    // findById 로 존재를 재확인하지 말 것. clearAutomatically 를 안 쓴 이유도 그쪽 주석 참고.
     @Modifying
     @Query("delete from GuestFcmRegion g where g.fcmToken in :tokens")
     int deleteAllByFcmTokenIn(@Param("tokens") List<String> tokens);
