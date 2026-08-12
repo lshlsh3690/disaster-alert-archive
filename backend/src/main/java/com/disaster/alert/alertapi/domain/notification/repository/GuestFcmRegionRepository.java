@@ -27,4 +27,10 @@ public interface GuestFcmRegionRepository extends JpaRepository<GuestFcmRegion, 
     void deleteByFcmToken(@Param("fcmToken") String fcmToken);
 
     void deleteByFcmTokenAndLegalDistrictCode(String fcmToken, String legalDistrictCode);
+
+    // 죽은 토큰들의 지역 구독을 한 번에 삭제한다. 게스트는 회원과 달리 토큰 자체가 신원이라,
+    // 토큰이 무효가 되면 그 토큰에 매달린 지역 구독도 전부 의미를 잃는다.
+    @Modifying
+    @Query("delete from GuestFcmRegion g where g.fcmToken in :tokens")
+    int deleteAllByFcmTokenIn(@Param("tokens") List<String> tokens);
 }
