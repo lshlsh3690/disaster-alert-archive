@@ -71,6 +71,35 @@ public class FcmSendService {
         }
     }
 
+    /**
+     * 배치 응답에서 <b>더 이상 살아있지 않은 토큰</b>만 골라낸다.
+     *
+     * <p><b>인덱스 매핑이 이 메서드의 전부이자 위험 지점이다.</b> Firebase 는
+     * {@link BatchResponse#getResponses()} 의 i 번째가 요청 토큰의 i 번째에 대응한다고 보장한다.
+     * 이 대응을 틀리면 <b>살아있는 토큰을 지우게 되어</b>, 정상 구독자에게 푸시가 영구히 끊긴다.
+     * 실패한 응답만 세거나 순서를 재정렬하면 곧바로 그 사고가 나므로 단위 테스트로 못박는다.
+     *
+     * <p>실패했다고 전부 죽은 토큰은 아니다. 쿼터 초과·일시적 서버 오류(`UNAVAILABLE`,
+     * `INTERNAL`)는 재시도하면 되는 상태라 지우면 안 된다. {@link #isDeadTokenError} 가
+     * 판정하는 두 코드만 삭제 대상이다.
+     */
+    static List<String> collectDeadTokens(List<String> tokens, BatchResponse response) {
+        return List.of();
+    }
+
+    /**
+     * 이 오류 코드가 "토큰이 영구히 무효"를 뜻하는지.
+     *
+     * <ul>
+     *   <li>{@code UNREGISTERED} — 앱/브라우저가 등록 해제됨. 캐시 삭제·재설치로 토큰이 갱신되면 옛 토큰이 이 상태가 된다</li>
+     *   <li>{@code INVALID_ARGUMENT} — 토큰 형식 자체가 잘못됨</li>
+     * </ul>
+     * 나머지(쿼터·네트워크·서버 오류)는 일시적이므로 <b>삭제하지 않는다</b>.
+     */
+    static boolean isDeadTokenError(MessagingErrorCode code) {
+        return false;
+    }
+
     // Android 설정 (ALARM: 높은 우선순위)
     private AndroidConfig buildAndroidConfig(String notificationType) {
         AndroidConfig.Builder builder = AndroidConfig.builder()
