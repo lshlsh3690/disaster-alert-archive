@@ -45,7 +45,7 @@ docker compose -f docker-compose.dev.yml up postgres redis   # Postgres(pgvector
 
 스키마는 Flyway로 관리합니다 (`backend/src/main/resources/db/migration/V*.sql`, `ddl-auto: validate`) — 이미 적용된 마이그레이션은 절대 수정하지 말고 새 `V{n}__description.sql`을 추가하세요. 법정동 번역 시딩과 여러 분기에 걸친 날씨 이력 백필용 시드 마이그레이션이 다수 존재합니다. `flyway.out-of-order: true`라 번호가 어긋난 미적용 마이그레이션도 실행됩니다.
 
-루트 `.env.example`은 백엔드용 템플릿이며 2026-08-10 기준 `application.yml`·`application-prod.yml`의 `${...}` 참조와 정확히 1:1로 맞춰져 있습니다 (프론트엔드는 `frontend/.env.local.example`). 환경변수를 추가/제거할 때 이 템플릿도 함께 갱신하고, 판단 기준은 항상 `application.yml`의 실제 참조로 삼으세요. Spring AI(임베딩·LLM 판정·번역)는 `OPENAI_API_KEY` 하나를 공유합니다. FCM 발송용 서비스 계정 키만은 환경변수가 아니라 클래스패스 파일(`backend/src/main/resources/firebase-service-account.json`)로 읽습니다 — `global/config/FirebaseConfig` 참고.
+루트 `.env.example`은 백엔드용 템플릿이며 2026-08-12 기준 `application.yml`·`application-prod.yml`의 `${...}` 참조와 정확히 1:1로 맞춰져 있습니다 (프론트엔드는 `frontend/.env.local.example`). 환경변수를 추가/제거할 때 이 템플릿도 함께 갱신하고, 판단 기준은 항상 `application.yml`의 실제 참조로 삼으세요. Spring AI(임베딩·LLM 판정·번역)는 `OPENAI_API_KEY` 하나를 공유합니다. FCM 발송용 서비스 계정 키만은 환경변수가 아니라 클래스패스 파일(`backend/src/main/resources/firebase-service-account.json`)로 읽습니다 — `global/config/FirebaseConfig` 참고.
 
 ## 아키텍처
 
