@@ -1,6 +1,7 @@
 package com.disaster.alert.alertapi.domain.notification.service;
 
 import com.google.firebase.messaging.BatchResponse;
+import com.google.firebase.messaging.FirebaseMessaging;
 import com.google.firebase.messaging.FirebaseMessagingException;
 import com.google.firebase.messaging.MessagingErrorCode;
 import com.google.firebase.messaging.SendResponse;
@@ -8,11 +9,17 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
+import org.mockito.MockedStatic;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.transaction.CannotCreateTransactionException;
 
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.when;
 
 /**
@@ -286,5 +293,100 @@ class FcmSendServiceTest {
         when(response.getResponses()).thenReturn(responses);
 
         assertThat(FcmSendService.isSuspectedPayloadFailure(tokens, response)).isFalse();
+    }
+
+    @Test
+    @DisplayName("sendToToken: cleanUp()이 DataAccessException(예: DataIntegrityViolationException)을 던져도 " +
+            "여기서 격리되어 false를 반환해야 한다 — 이 반환에 도달하지 못하면 호출부 " +
+            "AlertNotificationService.sendToMember의 catch(Exception)이 발송 이력 저장(notificationLogRepository.save) " +
+            "앞에서 예외를 삼켜, FCM은 이미 나갔는데 그 회원의 발송 이력만 통째로 사라진다")
+    void sendToToken_dataAccessExceptionFromCleanUp_isIsolatedAndReturnsFalse() throws Exception {
+        DeadTokenCleanupService cleanupService = mock(DeadTokenCleanupService.class);
+        when(cleanupService.cleanUp(anyList())).thenThrow(new DataIntegrityViolationException("정리 실패"));
+        FcmSendService fcmSendService = new FcmSendService(cleanupService);
+
+        try (MockedStatic<FirebaseMessaging> mockedStatic = mockStatic(FirebaseMessaging.class)) {
+            FirebaseMessaging firebaseMessaging = mock(FirebaseMessaging.class);
+            mockedStatic.when(FirebaseMessaging::getInstance).thenReturn(firebaseMessaging);
+
+            FirebaseMessagingException exception = mock(FirebaseMessagingException.class);
+            when(exception.getMessagingErrorCode()).thenReturn(MessagingErrorCode.UNREGISTERED);
+            when(firebaseMessaging.send(any())).thenThrow(exception);
+
+            boolean result = fcmSendService.sendToToken("dead-token", "제목", "본문", "ALARM", "alert-1");
+
+            assertThat(result).isFalse();
+        }
+    }
+
+    @Test
+    @DisplayName("sendToToken: cleanUp()이 TransactionException(예: CannotCreateTransactionException, " +
+            "커넥션 풀 고갈 시나리오)을 던져도 여기서 격리되어 false를 반환해야 한다 — " +
+            "DataAccessException만 잡고 이 형제 계층을 놓치면 가장 위험한 상황(풀 고갈)에서만 정확히 방어가 뚫린다")
+    void sendToToken_transactionExceptionFromCleanUp_isIsolatedAndReturnsFalse() throws Exception {
+        DeadTokenCleanupService cleanupService = mock(DeadTokenCleanupService.class);
+        when(cleanupService.cleanUp(anyList()))
+                .thenThrow(new CannotCreateTransactionException("커넥션 풀 고갈"));
+        FcmSendService fcmSendService = new FcmSendService(cleanupService);
+
+        try (MockedStatic<FirebaseMessaging> mockedStatic = mockStatic(FirebaseMessaging.class)) {
+            FirebaseMessaging firebaseMessaging = mock(FirebaseMessaging.class);
+            mockedStatic.when(FirebaseMessaging::getInstance).thenReturn(firebaseMessaging);
+
+            FirebaseMessagingException exception = mock(FirebaseMessagingException.class);
+            when(exception.getMessagingErrorCode()).thenReturn(MessagingErrorCode.UNREGISTERED);
+            when(firebaseMessaging.send(any())).thenThrow(exception);
+
+            boolean result = fcmSendService.sendToToken("dead-token", "제목", "본문", "ALARM", "alert-1");
+
+            assertThat(result).isFalse();
+        }
+    }
+
+    @Test
+    @DisplayName("sendToTokens: cleanUp()이 DataAccessException(예: DataIntegrityViolationException)을 던져도 " +
+            "여기서 격리되어 원래 BatchResponse를 그대로 반환해야 한다 — 배치 발송 결과 자체가 유실되면 " +
+            "호출부의 성공/실패 집계가 통째로 무너진다")
+    void sendToTokens_dataAccessExceptionFromCleanUp_isIsolatedAndReturnsOriginalBatchResponse() throws Exception {
+        DeadTokenCleanupService cleanupService = mock(DeadTokenCleanupService.class);
+        when(cleanupService.cleanUp(anyList())).thenThrow(new DataIntegrityViolationException("정리 실패"));
+        FcmSendService fcmSendService = new FcmSendService(cleanupService);
+
+        try (MockedStatic<FirebaseMessaging> mockedStatic = mockStatic(FirebaseMessaging.class)) {
+            FirebaseMessaging firebaseMessaging = mock(FirebaseMessaging.class);
+            mockedStatic.when(FirebaseMessaging::getInstance).thenReturn(firebaseMessaging);
+
+            BatchResponse batchResponse = mock(BatchResponse.class);
+            when(firebaseMessaging.sendEachForMulticast(any())).thenReturn(batchResponse);
+
+            BatchResponse result = fcmSendService.sendToTokens(
+                    List.of("token-A", "token-B"), "제목", "본문", "ALARM", "alert-1");
+
+            assertThat(result).isSameAs(batchResponse);
+        }
+    }
+
+    @Test
+    @DisplayName("sendToTokens: cleanUp()이 TransactionException(예: CannotCreateTransactionException, " +
+            "커넥션 풀 고갈 시나리오)을 던져도 여기서 격리되어 원래 BatchResponse를 그대로 반환해야 한다 — " +
+            "DataAccessException만 잡고 이 형제 계층을 놓치면 가장 위험한 상황(풀 고갈)에서만 정확히 방어가 뚫린다")
+    void sendToTokens_transactionExceptionFromCleanUp_isIsolatedAndReturnsOriginalBatchResponse() throws Exception {
+        DeadTokenCleanupService cleanupService = mock(DeadTokenCleanupService.class);
+        when(cleanupService.cleanUp(anyList()))
+                .thenThrow(new CannotCreateTransactionException("커넥션 풀 고갈"));
+        FcmSendService fcmSendService = new FcmSendService(cleanupService);
+
+        try (MockedStatic<FirebaseMessaging> mockedStatic = mockStatic(FirebaseMessaging.class)) {
+            FirebaseMessaging firebaseMessaging = mock(FirebaseMessaging.class);
+            mockedStatic.when(FirebaseMessaging::getInstance).thenReturn(firebaseMessaging);
+
+            BatchResponse batchResponse = mock(BatchResponse.class);
+            when(firebaseMessaging.sendEachForMulticast(any())).thenReturn(batchResponse);
+
+            BatchResponse result = fcmSendService.sendToTokens(
+                    List.of("token-A", "token-B"), "제목", "본문", "ALARM", "alert-1");
+
+            assertThat(result).isSameAs(batchResponse);
+        }
     }
 }
