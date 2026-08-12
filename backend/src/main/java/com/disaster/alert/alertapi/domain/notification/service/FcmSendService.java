@@ -84,6 +84,14 @@ public class FcmSendService {
                     response.getSuccessCount(), response.getFailureCount());
 
             logBatchFailures(tokens, response);
+
+            // 배치가 통째로 INVALID_ARGUMENT 로 죽었다면 토큰이 아니라 페이로드를 의심한다.
+            // 정리를 막지는 않는다 — isDeadTokenError 가 INVALID_ARGUMENT 를 삭제 대상에서
+            // 아예 제외하므로 이 상황에서 지워질 토큰은 애초에 없다. 여기서는 원인만 짚어준다.
+            if (isSuspectedPayloadFailure(tokens, response)) {
+                log.error("FCM 배치가 전부 INVALID_ARGUMENT 로 실패 — 토큰이 아니라 메시지 페이로드 문제로 "
+                        + "의심된다. 발송 코드/설정 변경을 확인할 것 - 토큰 수: {}", tokens.size());
+            }
             deadTokenCleanupService.cleanUp(collectDeadTokens(tokens, response));
             return response;
 
@@ -144,26 +152,32 @@ public class FcmSendService {
     /**
      * 배치 전멸이 <b>토큰이 아니라 메시지 페이로드 때문</b>으로 의심되는지.
      *
-     * <p>{@code INVALID_ARGUMENT} 는 토큰 형식 오류만 뜻하지 않는다. Firebase 는 메시지의
-     * 공유 필드(제목·본문·{@code data}·{@code AndroidConfig})가 잘못됐을 때도 같은 코드를
-     * 돌려준다. {@code sendToTokens} 는 하나의 페이로드를 여러 토큰에 보내므로, 페이로드에
-     * 버그가 있으면 <b>멀쩡한 토큰 전부가 INVALID_ARGUMENT 로 실패</b>한다. 그대로 정리하면
-     * 살아있는 구독자를 전량 삭제하게 되고, 이건 되돌릴 수 없다 — 사용자가 알림 권한을
-     * 다시 허용해야 한다. {@link #collectDeadTokens} 가 인덱스 매핑으로 막으려던 바로 그
-     * 사고가 다른 경로로 들어오는 것이다.
+     * <p><b>이건 안전장치가 아니라 진단이다.</b> 원래는 정리를 막는 가드로 만들었는데,
+     * {@link #isDeadTokenError} 가 {@code INVALID_ARGUMENT} 를 삭제 대상에서 아예 제외하게
+     * 되면서 막을 삭제 자체가 없어졌다. 배치 단위 가드로는 부족했기 때문이다 — 회원 발송은
+     * 기기가 1대면 단건 경로({@link #sendToToken})로 빠져 가드를 아예 타지 않고, 2~4대면
+     * {@link #SUSPECTED_PAYLOAD_FAILURE_MIN_BATCH} 미만이라 걸리지 않아 회원 경로가 사실상
+     * 무방비였다. 그래서 방어는 "모호한 코드로는 지우지 않는다"로 옮겼고, 이 메서드는
+     * <b>원인을 짚어주는 역할만</b> 남았다.
+     *
+     * <p>그 역할은 여전히 값이 있다. {@code INVALID_ARGUMENT} 는 토큰 형식 오류만 뜻하지 않고
+     * 메시지의 공유 필드(제목·본문·{@code data}·{@code AndroidConfig})가 잘못됐을 때도 같은
+     * 코드로 돌아온다. 발송 코드나 설정을 바꾼 직후 배치가 통째로 죽으면, 이 판정이 없으면
+     * 정체불명의 실패 로그 수십 줄만 남는다. 있으면 "토큰이 아니라 네가 방금 바꾼 페이로드가
+     * 문제다"라고 한 줄로 알려준다.
      *
      * <p>판별의 핵심은 <b>하나라도 성공했는지</b>다. 성공한 토큰이 있으면 페이로드는 유효하므로
      * 나머지의 {@code INVALID_ARGUMENT} 는 진짜 토큰 문제다. 전부 실패했고 그 전부가
      * {@code INVALID_ARGUMENT} 일 때만 페이로드를 의심한다.
      *
-     * <p>배치가 아주 작으면(1~2개) 진짜 죽은 토큰만 모여 있을 수도 있어 구분이 안 된다.
-     * {@link #SUSPECTED_PAYLOAD_FAILURE_MIN_BATCH} 이상일 때만 의심하는 이유다. 이 값은
-     * 실측으로 튜닝한 게 아니라 판단이며, 오탐(정리를 한 번 건너뜀)의 대가가 미탐(살아있는
-     * 토큰 전량 삭제)보다 훨씬 싸다는 전제로 정했다.
+     * <p>배치가 아주 작으면(1~2개) 진짜 깨진 토큰만 모여 있을 수도 있어 구분이 안 된다.
+     * {@link #SUSPECTED_PAYLOAD_FAILURE_MIN_BATCH} 이상일 때만 의심하는 이유다. 진단 용도라
+     * 임계값을 틀려도 잘못된 로그 한 줄이 나올 뿐, 데이터가 지워지지는 않는다.
      */
     static boolean isSuspectedPayloadFailure(List<String> tokens, BatchResponse response) {
-        // 방어 조건(1~4번)은 전부 "근거 없으면 의심하지 않는다" 방향이다 — collectDeadTokens와
-        // 반대로, 여기서 가드가 근거 없이 켜지면 정리 기능 자체가 죽어버리기 때문이다.
+        // 방어 조건은 전부 "근거 없으면 의심하지 않는다" 방향이다 — collectDeadTokens와 반대다.
+        // 그쪽은 지우는 쪽이 위험해서 모르면 안 지우고, 여기는 잘못 짚은 진단이 사람을 엉뚱한
+        // 곳으로 보내므로 모르면 아무 말도 하지 않는다.
         if (tokens == null || tokens.isEmpty() || response == null) {
             return false;
         }
@@ -207,7 +221,7 @@ public class FcmSendService {
      *
      * <p>실패했다고 전부 죽은 토큰은 아니다. 쿼터 초과·일시적 서버 오류(`UNAVAILABLE`,
      * `INTERNAL`)는 재시도하면 되는 상태라 지우면 안 된다. {@link #isDeadTokenError} 가
-     * 판정하는 두 코드만 삭제 대상이다.
+     * 판정하는 {@code UNREGISTERED} 하나만 삭제 대상이다.
      *
      * <p>방어 계약: {@code tokens}/{@code response} 가 null 이거나, 토큰 수와 응답 수가
      * 어긋나면 <b>아무것도 반환하지 않는다</b>. 지울 것을 놓치는 쪽이 잘못 지우는 쪽보다
@@ -249,13 +263,23 @@ public class FcmSendService {
      * 이 오류 코드가 "토큰이 영구히 무효"를 뜻하는지.
      *
      * <ul>
-     *   <li>{@code UNREGISTERED} — 앱/브라우저가 등록 해제됨. 캐시 삭제·재설치로 토큰이 갱신되면 옛 토큰이 이 상태가 된다</li>
-     *   <li>{@code INVALID_ARGUMENT} — 토큰 형식 자체가 잘못됨</li>
+     *   <li>{@code UNREGISTERED} — 앱/브라우저가 등록 해제됨. 캐시 삭제·재설치로 토큰이 갱신되면 옛 토큰이 이 상태가 된다.
+     *       이 상태만은 삭제 대상으로 판정한다.</li>
      * </ul>
-     * 나머지(쿼터·네트워크·서버 오류)는 일시적이므로 <b>삭제하지 않는다</b>.
+     *
+     * <p>{@code INVALID_ARGUMENT} 는 삭제 대상에서 <b>제외</b>한다. 토큰 형식 오류만 뜻하지 않고,
+     * Firebase 는 메시지 페이로드(제목·본문·{@code data}·{@code AndroidConfig})가 잘못됐을 때도
+     * 같은 코드를 돌려준다. 이 둘을 구분할 방법이 없어 그대로 삭제하면, 발송 코드/설정 변경으로
+     * 페이로드가 깨졌을 때 멀쩡한 구독자를 전량 삭제하게 되고 되돌릴 수 없다(사용자가 알림 권한을
+     * 다시 허용해야 함). 배치 단위 가드({@link #isSuspectedPayloadFailure})로 막으려 했으나 회원
+     * 기기가 1~4대인 실제 호출 경로(단건 발송·소규모 배치)는 그 가드가 걸리지 않아 무방비였다.
+     * 대가는 진짜로 형식이 깨진 토큰이 자동 정리되지 않는 것인데, 드물고 계속 실패하며 error
+     * 로그로 남으므로 감수한다.
+     *
+     * <p>나머지(쿼터·네트워크·서버 오류)는 일시적이므로 <b>삭제하지 않는다</b>.
      */
     static boolean isDeadTokenError(MessagingErrorCode code) {
-        return code == MessagingErrorCode.UNREGISTERED || code == MessagingErrorCode.INVALID_ARGUMENT;
+        return code == MessagingErrorCode.UNREGISTERED;
     }
 
     // Android 설정 (ALARM: 높은 우선순위)
