@@ -5,6 +5,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataAccessException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.TransactionException;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -60,9 +61,18 @@ public class FcmSendService {
                 // 던진 예외 자체는 그대로 이 호출부로 전파된다. 여기서 잡지 않으면 아래 return false에
                 // 도달하지 못해 호출부(AlertNotificationService.sendToMember)의 발송 이력 저장이
                 // 통째로 스킵된다 — FCM은 이미 나갔는데 이력만 사라지는 상황을 막는다.
+                //
+                // TransactionException 을 함께 잡는 이유: DataAccessException(쿼리 실행 실패)과
+                // TransactionException(트랜잭션을 여는 것 자체의 실패)은 부모-자식이 아니라 형제다.
+                // REQUIRES_NEW 는 커넥션을 하나 더 빌리므로, 풀이 고갈되면 트랜잭션 생성 단계에서
+                // CannotCreateTransactionException 이 난다 — DeadTokenCleanupService javadoc 이
+                // "발송 규모가 커지면 먼저 의심하라"고 지목한 바로 그 상황이다. DataAccessException 만
+                // 잡으면 정작 그때 이 방어가 통째로 무력해진다.
+                // RuntimeException 으로 더 넓히지 않은 것은 의도적이다 — NPE 같은 코드 버그까지
+                // 삼키면 진짜 결함이 로그 한 줄로 묻힌다.
                 try {
                     deadTokenCleanupService.cleanUp(List.of(token));
-                } catch (DataAccessException cleanupException) {
+                } catch (DataAccessException | TransactionException cleanupException) {
                     log.error("죽은 토큰 정리 실패 - token: {}", maskToken(token), cleanupException);
                 }
             } else {
@@ -102,10 +112,11 @@ public class FcmSendService {
                         + "의심된다. 발송 코드/설정 변경을 확인할 것 - 토큰 수: {}", tokens.size());
             }
             // 단건 경로와 동일한 이유로 감싼다: cleanUp() 예외가 여기서 전파되면 아래 return response에
-            // 도달하지 못해 BatchResponse 자체가 유실된다.
+            // 도달하지 못해 BatchResponse 자체가 유실된다. 잡는 예외 범위를 두 계층으로 둔 근거도
+            // 단건 경로(sendToToken)의 주석과 같다.
             try {
                 deadTokenCleanupService.cleanUp(collectDeadTokens(tokens, response));
-            } catch (DataAccessException cleanupException) {
+            } catch (DataAccessException | TransactionException cleanupException) {
                 log.error("죽은 토큰 배치 정리 실패 - 토큰 수: {}", tokens.size(), cleanupException);
             }
             return response;

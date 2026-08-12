@@ -193,8 +193,15 @@
   발송 이력을 되돌리지 않는 것은 두 장치가 함께 작동한 결과다: `REQUIRES_NEW` 는 정리
   트랜잭션이 발송 트랜잭션을 rollback-only 로 오염시키는 것을 막고, `FcmSendService` 쪽의
   `try/catch` 는 `cleanUp()` 이 던지는 예외 자체가 호출부로 전파되어 발송 결과 반환을
-  가로막지 않게 한다 (`FcmSendService.java:56-64`, `91-97`). `REQUIRES_NEW` 만으로는 예외
-  전파까지 막지 못한다.
+  가로막지 않게 한다 (`FcmSendService.java:75`, `119`). `REQUIRES_NEW` 만으로는 예외 전파까지
+  막지 못한다.
+- 그 `try/catch` 가 잡는 범위는 `DataAccessException` 과 `TransactionException` **두 계층**이다.
+  둘은 부모-자식이 아니라 형제라서 한쪽만 잡으면 다른 쪽이 그대로 빠져나간다. 특히
+  `REQUIRES_NEW` 가 커넥션을 하나 더 빌리므로 풀이 고갈되면 트랜잭션 생성 단계에서
+  `CannotCreateTransactionException`(`TransactionException` 계열)이 나는데, 이는
+  `DeadTokenCleanupService` javadoc 이 "발송 규모가 커지면 먼저 의심하라"고 지목한 상황과
+  같다 — `DataAccessException` 만 잡으면 **가장 위험한 상황에서만 정확히 방어가 뚫린다.**
+  그 밖의 런타임 예외(코드 버그 등)는 의도적으로 잡지 않는다.
   (2026-08-12 도입 — 그 전에는 로그만 남기고 삭제하지 않았다.)
 - 반면 `INVALID_ARGUMENT` 는 **삭제 대상이 아니다.** 이 코드는 토큰 형식 오류뿐 아니라
   메시지 페이로드(제목·본문·`data`·`AndroidConfig`) 오류에도 반환되므로, 이걸로 토큰을

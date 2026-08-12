@@ -24,13 +24,20 @@ import java.util.List;
  * {@code UnexpectedRollbackException} 이 터져 토큰 정리 실패 하나로 그 알림의 발송 이력
  * 전체가 되돌아간다. {@code REQUIRES_NEW} 는 이 rollback-only 오염만 막는다.
  *
- * <p><b>{@code cleanUp()} 이 던지는 {@code DataAccessException} 자체는 이 전파 설정으로
- * 막히지 않는다</b> — 별도 트랜잭션이어도 예외는 그대로 호출부로 전파된다. 이 예외 전파를
- * 실제로 막는 것은 호출부({@code FcmSendService.sendToToken}/{@code sendToTokens})의
- * {@code try/catch} 다. 거기서 잡지 않으면 정리 실패 예외가 단건 발송의 {@code return false}나
- * 배치 발송의 {@code return response} 를 가로막고, 그 위 {@code AlertNotificationService.sendToMember}
+ * <p><b>{@code cleanUp()} 이 던지는 예외 자체는 이 전파 설정으로 막히지 않는다</b> — 별도
+ * 트랜잭션이어도 예외는 그대로 호출부로 전파된다. 이 예외 전파를 실제로 막는 것은
+ * 호출부({@code FcmSendService.sendToToken}/{@code sendToTokens})의 {@code try/catch} 다.
+ * 거기서 잡지 않으면 정리 실패 예외가 단건 발송의 {@code return false}나 배치 발송의
+ * {@code return response} 를 가로막고, 그 위 {@code AlertNotificationService.sendToMember}
  * 의 {@code catch (Exception)} 이 발송 이력 저장(`notificationLogRepository.save`) 앞에서
  * 예외를 삼켜버려 FCM 은 이미 나갔는데 그 회원의 발송 이력만 통째로 안 남는 결과로 이어진다.
+ *
+ * <p>그 {@code try/catch} 가 잡는 범위는 <b>{@code DataAccessException} 과
+ * {@code TransactionException} 두 계층</b>이다. 둘은 부모-자식이 아니라 형제라서 한쪽만
+ * 잡으면 다른 쪽이 그대로 빠져나간다 — 특히 아래 커넥션 비용 문단에서 설명하는 풀 고갈은
+ * 트랜잭션 생성 단계에서 {@code CannotCreateTransactionException}({@code TransactionException}
+ * 계열)으로 나타나므로, {@code DataAccessException} 만 잡으면 <b>가장 위험한 상황에서만
+ * 정확히 방어가 뚫린다</b>. 그 밖의 런타임 예외(코드 버그 등)는 일부러 잡지 않는다.
  *
  * <p>{@code REQUIRES_NEW} 의 통상적 위험인 <b>행 잠금 자기 교착</b>(바깥 트랜잭션이 잠근 행을
  * 안쪽이 기다리는 상황)은 여기서는 없다. 발송 경로는 {@code fcm_token}/{@code guest_fcm_region} 을

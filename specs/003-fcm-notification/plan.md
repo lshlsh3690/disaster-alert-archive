@@ -44,9 +44,13 @@ Zustand(`guestFavoriteRegionsStore`), React Query(회원 관심지역 캐시 무
 `V103__create_guest_fcm_region.sql`). 클라이언트 측 캐시: `localStorage["fcm-token"]`.
 
 **테스트**: 2026-08-12 `DeadTokenCleanupService` 도입과 함께 `FcmSendServiceTest`·
-`DeadTokenCleanupServiceTest`가 추가되어, 죽은 토큰 판정·정리 트리거·배치 페이로드 오탐
-방지 등 두 클래스의 순수 로직은 더 이상 미검증 상태가 아니다. 반면 `AlertNotificationService`,
-`FcmTokenService`, `GuestFcmTokenService`와 관련 컨트롤러는 여전히 단위/통합 테스트가
+`DeadTokenCleanupServiceTest`가 추가되었다. 다만 검증 범위는 **정적 순수 로직에 한정**된다 —
+`collectDeadTokens`(배치 응답의 인덱스 매핑), `isDeadTokenError`(삭제 대상 코드 판정),
+`isSuspectedPayloadFailure`(페이로드 버그 오탐 방지), `cleanUp`(두 리포지토리 삭제·합산)이
+그것이다. **정리 실패가 발송 결과 반환을 막지 않는다는 예외 격리 동작
+(`sendToToken`/`sendToTokens`의 `try/catch`)은 어느 테스트에도 없다** — `FirebaseMessaging`
+정적 호출에 묶여 있어 순수 단위 테스트로 떼어내기 어렵기 때문이다. `AlertNotificationService`,
+`FcmTokenService`, `GuestFcmTokenService`와 관련 컨트롤러도 여전히 단위/통합 테스트가
 코드베이스에 **존재하지 않는다** — 이는 헌법 원칙 III(검증 가능한 변경) 대비 실제 격차로,
 아래 헌법 검사에 기록한다.
 
