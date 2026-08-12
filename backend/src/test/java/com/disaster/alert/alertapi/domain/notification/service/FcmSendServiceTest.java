@@ -62,7 +62,9 @@ class FcmSendServiceTest {
     }
 
     @Test
-    @DisplayName("UNREGISTERED·INVALID_ARGUMENT로 실패한 토큰만 죽은 토큰으로 판정하고, 나머지 실패 코드는 재시도 대상이라 제외한다")
+    @DisplayName("UNREGISTERED로 실패한 토큰만 죽은 토큰으로 판정한다 — INVALID_ARGUMENT는 토큰 형식뿐 아니라 " +
+            "메시지 페이로드(제목·본문·data·AndroidConfig) 오류에도 동일하게 뜨는 모호한 코드라 삭제 대상에서 제외한다 " +
+            "(그렇지 않으면 발송 코드/설정 변경으로 페이로드가 깨졌을 때 멀쩡한 구독자를 전량 삭제하게 된다)")
     void onlyPermanentErrorCodesAreCollected() {
         List<String> tokens = List.of(
                 "token-unregistered", "token-invalid", "token-unavailable",
@@ -82,7 +84,7 @@ class FcmSendServiceTest {
 
         List<String> deadTokens = FcmSendService.collectDeadTokens(tokens, response);
 
-        assertThat(deadTokens).containsExactlyInAnyOrder("token-unregistered", "token-invalid");
+        assertThat(deadTokens).containsExactly("token-unregistered");
     }
 
     @Test
@@ -147,21 +149,23 @@ class FcmSendServiceTest {
         assertThat(deadTokens).isEmpty();
     }
 
-    @ParameterizedTest(name = "{0}은 영구 무효(삭제 대상)로 판정한다")
-    @EnumSource(value = MessagingErrorCode.class, names = {"UNREGISTERED", "INVALID_ARGUMENT"})
-    @DisplayName("UNREGISTERED·INVALID_ARGUMENT는 영구 무효로 판정한다")
-    void permanentErrorCodesAreDead(MessagingErrorCode code) {
-        assertThat(FcmSendService.isDeadTokenError(code)).isTrue();
+    @Test
+    @DisplayName("UNREGISTERED는 '앱/브라우저가 등록 해제됨'을 명확히 뜻하므로 영구 무효(삭제 대상)로 판정한다")
+    void permanentErrorCodeIsDead() {
+        assertThat(FcmSendService.isDeadTokenError(MessagingErrorCode.UNREGISTERED)).isTrue();
     }
 
-    @ParameterizedTest(name = "{0}은 일시적 오류이므로 삭제 대상이 아니다")
+    @ParameterizedTest(name = "{0}은 삭제 대상이 아니다")
     @EnumSource(
             value = MessagingErrorCode.class,
-            names = {"UNREGISTERED", "INVALID_ARGUMENT"},
+            names = {"UNREGISTERED"},
             mode = EnumSource.Mode.EXCLUDE
     )
-    @DisplayName("쿼터·네트워크·서버 오류 등 일시적 실패는 재시도 대상이라 삭제 판정에서 제외한다")
-    void transientErrorCodesAreNotDead(MessagingErrorCode code) {
+    @DisplayName("UNREGISTERED를 제외한 나머지는 삭제 대상이 아니다 — 쿼터·네트워크·서버 오류는 " +
+            "재시도하면 되는 일시적 실패라 제외하고, INVALID_ARGUMENT는 일시적이라서가 아니라 토큰 형식 오류와 " +
+            "메시지 페이로드 오류를 구분할 수 없는 모호한 코드라서 별도 이유로 제외한다 " +
+            "(둘을 구분 못 하면 페이로드가 깨졌을 때 멀쩡한 구독자를 전량 삭제하게 된다)")
+    void nonUnregisteredErrorCodesAreNotDead(MessagingErrorCode code) {
         assertThat(FcmSendService.isDeadTokenError(code)).isFalse();
     }
 
