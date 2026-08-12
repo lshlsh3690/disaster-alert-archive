@@ -5,6 +5,7 @@ import com.disaster.alert.alertapi.domain.notification.repository.GuestFcmRegion
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
@@ -18,9 +19,18 @@ import java.util.List;
  * 같은 토큰으로 계속 실패하고, 회원 쪽을 빠뜨리면 발송 대상 수가 실제보다 부풀어 보인다.
  * 그래서 이 컴포넌트는 항상 양쪽을 함께 지운다.
  *
- * <p>트랜잭션은 기본 전파를 쓴다(호출한 발송 트랜잭션에 참여). 발송이 롤백되면 이 삭제도 함께
- * 되돌아가지만, 죽은 토큰은 다음 발송에서 다시 죽은 채로 잡히므로 손해가 없다. 반대로
- * {@code REQUIRES_NEW} 로 매 발송마다 커넥션을 하나 더 여는 비용이 더 크다.
+ * <p><b>전파는 {@code REQUIRES_NEW} 다 — 발송 트랜잭션에 참여시키면 안 된다.</b> 호출부인
+ * {@code AlertNotificationService} 는 {@code triggerNotification}/{@code sendToMember}/
+ * {@code sendToGuestTokens} 세 겹 모두 {@code catch (Exception)} 으로 예외를 삼키고 발송을
+ * 계속한다. 기본 전파였다면 정리 실패가 발송 트랜잭션을 rollback-only 로 표시하고, 삼켜진
+ * 예외 때문에 그 사실을 아무도 모른 채 커밋 시점에 {@code UnexpectedRollbackException} 이
+ * 터진다 — 토큰 정리 실패 하나로 그 알림의 발송 이력 전체가 되돌아가고, 원인은 로그상
+ * 한참 떨어진 곳에 나타난다. 별도 트랜잭션으로 떼어내 정리 실패가 발송에 번지지 않게 한다.
+ *
+ * <p>{@code REQUIRES_NEW} 의 통상적인 위험인 자기 교착(바깥 트랜잭션이 잠근 행을 안쪽이
+ * 기다리는 상황)은 여기서는 없다. 발송 경로는 {@code fcm_token}/{@code guest_fcm_region} 을
+ * <b>읽기만</b> 하고 수정하지 않아 그 행들에 쓰기 잠금을 걸지 않는다. 이 전제가 깨지면
+ * (발송 중 토큰 행을 UPDATE 하게 되면) 교착이 생기므로 그때 이 결정을 다시 봐야 한다.
  */
 @Slf4j
 @Service
@@ -39,7 +49,7 @@ public class DeadTokenCleanupService {
      *
      * @return 두 테이블에서 삭제된 행 수의 합
      */
-    @Transactional
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public int cleanUp(List<String> deadTokens) {
         if (deadTokens == null || deadTokens.isEmpty()) {
             return 0;

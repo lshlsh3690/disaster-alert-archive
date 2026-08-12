@@ -1,6 +1,7 @@
 package com.disaster.alert.alertapi.domain.notification.service;
 
 import com.google.firebase.messaging.*;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
@@ -9,12 +10,19 @@ import java.util.List;
 
 @Slf4j
 @Service
+@RequiredArgsConstructor
 public class FcmSendService {
 
     // 웹푸시는 data-only 메시지로만 발송한다 (webpush.notification 페이로드를 넣지 않음).
     // notification 페이로드가 있으면 Firebase JS SDK가 서비스워커에서 알림을 자동으로 한 번 더 표시하여,
     // onBackgroundMessage가 띄우는 알림과 합쳐져 알림이 2번(두 번째는 제목·본문 없는 빈 알림) 표시된다.
     // 실제 표시는 firebase-messaging-sw.js의 onBackgroundMessage에서 전담한다.
+
+    // 로그에 남길 토큰 접두사 길이. 배치 실패는 한 번에 수백 건이 날 수 있어 토큰 전문을 그대로
+    // 찍으면 로그가 토큰으로 뒤덮인다. 어느 토큰인지 구분할 정도만 남긴다.
+    private static final int TOKEN_LOG_PREFIX = 12;
+
+    private final DeadTokenCleanupService deadTokenCleanupService;
 
     // 단일 토큰에 FCM 발송
     public boolean sendToToken(String token, String title, String body,
@@ -34,13 +42,12 @@ public class FcmSendService {
             return true;
 
         } catch (FirebaseMessagingException e) {
-            log.error("FCM 발송 실패 - token: {}, error: {}", token, e.getMessage());
+            log.error("FCM 발송 실패 - token: {}, error: {}", maskToken(token), e.getMessage());
 
-            // 만료된 토큰 처리
-            if (e.getMessagingErrorCode() == MessagingErrorCode.UNREGISTERED ||
-                    e.getMessagingErrorCode() == MessagingErrorCode.INVALID_ARGUMENT) {
-                log.warn("만료된 FCM 토큰: {}", token);
-                return false;
+            // 영구 무효 판정은 배치 경로와 같은 기준(isDeadTokenError)을 쓴다. 조건을 여기에
+            // 따로 나열하면 한쪽만 고쳐져 두 경로의 판정이 갈라진다.
+            if (isDeadTokenError(e.getMessagingErrorCode())) {
+                deadTokenCleanupService.cleanUp(List.of(token));
             }
             return false;
         }
@@ -64,12 +71,49 @@ public class FcmSendService {
             BatchResponse response = FirebaseMessaging.getInstance().sendEachForMulticast(message);
             log.info("FCM 다중 발송 - 성공: {}, 실패: {}",
                     response.getSuccessCount(), response.getFailureCount());
+
+            logBatchFailures(tokens, response);
+            deadTokenCleanupService.cleanUp(collectDeadTokens(tokens, response));
             return response;
 
         } catch (FirebaseMessagingException e) {
             log.error("FCM 다중 발송 실패: {}", e.getMessage());
             return null;
         }
+    }
+
+    /**
+     * 배치에서 실패한 토큰을 <b>건별로</b> 남긴다.
+     *
+     * <p>기존에는 실패 개수만 찍혀서 "몇 개 실패했다"는 사실만 알 수 있었고, 어느 토큰이 왜
+     * 실패했는지 추적할 수단이 없었다. 죽어서 정리될 토큰과 쿼터·네트워크 때문에 재시도해야 할
+     * 토큰이 로그상 구분되지 않으면, 정리가 제대로 도는지도 확인할 수 없다.
+     *
+     * <p>토큰은 접두사만 남긴다. 배치 실패는 한 번에 수백 건이 날 수 있는 데다, 토큰 자체가
+     * 해당 기기로 푸시를 보낼 수 있는 값이라 전문을 로그에 흘릴 이유가 없다.
+     */
+    private void logBatchFailures(List<String> tokens, BatchResponse response) {
+        if (response.getFailureCount() == 0) return;
+
+        List<SendResponse> responses = response.getResponses();
+        if (responses == null || responses.size() != tokens.size()) return;
+
+        for (int i = 0; i < tokens.size(); i++) {
+            SendResponse sendResponse = responses.get(i);
+            if (sendResponse.isSuccessful()) continue;
+
+            FirebaseMessagingException exception = sendResponse.getException();
+            MessagingErrorCode code = exception == null ? null : exception.getMessagingErrorCode();
+            log.warn("FCM 배치 발송 실패 - token: {}, errorCode: {}, dead: {}, message: {}",
+                    maskToken(tokens.get(i)), code, isDeadTokenError(code),
+                    exception == null ? "-" : exception.getMessage());
+        }
+    }
+
+    // 토큰은 그 자체로 해당 기기에 푸시를 보낼 수 있는 값이라 로그에 전문을 남기지 않는다.
+    private static String maskToken(String token) {
+        if (token == null) return "null";
+        return token.length() <= TOKEN_LOG_PREFIX ? token : token.substring(0, TOKEN_LOG_PREFIX) + "...";
     }
 
     /**
