@@ -11,8 +11,13 @@
 <!--
 본 문서는 새 기능을 요청하는 명세가 아니라, 이미 배포되어 동작 중인 코드를 근거로 작성한
 소급(as-built) 명세다. 모든 사용자 스토리·인수 시나리오·기능 요구사항은 실제 코드 동작을
-`파일경로:줄번호` 형식으로 인용하여 뒷받침한다. 향후 speckit으로 이 기능을 변경할 때
-기준선(baseline)으로 사용한다.
+인용하여 뒷받침한다. 향후 speckit으로 이 기능을 변경할 때 기준선(baseline)으로 사용한다.
+
+인용 형식은 `파일경로:줄번호`를 기본으로 하되, **편집으로 위치가 자주 밀리는 지점은
+`클래스.메서드명`으로 인용한다.** 줄번호 인용은 그 파일을 몇 줄만 고쳐도 조용히 썩는데
+갱신을 강제할 수단이 없다 — 실제로 2026-08-12에 이 문서의 FR-020/FR-021이 `buildAndroidConfig`
+대신 전혀 무관한 코드를 가리키고 있는 것이 발견됐고, 같은 날 고친 인용이 주석 몇 줄을
+지우자 또 어긋났다. 메서드명은 이름이 바뀌면 컴파일이 깨져 최소한 드러난다.
 -->
 
 ## 사용자 시나리오 및 테스트 *(필수)*
@@ -310,10 +315,10 @@
 - **FR-020**: 시스템은 예외적으로 `AndroidConfig.setNotification()`(채널ID, 사운드, 진동,
   우선순위)은 사용해도 된다(MAY) — 이는 최상위 webpush notification 페이로드와는 별개로
   Android 네이티브 FCM SDK가 자체적으로 알림을 표시할 때 쓰는 채널 설정이라 FR-019가 막는
-  "중복 표시" 문제와 무관하다 (`FcmSendService.java:74-97`).
+  "중복 표시" 문제와 무관하다 (`FcmSendService.buildAndroidConfig`).
 - **FR-021**: 시스템은 `notificationType`이 `ALARM`이면 Android 채널 `disaster_alarm`,
   `MAX` 우선순위, 진동 패턴(`[0,200,100,200]`)을 사용하고, 그 외에는 `disaster_push` 채널을
-  사용해야 한다(MUST) (`FcmSendService.java:75-96`).
+  사용해야 한다(MUST) (`FcmSendService.buildAndroidConfig`).
 - **FR-022**: 시스템은 FCM 발송이 `UNREGISTERED` 로 실패하면 해당 토큰을 `fcm_token`과
   `guest_fcm_region` 양쪽에서 자동 삭제해야 한다(MUST) (`FcmSendService.isDeadTokenError`
   → `collectDeadTokens` → `DeadTokenCleanupService.cleanUp`). `INVALID_ARGUMENT` 는 토큰
