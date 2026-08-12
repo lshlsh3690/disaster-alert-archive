@@ -171,4 +171,116 @@ class FcmSendServiceTest {
     void nullErrorCodeIsNotDead() {
         assertThat(FcmSendService.isDeadTokenError(null)).isFalse();
     }
+
+    @Test
+    @DisplayName("배치 전체가 INVALID_ARGUMENT로 실패하고 배치 크기가 임계값(5) 이상이면 페이로드 버그로 의심한다 " +
+            "— 현재 스텁(항상 false)에서는 실패해야 하는 Red 케이스다")
+    void allInvalidArgumentAtOrAboveThresholdIsSuspected() {
+        List<String> tokens = List.of("t1", "t2", "t3", "t4", "t5");
+        List<SendResponse> responses = List.of(
+                failedResponse(MessagingErrorCode.INVALID_ARGUMENT),
+                failedResponse(MessagingErrorCode.INVALID_ARGUMENT),
+                failedResponse(MessagingErrorCode.INVALID_ARGUMENT),
+                failedResponse(MessagingErrorCode.INVALID_ARGUMENT),
+                failedResponse(MessagingErrorCode.INVALID_ARGUMENT)
+        );
+        BatchResponse response = mock(BatchResponse.class);
+        when(response.getResponses()).thenReturn(responses);
+
+        assertThat(FcmSendService.isSuspectedPayloadFailure(tokens, response)).isTrue();
+    }
+
+    @Test
+    @DisplayName("하나라도 성공한 토큰이 있으면 페이로드는 유효하다는 뜻이므로, 나머지 5개가 전부 " +
+            "INVALID_ARGUMENT로 실패해도 의심하지 않는다 — 판별의 핵심 계약")
+    void anySuccessMeansNotSuspectedEvenWithManyInvalidArgumentFailures() {
+        List<String> tokens = List.of("t1", "t2", "t3", "t4", "t5", "t6");
+        List<SendResponse> responses = List.of(
+                failedResponse(MessagingErrorCode.INVALID_ARGUMENT),
+                failedResponse(MessagingErrorCode.INVALID_ARGUMENT),
+                failedResponse(MessagingErrorCode.INVALID_ARGUMENT),
+                failedResponse(MessagingErrorCode.INVALID_ARGUMENT),
+                failedResponse(MessagingErrorCode.INVALID_ARGUMENT),
+                successResponse()
+        );
+        BatchResponse response = mock(BatchResponse.class);
+        when(response.getResponses()).thenReturn(responses);
+
+        assertThat(FcmSendService.isSuspectedPayloadFailure(tokens, response)).isFalse();
+    }
+
+    @Test
+    @DisplayName("전부 실패했더라도 실패 코드 중 INVALID_ARGUMENT가 아닌 코드(UNREGISTERED)가 섞여 있으면 " +
+            "페이로드 문제만으로는 설명되지 않으므로 의심하지 않는다")
+    void mixedFailureCodesAreNotSuspected() {
+        List<String> tokens = List.of("t1", "t2", "t3", "t4", "t5");
+        List<SendResponse> responses = List.of(
+                failedResponse(MessagingErrorCode.INVALID_ARGUMENT),
+                failedResponse(MessagingErrorCode.INVALID_ARGUMENT),
+                failedResponse(MessagingErrorCode.INVALID_ARGUMENT),
+                failedResponse(MessagingErrorCode.INVALID_ARGUMENT),
+                failedResponse(MessagingErrorCode.UNREGISTERED)
+        );
+        BatchResponse response = mock(BatchResponse.class);
+        when(response.getResponses()).thenReturn(responses);
+
+        assertThat(FcmSendService.isSuspectedPayloadFailure(tokens, response)).isFalse();
+    }
+
+    @Test
+    @DisplayName("배치 크기가 임계값(5) 미만인 4개는 전부 INVALID_ARGUMENT로 실패해도 의심하지 않는다 " +
+            "— 진짜 죽은 토큰만 우연히 모였을 가능성과 구분이 안 되는 경계값 4")
+    void belowThresholdBatchIsNotSuspected() {
+        List<String> tokens = List.of("t1", "t2", "t3", "t4");
+        List<SendResponse> responses = List.of(
+                failedResponse(MessagingErrorCode.INVALID_ARGUMENT),
+                failedResponse(MessagingErrorCode.INVALID_ARGUMENT),
+                failedResponse(MessagingErrorCode.INVALID_ARGUMENT),
+                failedResponse(MessagingErrorCode.INVALID_ARGUMENT)
+        );
+        BatchResponse response = mock(BatchResponse.class);
+        when(response.getResponses()).thenReturn(responses);
+
+        assertThat(FcmSendService.isSuspectedPayloadFailure(tokens, response)).isFalse();
+    }
+
+    @Test
+    @DisplayName("tokens가 null이면 판단 근거가 없으므로 의심하지 않는다")
+    void nullTokensAreNotSuspected() {
+        BatchResponse response = mock(BatchResponse.class);
+
+        assertThat(FcmSendService.isSuspectedPayloadFailure(null, response)).isFalse();
+    }
+
+    @Test
+    @DisplayName("tokens가 빈 리스트면 판단 근거가 없으므로 의심하지 않는다")
+    void emptyTokensAreNotSuspected() {
+        BatchResponse response = mock(BatchResponse.class);
+
+        assertThat(FcmSendService.isSuspectedPayloadFailure(List.of(), response)).isFalse();
+    }
+
+    @Test
+    @DisplayName("response가 null이면 판단 근거가 없으므로 의심하지 않는다")
+    void nullResponseIsNotSuspected() {
+        List<String> tokens = List.of("t1", "t2", "t3", "t4", "t5");
+
+        assertThat(FcmSendService.isSuspectedPayloadFailure(tokens, null)).isFalse();
+    }
+
+    @Test
+    @DisplayName("토큰 수와 응답 수가 불일치하면 인덱스 대응을 신뢰할 수 없으므로 의심하지 않는다")
+    void mismatchedTokenAndResponseCountIsNotSuspected() {
+        List<String> tokens = List.of("t1", "t2", "t3", "t4", "t5");
+        List<SendResponse> responses = List.of(
+                failedResponse(MessagingErrorCode.INVALID_ARGUMENT),
+                failedResponse(MessagingErrorCode.INVALID_ARGUMENT),
+                failedResponse(MessagingErrorCode.INVALID_ARGUMENT),
+                failedResponse(MessagingErrorCode.INVALID_ARGUMENT)
+        );
+        BatchResponse response = mock(BatchResponse.class);
+        when(response.getResponses()).thenReturn(responses);
+
+        assertThat(FcmSendService.isSuspectedPayloadFailure(tokens, response)).isFalse();
+    }
 }
