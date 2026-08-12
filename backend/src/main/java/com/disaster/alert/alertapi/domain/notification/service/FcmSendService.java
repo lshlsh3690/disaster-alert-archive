@@ -18,6 +18,10 @@ public class FcmSendService {
     // onBackgroundMessage가 띄우는 알림과 합쳐져 알림이 2번(두 번째는 제목·본문 없는 빈 알림) 표시된다.
     // 실제 표시는 firebase-messaging-sw.js의 onBackgroundMessage에서 전담한다.
 
+    // 이 서비스는 발송만 하지 않는다 — Firebase 가 영구 무효로 판정한 토큰을 그 자리에서
+    // DeadTokenCleanupService 로 넘겨 저장소에서 지우게 한다. 죽음을 판정하는 지식(MessagingErrorCode)이
+    // 여기에 있어서, 정리 트리거를 호출부로 올리면 오케스트레이터가 Firebase SDK 타입까지 알아야 한다.
+
     // 로그에 남길 토큰 접두사 길이. 배치 실패는 한 번에 수백 건이 날 수 있어 토큰 전문을 그대로
     // 찍으면 로그가 토큰으로 뒤덮인다. 어느 토큰인지 구분할 정도만 남긴다.
     private static final int TOKEN_LOG_PREFIX = 12;
@@ -42,12 +46,15 @@ public class FcmSendService {
             return true;
 
         } catch (FirebaseMessagingException e) {
-            log.error("FCM 발송 실패 - token: {}, error: {}", maskToken(token), e.getMessage());
-
             // 영구 무효 판정은 배치 경로와 같은 기준(isDeadTokenError)을 쓴다. 조건을 여기에
             // 따로 나열하면 한쪽만 고쳐져 두 경로의 판정이 갈라진다.
-            if (isDeadTokenError(e.getMessagingErrorCode())) {
+            MessagingErrorCode code = e.getMessagingErrorCode();
+            if (isDeadTokenError(code)) {
+                logDeadToken("FCM 발송", token, code);
                 deadTokenCleanupService.cleanUp(List.of(token));
+            } else {
+                log.error("FCM 발송 실패 - token: {}, errorCode: {}, error: {}",
+                        maskToken(token), code, e.getMessage());
             }
             return false;
         }
@@ -104,10 +111,31 @@ public class FcmSendService {
 
             FirebaseMessagingException exception = sendResponse.getException();
             MessagingErrorCode code = exception == null ? null : exception.getMessagingErrorCode();
-            log.warn("FCM 배치 발송 실패 - token: {}, errorCode: {}, dead: {}, message: {}",
-                    maskToken(tokens.get(i)), code, isDeadTokenError(code),
-                    exception == null ? "-" : exception.getMessage());
+            if (isDeadTokenError(code)) {
+                logDeadToken("FCM 배치 발송", tokens.get(i), code);
+            } else {
+                log.error("FCM 배치 발송 실패 - token: {}, errorCode: {}, message: {}",
+                        maskToken(tokens.get(i)), code,
+                        exception == null ? "-" : exception.getMessage());
+            }
         }
+    }
+
+    /**
+     * 죽은 토큰으로 인한 발송 실패를 남긴다.
+     *
+     * <p><b>{@code error} 가 아니라 {@code warn} 인 것이 요점이다.</b> 토큰이 무효가 되는 것은
+     * 브라우저 캐시 삭제·앱 재설치로 늘 일어나는 정상 현상이고, 이 코드가 곧바로 정리까지 하므로
+     * 사람이 볼 필요가 없다. 이 레포는 {@code log.error} 를 Sentry 이벤트로 승격시키므로
+     * error 로 남기면 정상 동작이 매번 이슈로 올라온다.
+     *
+     * <p>반대로 쿼터 초과·서버 오류처럼 재시도 대상인 실패는 호출부에서 {@code error} 로 남긴다 —
+     * 그쪽은 정말로 사람이 봐야 하는 신호다. 단건·배치 두 경로가 같은 기준으로 갈리도록
+     * 이 메서드를 공유한다.
+     */
+    private void logDeadToken(String context, String token, MessagingErrorCode code) {
+        log.warn("{} 실패(죽은 토큰, 정리 대상) - token: {}, errorCode: {}",
+                context, maskToken(token), code);
     }
 
     // 토큰은 그 자체로 해당 기기에 푸시를 보낼 수 있는 값이라 로그에 전문을 남기지 않는다.
