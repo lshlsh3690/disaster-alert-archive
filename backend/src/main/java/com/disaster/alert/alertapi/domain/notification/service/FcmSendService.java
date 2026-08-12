@@ -26,6 +26,10 @@ public class FcmSendService {
     // 찍으면 로그가 토큰으로 뒤덮인다. 어느 토큰인지 구분할 정도만 남긴다.
     private static final int TOKEN_LOG_PREFIX = 12;
 
+    // 이 크기 미만의 배치는 "전부 INVALID_ARGUMENT"여도 페이로드 버그로 의심하지 않는다.
+    // 토큰이 2~3개뿐이면 진짜 죽은 토큰만 우연히 모여 있을 수 있어 페이로드 버그와 구분되지 않는다.
+    private static final int SUSPECTED_PAYLOAD_FAILURE_MIN_BATCH = 5;
+
     private final DeadTokenCleanupService deadTokenCleanupService;
 
     // 단일 토큰에 FCM 발송
@@ -135,6 +139,56 @@ public class FcmSendService {
     private void logDeadToken(String context, String token, MessagingErrorCode code) {
         log.warn("{} 실패(죽은 토큰, 정리 대상) - token: {}, errorCode: {}",
                 context, maskToken(token), code);
+    }
+
+    /**
+     * 배치 전멸이 <b>토큰이 아니라 메시지 페이로드 때문</b>으로 의심되는지.
+     *
+     * <p>{@code INVALID_ARGUMENT} 는 토큰 형식 오류만 뜻하지 않는다. Firebase 는 메시지의
+     * 공유 필드(제목·본문·{@code data}·{@code AndroidConfig})가 잘못됐을 때도 같은 코드를
+     * 돌려준다. {@code sendToTokens} 는 하나의 페이로드를 여러 토큰에 보내므로, 페이로드에
+     * 버그가 있으면 <b>멀쩡한 토큰 전부가 INVALID_ARGUMENT 로 실패</b>한다. 그대로 정리하면
+     * 살아있는 구독자를 전량 삭제하게 되고, 이건 되돌릴 수 없다 — 사용자가 알림 권한을
+     * 다시 허용해야 한다. {@link #collectDeadTokens} 가 인덱스 매핑으로 막으려던 바로 그
+     * 사고가 다른 경로로 들어오는 것이다.
+     *
+     * <p>판별의 핵심은 <b>하나라도 성공했는지</b>다. 성공한 토큰이 있으면 페이로드는 유효하므로
+     * 나머지의 {@code INVALID_ARGUMENT} 는 진짜 토큰 문제다. 전부 실패했고 그 전부가
+     * {@code INVALID_ARGUMENT} 일 때만 페이로드를 의심한다.
+     *
+     * <p>배치가 아주 작으면(1~2개) 진짜 죽은 토큰만 모여 있을 수도 있어 구분이 안 된다.
+     * {@link #SUSPECTED_PAYLOAD_FAILURE_MIN_BATCH} 이상일 때만 의심하는 이유다. 이 값은
+     * 실측으로 튜닝한 게 아니라 판단이며, 오탐(정리를 한 번 건너뜀)의 대가가 미탐(살아있는
+     * 토큰 전량 삭제)보다 훨씬 싸다는 전제로 정했다.
+     */
+    static boolean isSuspectedPayloadFailure(List<String> tokens, BatchResponse response) {
+        // 방어 조건(1~4번)은 전부 "근거 없으면 의심하지 않는다" 방향이다 — collectDeadTokens와
+        // 반대로, 여기서 가드가 근거 없이 켜지면 정리 기능 자체가 죽어버리기 때문이다.
+        if (tokens == null || tokens.isEmpty() || response == null) {
+            return false;
+        }
+        if (tokens.size() < SUSPECTED_PAYLOAD_FAILURE_MIN_BATCH) {
+            return false;
+        }
+
+        List<SendResponse> responses = response.getResponses();
+        if (responses == null || responses.size() != tokens.size()) {
+            return false;
+        }
+
+        // 하나라도 성공하면 페이로드는 유효하다는 뜻이므로 즉시 의심을 접는다.
+        // 나머지 실패가 전부 INVALID_ARGUMENT여도 진짜 토큰 문제일 뿐이다.
+        for (SendResponse sendResponse : responses) {
+            if (sendResponse.isSuccessful()) {
+                return false;
+            }
+            FirebaseMessagingException exception = sendResponse.getException();
+            MessagingErrorCode code = exception == null ? null : exception.getMessagingErrorCode();
+            if (code != MessagingErrorCode.INVALID_ARGUMENT) {
+                return false;
+            }
+        }
+        return true;
     }
 
     // 토큰은 그 자체로 해당 기기에 푸시를 보낼 수 있는 값이라 로그에 전문을 남기지 않는다.
