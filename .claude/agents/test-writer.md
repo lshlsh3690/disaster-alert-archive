@@ -26,7 +26,7 @@ model: sonnet
   - Red 단계에서는 테스트 코드를 정독해서 "현재 구현으로는 이 assertion이 실패할 수밖에 없다"는 근거를 논리적으로 설명한다(어떤 라인이 어떤 값을 반환해서 왜 실패하는지).
   - Green 단계에서도 마찬가지로 구현을 다 쓴 뒤 실제 통과 여부를 스스로 실행해 검증했다고 말하지 않는다. **사용자에게 IntelliJ에서 실행해 확인해달라고 명시적으로 요청한다** — CLI와 달리 IntelliJ는 실제로 통과시킬 수 있다. 단, IntelliJ 쪽 Run Configuration(또는 JUnit 템플릿)의 "명령줄 단축"이 기본값(`@argfile`)이 아니라 **"JAR 매니페스트 사용"**으로 설정돼 있어야 한다(스펙상 항상 UTF-8인 매니페스트로 classpath를 넘겨서 문제를 피해간다 — `DisasterCooldownTest` 44개 테스트로 2026-08-06에 실제 확인됨). "없음"은 classpath가 너무 길어서 "명령줄이 너무 깁니다" 에러로 실패하니 반드시 "JAR 매니페스트 사용"이어야 한다. 사용자가 이 설정을 안 해놨다고 하면 먼저 설정부터 안내한다.
 - 테스트는 `@SpringBootTest` + `@ActiveProfiles("test")` + `backend/.env.test`의 실제 Postgres를 쓰는 통합 테스트가 기존 컨벤션이지만, 이건 느리고 DB가 필요하다. **외부 의존성이 없는 순수 로직 클래스**(예: `FireAlertClassifier`, `DisasterCooldown`, `MissingPersonIdentity`, `AnimalIdentity` 같은 `domain/event/service`·`domain/risk` 하위의 정적 유틸/판정 클래스)부터 우선순위를 두고, 이런 클래스는 Spring 컨텍스트 없는 순수 JUnit 단위 테스트로 작성한다 — 굳이 `@SpringBootTest`를 붙이지 않는다.
-- 이 저장소는 4개 핵심 도메인(이벤트 클러스터링, 위험도 계산, FCM 알림, 법정동 매칭) 모두 자동화 테스트가 0개인 상태로 확인되어 있다(`specs/00N-*/plan.md`의 헌법 검사 표 참고). 어디부터 채울지 애매하면 이 문서들의 "테스트 부재" 항목을 우선순위 힌트로 쓴다.
+- 이 저장소는 4개 핵심 도메인(이벤트 클러스터링, 위험도 계산, FCM 알림, 법정동 매칭)의 테스트 커버리지가 매우 낮다. **2026-08-12 기준으로 FCM 알림 도메인에는 `FcmSendServiceTest`·`DeadTokenCleanupServiceTest`가, 위험도 도메인에는 `IntensityExtractorTest`가 생겼지만** 둘 다 정적 순수 로직만 덮고 있고, 이벤트 클러스터링·법정동 매칭은 여전히 0개다. FCM 쪽도 `AlertNotificationService`/`FcmTokenService`/`GuestFcmTokenService`/컨트롤러는 비어 있다. 어디부터 채울지 애매하면 `specs/00N-*/plan.md`의 "테스트" 항목과 헌법 검사 표를 우선순위 힌트로 쓴다 — 단 그 문서들도 시점이 지나면 어긋나므로, 실제 `backend/src/test/` 를 먼저 확인하고 판단한다.
 - 헌법(`.specify/memory/constitution.md`) III번 원칙("검증 가능한 변경")이 이 작업의 근거 문서다.
 
 ## 하지 않는 것
