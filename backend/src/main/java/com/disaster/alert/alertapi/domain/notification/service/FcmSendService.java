@@ -83,6 +83,11 @@ public class FcmSendService {
      * <p>실패했다고 전부 죽은 토큰은 아니다. 쿼터 초과·일시적 서버 오류(`UNAVAILABLE`,
      * `INTERNAL`)는 재시도하면 되는 상태라 지우면 안 된다. {@link #isDeadTokenError} 가
      * 판정하는 두 코드만 삭제 대상이다.
+     *
+     * <p>방어 계약: {@code tokens}/{@code response} 가 null 이거나, 토큰 수와 응답 수가
+     * 어긋나면 <b>아무것도 반환하지 않는다</b>. 지울 것을 놓치는 쪽이 잘못 지우는 쪽보다
+     * 안전하기 때문이다 — 전자는 다음 발송에서 다시 걸리지만, 후자는 정상 구독자의 구독이
+     * 영구히 끊겨 복구할 수 없다.
      */
     static List<String> collectDeadTokens(List<String> tokens, BatchResponse response) {
         if (tokens == null || tokens.isEmpty() || response == null) {
@@ -92,7 +97,12 @@ public class FcmSendService {
         List<SendResponse> responses = response.getResponses();
         // 토큰 수와 응답 수가 어긋나면 인덱스 대응을 신뢰할 수 없다 — 잘못 지워 복구 불가능한
         // 사고(살아있는 토큰 삭제)를 막기 위해 아무것도 지우지 않는다.
+        // 다만 이 불일치 자체가 SDK 계약 위반이거나 호출부 버그를 뜻하는 이상 신호이므로,
+        // 조용히 넘기지 않고 로그를 남긴다 (정리 작업이 매번 아무것도 못 지우고 있는 상태를
+        // 알아챌 수 있는 유일한 단서다).
         if (responses == null || responses.size() != tokens.size()) {
+            log.warn("FCM 토큰/응답 수 불일치로 죽은 토큰 판별을 건너뜀 - 토큰: {}, 응답: {}",
+                    tokens.size(), responses == null ? "null" : responses.size());
             return List.of();
         }
 

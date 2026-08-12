@@ -129,6 +129,24 @@ class FcmSendServiceTest {
         assertThat(FcmSendService.collectDeadTokens(tokens, null)).isEmpty();
     }
 
+    @Test
+    @DisplayName("토큰 수보다 응답 수가 더 많은 역방향 불일치에서도 인덱스 대응을 신뢰할 수 없으므로 아무것도 지우지 않는다")
+    void returnsEmptyWhenResponseCountExceedsTokenCount() {
+        List<String> tokens = List.of("token-A", "token-B");
+        // 토큰은 2개인데 응답은 3개인, 반대 방향으로 대응이 깨진 상황을 시뮬레이션한다.
+        List<SendResponse> responses = List.of(
+                failedResponse(MessagingErrorCode.UNREGISTERED),
+                failedResponse(MessagingErrorCode.UNREGISTERED),
+                failedResponse(MessagingErrorCode.UNREGISTERED)
+        );
+        BatchResponse response = mock(BatchResponse.class);
+        when(response.getResponses()).thenReturn(responses);
+
+        List<String> deadTokens = FcmSendService.collectDeadTokens(tokens, response);
+
+        assertThat(deadTokens).isEmpty();
+    }
+
     @ParameterizedTest(name = "{0}은 영구 무효(삭제 대상)로 판정한다")
     @EnumSource(value = MessagingErrorCode.class, names = {"UNREGISTERED", "INVALID_ARGUMENT"})
     @DisplayName("UNREGISTERED·INVALID_ARGUMENT는 영구 무효로 판정한다")
@@ -145,5 +163,12 @@ class FcmSendServiceTest {
     @DisplayName("쿼터·네트워크·서버 오류 등 일시적 실패는 재시도 대상이라 삭제 판정에서 제외한다")
     void transientErrorCodesAreNotDead(MessagingErrorCode code) {
         assertThat(FcmSendService.isDeadTokenError(code)).isFalse();
+    }
+
+    @Test
+    @DisplayName("getMessagingErrorCode()가 null인 미분류 오류(code == null)는 NPE 없이 false를 반환한다 " +
+            "— switch(code) 형태로 리팩터링하면 이 케이스에서 NPE가 나므로 그 회귀를 막는 못이다")
+    void nullErrorCodeIsNotDead() {
+        assertThat(FcmSendService.isDeadTokenError(null)).isFalse();
     }
 }
