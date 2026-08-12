@@ -193,8 +193,8 @@
   발송 이력을 되돌리지 않는 것은 두 장치가 함께 작동한 결과다: `REQUIRES_NEW` 는 정리
   트랜잭션이 발송 트랜잭션을 rollback-only 로 오염시키는 것을 막고, `FcmSendService` 쪽의
   `try/catch` 는 `cleanUp()` 이 던지는 예외 자체가 호출부로 전파되어 발송 결과 반환을
-  가로막지 않게 한다 (`FcmSendService.java:75`, `119`). `REQUIRES_NEW` 만으로는 예외 전파까지
-  막지 못한다.
+  가로막지 않게 한다 (`FcmSendService.sendToToken`/`sendToTokens` 의 `cleanUp` 호출을 감싼
+  `try/catch`). `REQUIRES_NEW` 만으로는 예외 전파까지 막지 못한다.
 - 그 `try/catch` 가 잡는 범위는 `DataAccessException` 과 `TransactionException` **두 계층**이다.
   둘은 부모-자식이 아니라 형제라서 한쪽만 잡으면 다른 쪽이 그대로 빠져나간다. 특히
   `REQUIRES_NEW` 가 커넥션을 하나 더 빌리므로 풀이 고갈되면 트랜잭션 생성 단계에서

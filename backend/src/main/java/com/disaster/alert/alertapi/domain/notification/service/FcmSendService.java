@@ -57,19 +57,11 @@ public class FcmSendService {
             MessagingErrorCode code = e.getMessagingErrorCode();
             if (isDeadTokenError(code)) {
                 logDeadToken("FCM 발송", token, code);
-                // REQUIRES_NEW는 바깥 트랜잭션이 rollback-only로 오염되는 것만 막을 뿐, cleanUp()이
-                // 던진 예외 자체는 그대로 이 호출부로 전파된다. 여기서 잡지 않으면 아래 return false에
-                // 도달하지 못해 호출부(AlertNotificationService.sendToMember)의 발송 이력 저장이
-                // 통째로 스킵된다 — FCM은 이미 나갔는데 이력만 사라지는 상황을 막는다.
-                //
-                // TransactionException 을 함께 잡는 이유: DataAccessException(쿼리 실행 실패)과
-                // TransactionException(트랜잭션을 여는 것 자체의 실패)은 부모-자식이 아니라 형제다.
-                // REQUIRES_NEW 는 커넥션을 하나 더 빌리므로, 풀이 고갈되면 트랜잭션 생성 단계에서
-                // CannotCreateTransactionException 이 난다 — DeadTokenCleanupService javadoc 이
-                // "발송 규모가 커지면 먼저 의심하라"고 지목한 바로 그 상황이다. DataAccessException 만
-                // 잡으면 정작 그때 이 방어가 통째로 무력해진다.
-                // RuntimeException 으로 더 넓히지 않은 것은 의도적이다 — NPE 같은 코드 버그까지
-                // 삼키면 진짜 결함이 로그 한 줄로 묻힌다.
+                // 정리 실패 예외를 여기서 잡지 않으면 아래 return false 에 도달하지 못해,
+                // 호출부(AlertNotificationService.sendToMember)의 발송 이력 저장이 통째로
+                // 스킵된다 — FCM 은 이미 나갔는데 이력만 사라진다.
+                // 잡는 범위를 이 두 계층으로 정한 근거(형제 관계·풀 고갈·RuntimeException 을
+                // 쓰지 않은 이유)는 DeadTokenCleanupService 의 클래스 javadoc 에 있다.
                 try {
                     deadTokenCleanupService.cleanUp(List.of(token));
                 } catch (DataAccessException | TransactionException cleanupException) {
