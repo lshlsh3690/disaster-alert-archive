@@ -47,12 +47,14 @@ Zustand(`guestFavoriteRegionsStore`), React Query(회원 관심지역 캐시 무
 `DeadTokenCleanupServiceTest`가 추가되었다. 다만 검증 범위는 **정적 순수 로직에 한정**된다 —
 `collectDeadTokens`(배치 응답의 인덱스 매핑), `isDeadTokenError`(삭제 대상 코드 판정),
 `isSuspectedPayloadFailure`(페이로드 버그 오탐 방지), `cleanUp`(두 리포지토리 삭제·합산)이
-그것이다. **정리 실패가 발송 결과 반환을 막지 않는다는 예외 격리 동작
-(`sendToToken`/`sendToTokens`의 `try/catch`)은 어느 테스트에도 없다** — `FirebaseMessaging`
-정적 호출에 묶여 있어 순수 단위 테스트로 떼어내기 어렵기 때문이다. `AlertNotificationService`,
-`FcmTokenService`, `GuestFcmTokenService`와 관련 컨트롤러도 여전히 단위/통합 테스트가
-코드베이스에 **존재하지 않는다** — 이는 헌법 원칙 III(검증 가능한 변경) 대비 실제 격차로,
-아래 헌법 검사에 기록한다.
+그것이다. 여기에 **정리 실패 예외 격리**(`cleanUp()`이 `DataAccessException`/
+`TransactionException`을 던져도 단건은 `false`, 배치는 원래 `BatchResponse`를 반환하는지)
+검증 4개가 더해졌다 — `FirebaseMessaging.getInstance()` 정적 호출은 Mockito 5의
+`mockStatic`으로 목킹했다. (한때 이 동작을 "정적 호출에 묶여 단위 테스트로 떼기 어렵다"고
+기록했으나, 실제로 해보니 가능했다. 어려운 게 아니라 안 했던 것이다.) 반면
+`AlertNotificationService`, `FcmTokenService`, `GuestFcmTokenService`와 관련 컨트롤러는
+여전히 단위/통합 테스트가 코드베이스에 **존재하지 않는다** — 이는 헌법 원칙 III(검증 가능한
+변경) 대비 실제 격차로, 아래 헌법 검사에 기록한다.
 
 **대상 플랫폼**: 웹(PWA, Chrome/Edge 등 데스크톱·모바일 브라우저) — Web Push API +
 Firebase Cloud Messaging. 코드 내 `deviceType` 값으로 `WEB`/`ANDROID`/`IOS`를 구분하지만,
