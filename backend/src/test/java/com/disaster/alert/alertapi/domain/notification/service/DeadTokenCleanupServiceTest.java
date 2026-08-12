@@ -12,8 +12,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.anyList;
-import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -21,7 +19,6 @@ import static org.mockito.Mockito.when;
 /**
  * {@link DeadTokenCleanupService#cleanUp} 순수 단위 테스트.
  * DB·Spring 컨텍스트가 필요 없으므로 @SpringBootTest 없이 Mockito 목으로 검증한다.
- * 지금은 cleanUp이 항상 {@code return 0;}인 스텁이라 아래 테스트들은 전부 실패해야 정상이다(Red).
  */
 @ExtendWith(MockitoExtension.class)
 @DisplayName("DeadTokenCleanupService 죽은 토큰 정리")
@@ -81,15 +78,5 @@ class DeadTokenCleanupServiceTest {
         assertThat(result).isZero();
         verifyNoInteractions(fcmTokenRepository);
         verifyNoInteractions(guestFcmRegionRepository);
-    }
-
-    @Test
-    @DisplayName("빈 목록이면 저장소 메서드가 어떤 인자로도 호출되지 않는다 " +
-            "— verifyNoInteractions와 별개로 '빈 리스트로라도 호출은 한다' 식의 오구현까지 명시적으로 잡는다")
-    void neverCallsDeleteMethodsWhenTokenListEmpty() {
-        deadTokenCleanupService.cleanUp(List.of());
-
-        verify(fcmTokenRepository, never()).deleteAllByTokenIn(anyList());
-        verify(guestFcmRegionRepository, never()).deleteAllByFcmTokenIn(anyList());
     }
 }
