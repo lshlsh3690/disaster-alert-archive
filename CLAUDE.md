@@ -58,7 +58,7 @@ docker compose -f docker-compose.dev.yml up postgres redis   # Postgres(pgvector
 - `api/DisasterOpenApiClient.java` — 재난문자 공공데이터포털 API 클라이언트.
 - `*/tool/*BackfillTool` — 과거 데이터를 현재 로직으로 재처리하는 수동 실행 도구 (`EventClusteringBackfillTool`, `RiskBackfillTool`, `DisasterAlertRegionBackfillTool`).
 
-에러 트래킹은 Sentry(`sentry-spring-boot-starter-jakarta` + `sentry-logback`)를 사용합니다. 스타터만으로는 `GlobalExceptionHandler`가 이미 처리한 예외와 스케줄러 실패(= HTTP 요청이 아님)를 못 잡기 때문에 `log.error(msg, e)`를 이벤트로 승격시키는 logback 연동 모듈이 필수입니다 — `build.gradle`의 주석 참고. `SENTRY_DSN`을 비워두면 SDK가 자동으로 no-op이 됩니다.
+**외부 에러 트래킹 서비스는 쓰지 않습니다** — 2026-08-12에 Sentry(`sentry-spring-boot-starter-jakarta` + `sentry-logback`)를 제거했습니다. 장애 인지 수단은 로그뿐이며, 자동 알림 경로가 없다는 뜻입니다. 따라서 **로그 레벨이 사실상 유일한 신호 구분자**입니다: 사람이 조치해야 하는 것만 `log.error`로 남기고, 정상 흐름에서 늘 발생하는 것(4xx 비즈니스 예외, 죽은 FCM 토큰 등)은 `warn` 이하로 둡니다. 이 구분이 무너지면 `error`가 노이즈에 묻혀 진짜 장애를 못 찾습니다 — `GlobalExceptionHandler`(5xx만 error), `ThreadLocalLogTrace`(전부 info), `FcmSendService.logDeadToken`(죽은 토큰은 warn)이 그 예입니다.
 
 인증: httpOnly 쿠키 기반 JWT access+refresh 토큰 (`application.yml`의 `cookie.secure`/`cookie.domain` 참고), Google/Kakao/Naver OAuth2 로그인은 `domain/auth/oauth`에 직접 구현되어 있습니다 (`build.gradle`의 Spring `oauth2-client` 스타터 의존성은 주석 처리되어 있으며, 각 프로바이더는 수작업으로 구현됨).
 
