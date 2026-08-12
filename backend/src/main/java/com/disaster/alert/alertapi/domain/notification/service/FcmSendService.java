@@ -4,6 +4,7 @@ import com.google.firebase.messaging.*;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+import java.util.ArrayList;
 import java.util.List;
 
 @Slf4j
@@ -84,7 +85,29 @@ public class FcmSendService {
      * 판정하는 두 코드만 삭제 대상이다.
      */
     static List<String> collectDeadTokens(List<String> tokens, BatchResponse response) {
-        return List.of();
+        if (tokens == null || tokens.isEmpty() || response == null) {
+            return List.of();
+        }
+
+        List<SendResponse> responses = response.getResponses();
+        // 토큰 수와 응답 수가 어긋나면 인덱스 대응을 신뢰할 수 없다 — 잘못 지워 복구 불가능한
+        // 사고(살아있는 토큰 삭제)를 막기 위해 아무것도 지우지 않는다.
+        if (responses == null || responses.size() != tokens.size()) {
+            return List.of();
+        }
+
+        List<String> deadTokens = new ArrayList<>();
+        for (int i = 0; i < tokens.size(); i++) {
+            SendResponse sendResponse = responses.get(i);
+            if (sendResponse.isSuccessful()) {
+                continue;
+            }
+            FirebaseMessagingException exception = sendResponse.getException();
+            if (exception != null && isDeadTokenError(exception.getMessagingErrorCode())) {
+                deadTokens.add(tokens.get(i));
+            }
+        }
+        return deadTokens;
     }
 
     /**
@@ -97,7 +120,7 @@ public class FcmSendService {
      * 나머지(쿼터·네트워크·서버 오류)는 일시적이므로 <b>삭제하지 않는다</b>.
      */
     static boolean isDeadTokenError(MessagingErrorCode code) {
-        return false;
+        return code == MessagingErrorCode.UNREGISTERED || code == MessagingErrorCode.INVALID_ARGUMENT;
     }
 
     // Android 설정 (ALARM: 높은 우선순위)
