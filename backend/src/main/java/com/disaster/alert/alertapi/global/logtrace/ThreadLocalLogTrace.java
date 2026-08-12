@@ -12,8 +12,8 @@ import lombok.extern.slf4j.Slf4j;
 // remove() 해야 스레드 풀 재사용 시 이전 요청의 level이 새 요청에 새어 들어가지 않는다.
 //
 // begin/end/exception 전부 INFO 레벨로 고정한다. 여기서 exception()을 ERROR로 찍으면
-// 정상적인 4xx 비즈니스 예외(CustomException 등)까지 Sentry(logging.minimum-event-level=error)로
-// 전송돼 노이즈가 된다 — 실제 장애 여부 판단은 GlobalExceptionHandler/각 스케줄러의 log.error
+// 정상적인 4xx 비즈니스 예외(CustomException 등)까지 ERROR로 올라와, 로그에서 진짜 장애를
+// 골라내기 어려워진다 — 실제 장애 여부 판단은 GlobalExceptionHandler/각 스케줄러의 log.error
 // 몫이고, 이 클래스는 순수하게 호출 흐름과 소요 시간을 보여주는 용도로만 쓴다.
 @Slf4j
 public class ThreadLocalLogTrace implements LogTrace {

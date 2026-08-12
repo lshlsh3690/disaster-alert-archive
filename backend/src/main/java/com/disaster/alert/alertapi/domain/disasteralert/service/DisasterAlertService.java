@@ -177,8 +177,8 @@ public class DisasterAlertService {
     /**
      * body 배열 원소를 하나씩 파싱한다. 원소 하나가 깨져도 나머지는 계속 처리한다.
      * 실패한 원소들의 원문(JSON)은 응답 1건당 ERROR 로그 1개에 모아서 남긴다 — 원소마다 개별
-     * ERROR를 찍으면 한 페이지에서 여러 건 실패 시 Sentry 이벤트가 과다 발생하기 때문에,
-     * 건수와 무관하게 항상 1개의 이벤트로 묶되 그 안에 실패한 원소 원문을 그대로 담는다
+     * ERROR를 찍으면 한 페이지에서 여러 건 실패 시 같은 내용의 ERROR 가 로그를 도배하기 때문에,
+     * 건수와 무관하게 항상 1줄로 묶되 그 안에 실패한 원소 원문을 그대로 담는다
      * (최대 10건까지 미리보기 — 그 이상은 페이로드 비대화 방지를 위해 개수만 표기).
      */
     private List<DisasterAlertDto> parseBodyElements(JsonNode bodyNode) {

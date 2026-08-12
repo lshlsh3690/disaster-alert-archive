@@ -17,7 +17,7 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(CustomException.class)
     public ResponseEntity<ApiErrorResponse> handleCustomException(CustomException e, HttpServletRequest request) {
         ErrorCode ec = e.getErrorCode();
-        // 4xx 비즈니스 예외는 정상 흐름이라 노이즈이므로 제외, 5xx(서버측 오류)만 Sentry 로 전송(로그백 연동).
+        // 4xx 비즈니스 예외는 정상 흐름이라 로그 노이즈이므로 제외, 5xx(서버측 오류)만 error 로 남긴다.
         if (ec.getHttpStatus() >= 500) {
             log.error("서버 오류 [{}] {} {}", ec.getCode(), request.getRequestURI(), e.getDetail(), e);
         }
@@ -50,7 +50,7 @@ public class GlobalExceptionHandler {
                 .body(body);
     }
 
-    // 알 수 없는 모든 예외 — 미처리 예외는 항상 버그이므로 Sentry 로 전송(로그백 연동).
+    // 알 수 없는 모든 예외 — 미처리 예외는 항상 버그이므로 스택트레이스와 함께 error 로 남긴다.
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiErrorResponse> handleException(Exception e, HttpServletRequest request) {
         ErrorCode ec = ErrorCode.INTERNAL_SERVER_ERROR;

@@ -94,16 +94,6 @@ dependencies {
 
     implementation 'org.apache.httpcomponents.client5:httpclient5'
 
-    // Sentry — 백엔드 에러 트래킹 (5xx/미처리 예외 + 스케줄러 log.error 를 이벤트로 전송)
-    // sentry-spring-boot-starter-jakarta 는 로그백 연동 모듈을 자동으로 포함하지 않음 —
-    // sentry-logback 이 없으면 sentry.logging.* 설정이 아무 것도 소비되지 않고 무시된다
-    // (스타터가 제공하는 SentryExceptionResolver 는 MVC에서 "완전히 미처리"된 예외만 잡는데,
-    // 우리는 GlobalExceptionHandler가 모든 예외를 처리해버리고, 스케줄러 실패는 애초에
-    // HTTP 요청이 아니라서 그 경로로는 절대 못 잡힘 — log.error(msg, e) 를 이벤트로 바꾸려면
-    // 이 모듈이 반드시 필요).
-    implementation 'io.sentry:sentry-spring-boot-starter-jakarta:8.50.1'
-    implementation 'io.sentry:sentry-logback:8.50.1'
-
 }
 
 
