@@ -189,8 +189,12 @@
   실패로 처리되지 않는다 (`AlertNotificationService.java:89,111-113`).
 - FCM 발송이 `UNREGISTERED` 에러로 실패하면(등록 해제된 토큰) 해당 토큰을 `fcm_token`과
   `guest_fcm_region` **양쪽에서 자동 삭제한다** (`DeadTokenCleanupService.cleanUp`,
-  단건은 `FcmSendService.sendToToken`, 배치는 `collectDeadTokens`를 거쳐 호출). 정리는
-  `REQUIRES_NEW` 로 발송 트랜잭션과 분리되어 있어, 정리 실패가 발송 이력을 되돌리지 않는다.
+  단건은 `FcmSendService.sendToToken`, 배치는 `collectDeadTokens`를 거쳐 호출). 정리 실패가
+  발송 이력을 되돌리지 않는 것은 두 장치가 함께 작동한 결과다: `REQUIRES_NEW` 는 정리
+  트랜잭션이 발송 트랜잭션을 rollback-only 로 오염시키는 것을 막고, `FcmSendService` 쪽의
+  `try/catch` 는 `cleanUp()` 이 던지는 예외 자체가 호출부로 전파되어 발송 결과 반환을
+  가로막지 않게 한다 (`FcmSendService.java:56-64`, `91-97`). `REQUIRES_NEW` 만으로는 예외
+  전파까지 막지 못한다.
   (2026-08-12 도입 — 그 전에는 로그만 남기고 삭제하지 않았다.)
 - 반면 `INVALID_ARGUMENT` 는 **삭제 대상이 아니다.** 이 코드는 토큰 형식 오류뿐 아니라
   메시지 페이로드(제목·본문·`data`·`AndroidConfig`) 오류에도 반환되므로, 이걸로 토큰을

@@ -43,11 +43,12 @@ Zustand(`guestFavoriteRegionsStore`), React Query(회원 관심지역 캐시 무
 `V10__create_user_notification_log.sql`, `V102__alter_fcm_token_nullable_member.sql`,
 `V103__create_guest_fcm_region.sql`). 클라이언트 측 캐시: `localStorage["fcm-token"]`.
 
-**테스트**: 이 서브시스템(`AlertNotificationService`, `FcmSendService`, `FcmTokenService`,
-`GuestFcmTokenService`, 관련 컨트롤러)에 대한 단위/통합 테스트가 코드베이스에 **존재하지
-않는다** — `backend/src/test`에서 FCM/Notification 관련 테스트 클래스를 검색했으나
-0건이었다. 이는 헌법 원칙 III(검증 가능한 변경) 대비 실제 격차로, 아래 헌법 검사에
-기록한다.
+**테스트**: 2026-08-12 `DeadTokenCleanupService` 도입과 함께 `FcmSendServiceTest`·
+`DeadTokenCleanupServiceTest`가 추가되어, 죽은 토큰 판정·정리 트리거·배치 페이로드 오탐
+방지 등 두 클래스의 순수 로직은 더 이상 미검증 상태가 아니다. 반면 `AlertNotificationService`,
+`FcmTokenService`, `GuestFcmTokenService`와 관련 컨트롤러는 여전히 단위/통합 테스트가
+코드베이스에 **존재하지 않는다** — 이는 헌법 원칙 III(검증 가능한 변경) 대비 실제 격차로,
+아래 헌법 검사에 기록한다.
 
 **대상 플랫폼**: 웹(PWA, Chrome/Edge 등 데스크톱·모바일 브라우저) — Web Push API +
 Firebase Cloud Messaging. 코드 내 `deviceType` 값으로 `WEB`/`ANDROID`/`IOS`를 구분하지만,
@@ -93,9 +94,10 @@ UPSERT 시 다른 행과의 토큰 충돌을 먼저 정리해야 함(FR-027).
   핸들러가 없어 `@ExceptionHandler(Exception.class)`(`GlobalExceptionHandler.java:54-60`,
   "처리되지 않은 예외 — Sentry로 전송" 주석) catch-all로 떨어져 정당한 입력 검증 실패임에도
   `500 INTERNAL_SERVER_ERROR`로 응답하고 미처리 예외로 오탐(Sentry 상 버그로 분류)된다.
-- **III. 검증 가능한 변경** — **미준수**. FCM 알림 발송 로직(지역 코드 파생, UPSERT 시
-  토큰 충돌 정리, 알림 설정 분기 등 비즈니스 로직)에 대한 단위 테스트가 전무하다. 위
-  "테스트" 항목 참고.
+- **III. 검증 가능한 변경** — **부분 준수**. `FcmSendService`/`DeadTokenCleanupService`는
+  테스트가 갖춰졌으나, 지역 코드 파생·UPSERT 토큰 충돌 정리·알림 설정 분기 등 나머지
+  비즈니스 로직(`AlertNotificationService`, `FcmTokenService`, `GuestFcmTokenService`)은
+  여전히 단위 테스트가 없다. 위 "테스트" 항목 참고.
   기존 `docs/TEST_CASE.md` 기준으로도 낮은 커버리지가 알려진 상태이며, 이 서브시스템도
   예외가 아니다.
 - **IV. 정직한 문서화** — 이 문서 자체가 이 원칙을 적용해 작성됐다. 실제 코드를 직접
@@ -186,4 +188,4 @@ frontend/
 | 위반 사항 | 실제 동작 | 비고 |
 |-----------|------------|-------------------------------------|
 | 원칙 II: 임의 예외 사용 | `GuestFcmTokenService.registerGuestToken`이 관심지역 5개 초과 시 `CustomException`+`ErrorCode`가 아닌 원시 `IllegalArgumentException`을 던져, `GlobalExceptionHandler`의 catch-all(`Exception.class`)로 떨어지고 500 + Sentry 오탐으로 처리됨 (`GuestFcmTokenService.java:37-39`, `GlobalExceptionHandler.java:54-60`) | 이 spec 범위에서 수정하지 않음. 별도 fix 작업 후보로 남김 |
-| 원칙 III: 테스트 부재 | `AlertNotificationService`/`FcmSendService`/`FcmTokenService`/`GuestFcmTokenService`에 단위 테스트 없음 | 지역 코드 파생(FR-003), UPSERT 토큰 충돌 정리(FR-027), 알림 설정 분기(FR-006/007) 등 순수 로직부터 우선 테스트 추가가 유효한 후속 과제 |
+| 원칙 III: 테스트 부재 | `AlertNotificationService`/`FcmTokenService`/`GuestFcmTokenService`에 단위 테스트 없음 (`FcmSendService`/`DeadTokenCleanupService`는 2026-08-12 추가로 해소됨) | 지역 코드 파생(FR-003), UPSERT 토큰 충돌 정리(FR-027), 알림 설정 분기(FR-006/007) 등 순수 로직부터 우선 테스트 추가가 유효한 후속 과제 |

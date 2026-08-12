@@ -19,13 +19,18 @@ import java.util.List;
  * 같은 토큰으로 계속 실패하고, 회원 쪽을 빠뜨리면 발송 대상 수가 실제보다 부풀어 보인다.
  * 그래서 이 컴포넌트는 항상 양쪽을 함께 지운다.
  *
- * <p><b>전파는 {@code REQUIRES_NEW} 다 — 발송 트랜잭션에 참여시키면 안 된다.</b> 호출부인
- * {@code AlertNotificationService} 는 {@code triggerNotification}/{@code sendToMember}/
- * {@code sendToGuestTokens} 세 겹 모두 {@code catch (Exception)} 으로 예외를 삼키고 발송을
- * 계속한다. 기본 전파였다면 정리 실패가 발송 트랜잭션을 rollback-only 로 표시하고, 삼켜진
- * 예외 때문에 그 사실을 아무도 모른 채 커밋 시점에 {@code UnexpectedRollbackException} 이
- * 터진다 — 토큰 정리 실패 하나로 그 알림의 발송 이력 전체가 되돌아가고, 원인은 로그상
- * 한참 떨어진 곳에 나타난다. 별도 트랜잭션으로 떼어내 정리 실패가 발송에 번지지 않게 한다.
+ * <p><b>전파는 {@code REQUIRES_NEW} 다 — 발송 트랜잭션에 참여시키면 안 된다.</b> 기본 전파였다면
+ * 정리 실패가 발송 트랜잭션을 rollback-only 로 표시하고, 커밋 시점에
+ * {@code UnexpectedRollbackException} 이 터져 토큰 정리 실패 하나로 그 알림의 발송 이력
+ * 전체가 되돌아간다. {@code REQUIRES_NEW} 는 이 rollback-only 오염만 막는다.
+ *
+ * <p><b>{@code cleanUp()} 이 던지는 {@code DataAccessException} 자체는 이 전파 설정으로
+ * 막히지 않는다</b> — 별도 트랜잭션이어도 예외는 그대로 호출부로 전파된다. 이 예외 전파를
+ * 실제로 막는 것은 호출부({@code FcmSendService.sendToToken}/{@code sendToTokens})의
+ * {@code try/catch} 다. 거기서 잡지 않으면 정리 실패 예외가 단건 발송의 {@code return false}나
+ * 배치 발송의 {@code return response} 를 가로막고, 그 위 {@code AlertNotificationService.sendToMember}
+ * 의 {@code catch (Exception)} 이 발송 이력 저장(`notificationLogRepository.save`) 앞에서
+ * 예외를 삼켜버려 FCM 은 이미 나갔는데 그 회원의 발송 이력만 통째로 안 남는 결과로 이어진다.
  *
  * <p>{@code REQUIRES_NEW} 의 통상적 위험인 <b>행 잠금 자기 교착</b>(바깥 트랜잭션이 잠근 행을
  * 안쪽이 기다리는 상황)은 여기서는 없다. 발송 경로는 {@code fcm_token}/{@code guest_fcm_region} 을

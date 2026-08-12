@@ -3,6 +3,7 @@ package com.disaster.alert.alertapi.domain.notification.service;
 import com.google.firebase.messaging.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataAccessException;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
@@ -55,7 +56,15 @@ public class FcmSendService {
             MessagingErrorCode code = e.getMessagingErrorCode();
             if (isDeadTokenError(code)) {
                 logDeadToken("FCM 발송", token, code);
-                deadTokenCleanupService.cleanUp(List.of(token));
+                // REQUIRES_NEW는 바깥 트랜잭션이 rollback-only로 오염되는 것만 막을 뿐, cleanUp()이
+                // 던진 예외 자체는 그대로 이 호출부로 전파된다. 여기서 잡지 않으면 아래 return false에
+                // 도달하지 못해 호출부(AlertNotificationService.sendToMember)의 발송 이력 저장이
+                // 통째로 스킵된다 — FCM은 이미 나갔는데 이력만 사라지는 상황을 막는다.
+                try {
+                    deadTokenCleanupService.cleanUp(List.of(token));
+                } catch (DataAccessException cleanupException) {
+                    log.error("죽은 토큰 정리 실패 - token: {}", maskToken(token), cleanupException);
+                }
             } else {
                 log.error("FCM 발송 실패 - token: {}, errorCode: {}, error: {}",
                         maskToken(token), code, e.getMessage());
@@ -92,7 +101,13 @@ public class FcmSendService {
                 log.error("FCM 배치가 전부 INVALID_ARGUMENT 로 실패 — 토큰이 아니라 메시지 페이로드 문제로 "
                         + "의심된다. 발송 코드/설정 변경을 확인할 것 - 토큰 수: {}", tokens.size());
             }
-            deadTokenCleanupService.cleanUp(collectDeadTokens(tokens, response));
+            // 단건 경로와 동일한 이유로 감싼다: cleanUp() 예외가 여기서 전파되면 아래 return response에
+            // 도달하지 못해 BatchResponse 자체가 유실된다.
+            try {
+                deadTokenCleanupService.cleanUp(collectDeadTokens(tokens, response));
+            } catch (DataAccessException cleanupException) {
+                log.error("죽은 토큰 배치 정리 실패 - 토큰 수: {}", tokens.size(), cleanupException);
+            }
             return response;
 
         } catch (FirebaseMessagingException e) {
