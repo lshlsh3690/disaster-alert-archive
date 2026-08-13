@@ -45,6 +45,7 @@ public class FcmSendService {
                     .putData("notificationType", notificationType)
                     .putData("alertId", alertId != null ? alertId : "")
                     .setAndroidConfig(buildAndroidConfig(notificationType))
+                    .setWebpushConfig(buildWebpushConfig())
                     .build();
 
             String response = FirebaseMessaging.getInstance().send(message);
@@ -88,6 +89,7 @@ public class FcmSendService {
                     .putData("notificationType", notificationType)
                     .putData("alertId", alertId != null ? alertId : "")
                     .setAndroidConfig(buildAndroidConfig(notificationType))
+                    .setWebpushConfig(buildWebpushConfig())
                     .build();
 
             BatchResponse response = FirebaseMessaging.getInstance().sendEachForMulticast(message);
@@ -179,8 +181,8 @@ public class FcmSendService {
      * <b>원인을 짚어주는 역할만</b> 남았다.
      *
      * <p>그 역할은 여전히 값이 있다. {@code INVALID_ARGUMENT} 는 토큰 형식 오류만 뜻하지 않고
-     * 메시지의 공유 필드(제목·본문·{@code data}·{@code AndroidConfig})가 잘못됐을 때도 같은
-     * 코드로 돌아온다. 발송 코드나 설정을 바꾼 직후 배치가 통째로 죽으면, 이 판정이 없으면
+     * 메시지의 공유 필드(제목·본문·{@code data}·{@code AndroidConfig}·{@code WebpushConfig})가
+     * 잘못됐을 때도 같은 코드로 돌아온다. 발송 코드나 설정을 바꾼 직후 배치가 통째로 죽으면, 이 판정이 없으면
      * 정체불명의 실패 로그 수십 줄만 남는다. 있으면 "토큰이 아니라 네가 방금 바꾼 페이로드가
      * 문제다"라고 한 줄로 알려준다.
      *
@@ -286,8 +288,8 @@ public class FcmSendService {
      * </ul>
      *
      * <p>{@code INVALID_ARGUMENT} 는 삭제 대상에서 <b>제외</b>한다. 토큰 형식 오류만 뜻하지 않고,
-     * Firebase 는 메시지 페이로드(제목·본문·{@code data}·{@code AndroidConfig})가 잘못됐을 때도
-     * 같은 코드를 돌려준다. 이 둘을 구분할 방법이 없어 그대로 삭제하면, 발송 코드/설정 변경으로
+     * Firebase 는 메시지 페이로드(제목·본문·{@code data}·{@code AndroidConfig}·{@code WebpushConfig})가
+     * 잘못됐을 때도 같은 코드를 돌려준다. 이 둘을 구분할 방법이 없어 그대로 삭제하면, 발송 코드/설정 변경으로
      * 페이로드가 깨졌을 때 멀쩡한 구독자를 전량 삭제하게 되고 되돌릴 수 없다(사용자가 알림 권한을
      * 다시 허용해야 함). 배치 단위 가드({@link #isSuspectedPayloadFailure})로 막으려 했으나 회원
      * 기기가 1~4대인 실제 호출 경로(단건 발송·소규모 배치)는 그 가드가 걸리지 않아 무방비였다.
@@ -298,6 +300,32 @@ public class FcmSendService {
      */
     static boolean isDeadTokenError(MessagingErrorCode code) {
         return code == MessagingErrorCode.UNREGISTERED;
+    }
+
+    /**
+     * 웹푸시 전송 옵션.
+     *
+     * <p><b>{@code setNotification()} 을 절대 넣지 마라.</b> {@code WebpushConfig} 에도 같은 이름의
+     * 메서드가 있는데, 그걸 쓰는 순간 클래스 상단 주석이 설명한 중복 알림 버그가 그대로 재발한다
+     * (Firebase JS SDK 가 서비스워커에서 알림을 한 번 더 자동 표시해, 제목·본문 없는 빈 알림이
+     * 두 번째로 뜬다). 여기서는 <b>헤더만</b> 넣는다 — 표시는 firebase-messaging-sw.js 전담이다.
+     *
+     * <p>{@code Urgency: high} 를 넣는 이유: 이 설정이 없으면 웹푸시는 기본값 {@code normal} 로
+     * 나가고, 브라우저 푸시 서비스가 배터리 절약을 위해 메시지를 모아뒀다가 전달할 수 있다.
+     * 2026-08-13 운영에서 발송 자체는 200ms 대에 끝났는데(구글이 수락, 실패 0) 브라우저에는
+     * 30~60초 뒤에 도착하는 것을 확인했다. 재난 알림에는 맞지 않는 기본값이다.
+     *
+     * <p>다만 이 헤더가 지연을 <b>완전히</b> 없애지는 못한다 — Chrome 백그라운드 스로틀링과 기기
+     * 절전은 별개 요인이고, 서비스워커가 멈춰 있다가 깨어나는 시간도 남는다. 이 헤더는 그중
+     * 서버가 통제할 수 있는 유일한 부분이다.
+     *
+     * <p>{@code AndroidConfig} 와 달리 유형별로 나누지 않는다. {@code PUSH}/{@code ALARM} 모두
+     * 재난 알림이라 지연되면 안 되는 것은 같다.
+     */
+    private WebpushConfig buildWebpushConfig() {
+        return WebpushConfig.builder()
+                .putHeader("Urgency", "high")
+                .build();
     }
 
     // Android 설정 (ALARM: 높은 우선순위)
