@@ -181,8 +181,8 @@ public class FcmSendService {
      * <b>원인을 짚어주는 역할만</b> 남았다.
      *
      * <p>그 역할은 여전히 값이 있다. {@code INVALID_ARGUMENT} 는 토큰 형식 오류만 뜻하지 않고
-     * 메시지의 공유 필드(제목·본문·{@code data}·{@code AndroidConfig})가 잘못됐을 때도 같은
-     * 코드로 돌아온다. 발송 코드나 설정을 바꾼 직후 배치가 통째로 죽으면, 이 판정이 없으면
+     * 메시지의 공유 필드(제목·본문·{@code data}·{@code AndroidConfig}·{@code WebpushConfig})가
+     * 잘못됐을 때도 같은 코드로 돌아온다. 발송 코드나 설정을 바꾼 직후 배치가 통째로 죽으면, 이 판정이 없으면
      * 정체불명의 실패 로그 수십 줄만 남는다. 있으면 "토큰이 아니라 네가 방금 바꾼 페이로드가
      * 문제다"라고 한 줄로 알려준다.
      *
@@ -288,8 +288,8 @@ public class FcmSendService {
      * </ul>
      *
      * <p>{@code INVALID_ARGUMENT} 는 삭제 대상에서 <b>제외</b>한다. 토큰 형식 오류만 뜻하지 않고,
-     * Firebase 는 메시지 페이로드(제목·본문·{@code data}·{@code AndroidConfig})가 잘못됐을 때도
-     * 같은 코드를 돌려준다. 이 둘을 구분할 방법이 없어 그대로 삭제하면, 발송 코드/설정 변경으로
+     * Firebase 는 메시지 페이로드(제목·본문·{@code data}·{@code AndroidConfig}·{@code WebpushConfig})가
+     * 잘못됐을 때도 같은 코드를 돌려준다. 이 둘을 구분할 방법이 없어 그대로 삭제하면, 발송 코드/설정 변경으로
      * 페이로드가 깨졌을 때 멀쩡한 구독자를 전량 삭제하게 되고 되돌릴 수 없다(사용자가 알림 권한을
      * 다시 허용해야 함). 배치 단위 가드({@link #isSuspectedPayloadFailure})로 막으려 했으나 회원
      * 기기가 1~4대인 실제 호출 경로(단건 발송·소규모 배치)는 그 가드가 걸리지 않아 무방비였다.
