@@ -38,7 +38,7 @@ services:
       - redis_data:/data
 
   postgres:
-    image: pgvector/pgvector:pg15
+    image: pgvector/pgvector:pg16
     container_name: disaster-postgres
     restart: unless-stopped
     env_file:
