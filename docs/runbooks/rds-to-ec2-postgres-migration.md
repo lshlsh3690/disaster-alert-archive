@@ -97,6 +97,22 @@ docker compose -f docker-compose.prod.yml logs -f backend   # Flyway가 "Success
 - FCM 발송, 로그인 등 핵심 플로우 스모크 테스트.
 - **이 기간 동안 RDS 인스턴스는 삭제하지 않는다** — 문제가 발견되면 `.env`의 `DB_HOST`를 RDS 엔드포인트로 되돌리고 `docker compose -f docker-compose.prod.yml up -d --force-recreate --no-deps backend`로 즉시 롤백 가능하다 (RDS는 그동안 손대지 않았으므로 데이터는 최종 덤프 시점 이전까지 그대로 보존되어 있다 — 다만 새 컨테이너에서 발생한 신규 쓰기는 RDS에 없으므로 롤백하면 그 구간 데이터는 유실됨을 감안).
 
+### 알려진 이슈 — EC2 메모리 제약과 `postgres` 병렬 워커
+
+컷오버 직후 실측(2026-08-18, EC2 t3.small = RAM 1.9GB) 통계/상관관계 조회(`weather_observation` 650만 건 집계)에서 아래 에러로 API가 실패했다:
+
+```
+org.postgresql.util.PSQLException: ERROR: could not resize shared memory segment "/PostgreSQL.xxx" to 8388608 bytes: No space left on device
+```
+
+원인은 디스크가 아니라 Docker 컨테이너의 기본 `/dev/shm` 크기(64MB)와 EC2 자체의 RAM 부족(RDS를 쓸 때는 DB 메모리가 별도 인스턴스에 있었지만, 이관 후에는 backend(JVM)·Redis·Caddy와 이 EC2의 RAM을 나눠 써야 함)이 겹쳐서 Postgres 병렬 쿼리 워커가 공유메모리를 확보하지 못한 것이다. `free -h`로 실측한 여유 메모리가 421MB 수준이었고 스왑도 이미 사용 중이었다.
+
+**대응(t3.small 유지 결정, 2026-08-18):** `docker-compose.prod.yml`의 `postgres` 서비스에 `shm_size: '128mb'`와 `command: ["postgres", "-c", "max_parallel_workers_per_gather=0"]`를 추가해 병렬 워커를 비활성화했다. 집계 쿼리가 다소 느려지는 대신 이런 메모리 환경에서 안정성을 확보하는 쪽을 택함.
+
+**인스턴스 사양 검토 결과(참고용, 실제 단가는 AWS 콘솔/Pricing Calculator로 재확인할 것):** RDS 절감액이 월 $21인데, RAM 확보를 위해 t3.medium(4GB)으로 올리면 추가 비용이 절감액을 거의 다 상쇄한다(순절감 $0~3/월 추정). t3.large(8GB)는 오히려 RDS 유지보다 비싸진다(추정 월 $35 안팎 손해). 그래서 t3.small 유지 + 튜닝 쪽으로 결정했다. `t4g.small`(Graviton, ARM)은 스펙(2 vCPU/2GB RAM) 동일에 더 저렴하지만 **RAM 자체가 늘지 않아 이 문제의 해결책이 아니며**, 전환하려면 `backend-deploy.yml`이 지금 x86_64 전용으로만 이미지를 빌드하고 있어 arm64 멀티아키텍처 빌드로 CI를 먼저 바꿔야 한다(redis/caddy/postgres 공식 이미지는 arm64 지원되므로 문제없음).
+
+이 튜닝 이후에도 데이터가 계속 쌓이며(날씨 이력 등) 같은 문제가 재발하면, 그때 인스턴스 업그레이드를 재검토한다.
+
 ## 5단계 — RDS 제거 (검증 기간 종료 후, 별도 작업)
 
 검증 기간(예: 1~2주) 동안 이상 없으면 진행한다. 이 문서의 범위 밖이며 별도로 진행 시점에 다시 다룬다 — 삭제 전 RDS 최종 스냅샷을 남겨두는 것을 권장한다.
