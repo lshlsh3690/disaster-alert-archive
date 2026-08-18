@@ -24,6 +24,7 @@ services:
       - .env
     depends_on:
       - redis
+      - postgres
     environment:
       SPRING_PROFILES_ACTIVE: prod
 
@@ -36,8 +37,18 @@ services:
     volumes:
       - redis_data:/data
 
+  postgres:
+    image: pgvector/pgvector:pg15
+    container_name: disaster-postgres
+    restart: unless-stopped
+    env_file:
+      - .env
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
 volumes:
   redis_data:
+  postgres_data:
   caddy_data:
   caddy_config:
   caddy_logs:
