@@ -28,7 +28,7 @@
     <circle cx="8" cy="-6" r="7.5"/>
     <path d="M-5,10 a13,13 0 0 1 26,0 z"/>
   </g>
-  <!-- "Client" 라벨은 FCM 화살표보다 뒤에 그린다 (선이 글자 뒤로 지나가 보이도록) -->
+  <!-- "Client" 라벨은 FCM 화살표 바로 뒤에 그린다 (화살표가 라벨을 가리키므로 함께 묶어둠) -->
 
 
   <!-- 요청 / 응답 -->
@@ -171,9 +171,8 @@
         paint-order="stroke" stroke="#ffffff" stroke-width="3" stroke-linejoin="round">Firebase Admin SDK</text>
 
   <!-- FCM 푸시 알림 전송 -->
-  <path d="M183,343 H45 V216" fill="none" stroke="#E8710A" stroke-width="1.6" marker-end="url(#ah-o)"/>
-  <text x="45" y="251" text-anchor="middle" font-size="11" fill="#16191F"
-        paint-order="stroke" stroke="#ffffff" stroke-width="4.5" stroke-linejoin="round">Client</text>
+  <path d="M183,343 H45 V239" fill="none" stroke="#E8710A" stroke-width="1.6" marker-end="url(#ah-o)"/>
+  <text x="45" y="234" text-anchor="middle" font-size="11" fill="#16191F">Client</text>
   <text x="80" y="360" text-anchor="middle" font-size="9" fill="#E8710A">FCM 푸시 알림 전송</text>
 
   <!-- ══════════ 배포 프로세스 ══════════ -->
@@ -186,7 +185,7 @@
     <circle cx="8" cy="-6" r="7.5"/>
     <path d="M-5,10 a13,13 0 0 1 26,0 z"/>
   </g>
-  <text x="45" y="664" text-anchor="middle" font-size="11" fill="#16191F">Developer</text>
+  <text x="45" y="646" text-anchor="middle" font-size="11" fill="#16191F">Developer</text>
 
   <text x="104" y="602" text-anchor="middle" font-size="9" fill="#16191F">Push</text>
   <line x1="82" y1="612" x2="124" y2="612" stroke="#16191F" stroke-width="1.4" marker-end="url(#ah)"/>
