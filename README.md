@@ -109,6 +109,10 @@ AI 기반 이벤트 클러스터링으로 중복 알림을 제거하고, 기상 
 
 ![System Architecture](docs/system_architecture.png)
 
+> 편집 원본은 [`docs/system_architecture.svg`](docs/system_architecture.svg)다. 텍스트·도형이 전부 벡터라
+> 별도 툴 없이 SVG를 직접 고칠 수 있고, git diff 에도 변경 내용이 그대로 남는다.
+> 웹 PNG(`system_architecture.png`)는 이 SVG를 렌더링해 내보낸 결과물이므로, 수정할 때는 SVG를 먼저 고칠 것.
+
 ---
 
 ## 프로젝트 구조
