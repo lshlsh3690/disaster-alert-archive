@@ -1,7 +1,6 @@
 package com.disaster.alert.alertapi.global.translation;
 
 import com.disaster.alert.alertapi.domain.disasteralert.model.DisasterAlert;
-import com.disaster.alert.alertapi.domain.disasteralert.model.DisasterAlertTranslation;
 import com.disaster.alert.alertapi.domain.disasteralert.repository.DisasterAlertRepository;
 import com.disaster.alert.alertapi.domain.disasteralert.repository.DisasterAlertTranslationRepository;
 import lombok.RequiredArgsConstructor;
@@ -146,7 +145,11 @@ public class TranslationService {
     /**
      * 실제 번역 + 저장 로직 (내부 공용).
      *
-     * <p>중복 호출 시 PK 충돌이 발생할 수 있으므로 호출 측에서 존재 여부를 사전에 체크해야 한다.
+     * <p>저장은 {@code translationRepository.upsert(...)}(ON CONFLICT DO NOTHING)로 하므로
+     * 동시에 중복 호출돼도 PK 충돌 예외는 나지 않는다 — 먼저 저장된 쪽이 유지되고 나머지는
+     * 조용히 무시된다. 다만 호출 측(예: {@link #ensureTranslated})이 여전히 존재 여부를 먼저
+     * 확인하는 이유는 이미 캐시가 있는데도 매번 번역 API를 호출하는 낭비(비용·지연)를 막기
+     * 위해서다.
      */
     private void translateAndSaveInternal(Long alertId, SupportedLanguage language) {
         try {
@@ -169,9 +172,11 @@ public class TranslationService {
             }
 
             // 지역명(region_names)은 legal_district_translation 에서 처리하므로 여기서는 null 로 저장.
-            translationRepository.save(
-                    DisasterAlertTranslation.of(alertId, targetLang, translatedMessage, translatedType, null)
-            );
+            // save() 대신 upsert() — 동시 요청 간 check-then-act 틈에서 나는 PK 충돌을
+            // DB 레벨 ON CONFLICT DO NOTHING 으로 원천 차단한다(TranslationService.ensureTranslated
+            // 동시성 회귀 테스트 참고). 네이티브 쿼리라 save() 와 달리 즉시 실행되므로 예외도
+            // 여기 try 블록 안에서 바로 잡힌다.
+            translationRepository.upsert(alertId, targetLang, translatedMessage, translatedType);
             log.info("번역 완료: alertId={}, lang={}", alertId, targetLang);
 
         } catch (Exception e) {
