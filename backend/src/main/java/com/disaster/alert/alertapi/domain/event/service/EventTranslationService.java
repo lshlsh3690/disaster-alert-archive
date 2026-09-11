@@ -1,7 +1,6 @@
 package com.disaster.alert.alertapi.domain.event.service;
 
 import com.disaster.alert.alertapi.domain.event.model.DisasterEvent;
-import com.disaster.alert.alertapi.domain.event.model.DisasterEventTranslation;
 import com.disaster.alert.alertapi.domain.event.repository.DisasterEventRepository;
 import com.disaster.alert.alertapi.domain.event.repository.DisasterEventTranslationRepository;
 import com.disaster.alert.alertapi.global.translation.OpenAiTranslationClient;
@@ -88,7 +87,9 @@ public class EventTranslationService {
         }
         String targetLang = language.getDbCode();
         String translatedTitle = translationClient.translate(event.getEventTitle(), targetLang);
-        translationRepository.save(DisasterEventTranslation.of(eventId, targetLang, translatedTitle));
+        // save() 대신 upsert() — alert 번역 캐시와 동일한 동시성 문제(check-then-act +
+        // 복합키 write-behind)라 같은 해법을 적용한다. TranslationService.translateAndSaveInternal 참고.
+        translationRepository.upsert(eventId, targetLang, translatedTitle);
         log.info("이벤트 제목 번역 완료: eventId={}, lang={}", eventId, targetLang);
     }
 }
