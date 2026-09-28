@@ -56,7 +56,7 @@ AI 기반 이벤트 클러스터링으로 중복 알림을 제거하고, 기상 
 | 알림 | Firebase SDK (FCM) + PWA (`@ducanh2912/next-pwa`) |
 | 지도 | Kakao Map API |
 | 테스트 | Jest (`npm test`), Playwright 스크린샷 스크립트 (`scripts/`) |
-| 배포 | Vercel |
+| 배포 | 맥북 셀프호스팅 (Docker Compose, `docker-compose.prod.yml`의 frontend 서비스) |
 
 ### Backend
 
@@ -73,13 +73,13 @@ AI 기반 이벤트 클러스터링으로 중복 알림을 제거하고, 기상 
 | 로깅 | LogTrace 스타일 AOP 호출 추적 (`global/logtrace`) |
 | 모니터링 | Spring Actuator |
 | API 문서 | SpringDoc OpenAPI (Swagger UI) |
-| 배포 | AWS EC2 + Docker Compose + Caddy, GHCR 이미지 |
+| 배포 | 맥북 셀프호스팅 + Docker Compose, self-hosted GitHub Actions 러너 |
 
 ### 데이터
 
 | 분류 | 기술 |
 |------|------|
-| 메인 DB | PostgreSQL + pgvector (VECTOR 1536) — 로컬은 `pgvector/pgvector:pg15`, 운영은 AWS RDS |
+| 메인 DB | PostgreSQL + pgvector (VECTOR 1536) — 로컬은 `pgvector/pgvector:pg15`, 운영은 맥북의 `pgvector/pgvector:pg16` 컨테이너 |
 | 캐시 | Redis 7 |
 | 마이그레이션 | Flyway (`backend/src/main/resources/db/migration`, `ddl-auto: validate`) |
 
@@ -98,10 +98,10 @@ AI 기반 이벤트 클러스터링으로 중복 알림을 제거하고, 기상 
 
 | 분류 | 기술 |
 |------|------|
-| 클라우드 | AWS EC2 (백엔드), AWS RDS (PostgreSQL) |
+| 호스팅 | 맥북 셀프호스팅 (프론트엔드+백엔드+Postgres+Redis 전부 한 Docker Compose 스택) |
 | 컨테이너 | Docker + Docker Compose |
-| 리버스 프록시 | Caddy (자동 HTTPS) |
-| CI/CD | GitHub Actions |
+| 외부 접속 | Cloudflare Tunnel (자동 HTTPS, 포트포워딩 불필요) |
+| CI/CD | GitHub Actions (맥북에 설치한 self-hosted 러너에서 빌드·배포) |
 
 ---
 

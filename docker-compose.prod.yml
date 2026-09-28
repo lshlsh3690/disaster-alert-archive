@@ -1,24 +1,41 @@
 services:
-  proxy:
-    image: caddy:2
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: disaster-cloudflared
     restart: unless-stopped
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile:ro
-      - caddy_data:/data
-      - caddy_config:/config
-      - caddy_logs:/var/log/caddy
+    command: tunnel run
+    environment:
+      TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN}
+    depends_on:
+      - backend
+      - frontend
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: dockerfile
+      args:
+        BASE_API_URL: http://backend:8080
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
+        NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL}
+        NEXT_PUBLIC_KAKAO_MAP_APP_KEY: ${NEXT_PUBLIC_KAKAO_MAP_APP_KEY}
+        NEXT_PUBLIC_FIREBASE_API_KEY: ${NEXT_PUBLIC_FIREBASE_API_KEY}
+        NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: ${NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN}
+        NEXT_PUBLIC_FIREBASE_PROJECT_ID: ${NEXT_PUBLIC_FIREBASE_PROJECT_ID}
+        NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET: ${NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET}
+        NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: ${NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID}
+        NEXT_PUBLIC_FIREBASE_APP_ID: ${NEXT_PUBLIC_FIREBASE_APP_ID}
+        NEXT_PUBLIC_FIREBASE_VAPID_KEY: ${NEXT_PUBLIC_FIREBASE_VAPID_KEY}
+    container_name: disaster-frontend
+    restart: unless-stopped
     depends_on:
       - backend
 
   backend:
     build:
       context: ./backend
+      dockerfile: dockerfile
     container_name: disaster-backend
-    image: ghcr.io/disaster-alert-archive-team/disaster-alert-archive/backend:${API_TAG:-latest}
-    #image: ${DOCKER_USER}/disaster-backend:${API_TAG:-latest}
     restart: unless-stopped
     env_file:
       - .env
@@ -51,6 +68,3 @@ services:
 volumes:
   redis_data:
   postgres_data:
-  caddy_data:
-  caddy_config:
-  caddy_logs:

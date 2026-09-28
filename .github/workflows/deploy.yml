@@ -1,0 +1,29 @@
+name: deploy
+on:
+  push:
+    branches: [ "develop" ]
+    paths:
+      - "backend/**"
+      - "frontend/**"
+      - "docker-compose.prod.yml"
+      - ".github/workflows/deploy.yml"
+
+jobs:
+  deploy:
+    runs-on: [self-hosted]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Firebase 서비스 계정 키 생성
+        run: |
+          echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT }}' \
+          > backend/src/main/resources/firebase-service-account.json
+
+      - name: 이미지 빌드 (backend, frontend)
+        run: docker compose -f docker-compose.prod.yml build backend frontend
+
+      - name: 재기동 (backend, frontend만 — postgres/redis/cloudflared는 유지)
+        run: docker compose -f docker-compose.prod.yml up -d --force-recreate --no-deps backend frontend
+
+      - name: 미사용 이미지 정리
+        run: docker image prune -f || true
