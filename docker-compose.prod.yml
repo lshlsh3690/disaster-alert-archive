@@ -46,6 +46,13 @@ services:
       SPRING_PROFILES_ACTIVE: prod
 
 
+  dozzle:
+    image: amir20/dozzle:latest
+    container_name: disaster-dozzle
+    restart: unless-stopped
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+
   redis:
     image: redis:7-alpine
     container_name: disaster-redis

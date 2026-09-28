@@ -124,6 +124,20 @@ docker compose -f docker-compose.prod.yml logs -f backend   # Flyway "Successful
 - 맥북을 재부팅해 Docker Desktop + 모든 컨테이너가 자동으로 다시 뜨는지 한 번 실제로 검증해본다 (정전/업데이트 재부팅 대비).
 - **이 기간 동안 EC2 인스턴스는 종료하지 않는다** — 문제가 발견되면 Cloudflare Public Hostname을 EC2로, Vercel 도메인 연결을 다시 붙이는 것만으로 즉시 롤백 가능하다(단, 롤백 시점 이후 맥북에서 쌓인 데이터는 EC2에 반영되지 않으므로 유실 감안).
 
+## 부가 기능 — 외부에서 로그 보기 (Dozzle)
+
+EC2 정리 이후 SSH로 로그를 못 보게 되는 문제를 해결하기 위해 `docker-compose.prod.yml`에 `dozzle`(웹 기반 Docker 로그 뷰어, `amir20/dozzle`) 서비스를 추가했다. 호스트 포트는 노출하지 않고(다른 서비스와 동일한 패턴), Cloudflare Tunnel + Access로만 접근 가능하게 한다.
+
+1. Cloudflare Zero Trust → **Access** → **Applications** → **Add an application** → **Self-hosted**
+   - Public hostname: `logs.disaster-alert-archive.co.kr`
+   - Access policy: `owner-only` — Include 규칙 **Emails** = 본인 이메일만 허용 (인증 없이 공개하면 컨테이너 로그에 담긴 민감정보가 노출되므로 필수)
+   - Zero Trust Free 플랜도 카드 등록이 필요함(과금은 안 됨)
+2. Tunnel(`disasteralertarchive`) → **Routes** → **+ Add route** → **Published application**
+   - Subdomain `logs`, Domain `disaster-alert-archive.co.kr`, Service URL `http://dozzle:8080`
+3. 맥북에서 `docker compose -f docker-compose.prod.yml up -d dozzle`
+
+`https://logs.disaster-alert-archive.co.kr` 접속 시 Cloudflare Access 로그인(이메일 인증) → 통과하면 Dozzle 웹 UI에서 모든 컨테이너(backend/frontend/postgres/redis/cloudflared)의 실시간 로그를 볼 수 있다.
+
 ## 구자원 제거 (검증 기간 종료 후, 별도 작업)
 
 검증 기간(예: 1~2주) 동안 이상 없으면 진행한다. 이 문서의 범위 밖이며 별도로 진행 시점에 다시 다룬다 — EC2 인스턴스 종료 전 최종 스냅샷을 남겨두는 것을 권장하고, Vercel 프로젝트는 삭제 전 한 번 더 커스텀 도메인이 완전히 해제됐는지 확인한다.
