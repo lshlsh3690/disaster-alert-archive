@@ -12,7 +12,12 @@ jobs:
   deploy:
     runs-on: [self-hosted]
     steps:
+      # clean: false — actions/checkout 기본값(true)은 매 실행마다 git clean -ffdx를 돌려서
+      # .gitignore에 등록된 파일(.env 포함)까지 지운다. self-hosted 러너 워크스페이스에
+      # 한 번만 수동으로 채워둔 .env가 다음 배포 때 사라지면 안 되므로 꺼둔다.
       - uses: actions/checkout@v4
+        with:
+          clean: false
 
       - name: Firebase 서비스 계정 키 생성
         run: |

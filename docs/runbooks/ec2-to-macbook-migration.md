@@ -46,11 +46,26 @@ cd actions-runner
 ./svc.sh start
 ```
 
+이건 launchd **LaunchAgent**로 등록되는 것이라, 맥 계정에 로그인된 상태에서만 동작한다 — 잠금 화면(로그인 전)에 멈춰있으면 러너도 멈춘다. 자동 로그인을 켜두거나, 재부팅 후 반드시 다시 로그인해야 한다는 걸 기억해둔다.
+
 이 저장소는 self-hosted 러너에서 `.github/workflows/deploy.yml`이 `push → develop`(경로: `backend/**`, `frontend/**`, `docker-compose.prod.yml`)마다 자동으로 `docker compose build` + `up -d --force-recreate --no-deps backend frontend`를 실행하도록 이미 구성돼 있다 — 러너만 떠 있으면 별도 설정 없이 바로 동작한다.
 
 ### 6. `.env` 준비
 
-레포 루트에 `.env.example`을 복사해 `.env`로 채운다 (`cp .env.example .env`). `DB_HOST`/`REDIS_HOST`는 컨테이너 이름이 아니라 **compose 서비스명**(`postgres`/`redis`)으로 둔다. `COOKIE_DOMAIN`, OAuth 리다이렉트 URI 등 도메인 관련 값은 EC2에서 쓰던 값 그대로 옮기면 된다(도메인 자체는 안 바뀜). self-hosted 러너가 체크아웃하는 워크스페이스 안에 이 파일을 두되, git에는 잡히지 않으므로(`.gitignore`) `deploy.yml`이 재배포할 때마다 지워지지 않는다 — 최초 1회만 사람이 채워두면 된다.
+self-hosted 러너는 `~/actions-runner/_work/<repo>/<repo>/`에 체크아웃하는데, 이 폴더는 배포가 최소 1번 실행돼야 생성된다 — `.env` 없이 첫 배포를 돌리면 그 시점엔 무조건 실패하므로, 미리 수동으로 한 번 클론해서 폴더를 만들어두고 `.env`를 채운 뒤 실제 배포를 트리거하는 순서로 진행한다:
+
+```bash
+mkdir -p ~/actions-runner/_work/disaster-alert-archive
+cd ~/actions-runner/_work/disaster-alert-archive
+git clone https://github.com/lshlsh3690/disaster-alert-archive.git disaster-alert-archive
+cd disaster-alert-archive
+git checkout develop
+cp .env.example .env   # 값 채우기
+```
+
+`DB_HOST`/`REDIS_HOST`는 컨테이너 이름이 아니라 **compose 서비스명**(`postgres`/`redis`)으로 둔다. `COOKIE_DOMAIN`, OAuth 리다이렉트 URI 등 도메인 관련 값은 EC2에서 쓰던 값 그대로 옮기면 된다(도메인 자체는 안 바뀜). 이렇게 미리 만들어둔 폴더는 `actions/checkout`이 같은 저장소로 인식해서 그 자리에서 fetch/checkout만 하므로, 다음에 실제 push로 배포가 트리거돼도 이 `.env`는 그대로 남는다(`clean: false` 설정 덕분).
+
+`deploy.yml`의 checkout 스텝은 `clean: false`로 설정돼 있어 매 배포마다 워크스페이스를 청소하지 않는다 — `actions/checkout` 기본값(`clean: true`)은 `git clean -ffdx`를 돌려서 `.gitignore`된 파일(`.env` 포함)까지 지워버리는데, 그러면 최초 1회 채워둔 `.env`가 두 번째 배포 때 사라져 backend/postgres가 기동 실패한다 — 그래서 꺼둔 것이다. 즉 **최초 1회만 사람이 채워두면 이후 배포마다 그대로 유지된다.**
 
 ## 예비 검증 (다운타임 없음)
 
