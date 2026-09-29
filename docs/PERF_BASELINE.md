@@ -1,6 +1,10 @@
-# 통계 API 캐시 성능 측정 (Redis `@Cacheable` 도입 전/후)
+# 통계 API 성능 측정 및 병목 제거
 
-측정일: 2026-09-29. 재현 스크립트: `backend/loadtest/`.
+측정일: 2026-09-29. 재현 스크립트: `backend/loadtest/`. 두 라운드로 진행:
+- **1라운드(1~6절)**: 기존 Redis 캐시(`@Cacheable`)의 효과를 k6로 정량 측정 — 과정에서
+  Postgres 버퍼 워밍업이 측정치를 교란한다는 걸 발견해 캐시 기반 수치는 이력서에서 폐기.
+- **2라운드(7절)**: 1라운드에서 EXPLAIN ANALYZE로 규명한 실제 병목 2가지(인덱스 부재,
+  정규식 재계산, 대용량 응답 페이로드)를 실제로 제거. 이쪽이 이력서에 쓸 수 있는 수치.
 
 ## 1. 측정 환경
 
@@ -96,14 +100,129 @@ k6 run --env PATH=/api/v1/alerts/stats --env VUS=10 --env DURATION=30s backend/l
 ```
 전체 3개 엔드포인트 커맨드와 PowerShell 버전은 `backend/loadtest/README.md` 참고.
 
-## 6. 이력서 문장 초안
+## 6. 1라운드 수치의 이력서 채택 여부
 
-**주의 — 배수 계산 시 반드시 같은 측정 방식끼리 비교할 것**: 단발 curl 콜드 응답(5.11s)과 k6 부하테스트 히트 p95(19.48ms)는 서로 다른 측정 조건이라, 이 둘을 나눈 "260배" 같은 수치는 근거가 약하다. 아래 문장은 **동일 조건(k6 VU10, 같은 실행)에서 뽑은 미스 대 히트 p95**만 사용한다.
+**캐시 미스/히트 관련 수치는 전부 이력서에서 제외한다.** 4절에서 확인했듯 반복 측정 중
+Postgres 버퍼 워밍업이 섞여 들어가(rep1→rep3에서 미스 자체가 50.82ms→20.07ms로 빨라짐)
+"캐시가 N배 개선했다"는 주장 자체가 방어 불가능해졌다. 이 라운드의 가치는 수치가 아니라
+**"왜 병목이 생기는지 EXPLAIN ANALYZE로 규명한 것"**이고, 그 규명 결과가 7절의 실제
+개선 작업으로 이어졌다. 1라운드 수치는 면접에서 "측정 방법론을 어떻게 검증했나"를 설명할
+때만 근거로 쓴다(9절 참고).
 
-> Redis 기반 캐싱(Spring `@Cacheable`, TTL 10분)이 적용된 통계 집계 API에 대해 k6 부하 테스트(VU10 동시 요청, 합성 데이터 60,000건)로 캐시 미스/히트를 동일 조건에서 정량 비교. `GET /stats` 기준 p95 응답시간을 2.6배 단축(50.82ms→19.48ms)했고, 무엇보다 캐시 미스 시 발생하던 최악의 경우 응답 지연(최대 7.11초)을 캐시 히트 시 30ms 이내로 완전히 제거함을 확인.
+## 7. 2라운드 — 실제 병목 제거
 
-> 동일 하네스로 지역별 날씨 상관관계 API(`weather-by-region`)를 측정한 결과, 서버가 충분히 웜업되면 캐시 히트/미스가 ~450ms로 수렴하는 현상을 발견 — 40초당 2GB 이상 전송되는 대용량 응답 페이로드가 실제 병목이며 애플리케이션 캐싱만으로는 해결되지 않음을 코드 분석과 실측으로 규명 (해당 엔드포인트가 프론트엔드 지역 드릴다운 시 실사용됨을 확인).
+1라운드에서 EXPLAIN ANALYZE로 확인한 두 가지 근본 원인을 실제로 제거했다.
+브랜치: `perf/disaster-alert-indexes` → `perf/district-name-precompute` →
+`perf/weather-payload` (순서대로 쌓임, 각각 develop 대상 PR 예정).
 
-> micrometer-registry-prometheus·k6·합성 데이터 시드 스크립트로 재사용 가능한 성능 측정 하네스(`backend/loadtest/`)를 구축해, 캐시 효과 측정뿐 아니라 이후 알림 팬아웃/번역 파이프라인 성능 개선 작업에도 활용 가능하도록 정리.
+### 7-1. `disaster_type` 인덱스 부재 (커밋만, 이력서 제외)
 
-**면접 대비**: "왜 2.6배밖에 안 되냐"는 질문엔 3번 섹션의 반복 측정 추세(웜업될수록 격차가 더 좁혀짐)로 답하면 된다 — 오히려 "언제 캐시가 효과적이고 언제 아닌지"를 실측으로 규명했다는 깊이 있는 답변이 된다. 조건(60,000건 합성 데이터, VU10, 로컬 환경) 없이 숫자만 말하지 않는다.
+`/stats`의 `countByType`(유형별 집계)이 `disaster_type`에 인덱스가 없어 매번 Seq Scan +
+디스크 정렬 스필을 했다. `CREATE INDEX idx_disaster_alert_disaster_type`(V116) 추가.
+
+| | Before | After |
+|---|---|---|
+| 실행계획 | Seq Scan(60,000건) → 외부 정렬(디스크 1.6MB) | Index Scan (정렬 불필요) |
+| 실행시간 (EXPLAIN ANALYZE) | 162.9ms | 27.4ms (**약 6배**) |
+
+이력서 제외 이유: 사용자 판단 — 인덱스 추가는 흔한 최적화라 차별화 요소로 약함(코드/커밋에는 남김).
+
+### 7-2. `legal_district.name` 런타임 정규식 파싱 (커밋만, 이력서 제외)
+
+`sigungu/breakdown`, `weather-by-region`이 조회 시점마다 `legal_district.name`을
+`regexp_replace`+`split_part`로 파싱해 "시군구명"을 계산했다(`DisasterAlertRepositoryImpl`
+6개 호출부, 그중 3개는 `sigunguExpr()` 공유 헬퍼). `legal_district.sigungu_name`을
+`GENERATED ALWAYS ... STORED` 컬럼(V117)으로 추가해 조회 시점 계산을 없앴다.
+
+- GENERATED를 택한 이유: `LegalDistrictService.saveAllLegalDistricts()`가 Flyway 밖에서
+  CSV로 `legal_district`에 신규 행을 계속 추가하는 애플리케이션 쓰기 경로가 있어, 일반
+  컬럼+수동 백필이면 드리프트 위험이 있음(실제 코드로 확인).
+- 검증: 마이그레이션 직후 신규 컬럼과 기존 표현식을 전건 대조해 0건 불일치 확인. 코드 변경
+  전/후 API 응답 JSON을 실제로 덤프해 `diff`로 바이트 단위 동일함을 확인(로직 변경 아님을 증명).
+
+| | Before(정규식) | After(컬럼) |
+|---|---|---|
+| `/sigungu/breakdown` 실행시간 (동일 세션 3회 중앙값) | 6,399ms | 6,101ms (약 4.7%) |
+| `/weather-by-region` 실행시간 (동일 세션 3회 중앙값) | 7,077.8ms | 6,758.4ms (약 4.5%) |
+
+이력서 제외 이유: 개선폭이 작음 — `work_mem`(Postgres 기본값 4MB)이 69,027행 정렬을
+디스크 스필로 떨어뜨리는 게 지배적 비용이라, 정규식 계산 제거는 그 비용의 일부만 줄였다.
+`work_mem` 튜닝은 스키마/코드 범위를 벗어나 이번 작업에 포함하지 않음.
+
+### 7-3. `weather-by-region` 응답 페이로드 — **이력서 채택**
+
+`GET /stats/weather-by-region?groupBy=sigungu`가 264개 후보 시군구×최근 3년 일별 전체를
+반환해 단건 응답이 **8.2MB(58,265행)** 였다. 두 가지를 적용:
+
+1. **gzip 압축** (`server.compression`, 설정 2줄): 전송량은 91.9~91.8% 줄었지만(curl
+   단건 8,201,008→665,424 bytes, k6 30초 누적 2.2GB→180MB — 두 측정 교차검증됨),
+   **응답 시간은 로컬 환경에서 유의미하게 개선되지 않았다**(p95 1.36s→1.33s, avg는 오히려
+   근소 증가) — 로컬호스트는 대역폭이 사실상 무제한이라 전송 절감분이 미미하고 gzip 자체의
+   CPU 비용이 이를 상쇄한 것으로 추정.
+2. **서버사이드 상위 10개 지역 필터**: 코드 확인 결과 프론트(`WeatherByRegionChart.tsx`)가
+   총 건수 기준 상위 10개 지역만 차트에 쓰고 나머지는 버림 — 서버가 처음부터 그 10개만
+   반환하도록 `getWeatherBySigungu()`에 2단계 쿼리(랭킹→필터) 추가.
+   검증: 서버가 뽑은 상위 10개가 DB 직접 집계 상위 10개와 정확히 일치(11/12위 경계 확인),
+   포함된 지역 데이터가 기존 응답과 행 단위로 동일(부동소수점 평균의 최하위 자릿수 표현
+   차이 3건 제외)함을 확인. 동률 처리용 2차 정렬 키 누락을 dev-reviewer가 지적해 수정.
+
+**두 개를 합친 결과** (동일 세션, 3회 반복 중앙값, VU10/30s k6 + curl 단건 교차검증):
+
+| | Before | After (압축 + 상위 10개 필터) | 개선 |
+|---|---|---|---|
+| 응답 행수 | 58,265 | 6,734 | 약 88.4% 감소 |
+| 단건 전송량 | 8,201,008 bytes | 74,938 bytes | **약 99.1% 감소 (약 109배)** |
+| p95 응답시간 (k6 VU10) | 1.33~1.36s | 158.81ms | **약 8.6배** |
+| RPS (k6 VU10) | ~8.7/s | ~76/s | 약 8.7배 |
+
+이 수치가 이력서에 채택된 이유: 압축률(91.9%)은 로컬/운영 환경에 의존하지 않고(같은 JSON이면
+어디서 재도 같은 비율), 응답 행수 감소(88.4%)는 DB 실측과 정확히 교차검증됐으며, 그 결과로
+나온 응답시간 개선(8.6배)까지 동일 세션·동일 조건에서 재현 가능하게 나왔다 — 앞선 캐시 수치들과
+달리 버퍼 워밍업·동시성 등 환경 변수에 흔들리지 않는 측정이다.
+
+## 8. 이력서 문장 (확정)
+
+> **단일 응답이 8.2MB(58,265행)에 달하던 지역별 날씨 통계 API에, 프론트엔드 사용 패턴 분석(상위 10개 지역만 실제 사용)을 근거로 서버사이드 상위 N 필터링과 gzip 압축을 적용 — k6 부하 테스트(VU10) 기준 전송량을 99.1%(8.2MB→75KB), p95 응답시간을 8.6배(1.36s→158.81ms) 개선. curl 단건 측정과 k6 부하 측정으로 교차검증.**
+
+보조 문장(선택):
+> Redis 캐시가 이미 적용된 통계 API의 실효성을 k6로 검증하는 과정에서 Postgres 버퍼 워밍업이 측정치를 교란한다는 걸 발견 — EXPLAIN ANALYZE로 실제 병목(인덱스 부재, 런타임 정규식 재계산, 대용량 응답 페이로드)을 구분해 정말 효과적인 개선(응답 페이로드 축소)에 집중했다.
+
+## 9. 면접 대비 — 예상 질문
+
+- **"왜 캐시 효과 수치가 이력서에 없나요?"** → 반복 측정 중 DB 버퍼 워밍업이 섞여 캐시
+  기여분을 독립적으로 분리할 수 없었다고 설명. 이게 오히려 "측정을 의심할 줄 안다"는 근거.
+- **"인덱스나 컬럼 정규화는 왜 이력서에 없나요?"** → 인덱스(6배)는 있었지만 흔한 최적화라
+  차별화 요소로 약하다고 판단해 제외, 코드에는 남아있음(V116/V117). 정규식 제거는 실측상
+  개선폭이 4.5~4.7%로 작았고, 원인(`work_mem` 기본값 4MB로 인한 디스크 정렬)까지 규명했다고
+  설명.
+- **"압축만으로는 왜 부족했나요?"** → 로컬 환경은 대역폭이 사실상 무제한이라 전송 시간
+  절감분이 미미했고 압축 자체의 CPU 비용이 이를 상쇄했다(실측: p95 거의 그대로). 응답 행수
+  자체를 줄이는 게(상위 10개 필터) DB/직렬화 비용을 실제로 줄여 응답시간 개선으로 이어졌다.
+
+## 재현 방법
+
+```bash
+# 0) 인프라
+docker compose -f docker-compose.dev.yml up -d postgres redis
+docker exec postgres psql -U $POSTGRES_USER -d postgres -c "ALTER SYSTEM SET max_parallel_workers_per_gather = 0;"
+docker restart postgres
+cd backend && set -a && source ../.env.dev && set +a && export DB_HOST=localhost
+./gradlew bootRun   # "Started BackendApplication" 확인 후 그대로 두거나 재기동
+
+# 1) 시드 (최초 1회, 증량하려면 재실행)
+docker exec -i postgres psql -U $POSTGRES_USER -d $POSTGRES_DB < backend/loadtest/seed/seed_stats_data.sql
+
+# 2) 측정 (엔드포인트별 미스/히트, backend/loadtest/README.md에 3개 엔드포인트 전체 커맨드)
+while true; do docker exec redis sh -c "redis-cli --scan --pattern 'stats-*' | xargs -r redis-cli DEL" >/dev/null 2>&1; sleep 0.1; done &
+EVICT_PID=$!
+k6 run --env PATH=/api/v1/alerts/stats --env VUS=10 --env DURATION=30s backend/loadtest/k6/stats-endpoint.js
+kill $EVICT_PID
+
+curl -s -o /dev/null http://localhost:8080/api/v1/alerts/stats
+k6 run --env PATH=/api/v1/alerts/stats --env VUS=10 --env DURATION=30s backend/loadtest/k6/stats-endpoint.js
+
+# 3) 2라운드(압축+상위N) 재현 — Accept-Encoding 명시 필요 (k6 http.get 기본은 미전송)
+k6 run --env PATH=/api/v1/alerts/stats/weather-by-region --env QUERY=groupBy=sigungu --env VUS=10 --env DURATION=30s backend/loadtest/k6/stats-endpoint.js
+curl -s --compressed -o /dev/null -w "wire bytes: %{size_download}\n" "http://localhost:8080/api/v1/alerts/stats/weather-by-region?groupBy=sigungu"
+```
+전체 커맨드와 PowerShell 버전은 `backend/loadtest/README.md` 참고.

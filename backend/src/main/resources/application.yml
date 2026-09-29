@@ -55,6 +55,13 @@ logging:
 
 server:
   port: 8080
+  compression:
+    enabled: true
+    # mime-types는 명시 안 함 — application/json 포함 Spring Boot 기본 목록과 동일해서 다시
+    # 적으면 "새로 추가했다"는 오해만 생김(dev-reviewer 지적).
+    # min-response-size 기본값(2KB)보다 낮춘 이유: /stats 응답 다수가 수백 바이트~수 KB
+    # 사이라 기본값이면 압축 대상에서 자주 빠짐. 1KB로 낮춰 이런 응답도 포함되게 함.
+    min-response-size: 1024
 
 cookie:
   secure: false
