@@ -750,6 +750,12 @@ public class DisasterAlertRepositoryImpl implements DisasterAlertRepositoryCusto
                 .collect(Collectors.toList());
     }
 
+    // frontend/src/app/stats/charts/WeatherByRegionChart.tsx가 총 건수 기준 상위 10개
+    // 지역만 차트에 그리고 나머지는 버린다 — 264개 후보 시군구×날짜 전체를 응답에 실어
+    // 보내봐야 프론트가 90% 이상을 버리므로, 서버에서 미리 상위 10개로 좁혀서 응답
+    // 크기 자체를 줄인다(응답 계약은 동일, 포함되는 지역 집합만 서버가 선(先) 결정).
+    private static final int WEATHER_REGION_TOP_N = 10;
+
     @Override
     public List<WeatherRegionStatDto> getWeatherBySigungu(AlertSearchRequest request) {
         QWeatherDailySummary wds = QWeatherDailySummary.weatherDailySummary;
@@ -758,6 +764,19 @@ public class DisasterAlertRepositoryImpl implements DisasterAlertRepositoryCusto
         NumberExpression<Integer> day   = disasterAlert.createdAt.dayOfMonth();
 
         StringExpression sigungu = sigunguExpr();
+
+        List<String> topSigungu = queryFactory
+                .select(sigungu)
+                .from(disasterAlert)
+                .join(disasterAlert.disasterAlertRegions, disasterAlertRegion)
+                .join(disasterAlertRegion.legalDistrict, legalDistrict)
+                .where(byAlertCondition(request), regionFilterOnJoin(request))
+                .groupBy(sigungu)
+                .orderBy(disasterAlert.id.countDistinct().desc())
+                .limit(WEATHER_REGION_TOP_N)
+                .fetch();
+
+        if (topSigungu.isEmpty()) return List.of();
 
         List<Tuple> rows = queryFactory
                 .select(year, month, day, sigungu,
@@ -772,7 +791,7 @@ public class DisasterAlertRepositoryImpl implements DisasterAlertRepositoryCusto
                 .leftJoin(wds).on(
                         wds.legalDistrictCode.eq(legalDistrict.code)
                         .and(wds.date.eq(Expressions.dateTemplate(java.time.LocalDate.class, "cast({0} as date)", disasterAlert.createdAt))))
-                .where(byAlertCondition(request), regionFilterOnJoin(request))
+                .where(byAlertCondition(request), regionFilterOnJoin(request), legalDistrict.sigunguName.in(topSigungu))
                 .groupBy(year, month, day, sigungu)
                 .orderBy(year.asc(), month.asc(), day.asc())
                 .fetch();
