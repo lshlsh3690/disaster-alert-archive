@@ -55,6 +55,10 @@ logging:
 
 server:
   port: 8080
+  compression:
+    enabled: true
+    mime-types: application/json,application/xml,text/html,text/xml,text/plain,text/css,text/javascript,application/javascript
+    min-response-size: 1024
 
 cookie:
   secure: false
