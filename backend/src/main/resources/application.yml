@@ -172,5 +172,12 @@ clustering:
 springdoc:
   swagger-ui:
     path: /swagger-ui.html
+
+# 캐시 도입 전/후 성능 측정(backend/loadtest/)용. 필요한 엔드포인트만 노출.
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,prometheus,metrics,caches
   api-docs:
     path: /v3/api-docs

@@ -51,6 +51,8 @@ dependencies {
 
     implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
     implementation 'org.springframework.boot:spring-boot-starter-actuator'
+    // /actuator/prometheus 노출용 — 캐시 도입 전/후 성능 측정(backend/loadtest/)에서 사용
+    runtimeOnly 'io.micrometer:micrometer-registry-prometheus'
     // Controller/Service 계층 호출을 김영한 LogTrace 스타일(트랜잭션ID+들여쓰기)로 자동 로깅
     // (global/logtrace/LogTraceConfig 의 AOP 어드바이저). 새 라이브러리지만 명시적으로 요청받음.
     implementation 'org.springframework.boot:spring-boot-starter-aop'
