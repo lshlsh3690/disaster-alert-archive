@@ -58,15 +58,7 @@ public class AlertNotificationService {
             String body = alert.getMessage();
 
             // 3. 해당 지역들을 관심지역으로 등록한 사용자 조회
-            // 시도 전체 등록 사용자를 위해 시도 레벨 코드도 포함 (예: "2900300000" → "2900000000")
-            List<String> sidoCodes = regionCodes.stream()
-                    .filter(code -> code.length() == 10)
-                    .map(code -> code.substring(0, 2) + "00000000")
-                    .distinct()
-                    .toList();
-            List<String> allCodesToSearch = Stream.concat(regionCodes.stream(), sidoCodes.stream())
-                    .distinct()
-                    .toList();
+            List<String> allCodesToSearch = withSidoCodes(regionCodes);
 
             List<Long> memberIds = favoriteRegionRepository
                     .findByIdLegalDistrictCodeIn(allCodesToSearch)
@@ -88,6 +80,18 @@ public class AlertNotificationService {
         } catch (Exception e) {
             log.error("알림 트리거 실패 - alertId: {}, error: {}", alertId, e.getMessage());
         }
+    }
+
+    // 시도 전체 등록 사용자를 위해 시도 레벨 코드도 포함 (예: "2900300000" → "2900000000")
+    private List<String> withSidoCodes(List<String> regionCodes) {
+        List<String> sidoCodes = regionCodes.stream()
+                .filter(code -> code.length() == 10)
+                .map(code -> code.substring(0, 2) + "00000000")
+                .distinct()
+                .toList();
+        return Stream.concat(regionCodes.stream(), sidoCodes.stream())
+                .distinct()
+                .toList();
     }
 
     private void sendToMembers(List<Long> memberIds, Long alertId, String title, String body) {
