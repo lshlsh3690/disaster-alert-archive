@@ -34,6 +34,12 @@ public class AlertNotificationService {
     @Async
     @Transactional
     public void triggerNotification(Long alertId) {
+        // @Async라 HTTP 응답시간으로는 이 메서드의 실제 소요시간을 잴 수 없다(응답은 즉시
+        // 200, 처리는 백그라운드 스레드). ThreadLocalLogTrace AOP도 같은 프록시 체인에서
+        // @Async 어드바이저보다 안쪽/바깥쪽 어느 쪽에 걸리는지 두 어드바이저 모두 @Order가
+        // 없어 정적으로 확정할 수 없어 신뢰할 수 없다 — 그래서 여기서 직접 재서 남긴다.
+        // 팬아웃 성능 측정(backend/loadtest/)은 이 로그의 time=Xms를 파싱하는 방식을 쓴다.
+        long startNanos = System.nanoTime();
         try {
             // 1. 재난문자 조회
             DisasterAlert alert = disasterAlertRepository.findById(alertId)
@@ -72,18 +78,30 @@ public class AlertNotificationService {
                     .toList();
 
             if (!memberIds.isEmpty()) {
-                log.info("회원 알림 발송 대상: {}명, alertId: {}", memberIds.size(), alertId);
-                for (Long memberId : memberIds) {
-                    sendToMember(memberId, alertId, title, body);
-                }
+                sendToMembers(memberIds, alertId, title, body);
             }
 
             // 게스트 토큰 발송
             sendToGuestTokens(allCodesToSearch, alertId, title, body);
 
+            long totalMs = (System.nanoTime() - startNanos) / 1_000_000;
+            log.info("알림 트리거 완료 - alertId: {}, time={}ms", alertId, totalMs);
+
         } catch (Exception e) {
             log.error("알림 트리거 실패 - alertId: {}, error: {}", alertId, e.getMessage());
         }
+    }
+
+    private void sendToMembers(List<Long> memberIds, Long alertId, String title, String body) {
+        log.info("회원 알림 발송 대상: {}명, alertId: {}", memberIds.size(), alertId);
+        long fanoutStartNanos = System.nanoTime();
+        for (Long memberId : memberIds) {
+            sendToMember(memberId, alertId, title, body);
+        }
+        long fanoutNanos = System.nanoTime() - fanoutStartNanos;
+        log.info("회원 팬아웃 완료 - alertId: {}, 대상: {}명, time={}ms, avg={}ms/명",
+                alertId, memberIds.size(), fanoutNanos / 1_000_000,
+                fanoutNanos / 1_000_000.0 / memberIds.size());
     }
 
     private void sendToGuestTokens(List<String> regionCodes, Long alertId, String title, String body) {
