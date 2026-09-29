@@ -22,6 +22,7 @@ import com.querydsl.core.types.dsl.DateTimeTemplate;
 import com.querydsl.core.types.dsl.Expressions;
 import com.querydsl.core.types.dsl.NumberExpression;
 import com.querydsl.core.types.dsl.NumberPath;
+import com.querydsl.core.types.dsl.StringExpression;
 import com.querydsl.core.types.dsl.StringTemplate;
 import com.querydsl.jpa.JPAExpressions;
 import com.querydsl.jpa.impl.JPAQueryFactory;
@@ -189,19 +190,9 @@ public class DisasterAlertRepositoryImpl implements DisasterAlertRepositoryCusto
 
     @Override
     public List<DisasterAlertStatResponse.RegionStat> getStatsSigungu(AlertSearchRequest request) {
-        StringTemplate norm =
-                Expressions.stringTemplate(
-                        "function('btrim', function('regexp_replace', {0}, '\\\\s+', ' ', 'g'))",
-                        legalDistrict.name
-                );
-
-        // 시/도 + 시/군/구 = 첫 두 토큰 (두 번째 토큰이 없으면 첫 토큰만)
-        StringTemplate sigungu = Expressions.stringTemplate(
-                "CASE WHEN function('split_part', {0}, ' ', 2) = '' " +
-                "THEN function('split_part', {0}, ' ', 1) " +
-                "ELSE function('split_part', {0}, ' ', 1) || ' ' || function('split_part', {0}, ' ', 2) END",
-                norm
-        );
+        // V117: legal_district.sigungu_name(GENERATED STORED)을 그대로 쓴다 — 조회 시점마다
+        // regexp_replace/split_part로 다시 계산하지 않는다.
+        StringExpression sigungu = legalDistrict.sigunguName;
 
         return queryFactory
                 .select(Projections.constructor(DisasterAlertStatResponse.RegionStat.class,
@@ -231,18 +222,8 @@ public class DisasterAlertRepositoryImpl implements DisasterAlertRepositoryCusto
         // breakdown은 항상 전체 레벨을 함께 반환해야 하므로, 호출자가 level을 실어 보내더라도 무시한다.
         request.setLevel(null);
 
-        StringTemplate norm =
-                Expressions.stringTemplate(
-                        "function('btrim', function('regexp_replace', {0}, '\\\\s+', ' ', 'g'))",
-                        legalDistrict.name
-                );
-
-        StringTemplate sigungu = Expressions.stringTemplate(
-                "CASE WHEN function('split_part', {0}, ' ', 2) = '' " +
-                "THEN function('split_part', {0}, ' ', 1) " +
-                "ELSE function('split_part', {0}, ' ', 1) || ' ' || function('split_part', {0}, ' ', 2) END",
-                norm
-        );
+        // V117: legal_district.sigungu_name(GENERATED STORED)을 그대로 쓴다.
+        StringExpression sigungu = legalDistrict.sigunguName;
 
         NumberExpression<Long> level1Count = new CaseBuilder()
                 .when(disasterAlert.emergencyLevel.eq(DisasterLevel.LEVEL_1)).then(disasterAlert.id)
@@ -779,13 +760,8 @@ public class DisasterAlertRepositoryImpl implements DisasterAlertRepositoryCusto
         NumberExpression<Integer> month = disasterAlert.createdAt.month();
         NumberExpression<Integer> day   = disasterAlert.createdAt.dayOfMonth();
 
-        StringTemplate norm = Expressions.stringTemplate(
-                "function('btrim', function('regexp_replace', {0}, '\\\\s+', ' ', 'g'))", legalDistrict.name);
-        StringTemplate sigungu = Expressions.stringTemplate(
-                "CASE WHEN function('split_part', {0}, ' ', 2) = '' " +
-                "THEN function('split_part', {0}, ' ', 1) " +
-                "ELSE function('split_part', {0}, ' ', 1) || ' ' || function('split_part', {0}, ' ', 2) END",
-                norm);
+        // V117: legal_district.sigungu_name(GENERATED STORED)을 그대로 쓴다.
+        StringExpression sigungu = legalDistrict.sigunguName;
 
         List<Tuple> rows = queryFactory
                 .select(year, month, day, sigungu,
@@ -1166,7 +1142,7 @@ public class DisasterAlertRepositoryImpl implements DisasterAlertRepositoryCusto
 
     private List<WeatherRegionStatDto> getWeatherHourlyBySigunguFromRollup(AlertSearchRequest request) {
         QWeatherHourlyCorrelationRollup r = QWeatherHourlyCorrelationRollup.weatherHourlyCorrelationRollup;
-        StringTemplate sigungu = sigunguExpr();
+        StringExpression sigungu = sigunguExpr();
 
         // 표시용 건수는 weather 조인 없는 alertCountByHourAndSigungu로 정확히 구한다 (사유는
         // getWeatherHourlyCorrelationFromRollup 주석 참고 — 수원시/성남시처럼 구가 나뉜 일반시는
@@ -1205,7 +1181,7 @@ public class DisasterAlertRepositoryImpl implements DisasterAlertRepositoryCusto
         NumberExpression<Integer> month = disasterAlert.createdAt.month();
         NumberExpression<Integer> day   = disasterAlert.createdAt.dayOfMonth();
         NumberExpression<Integer> hour  = disasterAlert.createdAt.hour();
-        StringTemplate sigungu = sigunguExpr();
+        StringExpression sigungu = sigunguExpr();
 
         List<Tuple> rows = queryFactory
                 .select(year, month, day, hour, sigungu, disasterAlert.id.countDistinct())
@@ -1236,7 +1212,7 @@ public class DisasterAlertRepositoryImpl implements DisasterAlertRepositoryCusto
         NumberExpression<Integer> day   = disasterAlert.createdAt.dayOfMonth();
         NumberExpression<Integer> hour  = disasterAlert.createdAt.hour();
 
-        StringTemplate sigungu = sigunguExpr();
+        StringExpression sigungu = sigunguExpr();
 
         List<Tuple> rows = queryFactory
                 .select(year, month, day, hour, sigungu,
@@ -1271,15 +1247,13 @@ public class DisasterAlertRepositoryImpl implements DisasterAlertRepositoryCusto
                 .collect(Collectors.toList());
     }
 
-    /** legalDistrict.name의 첫 두 토큰("시/도 + 시/군/구")을 시군구 표시명으로 파싱. */
-    private StringTemplate sigunguExpr() {
-        StringTemplate norm = Expressions.stringTemplate(
-                "function('btrim', function('regexp_replace', {0}, '\\\\s+', ' ', 'g'))", legalDistrict.name);
-        return Expressions.stringTemplate(
-                "CASE WHEN function('split_part', {0}, ' ', 2) = '' " +
-                "THEN function('split_part', {0}, ' ', 1) " +
-                "ELSE function('split_part', {0}, ' ', 1) || ' ' || function('split_part', {0}, ' ', 2) END",
-                norm);
+    /**
+     * legalDistrict.name의 첫 두 토큰("시/도 + 시/군/구")을 시군구 표시명으로 파싱한 값.
+     * V117부터 legal_district.sigungu_name(GENERATED STORED)을 그대로 반환한다 — 조회 시점마다
+     * regexp_replace/split_part를 다시 계산하지 않는다.
+     */
+    private StringExpression sigunguExpr() {
+        return legalDistrict.sigunguName;
     }
 
     @Override

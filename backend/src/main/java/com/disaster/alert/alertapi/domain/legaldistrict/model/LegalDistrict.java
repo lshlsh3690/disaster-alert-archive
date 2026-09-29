@@ -23,6 +23,11 @@ public class LegalDistrict {
     @Column(name = "is_active_string", nullable = false)
     private String isActiveString;
 
+    // V117에서 GENERATED ALWAYS ... STORED로 정의됨 — name이 바뀌면 Postgres가 자동 재계산한다.
+    // 애플리케이션이 값을 쓰면 안 되므로 insertable/updatable을 막는다.
+    @Column(name = "sigungu_name", insertable = false, updatable = false)
+    private String sigunguName;
+
     //정적 팩토리: id(=code)만 채운 참조용 엔티티 생성. DB 조회 없음.
     public static LegalDistrict referencedByCode(String code) {
         LegalDistrict ld = new LegalDistrict();
