@@ -11,6 +11,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.mockito.MockedStatic;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.transaction.CannotCreateTransactionException;
 
 import java.util.List;
@@ -388,5 +389,41 @@ class FcmSendServiceTest {
 
             assertThat(result).isSameAs(batchResponse);
         }
+    }
+
+    @Test
+    @DisplayName("dryRun=true면 sendToToken은 실제 FirebaseMessaging.getInstance()를 호출하지 않고 즉시 " +
+            "true를 반환해야 한다 — 아직 dryRun 필드/분기가 없어 FirebaseMessaging이 초기화되지 않은 테스트 " +
+            "환경에서 getInstance() 호출 시 IllegalStateException이 터지므로(또는 ReflectionTestUtils가 " +
+            "존재하지 않는 필드를 찾지 못해 실패하므로) 현재는 Red다")
+    void sendToToken_dryRun_returnsTrueWithoutCallingFirebase() {
+        DeadTokenCleanupService cleanupService = mock(DeadTokenCleanupService.class);
+        FcmSendService fcmSendService = new FcmSendService(cleanupService);
+        ReflectionTestUtils.setField(fcmSendService, "dryRun", true);
+
+        // FirebaseMessaging을 mockStatic으로 감싸지 않는다 — dry-run이 제대로 동작하면 애초에
+        // FirebaseMessaging.getInstance()를 호출하지 않으므로, 초기화되지 않은 실제 클래스를
+        // 그대로 둬도 예외 없이 통과해야 한다는 것 자체가 이 테스트의 핵심 assertion이다.
+        boolean result = fcmSendService.sendToToken("token-A", "제목", "본문", "ALARM", "alert-1");
+
+        assertThat(result).isTrue();
+    }
+
+    @Test
+    @DisplayName("dryRun=true면 sendToTokens도 실제 Firebase 호출 없이, 넘긴 토큰 수만큼 성공하고 " +
+            "실패는 0건인 BatchResponse를 반환해야 한다 — 현재는 dryRun 분기가 없어 " +
+            "FirebaseMessaging.getInstance() 호출 시 예외가 터지므로 Red다")
+    void sendToTokens_dryRun_returnsAllSuccessBatchResponseWithoutCallingFirebase() {
+        DeadTokenCleanupService cleanupService = mock(DeadTokenCleanupService.class);
+        FcmSendService fcmSendService = new FcmSendService(cleanupService);
+        ReflectionTestUtils.setField(fcmSendService, "dryRun", true);
+
+        List<String> tokens = List.of("token-A", "token-B", "token-C");
+
+        BatchResponse result = fcmSendService.sendToTokens(tokens, "제목", "본문", "ALARM", "alert-1");
+
+        assertThat(result).isNotNull();
+        assertThat(result.getSuccessCount()).isEqualTo(tokens.size());
+        assertThat(result.getFailureCount()).isEqualTo(0);
     }
 }
