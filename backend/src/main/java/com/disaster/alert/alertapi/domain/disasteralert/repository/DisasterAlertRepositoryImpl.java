@@ -190,9 +190,7 @@ public class DisasterAlertRepositoryImpl implements DisasterAlertRepositoryCusto
 
     @Override
     public List<DisasterAlertStatResponse.RegionStat> getStatsSigungu(AlertSearchRequest request) {
-        // V117: legal_district.sigungu_name(GENERATED STORED)을 그대로 쓴다 — 조회 시점마다
-        // regexp_replace/split_part로 다시 계산하지 않는다.
-        StringExpression sigungu = legalDistrict.sigunguName;
+        StringExpression sigungu = sigunguExpr();
 
         return queryFactory
                 .select(Projections.constructor(DisasterAlertStatResponse.RegionStat.class,
@@ -222,8 +220,7 @@ public class DisasterAlertRepositoryImpl implements DisasterAlertRepositoryCusto
         // breakdown은 항상 전체 레벨을 함께 반환해야 하므로, 호출자가 level을 실어 보내더라도 무시한다.
         request.setLevel(null);
 
-        // V117: legal_district.sigungu_name(GENERATED STORED)을 그대로 쓴다.
-        StringExpression sigungu = legalDistrict.sigunguName;
+        StringExpression sigungu = sigunguExpr();
 
         NumberExpression<Long> level1Count = new CaseBuilder()
                 .when(disasterAlert.emergencyLevel.eq(DisasterLevel.LEVEL_1)).then(disasterAlert.id)
@@ -760,8 +757,7 @@ public class DisasterAlertRepositoryImpl implements DisasterAlertRepositoryCusto
         NumberExpression<Integer> month = disasterAlert.createdAt.month();
         NumberExpression<Integer> day   = disasterAlert.createdAt.dayOfMonth();
 
-        // V117: legal_district.sigungu_name(GENERATED STORED)을 그대로 쓴다.
-        StringExpression sigungu = legalDistrict.sigunguName;
+        StringExpression sigungu = sigunguExpr();
 
         List<Tuple> rows = queryFactory
                 .select(year, month, day, sigungu,
