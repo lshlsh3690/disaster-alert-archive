@@ -174,3 +174,13 @@ springdoc:
     path: /swagger-ui.html
   api-docs:
     path: /v3/api-docs
+
+# 캐시 도입 전/후 성능 측정(backend/loadtest/)용. 필요한 엔드포인트만 노출.
+# prod 프로필에서는 application-prod.yml이 health만 남기고 되돌린다 — 로그인만 하면(관리자
+# 권한 없이도) SecurityConfig의 anyRequest().authenticated()를 통과해 prometheus/metrics/caches에
+# 접근 가능해지므로, 운영에는 이 넓은 노출 범위를 그대로 두지 않는다.
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,prometheus,metrics,caches
