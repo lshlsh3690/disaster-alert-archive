@@ -34,11 +34,9 @@ public class AlertNotificationService {
     @Async
     @Transactional
     public void triggerNotification(Long alertId) {
-        // @Async라 HTTP 응답시간으로는 이 메서드의 실제 소요시간을 잴 수 없다(응답은 즉시
-        // 200, 처리는 백그라운드 스레드). ThreadLocalLogTrace AOP도 같은 프록시 체인에서
-        // @Async 어드바이저보다 안쪽/바깥쪽 어느 쪽에 걸리는지 두 어드바이저 모두 @Order가
-        // 없어 정적으로 확정할 수 없어 신뢰할 수 없다 — 그래서 여기서 직접 재서 남긴다.
-        // 팬아웃 성능 측정(backend/loadtest/)은 이 로그의 time=Xms를 파싱하는 방식을 쓴다.
+        // @Async라 HTTP 응답시간으로 못 재고, ThreadLocalLogTrace AOP도 @Async 어드바이저와의
+        // 순서가 둘 다 @Order 미지정이라 정적으로 불확실해 못 믿는다 — 직접 재서 로그로 남긴다
+        // (backend/loadtest/가 이 time=Xms를 파싱).
         long startNanos = System.nanoTime();
         try {
             // 1. 재난문자 조회
