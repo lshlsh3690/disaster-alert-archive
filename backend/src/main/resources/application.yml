@@ -55,14 +55,6 @@ logging:
 
 server:
   port: 8080
-  # weather-by-region(8.2MB 응답)이 계기가 되어 도입했으나(perf/weather-payload, PR #251),
-  # 상위 10개 지역 필터 적용 후 압축 단독 기여도를 on/off로 격리 측정한 결과 로컬 기준
-  # 응답시간에는 기여가 없고 오히려 근소하게 느려졌다(p95 131.87ms→143.47ms, gzip 자체의
-  # CPU 비용이 이미 줄어든 전송량(917KB) 절감분을 상쇄). 실질 가치는 전송 바이트 감소뿐이라
-  # 껐다 — 대역폭이 제한된 실제 네트워크에서는 다를 수 있으나 측정하지 않았다.
-  # 상세: docs/PERF_BASELINE.md 7-3-1절.
-  compression:
-    enabled: false
 
 cookie:
   secure: false
