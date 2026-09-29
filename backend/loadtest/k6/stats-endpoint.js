@@ -35,8 +35,6 @@ export const options = {
 const URL = QUERY ? `${BASE_URL}${PATH}?${QUERY}` : `${BASE_URL}${PATH}`;
 
 export default function () {
-    // Accept-Encoding을 명시해야 서버의 server.compression.enabled 설정이 실제로 gzip을
-    // 태운다 — k6 http.get()은 기본적으로 이 헤더를 보내지 않는다.
-    const res = http.get(URL, { headers: { 'Accept-Encoding': 'gzip' } });
+    const res = http.get(URL);
     check(res, { '200 응답': (r) => r.status === 200 });
 }
