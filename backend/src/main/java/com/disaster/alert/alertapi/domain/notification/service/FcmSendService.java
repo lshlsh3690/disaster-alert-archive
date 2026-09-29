@@ -3,11 +3,13 @@ package com.disaster.alert.alertapi.domain.notification.service;
 import com.google.firebase.messaging.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DataAccessException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.TransactionException;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 @Slf4j
@@ -34,9 +36,20 @@ public class FcmSendService {
 
     private final DeadTokenCleanupService deadTokenCleanupService;
 
+    // 로컬 부하테스트용 스위치. true면 실제 Firebase 호출을 전혀 하지 않고 즉시 성공으로 응답한다 —
+    // @RequiredArgsConstructor 생성자와 별개로 Spring이 필드 주입으로 채운다.
+    // 기본값 false라 운영 동작은 그대로 유지된다.
+    @Value("${fcm.dry-run:false}")
+    private boolean dryRun;
+
     // 단일 토큰에 FCM 발송
     public boolean sendToToken(String token, String title, String body,
                                String notificationType, String alertId) {
+        if (dryRun) {
+            log.info("FCM dry-run - 실제 발송 생략, token: {}", maskToken(token));
+            return true;
+        }
+
         try {
             Message message = Message.builder()
                     .setToken(token)
@@ -80,6 +93,11 @@ public class FcmSendService {
     public BatchResponse sendToTokens(List<String> tokens, String title, String body,
                                       String notificationType, String alertId) {
         if (tokens.isEmpty()) return null;
+
+        if (dryRun) {
+            log.info("FCM dry-run - 실제 배치 발송 생략, 토큰 수: {}", tokens.size());
+            return new DryRunBatchResponse(tokens.size());
+        }
 
         try {
             MulticastMessage message = MulticastMessage.builder()
@@ -326,6 +344,37 @@ public class FcmSendService {
         return WebpushConfig.builder()
                 .putHeader("Urgency", "high")
                 .build();
+    }
+
+    /**
+     * dry-run 전용 {@link BatchResponse} 구현체.
+     *
+     * <p>실제 Firebase 호출을 하지 않으므로 개별 {@link SendResponse}를 만들 근거가 없다 —
+     * {@link #getResponses()}는 빈 리스트를 반환한다. 실패가 0건이라 호출부의
+     * {@code logBatchFailures}/{@code collectDeadTokens}는 dry-run 분기에서 아예 호출되지 않으므로
+     * 빈 리스트로도 문제가 없다.
+     */
+    private static final class DryRunBatchResponse implements BatchResponse {
+        private final int successCount;
+
+        private DryRunBatchResponse(int successCount) {
+            this.successCount = successCount;
+        }
+
+        @Override
+        public List<SendResponse> getResponses() {
+            return Collections.emptyList();
+        }
+
+        @Override
+        public int getSuccessCount() {
+            return successCount;
+        }
+
+        @Override
+        public int getFailureCount() {
+            return 0;
+        }
     }
 
     // Android 설정 (ALARM: 높은 우선순위)
