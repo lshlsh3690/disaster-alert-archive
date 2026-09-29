@@ -17,11 +17,13 @@
 --     < backend/loadtest/seed/seed_notification_data.sql
 -- (.env.dev를 source해서 POSTGRES_USER/POSTGRES_DB를 미리 export해둘 것)
 --
--- 측정 방법: 이 스크립트 실행 후 마지막에 출력되는 alertId를 관리자 계정으로 로그인한 뒤
---   POST /api/v1/admin/trigger-notification/{alertId} 로 트리거하고, 애플리케이션 로그에서
---   "회원 팬아웃 완료 - alertId: {alertId}, ..." 줄의 time=Xms를 읽는다
---   (AlertNotificationService.triggerNotification, @Async라 HTTP 응답시간으로는 못 잰다).
+-- 측정 방법: 이 스크립트가 마지막에 출력하는 alertId로 AlertNotificationService.
+--   triggerNotification()을 실제로 호출해, 애플리케이션 로그의 "회원 팬아웃 완료 -
+--   alertId: {alertId}, ..." 줄에서 time=Xms를 읽는다 (@Async라 HTTP 응답시간으로는 못 잰다).
 --   실제 Firebase 호출 없이 DB 구간만 격리해서 재려면 `--fcm.dry-run=true`로 기동할 것.
+--   (트리거 수단이었던 POST /api/v1/admin/trigger-notification/{alertId}는 E2E 테스트
+--   목적을 다해 제거됨 — 다음 라운드 착수 전에 트리거 방식을 다시 정할 것.
+--   backend/loadtest/README.md 참고.)
 
 BEGIN;
 
@@ -113,6 +115,6 @@ UNION ALL
 SELECT '핫 지역 관심지역 등록 회원 수', count(*)::text
 FROM member_favorite_region WHERE legal_district_code = (SELECT code FROM _hot_region)
 UNION ALL
-SELECT '트리거용 alertId (POST /api/v1/admin/trigger-notification/{이 값})', (SELECT disaster_alert_id::text FROM _notify_alert);
+SELECT '트리거용 alertId (triggerNotification() 호출용 — 트리거 수단은 README 참고)', (SELECT disaster_alert_id::text FROM _notify_alert);
 
 COMMIT;
