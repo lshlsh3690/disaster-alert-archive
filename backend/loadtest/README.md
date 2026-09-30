@@ -111,3 +111,21 @@ cd backend && export SPRING_PROFILES_ACTIVE=fanout-trigger
 # 3) 로그에서 소요시간 확인 (bootRun 콘솔 또는 로그 파일에서)
 #    "회원 팬아웃 완료 - alertId: <alertId>, 대상: 10000명, time=Xms, avg=Yms/명"
 ```
+
+### 결과 (실측, 회원 1만 명 동일 데이터로 수정 전/후 비교)
+
+| | 수정 전 (N+1) | 수정 후 (벌크 조회 + flush/clear) | 개선 |
+|---|---|---|---|
+| 총 소요시간 | 1,073,301ms (17분 53초) | 21,562ms (21.6초) | **약 49.8배** |
+| 회원당 평균 | 107.33ms | 2.16ms | 약 49.7배 |
+
+원인은 쿼리 개수(N+1)뿐 아니라 세션(영속성 컨텍스트) 누적이기도 했다 — DB 쿼리 자체는
+0.04~0.05ms(EXPLAIN ANALYZE)인데 앱 레벨은 루프 진행에 따라 31ms→93ms로 3배 증가했다.
+`triggerNotification()` 전체가 `@Transactional` 메서드 하나로 회원 1만 명 루프를 감싸서
+Hibernate가 트랜잭션이 끝날 때까지 관리 엔티티를 계속 쌓아두고, 컨텍스트가 커질수록
+매 쿼리 전 더티체킹 비용이 늘어난 것이 원인. 수정은 두 가지: (1) 조회 결과를 엔티티가
+아니라 record(JPQL 생성자 프로젝션)로 받아 애초에 컨텍스트에 안 쌓이게 함, (2)
+`UserNotificationLog`가 `GenerationType.IDENTITY`라 INSERT 배치가 불가능해서 저장 자체는
+개별 INSERT로 남지만 500명마다 `entityManager.flush()+clear()`로 컨텍스트를 비움.
+
+검증: `user_notification_log`에 회원 1만 명 전원이 `SENT`로 기록됨을 SQL로 확인(결측 없음).
