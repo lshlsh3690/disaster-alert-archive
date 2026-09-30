@@ -18,14 +18,14 @@ public interface FcmTokenRepository extends JpaRepository<FcmToken, Long> {
     Optional<FcmToken> findByToken(String token);
 
     // 회원 여러 명의 토큰을 한 번에 조회하기 위한 프로젝션 타입.
-    // 엔티티가 아니라 이 record 로 받아 영속성 컨텍스트에 쌓이지 않게 하는 것이 목적 — 아직 미구현
-    // (Green 단계에서 JPQL 생성자 프로젝션으로 구현 예정). FcmTokenRepositoryTest 가 Red 로
-    // 실패하도록 지금은 default 메서드가 예외만 던진다.
+    // 엔티티가 아니라 이 record 로 받아 영속성 컨텍스트에 쌓이지 않게 하는 것이 목적.
     record MemberToken(Long memberId, String token) {}
 
-    default List<MemberToken> findTokensByMemberIdIn(List<Long> memberIds) {
-        throw new UnsupportedOperationException("아직 구현되지 않았습니다 — Green 단계에서 구현 예정");
-    }
+    // 토큰이 여러 개인 회원은 그 개수만큼 행이 나온다(1:N) — findAllByMemberId 건별 호출과
+    // 동일한 결과 집합을 한 번의 IN 쿼리로 얻는다. 토큰이 없는 회원은 결과에서 빠진다.
+    @Query("SELECT new com.disaster.alert.alertapi.domain.notification.repository.FcmTokenRepository.MemberToken(f.member.id, f.token) " +
+            "FROM FcmToken f WHERE f.member.id IN :memberIds")
+    List<MemberToken> findTokensByMemberIdIn(@Param("memberIds") List<Long> memberIds);
 
     // FCM 이 영구 무효로 판정한 토큰들을 한 번에 삭제한다. 파생 delete 는 엔티티를 먼저 조회해
     // 건별로 지우지만, 여기서는 지울 대상이 이미 확정돼 있어 단일 DML 이면 충분하다.
