@@ -17,13 +17,12 @@
 --     < backend/loadtest/seed/seed_notification_data.sql
 -- (.env.dev를 source해서 POSTGRES_USER/POSTGRES_DB를 미리 export해둘 것)
 --
--- 측정 방법: 이 스크립트가 마지막에 출력하는 alertId로 AlertNotificationService.
---   triggerNotification()을 실제로 호출해, 애플리케이션 로그의 "회원 팬아웃 완료 -
---   alertId: {alertId}, ..." 줄에서 time=Xms를 읽는다 (@Async라 HTTP 응답시간으로는 못 잰다).
---   실제 Firebase 호출 없이 DB 구간만 격리해서 재려면 `--fcm.dry-run=true`로 기동할 것.
---   (트리거 수단이었던 POST /api/v1/admin/trigger-notification/{alertId}는 E2E 테스트
---   목적을 다해 제거됨 — 다음 라운드 착수 전에 트리거 방식을 다시 정할 것.
---   backend/loadtest/README.md 참고.)
+-- 측정 방법: SPRING_PROFILES_ACTIVE=fanout-trigger로 기동하면 NotificationFanoutTriggerTool
+--   (domain/notification/tool/)이 이 스크립트가 만든 최신 alertId를 자동으로 찾아
+--   AlertNotificationService.triggerNotification()을 호출한다. 애플리케이션 로그의
+--   "회원 팬아웃 완료 - alertId: {alertId}, ..." 줄에서 time=Xms를 읽는다 (@Async라
+--   HTTP 응답시간으로는 못 잰다). 실제 Firebase 호출 없이 DB 구간만 격리해서 재려면
+--   `--fcm.dry-run=true`로 같이 기동할 것. 전체 커맨드는 backend/loadtest/README.md 참고.
 
 BEGIN;
 
@@ -36,18 +35,23 @@ FROM member
 WHERE email LIKE 'seed-notify-%@example.test';
 
 -- ── 1. member (합성 회원) ────────────────────────────────────
+-- CREATE TABLE ... AS는 SELECT만 받고 INSERT ... RETURNING을 직접 못 받는다 — data-modifying
+-- CTE로 감싸서 그 결과를 SELECT해야 한다(Postgres 표준 우회 패턴).
 CREATE TEMP TABLE _new_members AS
-INSERT INTO member (email, password, nickname, role, is_deleted, created_at, updated_at)
-SELECT
-    'seed-notify-' || (p.base_offset + gs) || '@example.test',
-    'synthetic-not-a-real-password-hash',
-    'seed-member-' || (p.base_offset + gs),
-    'USER',
-    false,
-    now(),
-    now()
-FROM _member_seed_params p, generate_series(1, p.row_count) AS gs
-RETURNING member_id;
+WITH ins AS (
+    INSERT INTO member (email, password, nickname, role, is_deleted, created_at, updated_at)
+    SELECT
+        'seed-notify-' || (p.base_offset + gs) || '@example.test',
+        'synthetic-not-a-real-password-hash',
+        'seed-member-' || (p.base_offset + gs),
+        'USER',
+        false,
+        now(),
+        now()
+    FROM _member_seed_params p, generate_series(1, p.row_count) AS gs
+    RETURNING member_id
+)
+SELECT * FROM ins;
 
 -- ── 2. 핫 지역 선정 ───────────────────────────────────────────
 -- 시군구 레벨 코드(뒤 5자리 0, 시도 레벨은 제외) 중 하나를 고정으로 고른다.
@@ -88,15 +92,18 @@ FROM disaster_alert
 WHERE disaster_alert_id >= 900000000;
 
 CREATE TEMP TABLE _notify_alert AS
-INSERT INTO disaster_alert (disaster_alert_id, sn, message, created_at, emergency_level, disaster_type)
-SELECT p.alert_id,
-       900000000 + p.alert_id,
-       '[측정용] 알림 팬아웃 부하테스트 — 핫 지역 전체 발송',
-       now(),
-       'LEVEL_2',
-       '호우'
-FROM _notify_alert_params p
-RETURNING disaster_alert_id;
+WITH ins AS (
+    INSERT INTO disaster_alert (disaster_alert_id, sn, message, created_at, emergency_level, disaster_type)
+    SELECT p.alert_id,
+           900000000 + p.alert_id,
+           '[측정용] 알림 팬아웃 부하테스트 — 핫 지역 전체 발송',
+           now(),
+           'LEVEL_2',
+           '호우'
+    FROM _notify_alert_params p
+    RETURNING disaster_alert_id
+)
+SELECT * FROM ins;
 
 INSERT INTO disaster_alert_region (disaster_alert_id, legal_district_code)
 SELECT na.disaster_alert_id, hr.code

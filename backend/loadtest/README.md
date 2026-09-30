@@ -87,38 +87,27 @@ curl -s -b /tmp/perf_cookies.txt http://localhost:8080/actuator/metrics/hikaricp
   `weather_daily_summary` 250,488건(Flyway 자체 백필, 실데이터 성격)
 - 앱: `SPRING_PROFILES_ACTIVE` 없음 (스케줄러 비활성), 로컬 `bootRun`
 
-## 알림 팬아웃(`AlertNotificationService`) 측정 — 인프라만, 아직 실측 전
+## 알림 팬아웃(`AlertNotificationService`) 측정
 
 `/stats` 라운드의 k6 방식론을 그대로 못 쓴다 — `triggerNotification`이 `@Async`라 HTTP
 응답은 즉시 200이 오고 실제 처리는 백그라운드 스레드에서 끝난다. 대신 애플리케이션 로그의
 `time=Xms` 줄을 직접 읽는 방식으로 측정한다.
 
+트리거 수단이던 관리자 API(`POST /api/v1/admin/trigger-notification/{alertId}`)는 E2E
+테스트 목적을 다해 제거됐다(`AdminController`) — 대신 `NotificationFanoutTriggerTool`
+(`domain/notification/tool/`, 기존 `*BackfillTool`류와 동일한 프로필 게이트 수동 도구 패턴)이
+시드가 만든 alertId를 자동으로 찾아 트리거한다.
+
 ```bash
 # 1) 회원 1만 명 + 관심지역(핫 지역 1곳에 전원 등록) + FCM 토큰 + 트리거용 alertId 시드
 docker exec -i postgres psql -U $POSTGRES_USER -d $POSTGRES_DB < backend/loadtest/seed/seed_notification_data.sql
-# 마지막 SELECT 결과의 "트리거용 alertId" 값을 기록해둘 것
 
-# 2) 앱을 dry-run 모드로 기동 (실제 Firebase 호출 없이 DB 구간만 격리해서 측정)
-cd backend && ./gradlew bootRun --args='--fcm.dry-run=true'
+# 2) fanout-trigger 프로필로 dry-run 기동 — NotificationFanoutTriggerTool이 부팅 직후
+#    시드가 만든 최신 alertId를 자동으로 찾아 triggerNotification()을 호출한다
+#    (실제 Firebase 호출 없이 DB 구간만 격리해서 측정)
+cd backend && export SPRING_PROFILES_ACTIVE=fanout-trigger
+./gradlew bootRun --args='--fcm.dry-run=true'
 
-# 3) admin 계정으로 로그인 (perftest 계정은 기본 role=USER라 role을 ADMIN으로 올려야 함,
-#    로컬 DB 전용 — 운영에는 이 계정 자체가 없음)
-docker exec postgres psql -U $POSTGRES_USER -d $POSTGRES_DB \
-  -c "UPDATE member SET role='ADMIN' WHERE email='perftest@local.test';"
-curl -s -c /tmp/perf_cookies.txt -X POST http://localhost:8080/api/v1/auth/login \
-  -H "Content-Type: application/json" -d '{"email":"perftest@local.test","password":"perftest1234"}'
-
-# 4) 트리거 — POST /api/v1/admin/trigger-notification/{alertId}가 E2E 테스트용으로
-#    존재했으나 목적을 다해 제거됨(AdminController). 이 시드가 만든 alertId로
-#    triggerNotification()을 실제로 호출할 방법이 현재 없다 — 다음 라운드에서
-#    트리거 방식을 다시 정해야 한다(예: 통합 테스트에서 직접 호출, 또는 전용 트리거
-#    엔드포인트를 이번엔 dry-run 가드와 함께 재도입).
-
-# 5) 로그에서 소요시간 확인 (bootRun 콘솔 또는 로그 파일에서)
+# 3) 로그에서 소요시간 확인 (bootRun 콘솔 또는 로그 파일에서)
 #    "회원 팬아웃 완료 - alertId: <alertId>, 대상: 10000명, time=Xms, avg=Yms/명"
 ```
-
-아직 실행하지 않았다 — 이번 라운드는 dry-run 플래그/타이밍 로그/시드 스크립트까지만
-준비했고(측정 인프라), 실제 수치 측정과 N+1 개선(배치 쿼리화 등)은 다음 라운드로 미룬다.
-**트리거 엔드포인트가 이후 제거되어(테스트 목적 완료) 위 4단계는 현재 이 형태로는 실행 불가
-— 다음 라운드 착수 전에 트리거 방식부터 다시 정해야 한다.**
