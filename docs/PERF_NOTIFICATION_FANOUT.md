@@ -125,7 +125,7 @@ N+1 제거라는 **서로 다른 두 원인의 기여를 곱한 값**이라, 마
 ## 재현 방법
 
 ```bash
-# 0) 인프라 (docs/PERF_BASELINE.md 재현 방법과 동일)
+# 0) 인프라 (docs/PERF_STATS_API.md 재현 방법과 동일)
 docker compose -f docker-compose.dev.yml up -d postgres redis
 docker exec postgres psql -U $POSTGRES_USER -d postgres -c "ALTER SYSTEM SET max_parallel_workers_per_gather = 0;"
 docker restart postgres

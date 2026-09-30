@@ -1,6 +1,6 @@
 # 통계 API 캐시 성능 측정
 
-`docs/PERF_BASELINE.md`(측정 결과 문서)를 재현하기 위한 스크립트 모음.
+`docs/PERF_STATS_API.md`(측정 결과 문서)를 재현하기 위한 스크립트 모음.
 
 ## 사전 준비 (1회)
 
