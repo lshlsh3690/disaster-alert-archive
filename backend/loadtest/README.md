@@ -108,8 +108,11 @@ docker exec postgres psql -U $POSTGRES_USER -d $POSTGRES_DB \
 curl -s -c /tmp/perf_cookies.txt -X POST http://localhost:8080/api/v1/auth/login \
   -H "Content-Type: application/json" -d '{"email":"perftest@local.test","password":"perftest1234"}'
 
-# 4) 트리거 (HTTP 응답은 바로 옴 — 실제 처리는 비동기로 계속 진행 중)
-curl -s -b /tmp/perf_cookies.txt -X POST http://localhost:8080/api/v1/admin/trigger-notification/<alertId>
+# 4) 트리거 — POST /api/v1/admin/trigger-notification/{alertId}가 E2E 테스트용으로
+#    존재했으나 목적을 다해 제거됨(AdminController). 이 시드가 만든 alertId로
+#    triggerNotification()을 실제로 호출할 방법이 현재 없다 — 다음 라운드에서
+#    트리거 방식을 다시 정해야 한다(예: 통합 테스트에서 직접 호출, 또는 전용 트리거
+#    엔드포인트를 이번엔 dry-run 가드와 함께 재도입).
 
 # 5) 로그에서 소요시간 확인 (bootRun 콘솔 또는 로그 파일에서)
 #    "회원 팬아웃 완료 - alertId: <alertId>, 대상: 10000명, time=Xms, avg=Yms/명"
@@ -117,3 +120,5 @@ curl -s -b /tmp/perf_cookies.txt -X POST http://localhost:8080/api/v1/admin/trig
 
 아직 실행하지 않았다 — 이번 라운드는 dry-run 플래그/타이밍 로그/시드 스크립트까지만
 준비했고(측정 인프라), 실제 수치 측정과 N+1 개선(배치 쿼리화 등)은 다음 라운드로 미룬다.
+**트리거 엔드포인트가 이후 제거되어(테스트 목적 완료) 위 4단계는 현재 이 형태로는 실행 불가
+— 다음 라운드 착수 전에 트리거 방식부터 다시 정해야 한다.**

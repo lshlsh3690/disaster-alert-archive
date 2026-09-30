@@ -72,11 +72,6 @@
    뒤 UPSERT를 진행한다 (`FcmTokenService.java:24-57`). 회원이 로그아웃 등으로
    `DELETE /api/v1/fcm-token?token=...`을 호출하면 해당 토큰 값이 삭제되며, 요청자가 그
    토큰의 소유 회원인지는 별도로 검증하지 않는다(FR-028, `FcmTokenController.java:34-41`).
-8. **Given** 관리자(또는 운영자)가 특정 alertId에 대해 알림을 수동으로 재발송하려 하면,
-   **When** `POST /api/v1/admin/trigger-notification/{alertId}`를 호출하면(인증 불필요,
-   FR-002), **Then** 위 시나리오 1~6과 동일한 `triggerNotification` 로직이 그대로
-   실행된다 — 단 이 엔드포인트는 별도 인가 없이 누구나 호출할 수 있다.
-
 ---
 
 ### 사용자 스토리 2 - 비로그인(게스트) 사용자도 관심지역 알림을 받는다 (우선순위: P2)
@@ -249,12 +244,13 @@
 - **FR-001**: 시스템은 재난문자 공공데이터를 10분 주기로 수집한 직후, 새로 저장된 각
   재난문자마다 알림 발송을 비동기로 트리거해야 한다(MUST)
   (`backend/.../scheduler/DisasterFetchScheduler.java:29,41-45`).
-- **FR-002**: 시스템은 관리자용 수동 트리거 엔드포인트(`POST /api/v1/admin/trigger-notification/{alertId}`,
-  `POST /api/v1/admin/trigger-fetch`)로 임의의 alertId에 대해 알림 발송을 재실행할 수 있게
-  지원해야 한다(MUST) (`global/controller/AdminController.java:24-35`). 이 엔드포인트들은
-  `/api/v1/admin/**`이 `permitAll`로 설정되어 있어 **인증 없이** 누구나 호출할 수 있다
-  (`global/config/SecurityConfig.java:57`) — 별도 인증/인가가 없다는 점을 실제 동작으로
-  기록한다.
+- **FR-002**: 시스템은 관리자용 수동 트리거 엔드포인트(`POST /api/v1/admin/trigger-fetch`)로
+  재난문자 수집과 그에 따른 알림 발송을 재실행할 수 있게 지원해야 한다(MUST)
+  (`global/controller/AdminController.java`). `/api/v1/admin/**`은 인증(`anyRequest().authenticated()`)
+  + `@PreAuthorize("hasRole('ADMIN')")`을 요구한다(`global/config/SecurityConfig.java:57-58`).
+  (특정 alertId 하나만 재발송하는 별도 엔드포인트(`trigger-notification/{alertId}`)가 한때
+  E2E 테스트용으로 존재했으나 테스트 목적을 다했다고 판단해 제거됨 — 재발송이 필요하면
+  `trigger-fetch`로 전체 수집을 다시 트리거한다.)
 - **FR-003**: 시스템은 알림 대상 지역 코드 집합을 계산할 때, 재난문자의 시군구 단위(10자리)
   법정동 코드 각각에 대해 앞 2자리(시도)를 취하고 나머지를 `0`으로 채운 시도 전체 코드를
   파생시켜 원본 코드 목록에 합쳐야 한다(MUST) — 시도 전체를 관심지역으로 등록한 사용자를
