@@ -98,7 +98,8 @@ backend/src/main/resources/
 backend/src/test/java/com/disaster/alert/alertapi/
 ├── global/translation/OpenAiTranslationClientTest.java              # 순수 단위(길이 가드 경계)
 ├── global/translation/OpenAiTranslationClientRealApiTest.java                   # 통합(실제 OpenAI 호출, 고정 원문, @Tag("realApi"))
-└── domain/disasteralert/service/DisasterAlertServiceTest.java                   # 통합(번역 클라이언트 목킹, lang→DTO 배선)
+├── domain/disasteralert/service/DisasterAlertServiceTest.java                   # 통합(번역 클라이언트 목킹, lang→DTO 배선)
+└── domain/disasteralert/service/DisasterAlertServiceTranslationConcurrencyTest.java  # 통합(CountDownLatch로 동시 요청 재현, UPSERT 회귀 테스트)
 ```
 
 **구조 결정**: 번역 클라이언트와 재난문자 번역 서비스는 `global/translation`에, 이벤트 제목 번역은 `domain/event`에 배치되어 있다. 번역 전용 컨트롤러나 엔드포인트는 존재하지 않는다. 다만 진입 경로는 둘로 갈린다 — **조회 시점 lazy 번역**은 소비처(`DisasterAlertService`, `EventQueryService`)가 기존 조회 API의 `?lang=` 파라미터를 받아 조회 로직 안에서 직접 호출하고, **수집 시점 사전 번역**은 `DisasterFetchScheduler`가 `saveData(raw)` 직후 요청 파라미터 없이 `translateAndSaveAsync`를 호출하는 내부 경로다(`DisasterFetchScheduler.java:39-43`). 즉 `?lang=`은 사용자 응답과 lazy 번역만 제어하며, 사전 번역은 그와 무관하게 지원 언어 전체로 실행된다.

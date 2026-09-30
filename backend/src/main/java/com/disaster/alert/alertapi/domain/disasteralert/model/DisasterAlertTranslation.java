@@ -31,15 +31,4 @@ public class DisasterAlertTranslation {
 
     @Column(name = "translated_at", nullable = false)
     private LocalDateTime translatedAt;
-
-    public static DisasterAlertTranslation of(Long alertId, String languageCode, String translatedMessage,
-                                              String translatedDisasterType, String translatedRegionNames) {
-        return DisasterAlertTranslation.builder()
-                .id(new DisasterAlertTranslationId(alertId, languageCode))
-                .translatedMessage(translatedMessage)
-                .translatedDisasterType(translatedDisasterType)
-                .translatedRegionNames(translatedRegionNames)
-                .translatedAt(LocalDateTime.now())
-                .build();
-    }
 }
