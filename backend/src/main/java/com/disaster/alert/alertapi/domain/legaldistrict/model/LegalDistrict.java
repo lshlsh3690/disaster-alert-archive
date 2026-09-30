@@ -28,6 +28,14 @@ public class LegalDistrict {
     @Column(name = "sigungu_name", insertable = false, updatable = false)
     private String sigunguName;
 
+    // V118에서 GENERATED ALWAYS ... STORED로 정의됨(name과 값은 동일, 컬럼 타입만 COLLATE "C").
+    // name 그대로 GROUP BY/ORDER BY하면 DB 기본 collation(en_US.utf8, 로케일 인식 비교)
+    // 때문에 정렬 비용이 크다(countByRegion 실측 4,921ms→이 컬럼으로 108ms) — 컬럼 자체에
+    // collation이 박혀있어 쿼리 쪽엔 특별한 표현식이 필요 없다. name 컬럼의 collation은
+    // 그대로라 다른 화면의 정렬에는 영향이 없다.
+    @Column(name = "name_collate_c", insertable = false, updatable = false)
+    private String nameCollateC;
+
     //정적 팩토리: id(=code)만 채운 참조용 엔티티 생성. DB 조회 없음.
     public static LegalDistrict referencedByCode(String code) {
         LegalDistrict ld = new LegalDistrict();

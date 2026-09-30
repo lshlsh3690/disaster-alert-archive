@@ -23,6 +23,7 @@ import com.querydsl.core.types.dsl.Expressions;
 import com.querydsl.core.types.dsl.NumberExpression;
 import com.querydsl.core.types.dsl.NumberPath;
 import com.querydsl.core.types.dsl.StringExpression;
+import com.querydsl.core.types.dsl.StringPath;
 import com.querydsl.core.types.dsl.StringTemplate;
 import com.querydsl.jpa.JPAExpressions;
 import com.querydsl.jpa.impl.JPAQueryFactory;
@@ -113,9 +114,19 @@ public class DisasterAlertRepositoryImpl implements DisasterAlertRepositoryCusto
 
     @Override
     public List<DisasterAlertStatResponse.RegionStat> countByRegion(AlertSearchRequest request) {
+        // legal_district.name 대신 name_collate_c(V118)로 그룹핑/정렬한다 — 값은 name과
+        // 동일하지만 컬럼 타입에 COLLATE "C"(바이트 비교)가 박혀있다. name 그대로 쓰면 DB 기본
+        // collation(en_US.utf8, 로케일 인식 비교) 때문에 69,027행 조인 기준 EXPLAIN ANALYZE
+        // 실측 4,921ms인데, 이 컬럼으로는 108.6ms(약 45배) — 컬럼 자체가 이미 그 collation을
+        // 가지므로 쿼리에 별도 표현식이 필요 없다(HQL의 `collate` 구문 미지원, 커스텀 도메인
+        // CAST 미인식, SQL 함수는 collation을 잃는 문제를 각각 실측으로 확인하고 이 방식으로
+        // 정착 — V118 마이그레이션 주석 참고). 이 쿼리는 1차 정렬키가 count DESC라 이름 비교는
+        // 동점자 타이브레이커로만 쓰여 정렬 순서 체감 영향이 작다.
+        StringPath nameCollateC = legalDistrict.nameCollateC;
+
         return queryFactory
                 .select(Projections.constructor(DisasterAlertStatResponse.RegionStat.class,
-                        disasterAlertRegion.legalDistrict.name,
+                        nameCollateC,
                         disasterAlert.id.countDistinct()
                 ))
                 .from(disasterAlert)
@@ -125,8 +136,8 @@ public class DisasterAlertRepositoryImpl implements DisasterAlertRepositoryCusto
                         byAlertCondition(request),
                         regionFilterOnJoin(request)
                 )
-                .groupBy(disasterAlertRegion.legalDistrict.name)
-                .orderBy(disasterAlert.id.countDistinct().desc(), disasterAlertRegion.legalDistrict.name.asc())
+                .groupBy(nameCollateC)
+                .orderBy(disasterAlert.id.countDistinct().desc(), nameCollateC.asc())
                 .fetch();
     }
 
