@@ -3,6 +3,7 @@ package com.disaster.alert.alertapi.domain.notification.repository;
 import com.disaster.alert.alertapi.domain.member.model.Member;
 import com.disaster.alert.alertapi.domain.member.model.MemberRole;
 import com.disaster.alert.alertapi.domain.member.repository.MemberRepository;
+import com.disaster.alert.alertapi.domain.notification.dto.MemberNotificationType;
 import com.disaster.alert.alertapi.domain.notification.model.NotificationPreference;
 import com.disaster.alert.alertapi.domain.notification.model.NotificationType;
 import com.disaster.alert.alertapi.global.testsupport.IntegrationTest;
@@ -59,7 +60,7 @@ class NotificationPreferenceRepositoryTest {
         notificationPreferenceRepository.flush();
 
         // when
-        List<NotificationPreferenceRepository.MemberNotificationType> result =
+        List<MemberNotificationType> result =
                 notificationPreferenceRepository.findNotificationTypesByMemberIdIn(
                         List.of(memberA.getId(), memberB.getId(), memberC.getId()));
 
@@ -67,8 +68,8 @@ class NotificationPreferenceRepositoryTest {
         assertThat(result).hasSize(2);
         assertThat(result)
                 .extracting(
-                        NotificationPreferenceRepository.MemberNotificationType::memberId,
-                        NotificationPreferenceRepository.MemberNotificationType::notificationType)
+                        MemberNotificationType::memberId,
+                        MemberNotificationType::notificationType)
                 .containsExactlyInAnyOrder(
                         tuple(memberA.getId(), NotificationType.PUSH),
                         tuple(memberC.getId(), NotificationType.NONE));

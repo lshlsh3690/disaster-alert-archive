@@ -1,5 +1,6 @@
 package com.disaster.alert.alertapi.domain.notification.repository;
 
+import com.disaster.alert.alertapi.domain.notification.dto.MemberToken;
 import com.disaster.alert.alertapi.domain.notification.model.FcmToken;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
@@ -17,13 +18,10 @@ public interface FcmTokenRepository extends JpaRepository<FcmToken, Long> {
 
     Optional<FcmToken> findByToken(String token);
 
-    // 회원 여러 명의 토큰을 한 번에 조회하기 위한 프로젝션 타입.
-    // 엔티티가 아니라 이 record 로 받아 영속성 컨텍스트에 쌓이지 않게 하는 것이 목적.
-    record MemberToken(Long memberId, String token) {}
-
     // 토큰이 여러 개인 회원은 그 개수만큼 행이 나온다(1:N) — findAllByMemberId 건별 호출과
     // 동일한 결과 집합을 한 번의 IN 쿼리로 얻는다. 토큰이 없는 회원은 결과에서 빠진다.
-    @Query("SELECT new com.disaster.alert.alertapi.domain.notification.repository.FcmTokenRepository.MemberToken(f.member.id, f.token) " +
+    // MemberToken이 최상위 클래스여야 하는 이유는 그 record의 javadoc 참고.
+    @Query("SELECT new com.disaster.alert.alertapi.domain.notification.dto.MemberToken(f.member.id, f.token) " +
             "FROM FcmToken f WHERE f.member.id IN :memberIds")
     List<MemberToken> findTokensByMemberIdIn(@Param("memberIds") List<Long> memberIds);
 

@@ -3,6 +3,8 @@ package com.disaster.alert.alertapi.domain.notification.service;
 import com.disaster.alert.alertapi.domain.disasteralert.model.DisasterAlert;
 import com.disaster.alert.alertapi.domain.disasteralert.repository.DisasterAlertRepository;
 import com.disaster.alert.alertapi.domain.member.repository.MemberFavoriteRegionRepository;
+import com.disaster.alert.alertapi.domain.notification.dto.MemberNotificationType;
+import com.disaster.alert.alertapi.domain.notification.dto.MemberToken;
 import com.disaster.alert.alertapi.domain.notification.model.NotificationType;
 import com.disaster.alert.alertapi.domain.notification.model.UserNotificationLog;
 import com.disaster.alert.alertapi.domain.notification.repository.FcmTokenRepository;
@@ -121,13 +123,13 @@ public class AlertNotificationService {
         Map<Long, String> typeByMember = preferenceRepository.findNotificationTypesByMemberIdIn(memberIds)
                 .stream()
                 .collect(Collectors.toMap(
-                        NotificationPreferenceRepository.MemberNotificationType::memberId,
+                        MemberNotificationType::memberId,
                         r -> r.notificationType().name()));
         Map<Long, List<String>> tokensByMember = fcmTokenRepository.findTokensByMemberIdIn(memberIds)
                 .stream()
                 .collect(Collectors.groupingBy(
-                        FcmTokenRepository.MemberToken::memberId,
-                        Collectors.mapping(FcmTokenRepository.MemberToken::token, Collectors.toList())));
+                        MemberToken::memberId,
+                        Collectors.mapping(MemberToken::token, Collectors.toList())));
 
         int processed = 0;
         for (Long memberId : memberIds) {

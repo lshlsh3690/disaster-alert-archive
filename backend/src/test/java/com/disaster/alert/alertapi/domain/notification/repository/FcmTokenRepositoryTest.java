@@ -3,6 +3,7 @@ package com.disaster.alert.alertapi.domain.notification.repository;
 import com.disaster.alert.alertapi.domain.member.model.Member;
 import com.disaster.alert.alertapi.domain.member.model.MemberRole;
 import com.disaster.alert.alertapi.domain.member.repository.MemberRepository;
+import com.disaster.alert.alertapi.domain.notification.dto.MemberToken;
 import com.disaster.alert.alertapi.domain.notification.model.FcmToken;
 import com.disaster.alert.alertapi.global.testsupport.IntegrationTest;
 import org.junit.jupiter.api.DisplayName;
@@ -51,14 +52,14 @@ class FcmTokenRepositoryTest {
         fcmTokenRepository.flush();
 
         // when
-        List<FcmTokenRepository.MemberToken> result =
+        List<MemberToken> result =
                 fcmTokenRepository.findTokensByMemberIdIn(
                         List.of(memberA.getId(), memberB.getId(), memberC.getId()));
 
         // then
         assertThat(result).hasSize(3);
         assertThat(result)
-                .extracting(FcmTokenRepository.MemberToken::memberId, FcmTokenRepository.MemberToken::token)
+                .extracting(MemberToken::memberId, MemberToken::token)
                 .containsExactlyInAnyOrder(
                         tuple(memberA.getId(), tokenA1),
                         tuple(memberA.getId(), tokenA2),
