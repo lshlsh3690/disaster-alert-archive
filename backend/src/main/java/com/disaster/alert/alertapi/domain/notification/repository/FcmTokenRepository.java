@@ -1,5 +1,6 @@
 package com.disaster.alert.alertapi.domain.notification.repository;
 
+import com.disaster.alert.alertapi.domain.notification.dto.MemberToken;
 import com.disaster.alert.alertapi.domain.notification.model.FcmToken;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
@@ -16,6 +17,13 @@ public interface FcmTokenRepository extends JpaRepository<FcmToken, Long> {
     List<FcmToken> findAllByMemberId(Long memberId);
 
     Optional<FcmToken> findByToken(String token);
+
+    // 토큰이 여러 개인 회원은 그 개수만큼 행이 나온다(1:N) — findAllByMemberId 건별 호출과
+    // 동일한 결과 집합을 한 번의 IN 쿼리로 얻는다. 토큰이 없는 회원은 결과에서 빠진다.
+    // MemberToken이 최상위 클래스여야 하는 이유는 그 record의 javadoc 참고.
+    @Query("SELECT new com.disaster.alert.alertapi.domain.notification.dto.MemberToken(f.member.id, f.token) " +
+            "FROM FcmToken f WHERE f.member.id IN :memberIds")
+    List<MemberToken> findTokensByMemberIdIn(@Param("memberIds") List<Long> memberIds);
 
     // FCM 이 영구 무효로 판정한 토큰들을 한 번에 삭제한다. 파생 delete 는 엔티티를 먼저 조회해
     // 건별로 지우지만, 여기서는 지울 대상이 이미 확정돼 있어 단일 DML 이면 충분하다.
