@@ -121,9 +121,13 @@ clean {
 // 발생하며, 응답이 완전히 결정적이지 않아 간헐적 실패가 가능하다. 기본 test 태스크에서 제외해
 // 키가 없는 환경에서도 나머지 테스트가 온전히 돌게 한다.
 // (헌법 원칙 III: "외부 AI API 호출은 고정된 픽스처를 사용해 결정적으로 검증한다")
+// 'benchmark' 태그가 붙은 테스트는 실제 DB 왕복 시간을 재서 비교하는 타이밍 기반 테스트다 —
+// 워밍업/반복측정 없이 단발 측정값을 비교해 CI 러너의 자원 경합만으로도 간헐적으로 실패할 수
+// 있다. realApi 와 같은 이유로 기본 test 태스크에서 제외한다.
 tasks.named('test') {
     useJUnitPlatform {
         excludeTags 'realApi'
+        excludeTags 'benchmark'
     }
 }
 
@@ -136,5 +140,17 @@ tasks.register('realApiTest', Test) {
     classpath = sourceSets.test.runtimeClasspath
     useJUnitPlatform {
         includeTags 'realApi'
+    }
+}
+
+// 타이밍 비교 벤치마크 테스트만 실행한다(@Tag("benchmark")). 로컬 DB가 필요하며, 성능
+// 개선 수치를 재확인하고 싶을 때 수동으로 돌리는 용도다: ./gradlew benchmarkTest
+tasks.register('benchmarkTest', Test) {
+    group = 'verification'
+    description = '타이밍 기반 벤치마크 테스트(@Tag("benchmark"))만 실행한다. 로컬 DB가 필요하다.'
+    testClassesDirs = sourceSets.test.output.classesDirs
+    classpath = sourceSets.test.runtimeClasspath
+    useJUnitPlatform {
+        includeTags 'benchmark'
     }
 }
