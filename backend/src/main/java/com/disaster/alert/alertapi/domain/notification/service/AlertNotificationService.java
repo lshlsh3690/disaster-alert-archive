@@ -84,7 +84,7 @@ public class AlertNotificationService {
                     .toList();
 
             // 게스트 토큰은 회원 팬아웃 전에 조회만 해 둔다(이유는 findGuestTokens 주석). 발송은 회원 뒤.
-            List<String> guestTokens = findGuestTokens(allCodesToSearch);
+            List<String> guestTokens = findGuestTokens(allCodesToSearch, alertId);
 
             if (!memberIds.isEmpty()) {
                 sendToMembers(memberIds, alertId, title, body);
@@ -172,7 +172,10 @@ public class AlertNotificationService {
     // @Transactional(triggerNotification) 안의 이후 flush 도 실패하고 커밋 시 롤백되므로, 이미 FCM 이
     // 나간 회원의 이력이 일부 또는 전부 사라질 수 있다 — 발송 지속을 우선한 의도적 선택이다.
     // 로그 레벨: 첫 실패만 error(스택트레이스 포함), 이후는 warn. aborted 이후 flush 는 연쇄 실패라 전부
-    // error 로 남기면 알림 1건당 error 가 수십 건이 된다(CLAUDE.md: error 는 사람이 조치할 것만).
+    // error 로 남기면 같은 error 가 500건마다 반복된다(CLAUDE.md: error 는 사람이 조치할 것만).
+    // 한계: aborted 상태에서는 시퀀스 블록(allocationSize 500)이 소진돼 nextval 이 필요해지는 시점부터
+    // sendToMember 의 save() 도 실패할 수 있고, 그때는 회원별 "개별 알림 발송 실패" error 가 남는다
+    // (FCM 은 이미 나간 뒤). 이 경로의 error 폭증까지 막지는 못한다.
     // @return flush 실패 로그 중 error 를 이미 남겼는지(호출자가 다음 호출에 넘긴다)
     private boolean flushAndClearSafely(String context, boolean errorAlreadyLogged) {
         try {
@@ -192,9 +195,9 @@ public class AlertNotificationService {
     }
 
     // 회원 팬아웃 앞에서 호출한다: 팬아웃 중 flush 가 실패하면 트랜잭션이 aborted 되어 이후 DB 조회가
-    // 모두 실패하므로, 뒤에서 조회하면 게스트 FCM 이 누락될 수 있다. 조회 실패는 발송 실패와 같은
-    // 취급(error 로그 후 게스트 발송만 생략)이라 기존 게스트 catch 동작을 유지한다.
-    private List<String> findGuestTokens(List<String> regionCodes) {
+    // 모두 실패하므로, 뒤에서 조회하면 게스트 FCM 이 누락될 수 있다. 조회 실패는 error 로그만 남기고
+    // 게스트 발송만 생략한다(회원 팬아웃은 계속). 발송 실패 로그와 구분되게 문구를 따로 둔다.
+    private List<String> findGuestTokens(List<String> regionCodes, Long alertId) {
         try {
             return guestFcmRegionRepository
                     .findAllByLegalDistrictCodeIn(regionCodes)
@@ -203,7 +206,7 @@ public class AlertNotificationService {
                     .distinct()
                     .toList();
         } catch (Exception e) {
-            log.error("게스트 알림 발송 실패: {}", e.getMessage());
+            log.error("게스트 토큰 조회 실패 - 게스트 발송 생략, alertId: {}, error: {}", alertId, e.getMessage());
             return List.of();
         }
     }
