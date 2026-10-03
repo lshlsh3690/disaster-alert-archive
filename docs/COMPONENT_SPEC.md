@@ -109,7 +109,7 @@
 | 컴포넌트 | 설명 |
 |---|---|
 | `NotificationPermissionBanner` | 전역 하단 배너 — 로그인 사용자/관심지역 등록 게스트에게 알림 권한 요청 |
-| `NotificationSettings` | 알림 유형(NONE/PUSH/ALARM) 설정 — `@/api` 훅 패턴을 안 쓰고 `fetch`를 직접 호출(다른 컴포넌트와 패턴 불일치) |
+| `NotificationSettings` | 알림 유형(NONE/PUSH) 설정 — `@/api` 훅 패턴을 안 쓰고 `fetch`를 직접 호출(다른 컴포넌트와 패턴 불일치) |
 
 ### 2.6 ui/
 | 컴포넌트 | 설명 | 사용처 |

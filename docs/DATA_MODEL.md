@@ -226,7 +226,7 @@ UNIQUE(`provider`, `provider_user_id`)
 |---|---|---|
 | id (PK) | BIGINT | IDENTITY |
 | member_id (FK) | BIGINT | UNIQUE, NOT NULL — 회원당 1행 |
-| notification_type | VARCHAR | ENUM(`NONE`,`PUSH`,`ALARM`), 기본 `PUSH` |
+| notification_type | VARCHAR | ENUM(`NONE`,`PUSH`), 기본 `PUSH` |
 | min_risk_score | INT | 기본 0 |
 | created_at / updated_at | TIMESTAMP | |
 

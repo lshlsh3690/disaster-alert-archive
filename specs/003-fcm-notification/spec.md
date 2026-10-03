@@ -157,22 +157,22 @@
 1. **Given** 서비스워커가 background 상태에서 웹 push 이벤트를 수신하면, **When** 표준 Push
    API의 `push` 이벤트 리스너가 `event.waitUntil(handlePush(event))`로 실행되면, **Then**
    `alertId`가 있으면 `/alerts/{alertId}`, 없으면 `/`를 `data.url`로 담아
-   `showNotification()`을 호출한다 (`frontend/public/firebase-messaging-sw.js:8-49`).
+   `showNotification()`을 호출한다 (`frontend/public/firebase-messaging-sw.js:8-51`).
    **과거에는** Firebase JS SDK의 `messaging().onBackgroundMessage()`를 사용했으나, 이
    SDK가 push 이벤트를 못 받거나 씹는 라우팅 이슈가 있어 SDK를 아예 로드하지 않고 표준
    `push` 이벤트를 직접 파싱하는 방식으로 재작성되었다(코드 주석 참고,
    `firebase-messaging-sw.js:3-6`). payload 파싱 실패 시 catch되어, 원인 파악용으로
    원본 payload와 에러 메시지를 담은 "SW DEBUG ERROR" 알림을 대신 표시한다 — 코드에
    "TEMP DEBUG: 원인 확인 후 제거할 것"으로 명시된 임시 디버그 코드다
-   (`firebase-messaging-sw.js:50-55`, FR-023a).
+   (`firebase-messaging-sw.js:45-50`, FR-023a).
 2. **Given** 사용자가 알림을 클릭하면, **When** `notificationclick` 이벤트가 발생하면,
    **Then** 이미 열려 있는 탭이 있으면 `client.navigate()`로 대상 URL로 이동 후 포커스,
    실패 시 `client.focus()`로 폴백, 열린 탭이 없으면 `clients.openWindow()`로 새 창을 연다
-   (`firebase-messaging-sw.js:58-89`).
+   (`firebase-messaging-sw.js:53-84`).
 3. **Given** 앱이 포그라운드(활성 탭)에 있는 상태에서 FCM 메시지를 수신하면, **When**
    `onMessage` 콜백이 실행되면, **Then** 브라우저 알림 권한이 `granted`일 때만 서비스워커의
    `showNotification()`(가능하면) 또는 `Notification` 생성자로 동일하게 알림을 표시한다
-   (`frontend/src/hooks/useForegroundMessage.ts:12-41`).
+   (`frontend/src/hooks/useForegroundMessage.ts:12-36`).
 
 ---
 
@@ -314,13 +314,14 @@
   1회 표시하고, 커스텀 `onBackgroundMessage` 핸들러가 동일 메시지를 다시 표시해 알림이
   중복(두 번째는 제목·본문이 비어 있는 빈 알림)으로 뜨는 실제 발생했던 버그이며, 코드 주석에
   재발 방지 목적으로 명시되어 있다 (`FcmSendService.java:13-16`).
-- **FR-020**: 시스템은 예외적으로 `AndroidConfig.setNotification()`(채널ID, 사운드, 진동,
+- **FR-020**: 시스템은 예외적으로 `AndroidConfig.setNotification()`(채널ID, 사운드,
   우선순위)은 사용해도 된다(MAY) — 이는 최상위 webpush notification 페이로드와는 별개로
   Android 네이티브 FCM SDK가 자체적으로 알림을 표시할 때 쓰는 채널 설정이라 FR-019가 막는
   "중복 표시" 문제와 무관하다 (`FcmSendService.buildAndroidConfig`).
-- **FR-021**: 시스템은 `notificationType`이 `ALARM`이면 Android 채널 `disaster_alarm`,
-  `MAX` 우선순위, 진동 패턴(`[0,200,100,200]`)을 사용하고, 그 외에는 `disaster_push` 채널을
-  사용해야 한다(MUST) (`FcmSendService.buildAndroidConfig`).
+- **FR-021**: 시스템은 `notificationType` 과 무관하게 Android 채널 `disaster_push`,
+  `default` 사운드, `HIGH` 우선순위를 사용해야 한다(MUST) (`FcmSendService.buildAndroidConfig`).
+  `NotificationType` 은 `NONE`/`PUSH` 두 값뿐이다 — 과거 `ALARM`(채널 `disaster_alarm`, 진동,
+  `MAX` 우선순위)은 실제 구현이 없고 사용자도 0명이라 제거되었다.
 - **FR-022**: 시스템은 FCM 발송이 `UNREGISTERED` 로 실패하면 해당 토큰을 `fcm_token`과
   `guest_fcm_region` 양쪽에서 자동 삭제해야 한다(MUST) (`FcmSendService.isDeadTokenError`
   → `collectDeadTokens` → `DeadTokenCleanupService.cleanUp`). `INVALID_ARGUMENT` 는 토큰
@@ -329,7 +330,7 @@
 - **FR-023**: 프론트엔드 서비스워커(`firebase-messaging-sw.js`)는 표준 Push API의 `push`
   이벤트를 `event.waitUntil(handlePush(event))`로 처리하여, 이벤트 핸들러가 반환된 뒤에도
   서비스워커가 비동기 처리(payload 파싱 + `showNotification()`)를 마칠 때까지 살아있음을
-  보장해야 한다(MUST) (`firebase-messaging-sw.js:8-49`). **근거**: 이 보장이 없으면
+  보장해야 한다(MUST) (`firebase-messaging-sw.js:8-51`). **근거**: 이 보장이 없으면
   서비스워커가 알림 표시 완료 전에 종료(terminate)되어 알림이 아예 표시되지 않을 수 있다.
   Firebase JS SDK `onBackgroundMessage()`는 이 SDK 자체의 push 이벤트 라우팅 이슈로 못
   받거나 씹는 경우가 있어(코드 주석, `firebase-messaging-sw.js:3-6`) 표준 Push API 직접
@@ -337,16 +338,16 @@
   await showNotification(...) })` 패턴을 사용했었다).
 - **FR-023a**: payload 파싱 또는 표시 중 예외가 발생하면, 정상 알림 대신 원본 payload와
   에러 메시지를 본문에 그대로 담은 "SW DEBUG ERROR" 알림을 표시한다(현재 동작)
-  (`firebase-messaging-sw.js:50-55`). 코드에 "TEMP DEBUG: 원인 확인 후 제거할 것"으로
+  (`firebase-messaging-sw.js:45-50`). 코드에 "TEMP DEBUG: 원인 확인 후 제거할 것"으로
   명시된 임시 디버그 코드이며, 정식 요구사항이 아니라 현재 남아있는 상태를 기록한다.
 - **FR-024**: 시스템은 `notificationType`이 `NONE`인 메시지를 수신하면 서비스워커/포그라운드
   핸들러 모두 알림을 표시하지 않아야 한다(MUST) (`firebase-messaging-sw.js:25-27`,
   `useForegroundMessage.ts:13-14`).
 - **FR-025**: 시스템은 알림 클릭 시, 이미 열려 있는 앱 탭이 있으면 그 탭을 대상 URL로
-  이동시켜 포커스하고, 없으면 새 창을 열어야 한다(MUST) (`firebase-messaging-sw.js:58-89`).
+  이동시켜 포커스하고, 없으면 새 창을 열어야 한다(MUST) (`firebase-messaging-sw.js:53-84`).
 - **FR-026**: 시스템은 앱이 포그라운드(활성 탭)에 있을 때도 FCM `onMessage` 콜백으로 알림을
   표시해야 한다(MUST), 단 브라우저 알림 권한이 `granted`가 아니면 표시하지 않는다(MUST)
-  (`useForegroundMessage.ts:12,20-40`).
+  (`useForegroundMessage.ts:12,20-35`).
 - **FR-027**: 회원 FCM 토큰 등록은 (memberId, deviceType) 단위로 UPSERT되어야 한다(MUST) —
   동일 디바이스 타입으로 재등록 시 새 토큰 값으로 갱신한다. 추가로 `fcm_token.token`에
   전역 UNIQUE 제약이 있어(`V114__add_fcm_token_unique_and_dedup.sql`), 동일 토큰 값이
@@ -376,8 +377,7 @@
 - **MemberFavoriteRegion**: 회원-법정동 코드 매핑(회원당 최대 5개, 관리자는 무제한).
   알림 대상 회원 조회의 기준 테이블 (`member/model/MemberFavoriteRegion.java`,
   `member/service/MemberFavoriteRegionService.java:21`).
-- **NotificationPreference** (`notification_preference`): 회원별 알림 방식(`NONE`/`PUSH`/
-  `ALARM`)과 `minRiskScore`(기본 0)를 저장하지만, `minRiskScore`는 발송 로직·수정 API
+- **NotificationPreference** (`notification_preference`): 회원별 알림 방식(`NONE`/`PUSH`)과 `minRiskScore`(기본 0)를 저장하지만, `minRiskScore`는 발송 로직·수정 API
   어디에서도 참조되지 않는 미사용 필드다 (`NotificationPreference.java`,
   `NotificationPreferenceDtos.java:11`, `NotificationPreferenceService.java`).
 - **UserNotificationLog** (`user_notification_log`): 회원 단위 발송 이력(SENT/FAILED, 읽음
