@@ -33,14 +33,7 @@ public class AlertNotificationService {
     // 나간다 — 이 flush 가 곧 배치 경계이며, hibernate.jdbc.batch_size(500, application.yml)와 같은 값이다.
     // flush 후 영속성 컨텍스트를 비우는 기존 목적도 유지된다: 회원 1만 명 팬아웃 내내 managed 엔티티가
     // 쌓이는 걸 막는다(실측: 루프 진행에 따라 건당 31ms→93ms로 3배 증가). 500은 튜닝된 값이 아니라
-    // "너무 자주도, 너무 뜸하지도 않은" 보수적인 출발점이다.
-    // 오류 처리 트레이드오프: INSERT 가 flush 시점으로 미뤄져 이력 저장 실패가 sendToMember 의 try/catch
-    // 밖에서 드러난다. 그래서 flush 실패는 flushAndClearSafely 에서 잡아 error 로그만 남기고 발송은
-    // 계속한다(재난 알림 발송이 이력 저장 때문에 멈추면 안 된다). 다만 flush 가 실패하면 Postgres
-    // 트랜잭션이 aborted 상태가 되어 같은 @Transactional(triggerNotification) 안의 이후 flush 도 실패하고
-    // 커밋 시 롤백되므로, 이미 FCM 이 나간 회원의 이력이 일부 또는 전부 사라질 수 있다 — 발송 지속을
-    // 우선한 의도적 선택이다. UNIQUE 는 V115 에서 제거되어 남는 원인은 FK 위반(팬아웃 중 회원 삭제)·
-    // DB 장애 정도다.
+    // "너무 자주도, 너무 뜸하지도 않은" 보수적인 출발점이다. flush 실패 처리는 flushAndClearSafely 참고.
     private static final int FLUSH_INTERVAL = 500;
 
     private final MemberFavoriteRegionRepository favoriteRegionRepository;
@@ -90,12 +83,15 @@ public class AlertNotificationService {
                     .distinct()
                     .toList();
 
+            // 게스트 토큰은 회원 팬아웃 전에 조회만 해 둔다(이유는 findGuestTokens 주석). 발송은 회원 뒤.
+            List<String> guestTokens = findGuestTokens(allCodesToSearch);
+
             if (!memberIds.isEmpty()) {
                 sendToMembers(memberIds, alertId, title, body);
             }
 
             // 게스트 토큰 발송
-            sendToGuestTokens(allCodesToSearch, alertId, title, body);
+            sendToGuestTokens(guestTokens, alertId, title, body);
 
             long totalMs = (System.nanoTime() - startNanos) / 1_000_000;
             log.info("알림 트리거 완료 - alertId: {}, time={}ms", alertId, totalMs);
@@ -140,6 +136,7 @@ public class AlertNotificationService {
                         Collectors.mapping(MemberToken::token, Collectors.toList())));
 
         int processed = 0;
+        boolean flushErrorLogged = false;
         for (Long memberId : memberIds) {
             String notificationType = typeByMember.getOrDefault(memberId, NotificationType.PUSH.name());
             List<String> tokens = tokensByMember.getOrDefault(memberId, List.of());
@@ -147,14 +144,15 @@ public class AlertNotificationService {
 
             processed++;
             if (processed % FLUSH_INTERVAL == 0) {
-                flushAndClearSafely(flushContext(alertId, memberIds.size(), processed));
+                flushErrorLogged = flushAndClearSafely(
+                        flushContext(alertId, memberIds.size(), processed), flushErrorLogged);
             }
         }
 
         // 마지막 잔여분(500 미만)은 주기 flush 에 안 걸리므로 여기서 명시적으로 내보낸다. 완료 로그 앞에
         // 둬야 측정 시간에 마지막 INSERT 비용이 포함된다. 정확히 500의 배수면 직전 flush 로 이미 빈 상태다.
         if (processed % FLUSH_INTERVAL != 0) {
-            flushAndClearSafely(flushContext(alertId, memberIds.size(), processed));
+            flushAndClearSafely(flushContext(alertId, memberIds.size(), processed), flushErrorLogged);
         }
 
         long fanoutNanos = System.nanoTime() - fanoutStartNanos;
@@ -167,27 +165,51 @@ public class AlertNotificationService {
         return "alertId: " + alertId + ", 대상: " + memberCount + "명, 처리: " + processed + "건";
     }
 
-    // flush 실패(FK 위반·DB 장애)가 루프 밖으로 번져 남은 회원·게스트 FCM 발송을 막지 않게 삼킨다.
-    // clear 는 실패해도 항상 호출해 managed 엔티티가 쌓이지 않게 한다.
-    private void flushAndClearSafely(String context) {
+    // flush 실패(예: FK 위반(팬아웃 중 회원 삭제), DB 장애)가 루프 밖으로 번져 남은 회원·게스트 FCM
+    // 발송을 막지 않게 삼킨다. clear 는 실패해도 항상 호출해 managed 엔티티가 쌓이지 않게 한다.
+    // 오류 처리 트레이드오프: INSERT 가 flush 시점으로 미뤄져 이력 저장 실패가 sendToMember 의 try/catch
+    // 밖에서 드러난다. flush 가 실패하면 Postgres 트랜잭션이 aborted 되어 같은
+    // @Transactional(triggerNotification) 안의 이후 flush 도 실패하고 커밋 시 롤백되므로, 이미 FCM 이
+    // 나간 회원의 이력이 일부 또는 전부 사라질 수 있다 — 발송 지속을 우선한 의도적 선택이다.
+    // 로그 레벨: 첫 실패만 error(스택트레이스 포함), 이후는 warn. aborted 이후 flush 는 연쇄 실패라 전부
+    // error 로 남기면 알림 1건당 error 가 수십 건이 된다(CLAUDE.md: error 는 사람이 조치할 것만).
+    // @return flush 실패 로그 중 error 를 이미 남겼는지(호출자가 다음 호출에 넘긴다)
+    private boolean flushAndClearSafely(String context, boolean errorAlreadyLogged) {
         try {
             entityManager.flush();
+            return errorAlreadyLogged;
         } catch (Exception e) {
-            log.error("알림 이력 flush 실패, 발송은 계속 - {}, error: {}", context, e.getMessage(), e);
+            if (errorAlreadyLogged) {
+                log.warn("알림 이력 flush 실패(이미 첫 실패를 error 로 기록함), 발송은 계속 - {}, error: {}",
+                        context, e.getMessage());
+            } else {
+                log.error("알림 이력 flush 실패, 발송은 계속 - {}, error: {}", context, e.getMessage(), e);
+            }
+            return true;
         } finally {
             entityManager.clear();
         }
     }
 
-    private void sendToGuestTokens(List<String> regionCodes, Long alertId, String title, String body) {
+    // 회원 팬아웃 앞에서 호출한다: 팬아웃 중 flush 가 실패하면 트랜잭션이 aborted 되어 이후 DB 조회가
+    // 모두 실패하므로, 뒤에서 조회하면 게스트 FCM 이 누락될 수 있다. 조회 실패는 발송 실패와 같은
+    // 취급(error 로그 후 게스트 발송만 생략)이라 기존 게스트 catch 동작을 유지한다.
+    private List<String> findGuestTokens(List<String> regionCodes) {
         try {
-            List<String> tokens = guestFcmRegionRepository
+            return guestFcmRegionRepository
                     .findAllByLegalDistrictCodeIn(regionCodes)
                     .stream()
                     .map(r -> r.getFcmToken())
                     .distinct()
                     .toList();
+        } catch (Exception e) {
+            log.error("게스트 알림 발송 실패: {}", e.getMessage());
+            return List.of();
+        }
+    }
 
+    private void sendToGuestTokens(List<String> tokens, Long alertId, String title, String body) {
+        try {
             if (tokens.isEmpty()) return;
 
             log.info("게스트 알림 발송 대상: {}개 토큰", tokens.size());
