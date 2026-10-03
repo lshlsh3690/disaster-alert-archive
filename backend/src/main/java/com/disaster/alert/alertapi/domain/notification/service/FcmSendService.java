@@ -57,7 +57,7 @@ public class FcmSendService {
                     .putData("body", body != null ? body : "")
                     .putData("notificationType", notificationType)
                     .putData("alertId", alertId != null ? alertId : "")
-                    .setAndroidConfig(buildAndroidConfig(notificationType))
+                    .setAndroidConfig(buildAndroidConfig())
                     .setWebpushConfig(buildWebpushConfig())
                     .build();
 
@@ -106,7 +106,7 @@ public class FcmSendService {
                     .putData("body", body != null ? body : "")
                     .putData("notificationType", notificationType)
                     .putData("alertId", alertId != null ? alertId : "")
-                    .setAndroidConfig(buildAndroidConfig(notificationType))
+                    .setAndroidConfig(buildAndroidConfig())
                     .setWebpushConfig(buildWebpushConfig())
                     .build();
 
@@ -337,8 +337,8 @@ public class FcmSendService {
      * 절전은 별개 요인이고, 서비스워커가 멈춰 있다가 깨어나는 시간도 남는다. 이 헤더는 그중
      * 서버가 통제할 수 있는 유일한 부분이다.
      *
-     * <p>{@code AndroidConfig} 와 달리 유형별로 나누지 않는다. {@code PUSH}/{@code ALARM} 모두
-     * 재난 알림이라 지연되면 안 되는 것은 같다.
+     * <p>{@code AndroidConfig} 와 마찬가지로 알림 유형({@code NotificationType})에 따라
+     * 나누지 않는다. 재난 알림은 어느 유형이든 지연되면 안 된다.
      */
     private WebpushConfig buildWebpushConfig() {
         return WebpushConfig.builder()
@@ -377,28 +377,16 @@ public class FcmSendService {
         }
     }
 
-    // Android 설정 (ALARM: 높은 우선순위)
-    private AndroidConfig buildAndroidConfig(String notificationType) {
-        AndroidConfig.Builder builder = AndroidConfig.builder()
-                .setPriority(AndroidConfig.Priority.HIGH);
-
-        if ("ALARM".equals(notificationType)) {
-            builder.setNotification(
-                    AndroidNotification.builder()
-                            .setChannelId("disaster_alarm")
-                            .setSound("default")
-                            .setVibrateTimingsInMillis(new long[]{0, 200, 100, 200})
-                            .setPriority(AndroidNotification.Priority.MAX)
-                            .build()
-            );
-        } else {
-            builder.setNotification(
-                    AndroidNotification.builder()
-                            .setChannelId("disaster_push")
-                            .setSound("default")
-                            .build()
-            );
-        }
-        return builder.build();
+    // Android 설정 (재난 알림이라 항상 높은 우선순위)
+    private AndroidConfig buildAndroidConfig() {
+        return AndroidConfig.builder()
+                .setPriority(AndroidConfig.Priority.HIGH)
+                .setNotification(
+                        AndroidNotification.builder()
+                                .setChannelId("disaster_push")
+                                .setSound("default")
+                                .build()
+                )
+                .build();
     }
 }
