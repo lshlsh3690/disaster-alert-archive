@@ -19,7 +19,14 @@ import java.time.LocalDateTime;
 public class UserNotificationLog {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    // IDENTITY 는 INSERT 를 JDBC 배치로 묶을 수 없어 팬아웃(회원 수만큼 로그 INSERT)이 건건이 나갔다.
+    // allocationSize 는 V120 에서 맞춘 시퀀스 INCREMENT(500) 와 반드시 같아야 한다.
+    @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "user_notification_log_seq_gen")
+    @SequenceGenerator(
+            name = "user_notification_log_seq_gen",
+            sequenceName = "user_notification_log_id_seq",
+            allocationSize = 500
+    )
     private Long id;
 
     @Column(name = "member_id", nullable = false)
