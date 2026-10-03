@@ -66,7 +66,7 @@ Firebase Cloud Messaging. 코드 내 `deviceType` 값으로 `WEB`/`ANDROID`/`IOS
 `backend/`, `frontend/` 분리)
 
 **성능 목표**: 코드에 명시된 성능 목표나 SLA는 없다. 발송은 `@Async`로 스케줄러 스레드를
-블로킹하지 않도록 되어 있고(`AlertNotificationService.java:34`), 멀티캐스트 발송은 Firebase
+블로킹하지 않도록 되어 있고(`AlertNotificationService.java:50`), 멀티캐스트 발송은 Firebase
 제약상 최대 500 토큰/요청으로 제한된다(`FcmSendService.java:48` 주석).
 
 **제약사항**: FCM 메시지는 반드시 data-only여야 함(webpush `notification` 필드 금지),

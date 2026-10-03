@@ -43,27 +43,27 @@
    호출하면 (`backend/.../scheduler/DisasterFetchScheduler.java:29,45`), **Then** 해당 회원의
    등록된 FCM 토큰으로 `title`/`body`/`notificationType`/`alertId`를 담은 data-only 메시지가
    발송되고 `UserNotificationLog`에 `SENT`로 기록된다
-   (`backend/.../notification/service/AlertNotificationService.java:67-79,116-156`).
+   (`backend/.../notification/service/AlertNotificationService.java:77-91,140-150,234-262`).
 2. **Given** 회원이 시도 전체("전체")를 관심지역으로 등록해 시도 코드가 0으로 패딩된 형태로
    저장되어 있고(`2900000000`), **When** 그 시도에 속한 특정 구(`2900300000`)의 재난문자가
    수집되면, **Then** 시스템은 알림 대상 재난문자의 시군구 코드로부터 시도 코드(앞 2자리)를
    추출해 `00000000`으로 패딩한 파생 코드를 함께 검색 조건에 포함하므로
-   (`AlertNotificationService.java:58-65`) 이 회원도 알림을 받는다.
+   (`AlertNotificationService.java:104-114`) 이 회원도 알림을 받는다.
 3. **Given** 동일 회원이 이미 동일 `alertId`에 대해 알림을 받은 이력이 있으면(`UserNotificationLog`
    존재), **When** `triggerNotification`이 같은 alertId로 다시 호출되면(예: 관리자 수동
    재트리거), **Then** 중복 체크 없이 다시 발송된다 — 이 중복 방지 로직은
    `V115__drop_user_notification_log_dedup_unique.sql`에서 "테스트/재발송 시나리오에서
    동일 alertId 재발송이 막히던 문제 해소"를 이유로 의도적으로 제거되었다
-   (`AlertNotificationService.java:116-156`에 더 이상 dedup 체크 없음; 과거에는 존재했다 —
+   (`AlertNotificationService.java:234-262`에 더 이상 dedup 체크 없음; 과거에는 존재했다 —
    FR-005 참고).
 4. **Given** 회원의 알림 설정이 `NONE`이면, **When** 관심지역 알림 대상에 포함되더라도,
-   **Then** FCM 발송을 하지 않는다 (`AlertNotificationService.java:119-125`).
+   **Then** FCM 발송을 하지 않는다 (`AlertNotificationService.java:237-238`).
 5. **Given** 회원이 알림 설정을 한 번도 저장한 적이 없으면(`NotificationPreference` 레코드
    없음), **When** 알림 대상이 되면, **Then** 기본값 `PUSH`로 취급해 발송한다
-   (`AlertNotificationService.java:119-122`, `NotificationPreference.java:32`).
+   (`AlertNotificationService.java:141`, `NotificationPreference.java:32`).
 6. **Given** 회원이 등록한 FCM 토큰이 1개면, **When** 발송하면, **Then** 단건 발송 API
    (`FirebaseMessaging.send`)를, 2개 이상이면 멀티캐스트 발송 API(`sendEachForMulticast`)를
-   사용한다 (`AlertNotificationService.java:137-141`, `FcmSendService.java:19-46,49-72`).
+   사용한다 (`AlertNotificationService.java:243-247`, `FcmSendService.java:19-46,49-72`).
 7. **Given** 회원이 로그인한 브라우저에서 알림 권한을 허용하면, **When** 프론트엔드가
    `POST /api/v1/fcm-token`으로 FCM 토큰과 `deviceType`을 등록하면, **Then** 서버는
    (memberId, deviceType) 단위로 토큰을 UPSERT하되, 동일 토큰 값이 다른 행(예: 게스트로
@@ -106,7 +106,7 @@
    집합과 겹치면, **When** `triggerNotification`이 실행되면, **Then** 해당 게스트 토큰들로
    data-only FCM이 발송된다 — 이 경로는 회원 경로와 달리 알림 설정(`NotificationType`)
    확인이나 `UserNotificationLog` 중복 방지 로직을 거치지 않는다
-   (`AlertNotificationService.java:82,89-114`).
+   (`AlertNotificationService.java:87,93-94,197-232`).
 5. **Given** 게스트가 알림 수신을 중단하려고 하면, **When** `DELETE /api/v1/fcm-token/guest`를
    호출하면(인증 불필요), **Then** 해당 토큰의 게스트 지역 레코드가 모두 삭제되고, 그
    토큰이 아직 회원과 연결되지 않은 경우에 한해 `fcm_token` 레코드 자체도 삭제된다
@@ -179,14 +179,20 @@
 ### 예외 상황
 
 - 재난문자에 유효한 법정동 코드가 하나도 없으면(`regionCodes.isEmpty()`), 알림 대상 조회
-  자체를 하지 않고 즉시 종료한다 (`AlertNotificationService.java:51`).
+  자체를 하지 않고 즉시 종료한다 (`AlertNotificationService.java:71`).
 - `triggerNotification` 전체가 예외를 던지면(예: 알림 조회 실패) 로그만 남기고 스케줄러의
-  나머지 파이프라인(클러스터링 등)에 영향을 주지 않는다 (`AlertNotificationService.java:36-37,84-86`,
+  나머지 파이프라인(클러스터링 등)에 영향을 주지 않는다 (`AlertNotificationService.java:99-101`,
   호출부는 `@Async`이므로 실패가 `DisasterFetchScheduler`를 멈추지 않는다).
 - 개별 회원 발송 중 예외가 발생해도 다른 회원 발송은 계속 진행된다 — 회원 단위로
-  `try/catch`가 걸려 있다 (`AlertNotificationService.java:116-156`).
-- 게스트 발송 전체가 예외를 던지면(예: 토큰 조회 실패) 로그만 남기고 트리거 자체는
-  실패로 처리되지 않는다 (`AlertNotificationService.java:89,111-113`).
+  `try/catch`가 걸려 있다 (`AlertNotificationService.java:234-262`). 다만 이력 `save()`는
+  SEQUENCE 전략이라 flush 시점(500건마다)까지 미뤄지므로, **이력 저장 실패는 이 `try/catch`가
+  아니라 `flushAndClearSafely`(`AlertNotificationService.java:180-195`)에서 잡힌다** — flush
+  실패는 error 로그만 남기고 발송은 계속하지만, 트랜잭션이 aborted 되어 이미 발송된 회원의
+  이력이 일부 또는 전부 사라질 수 있다.
+- 게스트 발송 전체가 예외를 던지면 로그만 남기고 트리거 자체는 실패로 처리되지 않는다
+  (`AlertNotificationService.java:214-216,229-231`). 게스트 토큰 조회는 `findGuestTokens`가
+  회원 팬아웃 앞에서 따로 수행하며, 조회 실패는 그 안에서 error 로그 후 빈 리스트로 흡수해
+  게스트 발송만 생략한다(`AlertNotificationService.java:208-211`).
 - FCM 발송이 `UNREGISTERED` 에러로 실패하면(등록 해제된 토큰) 해당 토큰을 `fcm_token`과
   `guest_fcm_region` **양쪽에서 자동 삭제한다** (`DeadTokenCleanupService.cleanUp`,
   단건은 `FcmSendService.sendToToken`, 배치는 `collectDeadTokens`를 거쳐 호출). 정리 실패가
@@ -227,8 +233,8 @@
 - `notificationType`이 `NONE`이면 서비스워커/포그라운드 핸들러 모두 알림을 표시하지 않고
   조기 반환한다 (`firebase-messaging-sw.js:27`, `useForegroundMessage.ts:14`). 서버가 이
   값으로 `NONE`을 실제 발송하는 경로는 현재 코드에 없다 — 게스트 발송은
-  `NotificationType.PUSH.name()`으로 고정되어 있고(`AlertNotificationService.java:106,109`),
-  회원 발송도 `NONE`이면 서버 단에서 발송 자체를 하지 않는다(`AlertNotificationService.java:125`).
+  `NotificationType.PUSH.name()`으로 고정되어 있고(`AlertNotificationService.java:224,227`),
+  회원 발송도 `NONE`이면 서버 단에서 발송 자체를 하지 않는다(`AlertNotificationService.java:238`).
   따라서 클라이언트의 `NONE` 분기는 두 발신 경로 모두에서 현재 도달하지 않는 방어 코드임을
   코드 추적으로 확인했다(추측이 아님).
 
@@ -254,33 +260,33 @@
 - **FR-003**: 시스템은 알림 대상 지역 코드 집합을 계산할 때, 재난문자의 시군구 단위(10자리)
   법정동 코드 각각에 대해 앞 2자리(시도)를 취하고 나머지를 `0`으로 채운 시도 전체 코드를
   파생시켜 원본 코드 목록에 합쳐야 한다(MUST) — 시도 전체를 관심지역으로 등록한 사용자를
-  포함하기 위함 (`AlertNotificationService.java:56-65`).
+  포함하기 위함 (`AlertNotificationService.java:104-114`).
 - **FR-004**: 시스템은 파생 코드를 포함한 지역 코드 집합과 일치하는 `MemberFavoriteRegion`을
-  가진 모든 회원 ID를 조회해야 한다(MUST) (`AlertNotificationService.java:67-72`,
+  가진 모든 회원 ID를 조회해야 한다(MUST) (`AlertNotificationService.java:79-84`,
   `MemberFavoriteRegionRepository.findByIdLegalDistrictCodeIn`).
 - **FR-005**: ~~시스템은 회원별로 동일한 `alertId`에 대해 두 번 이상 발송하지 않아야
   한다~~ — **2026-08-03 `V115__drop_user_notification_log_dedup_unique.sql`로 이 요구사항
   자체가 제거되었다.** `AlertNotificationService.sendToMember`는 더 이상
-  (memberId, alertId) 존재 여부를 판정하지 않으며(`AlertNotificationService.java:116-156`
+  (memberId, alertId) 존재 여부를 판정하지 않으며(`AlertNotificationService.java:234-262`
   전체에 dedup 체크 없음), DB의 `user_notification_log_member_id_alert_id_key` UNIQUE
   제약도 삭제되었다 — "테스트/재발송 시나리오에서 동일 alertId 재발송이 막히던 문제 해소"가
   명시된 사유다. 즉 동일 alertId로 트리거가 두 번 호출되면 회원은 동일 알림을 두 번
   받는다. 이 사실을 요구사항이 아니라 현재 동작으로 기록한다(가정 섹션도 참고).
 - **FR-006**: 시스템은 회원의 `NotificationPreference.notificationType`이 `NONE`이면 해당
-  회원에게 발송하지 않아야 한다(MUST) (`AlertNotificationService.java:119-125`).
+  회원에게 발송하지 않아야 한다(MUST) (`AlertNotificationService.java:237-238`).
 - **FR-007**: 시스템은 회원의 알림 설정 레코드가 없으면 기본값 `PUSH`로 간주해 발송해야
-  한다(MUST) (`AlertNotificationService.java:119-122`; 엔티티 기본값도 `PUSH`,
+  한다(MUST) (`AlertNotificationService.java:141`; 엔티티 기본값도 `PUSH`,
   `NotificationPreference.java:32`).
 - **FR-008**: 시스템은 회원에게 등록된 FCM 토큰이 없으면 발송을 건너뛰어야 한다(MUST)
-  (`AlertNotificationService.java:128-134`).
+  (`AlertNotificationService.java:240`).
 - **FR-009**: 시스템은 토큰 수에 따라 단건(`FirebaseMessaging.send`) 또는 멀티캐스트
   (`sendEachForMulticast`, 최대 500개) API를 선택해 사용해야 한다(MUST)
-  (`AlertNotificationService.java:137-141`, `FcmSendService.java:19-72`).
+  (`AlertNotificationService.java:243-247`, `FcmSendService.java:19-72`).
 - **FR-010**: 시스템은 회원 발송 결과(성공/실패)와 알림 타입을 `UserNotificationLog`에
-  `SENT`/`FAILED` 상태로 기록해야 한다(MUST) (`AlertNotificationService.java:143-151`).
+  `SENT`/`FAILED` 상태로 기록해야 한다(MUST) (`AlertNotificationService.java:249-257`).
 - **FR-011**: 시스템은 알림 발송 파이프라인(트리거 전체, 회원 단위, 게스트 단위)에서 발생하는
   예외를 각 단계별로 잡아 로깅만 하고 상위 스케줄러의 나머지 처리(번역, 클러스터링 등)를
-  중단시키지 않아야 한다(MUST) (`AlertNotificationService.java:36-37,84-86,111-113,116,153-155`).
+  중단시키지 않아야 한다(MUST) (`AlertNotificationService.java:99-101,259-261,229-231,208-211,184-194`).
 - **FR-012**: 시스템은 비로그인 사용자가 FCM 토큰과 관심지역 코드를 최대 5개까지 등록할
   수 있게 해야 한다(MUST) (`GuestFcmTokenService.java:23,33-39`). 이 등록 엔드포인트가
   인증 없이 접근 가능하다는 사실은 FR-017 참고.
@@ -296,7 +302,7 @@
   `GuestFcmTokenService.java:74-82`).
 - **FR-016**: 시스템은 (파생 시도코드를 포함한) 지역 코드 집합과 일치하는 `guest_fcm_region`
   레코드의 토큰들에게 FCM을 발송해야 한다(MUST) — 항상 `NotificationType.PUSH`로 발송하며
-  알림 타입 설정을 거치지 않는다(`AlertNotificationService.java:82,89-114`). 중복 발송
+  알림 타입 설정을 거치지 않는다(`AlertNotificationService.java:87,93-94,197-232`). 중복 발송
   방지 부재는 더 이상 게스트 경로만의 특징이 아니다 — FR-005가 제거되어 회원 경로도
   동일하게 dedup 체크가 없다.
 - **FR-017**: 시스템은 게스트 FCM 토큰 등록(`POST /api/v1/fcm-token/guest`)과 삭제
@@ -405,7 +411,7 @@
   성공 기준을 제시할 수 없으므로 지표를 지어내지 않고 이 사실을 그대로 기록한다.
 - **SC-002**: 알림 트리거는 재난문자 수집 스케줄러(10분 주기)에 종속되어 실행되며
   (`DisasterFetchScheduler.java:29`), 발송 자체는 `@Async`로 비동기 실행되어 스케줄러의
-  다음 작업(클러스터링 등)을 블로킹하지 않는다(`AlertNotificationService.java:34-35`) — 이는
+  다음 작업(클러스터링 등)을 블로킹하지 않는다(`AlertNotificationService.java:50`) — 이는
   실측 지연시간이 아니라 코드 구조상의 설계 사실이다.
 - **SC-003**: 회원 경로와 게스트 경로 모두 (memberId/토큰, alertId) 단위 중복 발송 방지
   로직을 갖고 있지 않다 — 회원 경로는 과거 `existsByMemberIdAndAlertId` 체크로 보장했으나
