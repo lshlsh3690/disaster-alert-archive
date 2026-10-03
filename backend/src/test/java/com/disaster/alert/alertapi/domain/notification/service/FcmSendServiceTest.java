@@ -314,7 +314,7 @@ class FcmSendServiceTest {
             when(exception.getMessagingErrorCode()).thenReturn(MessagingErrorCode.UNREGISTERED);
             when(firebaseMessaging.send(any())).thenThrow(exception);
 
-            boolean result = fcmSendService.sendToToken("dead-token", "제목", "본문", "ALARM", "alert-1");
+            boolean result = fcmSendService.sendToToken("dead-token", "제목", "본문", "PUSH", "alert-1");
 
             assertThat(result).isFalse();
         }
@@ -338,7 +338,7 @@ class FcmSendServiceTest {
             when(exception.getMessagingErrorCode()).thenReturn(MessagingErrorCode.UNREGISTERED);
             when(firebaseMessaging.send(any())).thenThrow(exception);
 
-            boolean result = fcmSendService.sendToToken("dead-token", "제목", "본문", "ALARM", "alert-1");
+            boolean result = fcmSendService.sendToToken("dead-token", "제목", "본문", "PUSH", "alert-1");
 
             assertThat(result).isFalse();
         }
@@ -361,7 +361,7 @@ class FcmSendServiceTest {
             when(firebaseMessaging.sendEachForMulticast(any())).thenReturn(batchResponse);
 
             BatchResponse result = fcmSendService.sendToTokens(
-                    List.of("token-A", "token-B"), "제목", "본문", "ALARM", "alert-1");
+                    List.of("token-A", "token-B"), "제목", "본문", "PUSH", "alert-1");
 
             assertThat(result).isSameAs(batchResponse);
         }
@@ -385,7 +385,7 @@ class FcmSendServiceTest {
             when(firebaseMessaging.sendEachForMulticast(any())).thenReturn(batchResponse);
 
             BatchResponse result = fcmSendService.sendToTokens(
-                    List.of("token-A", "token-B"), "제목", "본문", "ALARM", "alert-1");
+                    List.of("token-A", "token-B"), "제목", "본문", "PUSH", "alert-1");
 
             assertThat(result).isSameAs(batchResponse);
         }
@@ -404,7 +404,7 @@ class FcmSendServiceTest {
         // FirebaseMessaging을 mockStatic으로 감싸지 않는다 — dry-run이 제대로 동작하면 애초에
         // FirebaseMessaging.getInstance()를 호출하지 않으므로, 초기화되지 않은 실제 클래스를
         // 그대로 둬도 예외 없이 통과해야 한다는 것 자체가 이 테스트의 핵심 assertion이다.
-        boolean result = fcmSendService.sendToToken("token-A", "제목", "본문", "ALARM", "alert-1");
+        boolean result = fcmSendService.sendToToken("token-A", "제목", "본문", "PUSH", "alert-1");
 
         assertThat(result).isTrue();
     }
@@ -420,7 +420,7 @@ class FcmSendServiceTest {
 
         List<String> tokens = List.of("token-A", "token-B", "token-C");
 
-        BatchResponse result = fcmSendService.sendToTokens(tokens, "제목", "본문", "ALARM", "alert-1");
+        BatchResponse result = fcmSendService.sendToTokens(tokens, "제목", "본문", "PUSH", "alert-1");
 
         assertThat(result).isNotNull();
         assertThat(result.getSuccessCount()).isEqualTo(tokens.size());
