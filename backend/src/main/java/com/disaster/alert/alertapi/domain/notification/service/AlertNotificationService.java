@@ -29,10 +29,18 @@ import java.util.stream.Stream;
 @RequiredArgsConstructor
 public class AlertNotificationService {
 
-    // UserNotificationLog가 GenerationType.IDENTITY라 INSERT를 배치로 못 묶는다 — 대신 이 건수마다
-    // 영속성 컨텍스트를 비워 회원 1만 명 팬아웃 내내 managed 엔티티가 계속 쌓이는 걸 막는다
-    // (실측: 루프 진행에 따라 건당 31ms→93ms로 3배 증가). 500은 이번 벌크 조회 리팩터링과 함께
-    // 정한 값으로, 튜닝된 값이 아니라 "너무 자주도, 너무 뜸하지도 않은" 보수적인 출발점이다.
+    // UserNotificationLog 가 SEQUENCE 전략이라 INSERT 가 영속성 컨텍스트에 쌓였다가 flush 때 JDBC 배치로
+    // 나간다 — 이 flush 가 곧 배치 경계이며, hibernate.jdbc.batch_size(500, application.yml)와 같은 값이다.
+    // flush 후 영속성 컨텍스트를 비우는 기존 목적도 유지된다: 회원 1만 명 팬아웃 내내 managed 엔티티가
+    // 쌓이는 걸 막는다(실측: 루프 진행에 따라 건당 31ms→93ms로 3배 증가). 500은 튜닝된 값이 아니라
+    // "너무 자주도, 너무 뜸하지도 않은" 보수적인 출발점이다.
+    // 오류 처리 트레이드오프: INSERT 가 flush 시점으로 미뤄져 이력 저장 실패가 sendToMember 의 try/catch
+    // 밖에서 드러난다. 그래서 flush 실패는 flushAndClearSafely 에서 잡아 error 로그만 남기고 발송은
+    // 계속한다(재난 알림 발송이 이력 저장 때문에 멈추면 안 된다). 다만 flush 가 실패하면 Postgres
+    // 트랜잭션이 aborted 상태가 되어 같은 @Transactional(triggerNotification) 안의 이후 flush 도 실패하고
+    // 커밋 시 롤백되므로, 이미 FCM 이 나간 회원의 이력이 일부 또는 전부 사라질 수 있다 — 발송 지속을
+    // 우선한 의도적 선택이다. UNIQUE 는 V115 에서 제거되어 남는 원인은 FK 위반(팬아웃 중 회원 삭제)·
+    // DB 장애 정도다.
     private static final int FLUSH_INTERVAL = 500;
 
     private final MemberFavoriteRegionRepository favoriteRegionRepository;
@@ -139,15 +147,36 @@ public class AlertNotificationService {
 
             processed++;
             if (processed % FLUSH_INTERVAL == 0) {
-                entityManager.flush();
-                entityManager.clear();
+                flushAndClearSafely(flushContext(alertId, memberIds.size(), processed));
             }
+        }
+
+        // 마지막 잔여분(500 미만)은 주기 flush 에 안 걸리므로 여기서 명시적으로 내보낸다. 완료 로그 앞에
+        // 둬야 측정 시간에 마지막 INSERT 비용이 포함된다. 정확히 500의 배수면 직전 flush 로 이미 빈 상태다.
+        if (processed % FLUSH_INTERVAL != 0) {
+            flushAndClearSafely(flushContext(alertId, memberIds.size(), processed));
         }
 
         long fanoutNanos = System.nanoTime() - fanoutStartNanos;
         log.info("회원 팬아웃 완료 - alertId: {}, 대상: {}명, time={}ms, avg={}ms/명",
                 alertId, memberIds.size(), fanoutNanos / 1_000_000,
                 fanoutNanos / 1_000_000.0 / memberIds.size());
+    }
+
+    private String flushContext(Long alertId, int memberCount, int processed) {
+        return "alertId: " + alertId + ", 대상: " + memberCount + "명, 처리: " + processed + "건";
+    }
+
+    // flush 실패(FK 위반·DB 장애)가 루프 밖으로 번져 남은 회원·게스트 FCM 발송을 막지 않게 삼킨다.
+    // clear 는 실패해도 항상 호출해 managed 엔티티가 쌓이지 않게 한다.
+    private void flushAndClearSafely(String context) {
+        try {
+            entityManager.flush();
+        } catch (Exception e) {
+            log.error("알림 이력 flush 실패, 발송은 계속 - {}, error: {}", context, e.getMessage(), e);
+        } finally {
+            entityManager.clear();
+        }
     }
 
     private void sendToGuestTokens(List<String> regionCodes, Long alertId, String title, String body) {
