@@ -37,8 +37,8 @@
 - **원칙 I (가독성과 단순성 우선) — 부분 위반, 실제 중복 확인됨.**
   "법정동 코드에서 시도/시군구 상위 레벨을 파생한다"는 동일한 목적의 로직이 6개 지점(백엔드 5 + 프론트엔드 1)에서 각자 재구현되어 있고, `LegalDistrict` 엔티티나 `LegalDistrictService`에는 이를 위한 공용 헬퍼(예: `sidoCodeOf(code)`, `sigunguCodeOf(code)`)가 전혀 없다:
   1. `AlertNotificationService.java:60` — `code.substring(0,2) + "00000000"` (시도 10자리 코드 조합, 관심지역 매칭용)
-  2. `EventClusteringService.java:682` (`sidoPrefix`) — `code.substring(0,2)` (2자리, 브로드캐스트 분류용)
-  3. `EventClusteringService.java:735` (`sigunguPrefixes`) — `code.substring(0,5)` (5자리, 클러스터링 hard 필터용)
+  2. `EventClusteringService.java:688` (`sidoPrefix`) — `code.substring(0,2)` (2자리, 브로드캐스트 분류용)
+  3. `EventClusteringService.java:741` (`sigunguPrefixes`) — `code.substring(0,5)` (5자리, 클러스터링 hard 필터용)
   4. `RiskCalculationService.java:145` — `code.substring(0, Math.min(5, code.length()))` (5자리, 위험도 지역 키용)
   5. `DisasterAlertRepositoryImpl.java:376-379`(`sidoCodeExpr`) — QueryDSL `function('left', code, 2)` (SQL 레벨 2자리, 통계 그룹핑용)
   6. (프론트) `frontend/src/app/user/settings/regions/page.tsx:21-39` — 시도 2자리 코드 → 시도명 하드코딩 맵(17개 항목), 백엔드 데이터와 무관한 별도 소스.

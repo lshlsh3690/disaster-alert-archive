@@ -195,7 +195,7 @@ mini 는 곡성군을 `谷城郡` 대신 `ゴクソン郡`, 성수JC 를 `聖水
 
 ## 이 파이프라인이 건드리지 않는 경계
 
-- **임베딩·클러스터링·위험도**: `EventClusteringService`는 한국어 원문(`disaster_alert.message`)만 임베딩한다(`domain/event/service/EventClusteringService.java:172,205`). 번역 엔진 교체·번역 실패가 벡터·코사인 유사도·이벤트 구성·위험도 점수를 바꾸지 않는다(spec.md FR-016). 2026-08-09 교체 당시 두 DeepL 키가 모두 소진돼 번역이 전무한 상태에서도 이벤트·위험도가 정상 동작한 것이 이 독립성의 실증이다.
+- **임베딩·클러스터링·위험도**: `EventClusteringService`는 한국어 원문(`disaster_alert.message`)만 임베딩한다(`domain/event/service/EventClusteringService.java:173,206`). 번역 엔진 교체·번역 실패가 벡터·코사인 유사도·이벤트 구성·위험도 점수를 바꾸지 않는다(spec.md FR-016). 2026-08-09 교체 당시 두 DeepL 키가 모두 소진돼 번역이 전무한 상태에서도 이벤트·위험도가 정상 동작한 것이 이 독립성의 실증이다.
 - **법정동 명칭 번역**: `legal_district_translation`은 Flyway 시드 테이블이고 런타임 번역 호출이 없다(spec.md FR-011). 상세는 `specs/004-legal-district-matching/spec.md` FR-017·FR-018에 위임한다.
 - **프론트엔드 언어 선택 상태**: `languageStore`와 `?lang=` 파라미터 전달 경로는 범위 밖이다 — 백엔드가 `lang`을 수신한 시점부터를 다룬다.
 - **사용자 제보 알림(`user_disaster_alert`)**: 번역 경로를 타지 않는다. `translateAndSaveInternal`은 `disasterAlertRepository`(공식 재난문자)만 조회한다(`TranslationService.java:149`). 이 전제가 프롬프트 인젝션 위험 평가의 근거이므로, 사용자 생성 콘텐츠를 번역 대상에 추가하면 재평가가 필요하다.

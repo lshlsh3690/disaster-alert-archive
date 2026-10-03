@@ -3,6 +3,7 @@ package com.disaster.alert.alertapi.domain.event.service;
 import com.disaster.alert.alertapi.domain.disasteralert.model.DisasterAlert;
 import com.disaster.alert.alertapi.domain.disasteralert.model.DisasterAlertRegion;
 import com.disaster.alert.alertapi.domain.disasteralert.repository.DisasterAlertRepository;
+import com.disaster.alert.alertapi.domain.event.model.DisasterCooldown;
 import com.disaster.alert.alertapi.domain.event.model.DisasterEvent;
 import com.disaster.alert.alertapi.domain.event.model.EventAlertMapping;
 import com.disaster.alert.alertapi.domain.event.model.FireAlertClassifier;
@@ -288,6 +289,11 @@ public class EventClusteringService {
         for (Long id : borderlineIds) {
             DisasterEvent ev = disasterEventRepository.findById(id).orElse(null);
             if (ev == null || !isAccidentType(ev.getPrimaryDisasterType())) {
+                continue;
+            }
+            // 화재는 별개 화재를 합치는 오병합이 많아 이벤트 마지막 알림 72h 초과 시 후보 제외(운영 데이터 분석 2026-10)
+            if (!DisasterCooldown.allowsLlmFallbackMerge(alert.getDisasterType(),
+                    ev.getFirstAlertAt(), ev.getLastAlertAt(), alert.getCreatedAt())) {
                 continue;
             }
             cands.add(new EventLLMDecisionService.Candidate(id, repMessages.getOrDefault(id, "")));
