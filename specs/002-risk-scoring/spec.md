@@ -34,7 +34,7 @@
 
 **인수 시나리오**:
 
-1. **Given** 새 재난문자가 클러스터링되어 신규 이벤트가 생성됨, **When** `EventClusteringService.createNewEvent`가 `eventPublisher.publishEvent(new AlertClusteredEvent(...))`를 호출함, **Then** 트랜잭션 커밋 후(`AFTER_COMMIT`) `ClusteringEventListener.onAlertClustered`가 비동기(`riskTaskExecutor`)로 실행된다 — `backend/.../event/service/EventClusteringService.java:600`, `backend/.../risk/listener/ClusteringEventListener.java:32-34`
+1. **Given** 새 재난문자가 클러스터링되어 신규 이벤트가 생성됨, **When** `EventClusteringService.createNewEvent`가 `eventPublisher.publishEvent(new AlertClusteredEvent(...))`를 호출함, **Then** 트랜잭션 커밋 후(`AFTER_COMMIT`) `ClusteringEventListener.onAlertClustered`가 비동기(`riskTaskExecutor`)로 실행된다 — `backend/.../event/service/EventClusteringService.java:606`, `backend/.../risk/listener/ClusteringEventListener.java:32-34`
 2. **Given** `AlertClusteredEvent` 수신, **When** `recomputeEventRisk(eventId)`가 실행됨, **Then** `baseScore = weight[유형] × intensity[강도] × severity[위급단계]`가 계산되어 이벤트의 영향 법정동 전체에 `event_region_impact`로 upsert된다 — `backend/.../risk/service/RiskCalculationService.java:100-138`
 3. **Given** `event_region_impact` upsert 완료, **When** 영향받은 시군구 집합이 리스너로 반환됨, **Then** 해당 시군구들에 대해 `recomputeRegionSource`가 호출되어 `region_risk_index.source_score`가 갱신된다 — `backend/.../risk/listener/ClusteringEventListener.java:37-41`
 4. **Given** source가 갱신된 시군구가 1개 이상 존재, **When** 리스너 마지막 단계 실행, **Then** `propagateEffective()`가 전체 인접 그래프에 대해 1회 실행되어 `region_risk_index.risk_score`(effective)가 갱신된다 — `backend/.../risk/listener/ClusteringEventListener.java:43-47`
@@ -153,7 +153,7 @@
 
 ### 기능 요구사항
 
-- **FR-001**: 시스템은 알림이 이벤트로 클러스터링 완료되면(`AlertClusteredEvent` 발행) 트랜잭션 커밋 이후(`AFTER_COMMIT`) 비동기로 위험도 재계산을 트리거해야 한다(MUST) — `backend/.../event/service/EventClusteringService.java:510,583,600`, `backend/.../risk/listener/ClusteringEventListener.java:32-34`
+- **FR-001**: 시스템은 알림이 이벤트로 클러스터링 완료되면(`AlertClusteredEvent` 발행) 트랜잭션 커밋 이후(`AFTER_COMMIT`) 비동기로 위험도 재계산을 트리거해야 한다(MUST) — `backend/.../event/service/EventClusteringService.java:516,589,606`, `backend/.../risk/listener/ClusteringEventListener.java:32-34`
 - **FR-002**: 시스템은 `baseScore = weight[유형] × intensity[강도] × severity[위급단계]` 공식으로 이벤트 단위 위험 점수를 산출해야 한다(MUST) — `backend/.../risk/service/RiskCalculationService.java:38,122`, `backend/.../risk/model/RiskScore.java:17-19`
 - **FR-004**: 강도(intensity) multiplier는 이벤트에 속한 알림 본문에서 정규식으로 추출한 수치를 `intensity_bracket` 구간에 매핑해 산출하며, 이벤트 내 여러 알림 중 최댓값을 사용해야 한다(MUST) — `backend/.../risk/service/RiskCalculationService.java:108-113`, `backend/.../risk/service/IntensityExtractor.java:22-29`
 - **FR-005**: 강도 추출/구간 매핑이 정의되지 않은 유형이거나 정규식 매칭에 실패하면 intensity multiplier는 1.0(미반영)이어야 한다(MUST) — `backend/.../risk/service/IntensityExtractor.java:16-17,37-41`, `backend/.../risk/repository/IntensityBracketRepository.java:12-22`
@@ -220,4 +220,4 @@
 - **LLM 프로파일 생성에는 클러스터링 도메인과 달리 별도 게이팅 플래그가 없다**: `EventLLMDecisionService` 등 클러스터링 쪽 LLM 호출은 `llm-fallback.enabled`/`cross-region.enabled` 같은 설정 플래그 뒤에 있지만, `LlmRiskProfiler`는 그런 `@ConditionalOnProperty`/설정 검사가 코드에 없다 — 35종에 없는 유형이 처음 감지되는 즉시 항상 LLM을 호출한다(단, 유형당 최초 1회만).
 - **공간 확산은 "정부 broadcast 영향 법정동 자체"에는 적용되지 않는다**: FR-007에서 보듯 이벤트의 1차 영향 법정동은 알림에 포함된 법정동 그대로 사용하고 공간 추론을 하지 않는다. 공간 확산(BFS, 유형별 spread_coeff)은 오직 "시군구 source → effective" 단계에만 적용된다 — 두 개념(법정동 broadcast 집합 vs 시군구 인접 전파)이 서로 다른 레이어임을 전제한다.
 - **클러스터링 도메인과의 완전한 결합도 분리**: 위험도 계산은 `AlertClusteredEvent`라는 단일 이벤트 payload(`eventId`, `alertId`)만 받으며, 클러스터링 임계값·병합 방식(EMBEDDING/BROADCAST/REGIONAL_TYPE/ADVISORY 등)에 대해 전혀 알지 못한다는 것을 전제로 설계되어 있다.
-- **`AlertClusteredEvent` 발행 지점은 저장소 전체에 3곳뿐이다**: `domain/event/service/EventClusteringService.java:510,583,600`(신규 안내성 이벤트 생성, 기존 이벤트 병합, 신규 이벤트 생성). `CLAUDE.md`가 언급하는 `EventFragmentMergeService`(파편 이벤트 정합화 스케줄러)는 조사 시점 기준 이 저장소의 `domain/event/service/`에 실제로 존재하지 않는다 — 해당 패키지에는 `EventClusteringService`, `EventCrossRegionService`, `EventLLMDecisionService`, `EventQueryService`, `EventTranslationService`만 있다. 따라서 이벤트 병합/파편 흡수가 `event_region_impact`를 갱신하는 별도 경로는 현재 코드베이스에 존재하지 않는다(향후 해당 서비스가 추가되면 `AlertClusteredEvent` 재발행 여부를 함께 검토해야 한다).
+- **`AlertClusteredEvent` 발행 지점은 저장소 전체에 3곳뿐이다**: `domain/event/service/EventClusteringService.java:516,589,606`(신규 안내성 이벤트 생성, 기존 이벤트 병합, 신규 이벤트 생성). `CLAUDE.md`가 언급하는 `EventFragmentMergeService`(파편 이벤트 정합화 스케줄러)는 조사 시점 기준 이 저장소의 `domain/event/service/`에 실제로 존재하지 않는다 — 해당 패키지에는 `EventClusteringService`, `EventCrossRegionService`, `EventLLMDecisionService`, `EventQueryService`, `EventTranslationService`만 있다. 따라서 이벤트 병합/파편 흡수가 `event_region_impact`를 갱신하는 별도 경로는 현재 코드베이스에 존재하지 않는다(향후 해당 서비스가 추가되면 `AlertClusteredEvent` 재발행 여부를 함께 검토해야 한다).
