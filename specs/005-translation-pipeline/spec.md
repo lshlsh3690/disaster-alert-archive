@@ -36,9 +36,8 @@ lazy 번역(P2)은 캐시 미스 보정용으로만 쓰인다. 이 경로가 막
 **인수 시나리오**:
 
 1. **Given** 수집 스케줄러가 10분 주기로 기동됨(`@Scheduled(cron = "0 0/10 * * * *")`), **When** `alertService.saveData(raw)`가 신규 알림 ID 목록을 반환함, **Then** 각 ID에 대해 `translationService.translateAndSaveAsync(alertId)`가 호출된다 — `backend/src/main/java/com/disaster/alert/alertapi/scheduler/DisasterFetchScheduler.java:29,39,43`
-2. **Given** `translateAndSaveAsync` 호출, **When** `@Async("translationExecutor")`로 별도 스레드 풀에 위임됨, **Then** `SupportedLanguage.values()` 전체(EN/JA/ZH)에 대해 순차 번역이 시도된다 — `backend/src/main/java/com/disaster/alert/alertapi/global/translation/TranslationService.java:55,61`
-3. **Given** 3개 언어 중 하나가 번역 API 오류로 실패, **When** 해당 언어의 예외가 발생함, **Then** 그 언어만 `warn` 로그로 스킵하고 나머지 언어는 계속 진행한다 — `TranslationService.java:64-66`
-4. **Given** `translation.enabled=false`, **When** `translateAndSaveAsync`가 호출됨, **Then** 아무 번역도 시도하지 않고 즉시 반환한다 — `TranslationService.java:58-60`
+2. **Given** `translateAndSaveAsync` 호출, **When** `@Async("translationExecutor")`로 별도 스레드 풀에 위임됨, **Then** `SupportedLanguage.values()` 전체(EN/JA/ZH)에 대해 순차 번역이 시도된다 — `backend/src/main/java/com/disaster/alert/alertapi/global/translation/TranslationService.java:54,57`
+3. **Given** 3개 언어 중 하나가 번역 API 오류로 실패, **When** 해당 언어의 예외가 발생함, **Then** 그 언어만 `warn` 로그로 스킵하고 나머지 언어는 계속 진행한다 — `TranslationService.java:60-62`
 
 ---
 
@@ -56,10 +55,10 @@ lazy 번역(P2)은 캐시 미스 보정용으로만 쓰인다. 이 경로가 막
 
 **인수 시나리오**:
 
-1. **Given** `lang` 파라미터가 지원 언어이고 해당 알림의 번역 캐시가 없음, **When** `getAlertDetail`이 호출됨, **Then** `ensureTranslated(id, language)`가 그 자리에서 번역·저장한다 — `backend/src/main/java/com/disaster/alert/alertapi/domain/disasteralert/service/DisasterAlertService.java:551-553`; `TranslationService.java:81-94`
-2. **Given** 목록/검색 응답에 담길 알림 ID 목록, **When** `ensureTranslatedBatch(alertIds, language)`가 호출됨, **Then** 이미 번역된 ID를 1쿼리로 조회한 뒤 **누락분만** 순차 번역한다 — `TranslationService.java:112-143`; 호출부 `DisasterAlertService.java:701,758,817`
+1. **Given** `lang` 파라미터가 지원 언어이고 해당 알림의 번역 캐시가 없음, **When** `getAlertDetail`이 호출됨, **Then** `ensureTranslated(id, language)`가 그 자리에서 번역·저장한다 — `backend/src/main/java/com/disaster/alert/alertapi/domain/disasteralert/service/DisasterAlertService.java:551-553`; `TranslationService.java:77-87`
+2. **Given** 목록/검색 응답에 담길 알림 ID 목록, **When** `ensureTranslatedBatch(alertIds, language)`가 호출됨, **Then** 이미 번역된 ID를 1쿼리로 조회한 뒤 **누락분만** 순차 번역한다 — `TranslationService.java:105-136`; 호출부 `DisasterAlertService.java:701,758,817`
 3. **Given** `lang`이 `"ko"`이거나 미지정, **When** `SupportedLanguage.fromRequestParam(lang)`이 `Optional.empty()`를 반환함, **Then** 번역 경로 자체가 실행되지 않고 번역 필드는 모두 `null`로 응답한다 — `backend/src/main/java/com/disaster/alert/alertapi/global/translation/SupportedLanguage.java:67-74`
-4. **Given** 일괄 번역 중 특정 알림 1건이 실패, **When** 예외가 발생함, **Then** 그 건만 스킵하고 나머지 알림 번역을 계속한다 — `TranslationService.java:136-140`
+4. **Given** 일괄 번역 중 특정 알림 1건이 실패, **When** 예외가 발생함, **Then** 그 건만 스킵하고 나머지 알림 번역을 계속한다 — `TranslationService.java:129-133`
 
 ---
 
@@ -78,8 +77,8 @@ lazy 번역(P2)은 캐시 미스 보정용으로만 쓰인다. 이 경로가 막
 
 1. **Given** 이벤트 목록 조회에 `lang`이 지정됨, **When** `EventQueryService.list`가 실행됨, **Then** `eventTranslationService.ensureTranslatedBatch(eventIds, language)`가 미번역 제목만 번역한다 — `backend/src/main/java/com/disaster/alert/alertapi/domain/event/service/EventQueryService.java:89`
 2. **Given** 이벤트 상세 조회에 `lang`이 지정됨, **When** `EventQueryService.detail`이 실행됨, **Then** `eventTranslationService.ensureTranslated(id, language)`가 호출된다 — `EventQueryService.java:121`
-3. **Given** 이벤트 제목 번역 실패, **When** 예외가 발생함, **Then** 예외를 삼키고 원문 제목으로 폴백한다 — `backend/src/main/java/com/disaster/alert/alertapi/domain/event/service/EventTranslationService.java:49-53`
-4. **Given** `lang`이 지원 언어 중 하나, **When** 이벤트 목록/상세를 조회함, **Then** 재난문자와 동일한 언어 범위가 적용된다 — `EventTranslationService`는 `language.getDbCode()`를 그대로 넘기므로 `SupportedLanguage`를 단일 출처로 따르며, 언어를 늘리거나 줄일 때 이벤트 경로를 따로 손댈 필요가 없다 (`EventTranslationService.java:89`)
+3. **Given** 이벤트 제목 번역 실패, **When** 예외가 발생함, **Then** 예외를 삼키고 원문 제목으로 폴백한다 — `backend/src/main/java/com/disaster/alert/alertapi/domain/event/service/EventTranslationService.java:44-48`
+4. **Given** `lang`이 지원 언어 중 하나, **When** 이벤트 목록/상세를 조회함, **Then** 재난문자와 동일한 언어 범위가 적용된다 — `EventTranslationService`는 `language.getDbCode()`를 그대로 넘기므로 `SupportedLanguage`를 단일 출처로 따르며, 언어를 늘리거나 줄일 때 이벤트 경로를 따로 손댈 필요가 없다 (`EventTranslationService.java:84`)
 
 ---
 
@@ -97,49 +96,47 @@ lazy 번역(P2)은 캐시 미스 보정용으로만 쓰인다. 이 경로가 막
 
 **인수 시나리오**:
 
-1. **Given** 번역 클라이언트가 예외를 던짐(단일 요청), **When** 상세 조회가 `ensureTranslated`를 호출함, **Then** 예외를 삼키고 `warn` 로그만 남긴 뒤 번역 필드 `null`(원문 노출)로 200 응답한다 — `TranslationService.java:89-94`. **동시 요청에서도 성립한다** — 아래 예외 상황 절 참고.
+1. **Given** 번역 클라이언트가 예외를 던짐(단일 요청), **When** 상세 조회가 `ensureTranslated`를 호출함, **Then** 예외를 삼키고 `warn` 로그만 남긴 뒤 번역 필드 `null`(원문 노출)로 200 응답한다 — `TranslationService.java:82-87`. **동시 요청에서도 성립한다** — 아래 예외 상황 절 참고.
 2. **Given** 번역문이 원문 길이의 6배를 초과함(설명 혼입 의심), **When** 길이 가드가 판정함, **Then** 해당 번역을 저장하지 않고 예외를 던져 원문 폴백시킨다 — `backend/src/main/java/com/disaster/alert/alertapi/global/translation/OpenAiTranslationClient.java:83,89,129-133,151-157`
-3. **Given** 본문 번역은 성공했으나 재난 유형 번역만 실패, **When** 유형 번역 예외가 발생함, **Then** 유형만 `null`로 두고 본문 번역은 정상 저장한다(부분 번역 허용) — `TranslationService.java:165-172`
+3. **Given** 본문 번역은 성공했으나 재난 유형 번역만 실패, **When** 유형 번역 예외가 발생함, **Then** 유형만 `null`로 두고 본문 번역은 정상 저장한다(부분 번역 허용) — `TranslationService.java:158-165`
 
 ---
 
 ### 예외 상황
 
-- **~~동시 요청 시 상세 조회가 500이 된다.~~ (2026-09 해소)** `ensureTranslated`는 "존재 확인 → 저장"이 원자적이지 않아, 같은 `(alertId, languageCode)`를 동시 요청 두 개가 모두 미존재로 판단한 뒤 각자 `save()`를 예약하면 복합 PK 충돌이 **flush/commit 시점**에 발생했다 — 이는 `ensureTranslated`의 `catch` 블록을 이미 벗어난 뒤라 호출부 `getAlertDetail`의 `@Transactional`(`DisasterAlertService.java:542`)이 rollback-only로 마킹되어 HTTP 500으로 이어졌다. 저장을 `save()`에서 `translationRepository.upsert(...)`(`INSERT ... ON CONFLICT (disaster_alert_id, language_code) DO NOTHING`)로 교체해 해결했다 — 네이티브 쿼리라 `save()`와 달리 **호출 즉시 SQL이 나가므로** `translateAndSaveInternal`의 `try` 블록을 벗어나기 전에 충돌 여부가 결정되고, 늦게 도착한 요청은 예외 없이 조용히 무시된다. 목록 경로(`ensureTranslatedBatch`)와 이벤트 제목 캐시(`EventTranslationService`/`DisasterEventTranslationRepository`)도 같은 구조라 함께 고쳤다 (`TranslationService.java:81-94,112-143,179`; `domain/disasteralert/repository/DisasterAlertTranslationRepository.java`의 `upsert(...)`; `번역캐시_동시성_PK충돌_UPSERT_원인분석.md`). 재현 테스트는 `DisasterAlertServiceTranslationConcurrencyTest`.
+- **~~동시 요청 시 상세 조회가 500이 된다.~~ (2026-09 해소)** `ensureTranslated`는 "존재 확인 → 저장"이 원자적이지 않아, 같은 `(alertId, languageCode)`를 동시 요청 두 개가 모두 미존재로 판단한 뒤 각자 `save()`를 예약하면 복합 PK 충돌이 **flush/commit 시점**에 발생했다 — 이는 `ensureTranslated`의 `catch` 블록을 이미 벗어난 뒤라 호출부 `getAlertDetail`의 `@Transactional`(`DisasterAlertService.java:542`)이 rollback-only로 마킹되어 HTTP 500으로 이어졌다. 저장을 `save()`에서 `translationRepository.upsert(...)`(`INSERT ... ON CONFLICT (disaster_alert_id, language_code) DO NOTHING`)로 교체해 해결했다 — 네이티브 쿼리라 `save()`와 달리 **호출 즉시 SQL이 나가므로** `translateAndSaveInternal`의 `try` 블록을 벗어나기 전에 충돌 여부가 결정되고, 늦게 도착한 요청은 예외 없이 조용히 무시된다. 목록 경로(`ensureTranslatedBatch`)와 이벤트 제목 캐시(`EventTranslationService`/`DisasterEventTranslationRepository`)도 같은 구조라 함께 고쳤다 (`TranslationService.java:77-87,105-136,172`; `domain/disasteralert/repository/DisasterAlertTranslationRepository.java`의 `upsert(...)`; `번역캐시_동시성_PK충돌_UPSERT_원인분석.md`). 재현 테스트는 `DisasterAlertServiceTranslationConcurrencyTest`.
 - **enum에만 언어를 추가하면 런타임 예외가 난다 (알려진 결함).** 지원 언어가 `SupportedLanguage` enum(`SupportedLanguage.java:43-45`)과 `OpenAiTranslationClient.LANGUAGE_NAMES`(`OpenAiTranslationClient.java:96-100`) 두 곳으로 갈라져 있어, enum에만 추가하면 `translate()`가 `IllegalArgumentException`을 던진다(`OpenAiTranslationClient.java:113-116`). 컴파일 타임에 강제되지 않는다. 2026-08-11에 enum 주석을 "이 enum 만으로 끝나지 않는다"로 고쳐 함께 손봐야 할 곳을 열거했지만(`SupportedLanguage.java:22-37`), **이원화 자체는 그대로다** — 주석은 규약을 강제하지 못한다.
-- **~~VI/TH 사용자는 지역명만 영어로 보게 된다.~~ (2026-08-11 해소)** 본문 번역 언어가 법정동 명칭 시드 언어(EN/JA/ZH)보다 넓어서, VI/TH 사용자는 본문은 모국어이고 지역명은 영어인 혼합 응답을 받았다. `plan.md` `미해결 항목` 표의 #3(해소 처리됨)이 제시한 세 선택지 중 **지원 언어를 시드 범위로 좁히는 쪽**을 택해 VI/TH 를 제거했다(`SupportedLanguage.java`). 두 파이프라인이 별개라는 구조 자체는 그대로이므로(FR-012 참고), 앞으로 한쪽만 언어를 늘리면 같은 불일치가 재발한다.
+- **~~VI/TH 사용자는 지역명만 영어로 보게 된다.~~ (2026-08-11 해소)** 본문 번역 언어가 법정동 명칭 시드 언어(EN/JA/ZH)보다 넓어서, VI/TH 사용자는 본문은 모국어이고 지역명은 영어인 혼합 응답을 받았다. `plan.md` `미해결 항목` 표의 #3(해소 처리됨)이 제시한 세 선택지 중 **지원 언어를 시드 범위로 좁히는 쪽**을 택해 VI/TH 를 제거했다(`SupportedLanguage.java`). 두 파이프라인이 별개라는 구조 자체는 그대로이므로(FR-011 참고), 앞으로 한쪽만 언어를 늘리면 같은 불일치가 재발한다.
 - 번역 API가 빈 문자열을 반환하면 저장하지 않고 예외를 던진다 — `OpenAiTranslationClient.java:124-126`.
-- `translation.enabled=false`이면 사전 번역·lazy 번역 3개 경로 모두 즉시 반환하며, 응답은 항상 원문이 된다 — `TranslationService.java:58,82,113`; `EventTranslationService.java:43,60`.
-- 목록 lazy 번역은 미번역 건수만큼 번역 API를 **순차 호출**한다. 알림 1건당 최대 2회(본문 + 유형)이므로 20건 페이지의 첫 외국어 조회는 최대 40회 왕복이 응답 시간에 그대로 더해진다 — `TranslationService.java:134-141,163,168`. 타임아웃·상한 건수 제한은 코드에 없다.
+- 목록 lazy 번역은 미번역 건수만큼 번역 API를 **순차 호출**한다. 알림 1건당 최대 2회(본문 + 유형)이므로 20건 페이지의 첫 외국어 조회는 최대 40회 왕복이 응답 시간에 그대로 더해진다 — `TranslationService.java:127-134,156,161`. 타임아웃·상한 건수 제한은 코드에 없다.
 
 ## 요구사항 *(필수)*
 
 ### 기능 요구사항
 
-- **FR-001**: 시스템은 재난문자 수집 직후 신규 알림 각각에 대해 지원 언어 전체를 비동기로 사전 번역해야 한다(MUST) (`DisasterFetchScheduler.java:39-43`; `TranslationService.java:55-69`).
+- **FR-001**: 시스템은 재난문자 수집 직후 신규 알림 각각에 대해 지원 언어 전체를 비동기로 사전 번역해야 한다(MUST) (`DisasterFetchScheduler.java:39-43`; `TranslationService.java:54-65`).
 - **FR-002**: 사전 번역은 전용 스레드 풀 `translationExecutor`(core 5 / max 10 / queue 100)에서 실행되어 수집·알림 발송·클러스터링 경로를 블로킹하지 않아야 한다(MUST) (`global/config/AsyncConfig.java:22-27`; `DisasterFetchScheduler.java:43,45,47`).
 - **FR-003**: 지원 번역 언어는 `SupportedLanguage` enum이 단일 정의해야 한다(MUST) — 현재 EN/JA/ZH 3개(2026-08-11 VI/TH 제거, 법정동 시드 언어와 범위를 맞춤). 한국어(`ko`)는 원본이므로 enum에 포함하지 않는다 (`SupportedLanguage.java`). **현재 미충족(알려진 결함)**: 언어명 매핑이 `OpenAiTranslationClient.LANGUAGE_NAMES`에 이원화되어 있어, enum에만 추가하면 런타임 `IllegalArgumentException`이 난다 — 예외 상황 절 2번 항목, `plan.md` 미해결 항목 #2 참고.
 - **FR-004**: 요청 파라미터 `lang`이 `null`·공백·`"ko"`이거나 미지원 코드이면 번역 경로를 실행하지 않고 번역 필드를 `null`로 응답해야 한다(MUST) (`SupportedLanguage.java:67-74`).
-- **FR-005**: 재난문자 상세 조회는 해당 언어 번역이 캐시에 없을 때 조회 시점에 동기 번역·저장해야 한다(MUST) (`DisasterAlertService.java:551-553`; `TranslationService.java:81-94`).
-- **FR-006**: 목록·검색 조회는 페이지에 포함된 알림 중 **미번역 건만** 선별해 번역해야 하며(MUST), 이미 번역된 ID 조회는 1회 쿼리로 수행해야 한다(MUST) (`TranslationService.java:117-127`; 호출부 `DisasterAlertService.java:701,758,817`).
-- **FR-007**: 이벤트 제목 번역은 재난문자와 동일한 lazy 패턴(단건 `ensureTranslated` / 일괄 `ensureTranslatedBatch`)으로 동작해야 한다(MUST) (`EventTranslationService.java:41-80`; `EventQueryService.java:89,121`).
+- **FR-005**: 재난문자 상세 조회는 해당 언어 번역이 캐시에 없을 때 조회 시점에 동기 번역·저장해야 한다(MUST) (`DisasterAlertService.java:551-553`; `TranslationService.java:77-87`).
+- **FR-006**: 목록·검색 조회는 페이지에 포함된 알림 중 **미번역 건만** 선별해 번역해야 하며(MUST), 이미 번역된 ID 조회는 1회 쿼리로 수행해야 한다(MUST) (`TranslationService.java:110-120`; 호출부 `DisasterAlertService.java:701,758,817`).
+- **FR-007**: 이벤트 제목 번역은 재난문자와 동일한 lazy 패턴(단건 `ensureTranslated` / 일괄 `ensureTranslatedBatch`)으로 동작해야 한다(MUST) (`EventTranslationService.java:39-75`; `EventQueryService.java:89,121`).
 - **FR-008**: 번역 결과는 `disaster_alert_translation(disaster_alert_id, language_code)`·`disaster_event_translation(disaster_event_id, language_code)` 복합 PK 테이블에 캐시해야 하며(MUST), 동일 키에 대해 번역 API를 두 번 호출하지 않아야 한다(MUST) (`V3__create_disaster_alert_translation.sql:1-12`; `V40__create_disaster_event_translation.sql:3-9`). **이 보장은 동시 요청에서도 성립한다** — 저장이 `translationRepository.upsert(...)`(`ON CONFLICT (disaster_alert_id, language_code) DO NOTHING`)라 동시에 두 요청이 같은 키를 저장해도 하나만 반영되고 다른 하나는 조용히 무시된다(예외 상황 절 참고). 다만 두 요청이 "번역 없음"을 동시에 확인한 경우 번역 API 자체는 두 번 호출될 수 있다 — 이 보장은 **DB 저장 결과의 유일성**에 대한 것이지 API 호출 횟수에 대한 것이 아니다.
-- **FR-009**: 번역 실패는 상위로 전파하지 않고 삼켜 원문(한국어)으로 폴백해야 한다(MUST). 사전 번역은 언어 단위로, 일괄 번역은 알림 단위로, 단건 번역은 요청 단위로 격리해야 한다(MUST) (`TranslationService.java:62-67,89-94,136-140`; `EventTranslationService.java:49-53,75-79`).
-- **FR-010**: 재난 유형(`disasterType`) 번역 실패는 본문 번역 결과를 무효화하지 않아야 한다(MUST) — 유형만 `null`로 저장하고 본문은 정상 저장한다 (`TranslationService.java:165-172`).
-- **FR-011**: 시스템은 `translation.enabled` 설정으로 번역 기능 전체를 비활성화할 수 있어야 한다(MUST). 비활성화 시 모든 진입점이 즉시 반환해야 한다(MUST) (`application.yml`의 `translation.enabled: ${TRANSLATION_ENABLED:true}`; `global/translation/TranslationProperties.java`; `TranslationService.java:58,82,113`).
-- **FR-012**: **법정동 명칭 번역은 이 파이프라인의 대상이 아니다**(MUST NOT). 지역명은 Flyway로 시드된 `legal_district_translation` 테이블을 조회할 뿐 런타임 번역 API 호출이 없다. 이 명세의 대상은 재난문자 `message`/`disasterType`과 이벤트 `event_title` 세 필드로 한정된다 (`TranslationService.java:154,156` — `translateAndSaveInternal`이 `disasterAlertRepository`만 조회; `V6__create_legal_district_translation.sql`; 상세는 `specs/004-legal-district-matching/spec.md` FR-017·FR-018).
-- **FR-013**: 번역 엔진은 OpenAI 계열 모델을 사용하며(MUST), 모델 호출 시 `temperature 0`으로 결정성을 요청해야 한다(MUST) (`OpenAiTranslationClient.java:60,69,118-122`). 이는 **모델 호출 설정에 대한 요구사항이지 출력 재현성 보장이 아니다** — `temperature 0`에서도 같은 원문이 다른 번역을 낼 수 있다(SC-005). 실제 재현성은 결과를 DB에 캐시해 같은 키를 다시 호출하지 않는 것(FR-008)으로 확보한다.
-- **FR-014**: 번역 프롬프트는 재난문자 표기 규칙을 명시해야 한다(MUST): 대괄호 발신 기관 표기의 대괄호 유지, `▲ · ※` 기호·줄 구조 보존, "발효/해제/특보/주의보/경보"를 경보 용어로 해석, 붙여 쓴 행정 용어를 단일 용어로 인식, 원문에 없는 내용 추가 금지, 번역문만 출력 (`OpenAiTranslationClient.java:185-202`, 규칙 목록은 `189-198`).
-- **FR-015**: 시스템은 번역문이 원문 대비 비정상적으로 길면(6배 초과, 단 60자까지는 무조건 허용) 설명 혼입으로 간주해 폐기하고 원문 폴백시켜야 한다(MUST) — 재난문자는 안전 정보라 원문에 없는 내용이 섞이는 것이 번역 실패보다 위험하다 (`OpenAiTranslationClient.java:83,89,151-157`).
-- **FR-016**: 번역 API가 빈 응답을 반환하면 저장하지 않아야 한다(MUST) (`OpenAiTranslationClient.java:124-126`).
-- **FR-017**: **번역은 임베딩·클러스터링·위험도에 영향을 주지 않아야 한다**(MUST NOT). 이벤트 클러스터링은 한국어 원문(`disaster_alert.message`)만 임베딩하므로, 번역 엔진 교체나 번역 실패가 벡터·코사인 유사도·이벤트 구성·위험도 점수를 바꾸지 않는다 (`domain/event/service/EventClusteringService.java:172,205`).
+- **FR-009**: 번역 실패는 상위로 전파하지 않고 삼켜 원문(한국어)으로 폴백해야 한다(MUST). 사전 번역은 언어 단위로, 일괄 번역은 알림 단위로, 단건 번역은 요청 단위로 격리해야 한다(MUST) (`TranslationService.java:58-63,82-87,129-133`; `EventTranslationService.java:44-48,70-74`).
+- **FR-010**: 재난 유형(`disasterType`) 번역 실패는 본문 번역 결과를 무효화하지 않아야 한다(MUST) — 유형만 `null`로 저장하고 본문은 정상 저장한다 (`TranslationService.java:158-165`).
+- **FR-011**: **법정동 명칭 번역은 이 파이프라인의 대상이 아니다**(MUST NOT). 지역명은 Flyway로 시드된 `legal_district_translation` 테이블을 조회할 뿐 런타임 번역 API 호출이 없다. 이 명세의 대상은 재난문자 `message`/`disasterType`과 이벤트 `event_title` 세 필드로 한정된다 (`TranslationService.java:147,149` — `translateAndSaveInternal`이 `disasterAlertRepository`만 조회; `V6__create_legal_district_translation.sql`; 상세는 `specs/004-legal-district-matching/spec.md` FR-017·FR-018).
+- **FR-012**: 번역 엔진은 OpenAI 계열 모델을 사용하며(MUST), 모델 호출 시 `temperature 0`으로 결정성을 요청해야 한다(MUST) (`OpenAiTranslationClient.java:60,69,118-122`). 이는 **모델 호출 설정에 대한 요구사항이지 출력 재현성 보장이 아니다** — `temperature 0`에서도 같은 원문이 다른 번역을 낼 수 있다(SC-005). 실제 재현성은 결과를 DB에 캐시해 같은 키를 다시 호출하지 않는 것(FR-008)으로 확보한다.
+- **FR-013**: 번역 프롬프트는 재난문자 표기 규칙을 명시해야 한다(MUST): 대괄호 발신 기관 표기의 대괄호 유지, `▲ · ※` 기호·줄 구조 보존, "발효/해제/특보/주의보/경보"를 경보 용어로 해석, 붙여 쓴 행정 용어를 단일 용어로 인식, 원문에 없는 내용 추가 금지, 번역문만 출력 (`OpenAiTranslationClient.java:185-202`, 규칙 목록은 `189-198`).
+- **FR-014**: 시스템은 번역문이 원문 대비 비정상적으로 길면(6배 초과, 단 60자까지는 무조건 허용) 설명 혼입으로 간주해 폐기하고 원문 폴백시켜야 한다(MUST) — 재난문자는 안전 정보라 원문에 없는 내용이 섞이는 것이 번역 실패보다 위험하다 (`OpenAiTranslationClient.java:83,89,151-157`).
+- **FR-015**: 번역 API가 빈 응답을 반환하면 저장하지 않아야 한다(MUST) (`OpenAiTranslationClient.java:124-126`).
+- **FR-016**: **번역은 임베딩·클러스터링·위험도에 영향을 주지 않아야 한다**(MUST NOT). 이벤트 클러스터링은 한국어 원문(`disaster_alert.message`)만 임베딩하므로, 번역 엔진 교체나 번역 실패가 벡터·코사인 유사도·이벤트 구성·위험도 점수를 바꾸지 않는다 (`domain/event/service/EventClusteringService.java:172,205`).
 
 ### 주요 엔티티
 
-- **DisasterAlertTranslation**: 재난문자 번역 캐시. PK=(`disasterAlertId`,`languageCode`). 필드: `translatedMessage`(NOT NULL), `translatedDisasterType`(nullable — 유형 번역만 실패 가능), `translatedRegionNames`(항상 `null`로 저장 — 지역명은 FR-012에 따라 별도 경로), `translatedAt`.
+- **DisasterAlertTranslation**: 재난문자 번역 캐시. PK=(`disasterAlertId`,`languageCode`). 필드: `translatedMessage`(NOT NULL), `translatedDisasterType`(nullable — 유형 번역만 실패 가능), `translatedRegionNames`(항상 `null`로 저장 — 지역명은 FR-011에 따라 별도 경로), `translatedAt`.
 - **DisasterEventTranslation**: 이벤트 제목 번역 캐시. PK=(`disasterEventId`,`languageCode`). 필드: `translatedTitle`(NOT NULL), `translatedAt`. `disaster_events`에 `ON DELETE CASCADE`.
 - **SupportedLanguage**: 지원 언어 enum. 요청 파라미터는 소문자(`en`), DB `language_code` 컬럼은 대문자(`EN`)로 관리. 현재 EN/JA/ZH.
-- **(참조, 이 서브시스템이 소유하지 않음)**: `LegalDistrictTranslation` — 시드 테이블이며 이 파이프라인의 대상이 아니다(FR-012). 시드 언어는 EN/JA/ZH 3개로 이 파이프라인의 번역 대상 언어와 범위가 일치한다(2026-08-11 VI/TH 제거).
+- **(참조, 이 서브시스템이 소유하지 않음)**: `LegalDistrictTranslation` — 시드 테이블이며 이 파이프라인의 대상이 아니다(FR-011). 시드 언어는 EN/JA/ZH 3개로 이 파이프라인의 번역 대상 언어와 범위가 일치한다(2026-08-11 VI/TH 제거).
 
 ## 성공 기준 *(필수)*
 
@@ -148,14 +145,14 @@ lazy 번역(P2)은 캐시 미스 보정용으로만 쓰인다. 이 경로가 막
 - **SC-001**: 코드에 명시된 유일한 정량 임계값은 번역문 길이 가드(원문 대비 6배, 하한 60자)이며, 이 값은 `OpenAiTranslationClientTest`의 경계 테스트로 고정되어 있다 (`OpenAiTranslationClient.java:83,89`; `backend/src/test/java/com/disaster/alert/alertapi/global/translation/OpenAiTranslationClientTest.java`).
 - **SC-002**: 번역 응답 시간·처리량·비용 상한에 대한 SLA는 코드·설정 어디에도 정의되어 있지 않다 — 측정되지 않음. 목록 lazy 번역의 순차 호출 횟수(미번역 건수 × 최대 2)에 대한 상한도 없다.
 - **SC-003**: 자동화 검증은 두 종류뿐이다. 길이 가드는 순수 단위 테스트(`OpenAiTranslationClientTest`)로, 실제 번역 품질은 실제 API를 호출하는 통합 테스트(`OpenAiTranslationClientRealApiTest`)로 검증한다. 후자는 `@Tag("realApi")` 로 기본 `test` 태스크에서 제외되어 있어 `./gradlew realApiTest` 로 명시 실행해야 하며, `OPENAI_API_KEY` 가 없으면 실패한다. 한편 `backend/dockerfile` 이 `bootJar -x test` 로 빌드하고 별도 CI 테스트 잡이 없어 **배포 파이프라인에서는 어떤 테스트도 실행되지 않는다**.
-- **SC-004**: 프롬프트 표기 규칙(FR-014) 중 자동 검증되는 항목은 세 가지다 — 지원 언어 3개 전체에서 ①번역문에 한글이 남지 않을 것 ②대괄호 발신 기관 표기가 보존될 것 ③`▲` 불릿 개수가 원문과 같을 것(`OpenAiTranslationClientRealApiTest`). "발효"의 경보 의미 해석, 붙여 쓴 행정 용어 인식, 원문에 없는 내용 미추가는 **자동 검증되지 않는다** — 길이 가드(FR-015)가 극단적인 설명 혼입만 걸러낼 뿐이다.
+- **SC-004**: 프롬프트 표기 규칙(FR-013) 중 자동 검증되는 항목은 세 가지다 — 지원 언어 3개 전체에서 ①번역문에 한글이 남지 않을 것 ②대괄호 발신 기관 표기가 보존될 것 ③`▲` 불릿 개수가 원문과 같을 것(`OpenAiTranslationClientRealApiTest`). "발효"의 경보 의미 해석, 붙여 쓴 행정 용어 인식, 원문에 없는 내용 미추가는 **자동 검증되지 않는다** — 길이 가드(FR-014)가 극단적인 설명 혼입만 걸러낼 뿐이다.
 - **SC-005**: 이 통합 테스트는 고정 원문 1건을 사용해 실행마다 같은 입력을 보낸다. 다만 LLM 응답 자체가 완전히 결정적이지는 않아(temperature 0도 보장은 아님) 간헐적 실패 가능성이 남는다 — 실제로 실 DB의 최신 재난문자를 쓰던 이전 버전에서는 목록에 `[태안군]`이 들어온 회차에만 TH가 실패했다.
 
 ## 가정
 
-- 번역 대상 원문은 정부(행정안전부)가 발신한 재난문자와 그로부터 파생된 이벤트 제목뿐이며, 사용자가 작성한 텍스트는 번역 경로를 타지 않는다고 가정한다 — `translateAndSaveInternal`은 `disasterAlertRepository`(공식 재난문자)만 조회하고, `user_disaster_alert`(사용자 제보)는 번역 대상에 포함되지 않는다 (`TranslationService.java:154,156`). 이 가정 때문에 프롬프트 인젝션 위험을 낮게 평가하고 있으며, 사용자 생성 콘텐츠가 번역 대상에 추가되면 이 전제는 무효가 된다.
+- 번역 대상 원문은 정부(행정안전부)가 발신한 재난문자와 그로부터 파생된 이벤트 제목뿐이며, 사용자가 작성한 텍스트는 번역 경로를 타지 않는다고 가정한다 — `translateAndSaveInternal`은 `disasterAlertRepository`(공식 재난문자)만 조회하고, `user_disaster_alert`(사용자 제보)는 번역 대상에 포함되지 않는다 (`TranslationService.java:147,149`). 이 가정 때문에 프롬프트 인젝션 위험을 낮게 평가하고 있으며, 사용자 생성 콘텐츠가 번역 대상에 추가되면 이 전제는 무효가 된다.
 - 번역 엔진은 2026-08-09에 DeepL에서 OpenAI로 교체되었다. DeepL Free는 계정당 **평생 누적** 쿼터라 소진 후 리셋되지 않으며, 주 키·예비 키가 모두 456 Quota exceeded로 막혀 번역이 영구 정지된 것이 교체 사유다. 교체 이전에 DeepL로 번역되어 캐시에 남은 행은 소급 재번역되지 않으므로, 목록에 두 엔진의 번역이 섞여 어투가 다를 수 있다.
 - 사전 번역(P1)이 정상 동작하는 한 조회 시점 lazy 번역(P2)은 과거 데이터에만 적용된다고 가정한다. 다만 사전 번역이 언제 도입되었는지, 그 이전 알림 중 미번역분이 몇 건인지는 운영 DB 조회 없이 확인하지 못했다 — 첫 외국어 조회의 실제 지연(SC-002)은 이 미번역 잔량에 비례한다.
 - OpenAI 자격증명은 `spring.ai.openai.api-key` 하나를 임베딩·LLM 판정(클러스터링 cross-region, 위험도 프로파일링)과 공유한다. 번역 트래픽 증가가 그 두 기능의 쿼터·요금에 함께 반영된다.
-- 이 문서는 `global/translation/*`와 이를 소비하는 `domain/disasteralert`·`domain/event`의 번역 경로만 다룬다. 법정동 명칭 번역(`domain/legaldistrict`)은 FR-012에서 경계만 긋고 상세는 `specs/004-legal-district-matching/spec.md`에 위임한다.
+- 이 문서는 `global/translation/*`와 이를 소비하는 `domain/disasteralert`·`domain/event`의 번역 경로만 다룬다. 법정동 명칭 번역(`domain/legaldistrict`)은 FR-011에서 경계만 긋고 상세는 `specs/004-legal-district-matching/spec.md`에 위임한다.
 - 프론트엔드의 언어 선택 상태(`languageStore`)와 `lang` 파라미터 전달 경로는 이 명세의 범위 밖이다 — 백엔드가 `lang`을 받은 시점부터를 다룬다.

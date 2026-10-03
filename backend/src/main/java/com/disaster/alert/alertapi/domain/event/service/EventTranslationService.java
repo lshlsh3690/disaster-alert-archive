@@ -5,7 +5,6 @@ import com.disaster.alert.alertapi.domain.event.repository.DisasterEventReposito
 import com.disaster.alert.alertapi.domain.event.repository.DisasterEventTranslationRepository;
 import com.disaster.alert.alertapi.global.translation.OpenAiTranslationClient;
 import com.disaster.alert.alertapi.global.translation.SupportedLanguage;
-import com.disaster.alert.alertapi.global.translation.TranslationProperties;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -29,7 +28,6 @@ public class EventTranslationService {
     private final DisasterEventRepository disasterEventRepository;
     private final DisasterEventTranslationRepository translationRepository;
     private final OpenAiTranslationClient translationClient;
-    private final TranslationProperties properties;
 
     /**
      * 상세 조회 lazy 번역 — 단건.
@@ -39,9 +37,6 @@ public class EventTranslationService {
      */
     @Transactional
     public void ensureTranslated(Long eventId, SupportedLanguage language) {
-        if (!properties.isEnabled()) {
-            return;
-        }
         if (translationRepository.findByIdEventIdAndIdLanguageCode(eventId, language.getDbCode()).isPresent()) {
             return;
         }
@@ -56,7 +51,7 @@ public class EventTranslationService {
     /** 목록 조회 lazy 번역 — 페이지 내 미번역분만 일괄 번역. */
     @Transactional
     public void ensureTranslatedBatch(List<Long> eventIds, SupportedLanguage language) {
-        if (!properties.isEnabled() || eventIds == null || eventIds.isEmpty()) {
+        if (eventIds == null || eventIds.isEmpty()) {
             return;
         }
         Set<Long> existing = translationRepository
