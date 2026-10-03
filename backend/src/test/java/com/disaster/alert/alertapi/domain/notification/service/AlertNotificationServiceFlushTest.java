@@ -11,10 +11,17 @@ import com.disaster.alert.alertapi.domain.notification.repository.FcmTokenReposi
 import com.disaster.alert.alertapi.domain.notification.repository.GuestFcmRegionRepository;
 import com.disaster.alert.alertapi.domain.notification.repository.NotificationPreferenceRepository;
 import com.disaster.alert.alertapi.domain.notification.repository.UserNotificationLogRepository;
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
+import com.disaster.alert.alertapi.domain.notification.model.GuestFcmRegion;
 import jakarta.persistence.EntityManager;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.mockito.InOrder;
+import org.slf4j.LoggerFactory;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.List;
@@ -25,7 +32,10 @@ import java.util.stream.LongStream;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
@@ -51,6 +61,18 @@ class AlertNotificationServiceFlushTest {
     private EntityManager entityManager;
 
     private AlertNotificationService service;
+
+    private ch.qos.logback.classic.Logger serviceLogger;
+    private ListAppender<ILoggingEvent> logAppender;
+    private Level originalLevel;
+
+    @AfterEach
+    void detachLogAppender() {
+        if (serviceLogger != null) {
+            serviceLogger.detachAppender(logAppender);
+            serviceLogger.setLevel(originalLevel);
+        }
+    }
 
     @BeforeEach
     void setUp() {
@@ -149,6 +171,87 @@ class AlertNotificationServiceFlushTest {
 
         verifyAllMembersAttemptedAndGuestCalled(700);
         verify(entityManager, times(2)).flush();
+    }
+
+    private static final String GUEST_TOKEN = "guest-token";
+
+    private void givenGuestToken() {
+        when(guestFcmRegionRepository.findAllByLegalDistrictCodeIn(anyList()))
+                .thenReturn(List.of(GuestFcmRegion.builder()
+                        .fcmToken(GUEST_TOKEN).legalDistrictCode(REGION_CODE).build()));
+    }
+
+    private void captureServiceLogs() {
+        serviceLogger = (ch.qos.logback.classic.Logger) LoggerFactory.getLogger(AlertNotificationService.class);
+        originalLevel = serviceLogger.getLevel();
+        serviceLogger.setLevel(Level.ALL);
+        logAppender = new ListAppender<>();
+        logAppender.start();
+        serviceLogger.addAppender(logAppender);
+    }
+
+    /** "flush 실패" 문구가 든 로그의 레벨을 발생 순서대로 반환한다. */
+    private List<Level> flushFailureLevels() {
+        return logAppender.list.stream()
+                .filter(e -> e.getFormattedMessage().contains("flush 실패"))
+                .map(ILoggingEvent::getLevel)
+                .toList();
+    }
+
+    @Test
+    @DisplayName("게스트 토큰 조회는 회원 팬아웃의 첫 flush 보다 먼저 일어난다")
+    void 게스트_토큰_조회가_회원_flush_보다_먼저() {
+        givenMembers(1_200);
+        givenGuestToken();
+
+        service.triggerNotification(ALERT_ID);
+
+        InOrder order = inOrder(guestFcmRegionRepository, entityManager);
+        order.verify(guestFcmRegionRepository).findAllByLegalDistrictCodeIn(anyList());
+        order.verify(entityManager, org.mockito.Mockito.atLeastOnce()).flush();
+    }
+
+    @Test
+    @DisplayName("게스트 발송은 모든 회원 발송이 끝난 뒤에 일어난다")
+    void 게스트_발송은_회원_발송_뒤() {
+        givenMembers(1_200);
+        givenGuestToken();
+
+        service.triggerNotification(ALERT_ID);
+
+        InOrder order = inOrder(fcmSendService);
+        // 마지막 회원 발송 -> 게스트 발송 순서. 회원 발송 1,200건 전부가 게스트보다 앞서야 한다
+        order.verify(fcmSendService, times(1_200))
+                .sendToToken(org.mockito.ArgumentMatchers.startsWith("token-"),
+                        anyString(), any(), anyString(), anyString());
+        order.verify(fcmSendService)
+                .sendToToken(eq(GUEST_TOKEN), anyString(), any(), anyString(), anyString());
+    }
+
+    @Test
+    @DisplayName("flush 가 매번 실패해도 ERROR 는 첫 실패 1건뿐이고 나머지는 WARN 이다")
+    void flush_연속_실패는_첫_건만_ERROR() {
+        givenMembers(1_500);
+        captureServiceLogs();
+        doThrow(new RuntimeException("batch insert 실패")).when(entityManager).flush();
+
+        service.triggerNotification(ALERT_ID);
+
+        verify(entityManager, times(3)).flush();
+        assertThat(flushFailureLevels()).containsExactly(Level.ERROR, Level.WARN, Level.WARN);
+    }
+
+    @Test
+    @DisplayName("flush 가 한 번 성공한 뒤 처음 실패하는 건도 ERROR 이고 이후는 WARN 이다")
+    void 성공_뒤_첫_실패도_ERROR() {
+        givenMembers(1_500);
+        captureServiceLogs();
+        doNothing().doThrow(new RuntimeException("batch insert 실패")).when(entityManager).flush();
+
+        service.triggerNotification(ALERT_ID);
+
+        verify(entityManager, times(3)).flush();
+        assertThat(flushFailureLevels()).containsExactly(Level.ERROR, Level.WARN);
     }
 
     private static org.mockito.stubbing.Stubber doNothing() {
