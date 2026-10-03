@@ -209,7 +209,6 @@ npm run dev
 | `DISASTER_ALERT_SERVICE_KEY` | 행안부 Open API 키 |
 | `KMA_ASOS_API_KEY` | 기상청 Open API 키 |
 | `OPENAI_API_KEY` | Spring AI — 임베딩·LLM 판정·번역 공용 키 |
-| `TRANSLATION_ENABLED` | 번역 기능 on/off (미설정 시 `true`). 번역 엔진은 OpenAI 이며 `OPENAI_API_KEY` 를 임베딩·LLM 판정과 공유하므로 번역 전용 키가 없다 |
 | `CLUSTERING_ENABLED` / `LLM_FALLBACK_ENABLED` / `CROSS_REGION_ENABLED` | 이벤트 클러스터링 기능 플래그 (모두 기본값 `false`) |
 | `GOOGLE_OAUTH_CLIENT_ID` / `_SECRET` | Google OAuth2 |
 | `KAKAO_OAUTH_CLIENT_ID` / `_SECRET` | Kakao OAuth2 |

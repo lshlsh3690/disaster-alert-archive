@@ -44,7 +44,6 @@ public class TranslationService {
     private final DisasterAlertRepository disasterAlertRepository;
     private final DisasterAlertTranslationRepository translationRepository;
     private final OpenAiTranslationClient translationClient;
-    private final TranslationProperties properties;
 
     /**
      * 스케줄러용 — 새 재난문자 저장 시 {@link SupportedLanguage}에 등록된 모든 언어로
@@ -55,9 +54,6 @@ public class TranslationService {
     @Async("translationExecutor")
     @Transactional
     public void translateAndSaveAsync(Long alertId) {
-        if (!properties.isEnabled()) {
-            return;
-        }
         for (SupportedLanguage language : SupportedLanguage.values()) {
             try {
                 translateAndSaveInternal(alertId, language);
@@ -79,9 +75,6 @@ public class TranslationService {
      */
     @Transactional
     public void ensureTranslated(Long alertId, SupportedLanguage language) {
-        if (!properties.isEnabled()) {
-            return;
-        }
         if (translationRepository.findByIdAlertIdAndIdLanguageCode(alertId, language.getDbCode()).isPresent()) {
             return;
         }
@@ -110,7 +103,7 @@ public class TranslationService {
      */
     @Transactional
     public void ensureTranslatedBatch(List<Long> alertIds, SupportedLanguage language) {
-        if (!properties.isEnabled() || alertIds == null || alertIds.isEmpty()) {
+        if (alertIds == null || alertIds.isEmpty()) {
             return;
         }
 
