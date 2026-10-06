@@ -284,10 +284,9 @@ public class DisasterAlertService {
     private List<String> resolveRegionNamesFromRaw(String rawRegion) {
         List<String> regionNames = new ArrayList<>(
                 Arrays.stream(rawRegion.split(","))
-                        .flatMap(region -> {
-                            String cleanedRegion = cleanRegionString(region);
-                            return sanitizeRegionNames(cleanedRegion).stream();
-                        })
+                        .map(this::cleanRegionString)
+                        .map(this::sanitizeRegionName)
+                        .flatMap(Optional::stream)
                         .toList()
         );
 
@@ -369,30 +368,21 @@ public class DisasterAlertService {
                 .collect(Collectors.joining(","));
     }
 
-    private List<String> sanitizeRegionNames(String regionRaw) {
-        List<String> regions = Arrays.stream(regionRaw.split(","))
-                .map(String::trim)
-                .map(this::removeDuplicatePrefix) // 중복된 단어 제거
-                .toList();
-
-        List<String> result = new ArrayList<>();
-        for (String region : regions) {
-            // 지역이름 : "세종특별자치시 가람동 1동"
-            List<String> tokens = Arrays.asList(region.split(" "));
-            // 가장 긴 법정동 이름을 찾기 위해 뒤에서부터 검사
-            for (int i = tokens.size(); i > 0; i--) {
-                // 첫번째 candidate : "세종특별자치시 가람동 1동"
-                // 두번째 candidate : "세종특별자치시 가람동"
-                // 세번째 candidate : "세종특별자치시"
-                String candidate = String.join(" ", tokens.subList(0, i));
-                if (!legalDistrictCache.get(candidate).isEmpty()) {
-                    result.add(candidate); // 법정동이 존재하면 추가
-                    break;
-                }
+    /** 쉼표로 이미 분리된 지역명 하나에서 캐시에 존재하는 가장 긴 법정동 이름을 찾는다. */
+    private Optional<String> sanitizeRegionName(String regionRaw) {
+        // 지역이름 : "세종특별자치시 가람동 1동"
+        List<String> tokens = Arrays.asList(removeDuplicatePrefix(regionRaw.trim()).split(" "));
+        // 가장 긴 법정동 이름을 찾기 위해 뒤에서부터 검사
+        for (int i = tokens.size(); i > 0; i--) {
+            // 첫번째 candidate : "세종특별자치시 가람동 1동"
+            // 두번째 candidate : "세종특별자치시 가람동"
+            // 세번째 candidate : "세종특별자치시"
+            String candidate = String.join(" ", tokens.subList(0, i));
+            if (!legalDistrictCache.get(candidate).isEmpty()) {
+                return Optional.of(candidate); // 법정동이 존재하면 반환
             }
         }
-
-        return result;
+        return Optional.empty();
     }
 
     private String removeDuplicatePrefix(String input) {
