@@ -1,50 +1,38 @@
--- 2026년 하반기 행정구역 개편(인천 구 재편, 화성시 4개 구 신설, 달성군 구지읍·용인 양지읍·음성 대소읍 승격 등)에 따른
--- 법정동코드 재발급 반영. V108(전남광주 통합)과 같은 방식으로 신규 코드는 추가하고 옛 코드는 is_active=false 로만 전환한다.
+-- 2026년 하반기 행정구역 개편(인천 구 재편, 화성시 4개 구 신설, 구지읍·양지읍·대소읍 승격, 일부 리 개명)에 따른
+-- 법정동코드 재발급 반영. V108(전남광주 통합)과 같이 신규 코드는 추가하고 옛 코드는 is_active=false 로만 전환한다.
 -- 근거: 행정표준코드관리시스템 법정동코드 전체자료(53,403행) vs legal_district(53,063행) diff —
---   공식에만 있는 340행 중 활성 338행을 추가(나머지 2행은 이미 폐지된 코드라 제외), 공식 폐지/우리 활성인 332행을 비활성화.
---   우리에만 있는 코드는 0건.
+--   공식에만 있는 340행 중 활성 338행 추가(나머지 2행은 이미 폐지), 공식 폐지/우리 활성 332행 비활성화, 우리에만 있는 코드 0건.
 --
--- 이관 규칙(옛 코드 -> 새 코드). 이름 기반 매칭이 아니라 diff 결과를 코드 쌍으로 박아 둔다(면->읍 승격은 이름이 바뀜):
---   A) 1:1 대응 326쌍 — 이름이 같거나, 면->읍 승격으로 이름만 바뀌었거나, 아래 4쌍처럼 개명된 행.
---      이력 테이블과 구독 테이블 모두 이관.
---      개명 4쌍은 행정안전부·화성시 공고로 확인했다(공식 전체자료에서도 옛 코드는 폐지, 새 코드는 존재).
---        4159012900 화성 오산동 -> 4159711500 동탄구 여울동 (2026-03-01 오산동->여울동. 구 신설 때 4159710400 으로
---          재발급됐다가 명칭 변경으로 다시 폐지됨)
+-- 이관 규칙(옛 -> 새 코드). 이름이 바뀌는 경우(면->읍, 개명)가 있어 이름 매칭 대신 diff 결과를 코드 쌍으로 박았다.
+--   A) 1:1 326쌍(이름 동일 / 면->읍 승격 / 개명 4쌍): 이력·기상관측소 매핑을 이관한다(구독은 아래 참고).
+--      개명 4쌍(공식 전체자료에서도 옛 코드 폐지, 새 코드 존재):
+--        4159012900 오산동 -> 4159711500 동탄구 여울동 (2026-03-01)
 --          https://www.mois.go.kr/frt/bbs/type001/commonSelectBoardArticle.do?bbsId=BBSMSTR_000000000052&nttId=124059
---        4159035028 화성 서신면 사곳리 -> 4159133032 만세구 서신면 사곶리 (철자 정정)
+--        4159035028 서신면 사곳리 -> 4159133032 만세구 사곶리 (철자 정정, 화성시 조례)
 --          https://www.law.go.kr/ordinInfoP.do?ordinSeq=2087411
---        4777036038 영덕 영해면 대리 -> 4777036039 대동리 (2025-06-30)
+--        4777036038 영덕 대리 -> 4777036039 대동리 (2025-06-30)
 --          https://www.mois.go.kr/frt/bbs/type001/commonSelectBoardArticle.do?bbsId=BBSMSTR_000000000052&nttId=118602
---        4822025025 통영 산양읍 삼덕리 -> 4822025032 당포리 (2025-10-17)
+--        4822025025 통영 삼덕리 -> 4822025032 당포리 (2025-10-17)
 --          https://www.mois.go.kr/frt/bbs/type001/commonSelectBoardArticle.do?bbsId=BBSMSTR_000000000052&nttId=121446
---   B) 1:N 대응(6행 + 화성시 시 단위 1행) — 이력 테이블은 어느 새 코드인지 판정할 근거가 없어 옛 코드를 그대로 둔다.
---      _ld_expand 에는 옛 코드 7개가 들어 있고 내역은 다음과 같다.
---        - 인천 옛 중·동·서구 3행(구 단위, 새 구로 분리·합병): 2811000000(중) 2814000000(동) 2826000000(서)
---        - 인천 금곡동 2행: 2814010600(동구 금곡동), 2826011800(서구 금곡동) — 새 구 두 곳(제물포·검단)에 같은 동 이름이 있음
---        - 화성 능동 1행: 4159011800 — 병점구·동탄구 두 곳에 같은 동 이름이 있음
---        - 화성시 시 단위 1행: 4159000000 — 위 6행과 달리 아직 활성이라 폐지 대상이 아니고(drop_old=false), 아래 별도 설명 참고
---      "6행"은 이 중 폐지되는 옛 코드만 센 값이고, 확장 행 수로는 15행(= 위 6행에서 11행 + 화성시 4행)이다.
---      구독 테이블(member_favorite_region, guest_fcm_region)은 알림이 끊기지 않게 후보 전부로 확장한다.
---      인천 동구(2814000000)는 후보가 제물포구 하나뿐이라 사실상 1:1이지만, 같은 구 단위 행이라 이력은 옛 코드에 남기고
---      구독만 확장하는 B 규칙에 맞췄다.
---      화성시(4159000000)는 여전히 활성이므로 옛 행을 지우지 않고 새 구 4개를 추가로 구독시킨다.
---      주의: 앱의 관심지역 상한은 5개(MemberFavoriteRegionService, GuestFcmTokenService)인데 확장하면 상한을 넘는
---      구독자가 생길 수 있다(화성시 구독자는 +4행). 알림이 끊기지 않는 것을 우선한 트레이드오프이며, 이 마이그레이션은
---      상한을 검사하지 않는다.
--- 기상 관측 이력(weather_observation 등)은 V109와 같은 원칙으로 옛 코드를 유지한다.
--- 5자리 시군구 코드 기반 위험도 테이블(region_risk_index/history/daily)은 다루지 않는다 — 인천 옛 구는 새 구로 갈라져
---   이관 대상을 하나로 정할 근거가 없고, 화성시는 시 단위 코드(41590)가 그대로 남아 있기 때문이다. region_adjacency 는 V126 참고.
--- 번역: 이관 전에 기존 EN 시드의 면 중복 오류를 먼저 정정하고(7-1), 그 결과에서 면->읍 번역을 파생한다(7-2).
---   이 파일이 번역 행을 만드는 것은 면->읍 승격 40쌍뿐이다. 나머지 신규 코드는 번역 행이 생기지 않으며, 다음 두 부류다.
---   (a) 새 구 이름이 들어가는 행 — 인천 4개 구 아래 행은 V125 가 시드한다. 화성 4개 구(만세·효행·병점·동탄) 아래 행은
---       구명 한자(JA/ZH)의 검증 가능한 출처를 후속 조사에서 찾지 못해 EN/JA/ZH 모두 시드하지 않는다(한자 날조 방지,
---       CLAUDE.md 번역 절). 출처가 확인되면 V125 와 같은 방식(구 이름만 치환)으로 별도 마이그레이션에서 시드한다.
---       개명 4쌍 중 4159012900 오산동->4159711500 여울동(동탄구)과 4159035028 사곳리->4159133032 사곶리(만세구)가 여기에 속한다.
---   (b) 리 이름이 바뀐 행 — 4777036038 영덕 대리->4777036039 대동리, 4822025025 통영 삼덕리->4822025032 당포리는 새 구 이름과
---       무관하지만 옛 번역이 옛 이름 그대로다(대리: Dae-ri / 大里, 삼덕리: Samdeok-ri / 三德里). 옛 번역을 복사하면
---       새 이름과 어긋나는 오역이 되고, 새 이름(대동리·당포리)의 JA/ZH 한자 표기는 출처를 확인하지 못해 파생하지 않았다.
---   따라서 개명 4쌍의 새 코드는 번역 행이 없다. 옛 코드의 번역 행은 폐지된 코드에 그대로 남는다(삭제하지 않음).
---   번역 행이 없을 때의 화면 표시는 이 마이그레이션의 범위 밖이므로 서비스의 폴백 동작에 의존한다.
+--   B) 1:N(_ld_expand, 옛 코드 7개): 인천 중·동·서구 구 단위 3행, 금곡동 2행, 화성 능동 1행, 화성시 시 단위 1행.
+--      새 구로 갈라지거나 같은 동 이름이 두 구에 있다. 이력은 새 구 후보 전부로 복제하고 옛 행은 지운다.
+--      후보는 옛 구의 소속 관계로 좁힌다: 동구는 제물포로만, 동구 금곡동은 제물포 금곡동, 서구 금곡동은 검단 금곡동으로만 간다.
+--      그래도 둘 이상인 중구(제물포·영종), 서구(서해·검단), 화성 능동(병점·동탄)은 후보 전부로 복제한다.
+--      복제로 옛 중·서구 구 단위 알림이 새 구 두 곳에 모두 걸려 지역별 집계가 늘어난다. disaster_events 의 주 지역 캐시는
+--      값이 하나뿐이라 후보가 하나로 정해지는 코드만 갱신하고, 후보가 둘 이상이면 옛 코드를 유지한다.
+--      화성시(4159000000)는 아직 활성이라 옛 행과 이력을 유지하고 기상관측소 설정만 새 구 4개에 복제한다(drop_old=false).
+--   구독(member_favorite_region, guest_fcm_region): 이관하지 않고 폐지된 코드 구독을 삭제한다. 사용자가 새 지역명으로 다시
+--      구독하게 한다(2026-10 결정). 화성시(4159000000)는 코드가 활성이지만 새 알림이 새 구 코드로 오므로 구독을 함께 삭제한다.
+--      삭제 사실을 사용자에게 알리는 앱 공지는 이 마이그레이션에 없고 추후 구현 예정이다.
+--
+-- 이관하지 않는 것: 기상 관측 이력(V109와 같은 원칙), 위험도 테이블 region_risk_*(인천 옛 구는 새 구로 갈라져 대상을 하나로
+--   정할 근거가 없고 화성시는 시 단위 코드가 유지됨), region_adjacency(V126).
+-- 번역: 7-1 에서 기존 EN 시드의 면 중복 오류 46행을 먼저 정정하고, 7-2 에서 면->읍 승격 40쌍만 옛 번역에서 파생한다.
+--   그 외 신규 코드는 이 파일에서 번역 행을 만들지 않는다. 인천 4개 구 아래는 V125 가 시드한다. 화성 4개 구 아래는 구명 한자
+--   출처를 확인하지 못했고(한자 날조 방지, CLAUDE.md 번역 절) 한 구의 언어별 시드가 어긋나는 것도 피하려고 EN/JA/ZH 모두 보류한다.
+--   개명 4쌍의 새 코드도 번역 행이 없다: 오산동·사곳리는 위 화성 구 이름 문제, 대리·삼덕리는 옛 번역이 옛 이름(Dae-ri / 大里,
+--   Samdeok-ri / 三德里)이라 복사하면 오역이 되기 때문이다. 옛 코드의 번역 행은 삭제하지 않으며, 번역 행이 없을 때의 표시는
+--   서비스의 폴백 동작에 의존한다.
 
 -- 1) 신규 법정동코드 338건
 INSERT INTO legal_district (code, name, is_active, is_active_string) VALUES
@@ -541,10 +529,8 @@ INSERT INTO _ld_expand (old_code, new_code, drop_old) VALUES
 ('2811000000','2815500000',true),
 ('2814000000','2812500000',true),
 ('2814010600','2812510600',true),
-('2814010600','2829010700',true),
 ('2826000000','2827500000',true),
 ('2826000000','2829000000',true),
-('2826011800','2812510600',true),
 ('2826011800','2829010700',true),
 ('4159011800','4159510300',true),
 ('4159011800','4159710100',true),
@@ -553,50 +539,50 @@ INSERT INTO _ld_expand (old_code, new_code, drop_old) VALUES
 ('4159000000','4159500000',false),
 ('4159000000','4159700000',false);
 
--- 4) 이력 테이블: 1:1 대응만 새 코드로 이관 (새 코드 추가 후 옛 행 삭제, PK 충돌은 무시)
+-- 이력 테이블용 대응: 1:1 전체 + 폐지되는 1:N(drop_old=true)의 후보 전부. 활성인 화성시(drop_old=false)는 이력을 옮기지 않는다.
+CREATE TEMP TABLE _ld_hist AS
+SELECT old_code, new_code FROM _ld_one
+UNION ALL
+SELECT old_code, new_code FROM _ld_expand WHERE drop_old;
+
+-- 4) 이력 테이블: 1:1 은 새 코드로 이관, 1:N 은 새 구 후보 전부로 복제한 뒤 옛 행 삭제 (PK 충돌은 무시)
+--    복제 때문에 옛 인천 중·서구 구 단위 알림은 새 구 두 곳에 모두 걸려 지역별 집계가 그만큼 늘어난다.
 -- 4-1) disaster_alert_region
 INSERT INTO disaster_alert_region (disaster_alert_id, legal_district_code)
-SELECT x.disaster_alert_id, m.new_code FROM disaster_alert_region x JOIN _ld_one m ON m.old_code = x.legal_district_code
+SELECT x.disaster_alert_id, m.new_code FROM disaster_alert_region x JOIN _ld_hist m ON m.old_code = x.legal_district_code
 ON CONFLICT DO NOTHING;
-DELETE FROM disaster_alert_region x USING _ld_one m WHERE x.legal_district_code = m.old_code;
+DELETE FROM disaster_alert_region x USING (SELECT DISTINCT old_code FROM _ld_hist) m WHERE x.legal_district_code = m.old_code;
 
 -- 4-2) user_disaster_alert_region
 INSERT INTO user_disaster_alert_region (user_disaster_alert_id, legal_district_code)
-SELECT x.user_disaster_alert_id, m.new_code FROM user_disaster_alert_region x JOIN _ld_one m ON m.old_code = x.legal_district_code
+SELECT x.user_disaster_alert_id, m.new_code FROM user_disaster_alert_region x JOIN _ld_hist m ON m.old_code = x.legal_district_code
 ON CONFLICT DO NOTHING;
-DELETE FROM user_disaster_alert_region x USING _ld_one m WHERE x.legal_district_code = m.old_code;
+DELETE FROM user_disaster_alert_region x USING (SELECT DISTINCT old_code FROM _ld_hist) m WHERE x.legal_district_code = m.old_code;
 
--- 4-3) disaster_events 의 주 지역 캐시 컬럼
+-- 4-3) disaster_events 의 주 지역 캐시 컬럼 — 값이 하나뿐이라 복제할 수 없으므로 새 코드가 하나로 정해지는 옛 코드만 갱신한다.
+--      후보가 둘 이상인 옛 코드(인천 중·서구 구 단위, 화성 능동)를 주 지역으로 둔 이벤트는 옛 코드를 유지한다.
 UPDATE disaster_events de SET primary_region_code = ld.code, primary_region_name = ld.name
-FROM _ld_one m JOIN legal_district ld ON ld.code = m.new_code
+FROM (SELECT old_code, min(new_code) AS new_code FROM _ld_hist GROUP BY old_code HAVING count(*) = 1) m
+JOIN legal_district ld ON ld.code = m.new_code
 WHERE de.primary_region_code = m.old_code;
 
 -- 4-4) event_region_impact (PK: event_id, region_code) — 같은 이벤트의 옛 코드 둘이 한 새 코드로 몰릴 수 있어 먼저 집계
 INSERT INTO event_region_impact (event_id, region_code, impact_score, created_at)
 SELECT x.event_id, m.new_code, MAX(x.impact_score), MIN(x.created_at)
-FROM event_region_impact x JOIN _ld_one m ON m.old_code = x.region_code
+FROM event_region_impact x JOIN _ld_hist m ON m.old_code = x.region_code
 GROUP BY x.event_id, m.new_code
 ON CONFLICT (event_id, region_code) DO UPDATE SET impact_score = GREATEST(event_region_impact.impact_score, EXCLUDED.impact_score);
-DELETE FROM event_region_impact x USING _ld_one m WHERE x.region_code = m.old_code;
+DELETE FROM event_region_impact x USING (SELECT DISTINCT old_code FROM _ld_hist) m WHERE x.region_code = m.old_code;
 
--- 5) 구독 테이블: 1:1 이관 + 1:N 확장
+-- 5) 구독 테이블 초기화: 폐지된 코드를 구독 중이던 관심지역은 새 코드로 옮기지 않고 삭제한다.
+--    구 단위 개편이라 옛 구독이 새 구 어디에 해당하는지 일부는 정할 수 없고(중·서구, 능동), 이관하면 엉뚱한 지역 알림이나 관심지역
+--    상한(5개) 초과가 생길 수 있어, 새 지역명으로 사용자가 다시 구독하게 한다(2026-10 결정). 화성시(4159000000)는 아직 활성이지만
+--    새 알림이 만세·효행·병점·동탄구 코드로 오므로 함께 삭제한다. 앱 공지는 추후 구현 예정.
 -- 5-1) member_favorite_region
-INSERT INTO member_favorite_region (member_id, legal_district_code, created_at)
-SELECT x.member_id, t.new_code, x.created_at FROM member_favorite_region x
-JOIN (SELECT old_code, new_code FROM _ld_one UNION ALL SELECT old_code, new_code FROM _ld_expand) t ON t.old_code = x.legal_district_code
-ON CONFLICT (member_id, legal_district_code) DO NOTHING;
-DELETE FROM member_favorite_region x
-USING (SELECT old_code FROM _ld_one UNION SELECT old_code FROM _ld_expand WHERE drop_old) t
-WHERE x.legal_district_code = t.old_code;
+DELETE FROM member_favorite_region x USING (SELECT old_code FROM _ld_hist UNION SELECT old_code FROM _ld_expand) t WHERE x.legal_district_code = t.old_code;
 
--- 5-2) guest_fcm_region (UNIQUE(fcm_token, legal_district_code))
-INSERT INTO guest_fcm_region (fcm_token, legal_district_code, created_at)
-SELECT x.fcm_token, t.new_code, x.created_at FROM guest_fcm_region x
-JOIN (SELECT old_code, new_code FROM _ld_one UNION ALL SELECT old_code, new_code FROM _ld_expand) t ON t.old_code = x.legal_district_code
-ON CONFLICT (fcm_token, legal_district_code) DO NOTHING;
-DELETE FROM guest_fcm_region x
-USING (SELECT old_code FROM _ld_one UNION SELECT old_code FROM _ld_expand WHERE drop_old) t
-WHERE x.legal_district_code = t.old_code;
+-- 5-2) guest_fcm_region
+DELETE FROM guest_fcm_region x USING (SELECT old_code FROM _ld_hist UNION SELECT old_code FROM _ld_expand) t WHERE x.legal_district_code = t.old_code;
 
 -- 6) weather_station_mapping (PK: legal_district_code) — 1:1은 코드 교체, 1:N은 옛 관측소 설정을 새 코드에 복제
 UPDATE weather_station_mapping w SET legal_district_code = m.new_code
@@ -646,4 +632,4 @@ FROM _ld_promo p JOIN legal_district_translation t ON t.code = p.old_code
 ON CONFLICT (code, language_code) DO NOTHING;
 
 -- 임시 테이블 정리 (같은 Flyway 세션에서 뒤따르는 마이그레이션과 이름이 겹치지 않게)
-DROP TABLE _ld_one, _ld_expand, _ld_promo;
+DROP TABLE _ld_one, _ld_expand, _ld_hist, _ld_promo;
