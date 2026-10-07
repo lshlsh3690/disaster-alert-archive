@@ -5,14 +5,31 @@
 --   우리에만 있는 코드는 0건.
 --
 -- 이관 규칙(옛 코드 -> 새 코드). 이름 기반 매칭이 아니라 diff 결과를 코드 쌍으로 박아 둔다(면->읍 승격은 이름이 바뀜):
---   A) 1:1 대응 322쌍 — 이름이 같거나 면->읍으로만 바뀐 행. 이력 테이블과 구독 테이블 모두 이관.
---   B) 1:N 대응(6행) — 인천 옛 중·동·서구 3행(구 단위, 새 구 여러 개로 분리), 인천 금곡동 2행·화성 능동 1행
+--   A) 1:1 대응 326쌍 — 이름이 같거나, 면->읍 승격으로 이름만 바뀌었거나, 아래 4쌍처럼 개명된 행.
+--      이력 테이블과 구독 테이블 모두 이관.
+--      개명 4쌍은 행정안전부·화성시 공고로 확인했다(공식 전체자료에서도 옛 코드는 폐지, 새 코드는 존재).
+--        4159012900 화성 오산동 -> 4159711500 동탄구 여울동 (2026-03-01 오산동->여울동. 구 신설 때 4159710400 으로
+--          재발급됐다가 명칭 변경으로 다시 폐지됨)
+--          https://www.mois.go.kr/frt/bbs/type001/commonSelectBoardArticle.do?bbsId=BBSMSTR_000000000052&nttId=124059
+--        4159035028 화성 서신면 사곳리 -> 4159133032 만세구 서신면 사곶리 (철자 정정)
+--          https://www.law.go.kr/ordinInfoP.do?ordinSeq=2087411
+--        4777036038 영덕 영해면 대리 -> 4777036039 대동리 (2025-06-30)
+--          https://www.mois.go.kr/frt/bbs/type001/commonSelectBoardArticle.do?bbsId=BBSMSTR_000000000052&nttId=118602
+--        4822025025 통영 산양읍 삼덕리 -> 4822025032 당포리 (2025-10-17)
+--          https://www.mois.go.kr/frt/bbs/type001/commonSelectBoardArticle.do?bbsId=BBSMSTR_000000000052&nttId=121446
+--   B) 1:N 대응(6행) — 인천 옛 중·동·서구 3행(구 단위, 새 구로 분리·합병), 인천 금곡동 2행·화성 능동 1행
 --      (새 구 두 곳에 같은 동 이름). 이력 테이블은 어느 새 코드인지 판정할 근거가 없어 옛 코드를 그대로 둔다.
 --      구독 테이블(member_favorite_region, guest_fcm_region)은 알림이 끊기지 않게 후보 전부로 확장한다.
+--      인천 동구(2814000000)는 후보가 제물포구 하나뿐이라 사실상 1:1이지만, 같은 구 단위 행이라 이력은 옛 코드에 남기고
+--      구독만 확장하는 B 규칙에 맞췄다.
 --      화성시(4159000000)는 여전히 활성이므로 옛 행을 지우지 않고 새 구 4개를 추가로 구독시킨다.
---   C) 대응 불명 4행 — 화성 오산동·서신면 사곳리, 영덕 영해면 대리, 통영 산양읍 삼덕리. 개명/이동인지 확인할 수
---      없어 건드리지 않는다(옛 코드 그대로 남음).
+--      주의: 앱의 관심지역 상한은 5개(MemberFavoriteRegionService, GuestFcmTokenService)인데 확장하면 상한을 넘는
+--      구독자가 생길 수 있다(화성시 구독자는 +4행). 알림이 끊기지 않는 것을 우선한 트레이드오프이며, 이 마이그레이션은
+--      상한을 검사하지 않는다.
 -- 기상 관측 이력(weather_observation 등)은 V109와 같은 원칙으로 옛 코드를 유지한다.
+-- 5자리 시군구 코드 기반 위험도 테이블(region_risk_index/history/daily)은 다루지 않는다 — 인천 옛 구는 새 구로 갈라져
+--   이관 대상을 하나로 정할 근거가 없고, 화성시는 시 단위 코드(41590)가 그대로 남아 있기 때문이다. region_adjacency 는 V126 참고.
+-- 번역: 이관 전에 기존 EN 시드의 면 중복 오류를 먼저 정정하고(7-1), 그 결과에서 면->읍 번역을 파생한다(7-2).
 
 -- 1) 신규 법정동코드 338건
 INSERT INTO legal_district (code, name, is_active, is_active_string) VALUES
@@ -499,7 +516,9 @@ INSERT INTO _ld_one (old_code, new_code) VALUES
 ('4159041039','4159333039'), ('4377034000','4377025600'), ('4377034021','4377025621'), ('4377034022','4377025622'),
 ('4377034023','4377025623'), ('4377034024','4377025624'), ('4377034025','4377025625'), ('4377034026','4377025626'),
 ('4377034027','4377025627'), ('4377034028','4377025628'), ('4377034029','4377025629'), ('4377034030','4377025630'),
-('4377034031','4377025631'), ('4377034032','4377025632');
+('4377034031','4377025631'), ('4377034032','4377025632'),
+-- 개명 4쌍 (근거는 헤더 A 참고)
+('4159012900','4159711500'), ('4159035028','4159133032'), ('4777036038','4777036039'), ('4822025025','4822025032');
 
 CREATE TEMP TABLE _ld_expand (old_code VARCHAR(10) NOT NULL, new_code VARCHAR(10) NOT NULL, drop_old BOOLEAN NOT NULL);
 INSERT INTO _ld_expand (old_code, new_code, drop_old) VALUES
@@ -572,10 +591,25 @@ SELECT e.new_code, w.asos_station_id, w.asos_station_name, w.kma_nx, w.kma_ny
 FROM weather_station_mapping w JOIN _ld_expand e ON e.old_code = w.legal_district_code
 ON CONFLICT (legal_district_code) DO NOTHING;
 
--- 7) 번역 시드: 면->읍 승격 40쌍만 옛 번역에서 기계적으로 파생 (EN 마지막 -myeon->-eup, JA/ZH 面->邑).
---    기존 EN 시드에는 처인구 양지면처럼 "Baegam-myeon Yangji-myeon" 형태로 면이 둘 들어간 행이 있어, 전역 치환하면 백암면까지 읍으로
---    바뀐다 — 면->읍 승격 대상인 마지막 면만 치환한다.
+-- 7-1) 기존 EN 시드의 면 중복 오류 정정 (V7 시드 유래, 46행)
+--    "Gyeonggi-do Cheoin-gu, Yongin-si Baegam-myeon Yangji-myeon" 처럼 한글명에 없는 다른 면 이름이 앞에 하나 더 붙어 있다
+--    (처인구 모현·남사·이동·양지면 42행, 청주 남일·남이·옥산면, 창원 진동면 각 1행). 올바른 면은 항상 마지막 토큰이므로,
+--    뒤에 또 다른 -myeon 이 오는 -myeon 토큰을 제거한다. 면->읍 파생(7-2) 전에 해야 새 행이 오류를 복제하지 않는다.
+--    별개 오류: 4311231·4311332 의 EN 구 이름이 "Sangdang-gu"로 잘못 들어가 있으나 이 마이그레이션 범위 밖이다.
+UPDATE legal_district_translation
+SET name = regexp_replace(name, '\s[A-Za-z]+-myeon(?=\s.*-myeon)', '')
+WHERE language_code = 'EN' AND name ~ '-myeon.*-myeon';
+
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM legal_district_translation WHERE language_code = 'EN' AND name ~ '-myeon.*-myeon') THEN
+        RAISE EXCEPTION 'V123 left EN translations with duplicated -myeon';
+    END IF;
+END $$;
+
+-- 7-2) 번역 시드: 면->읍 승격 40쌍만 옛 번역에서 기계적으로 파생 (EN 마지막 -myeon->-eup, JA/ZH 面->邑).
 --    신규 구 이름(제물포·영종·서해·검단·만세·효행·병점·동탄)이 들어가는 행은 한자 표기를 날조하지 않기 위해 시드하지 않는다.
+--    (인천 4개 구는 V125 에서 시드)
 CREATE TEMP TABLE _ld_promo (old_code VARCHAR(10) PRIMARY KEY, new_code VARCHAR(10) NOT NULL);
 INSERT INTO _ld_promo (old_code, new_code) VALUES
 ('2771038000','2771026800'), ('2771038021','2771026821'), ('2771038022','2771026822'), ('2771038023','2771026823'),
@@ -595,3 +629,6 @@ SELECT p.new_code, t.language_code,
                             ELSE regexp_replace(t.name, '面', '邑') END
 FROM _ld_promo p JOIN legal_district_translation t ON t.code = p.old_code
 ON CONFLICT (code, language_code) DO NOTHING;
+
+-- 임시 테이블 정리 (같은 Flyway 세션에서 뒤따르는 마이그레이션과 이름이 겹치지 않게)
+DROP TABLE _ld_one, _ld_expand, _ld_promo;
