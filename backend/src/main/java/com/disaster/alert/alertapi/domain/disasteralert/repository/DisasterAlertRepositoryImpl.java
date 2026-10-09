@@ -7,6 +7,7 @@ import com.disaster.alert.alertapi.domain.weather.model.QWeatherObservation;
 import com.disaster.alert.alertapi.domain.disasteralert.model.DisasterAlert;
 import com.disaster.alert.alertapi.domain.disasteralert.model.DisasterLevel;
 import com.disaster.alert.alertapi.domain.disasteralert.model.QDisasterAlertRegion;
+import com.disaster.alert.alertapi.domain.disasteralert.model.RegionCodeUnit;
 import com.disaster.alert.alertapi.domain.legaldistrict.model.QLegalDistrict;
 import com.disaster.alert.alertapi.domain.useralert.model.QUserDisasterAlert;
 import com.disaster.alert.alertapi.domain.useralert.model.QUserDisasterAlertRegion;
@@ -217,6 +218,37 @@ public class DisasterAlertRepositoryImpl implements DisasterAlertRepositoryCusto
                 )
                 .groupBy(sigungu)
                 .orderBy(disasterAlert.id.countDistinct().desc(), sigungu.asc())
+                .fetch();
+    }
+
+    @Override
+    public List<DisasterAlertStatResponse.RegionCodeStat> getStatsByRegionCode(AlertSearchRequest request, RegionCodeUnit unit) {
+        // 법정동 코드 앞 N자리로 그룹핑 — sidoCodeExpr() 와 같은 이유(이름 파싱보다 저렴, 지도 폴리곤 코드와 직접 매칭).
+        // prefixLength 는 enum 상수라 템플릿 문자열에 바로 넣어도 안전하다.
+        StringTemplate regionCode = Expressions.stringTemplate(
+                "function('left', {0}, " + unit.prefixLength() + ")", legalDistrict.code);
+
+        // 시도 전체 코드(xx00000000, 3~5번째 자리가 000)는 시군구/읍면동 어디에도 귀속시킬 수 없어 제외한다.
+        // 읍면동은 시군구 전체 코드(6~8번째 자리가 000)도 제외한다 — 읍면동까지 특정되지 않은 알림이다.
+        BooleanExpression belongsToUnit = legalDistrict.code.substring(2, 5).ne("000");
+        if (unit == RegionCodeUnit.EMD) {
+            belongsToUnit = belongsToUnit.and(legalDistrict.code.substring(5, 8).ne("000"));
+        }
+
+        return queryFactory
+                .select(Projections.constructor(DisasterAlertStatResponse.RegionCodeStat.class,
+                        regionCode,
+                        disasterAlert.id.countDistinct()))
+                .from(disasterAlert)
+                .join(disasterAlert.disasterAlertRegions, disasterAlertRegion)
+                .join(disasterAlertRegion.legalDistrict, legalDistrict)
+                .where(
+                        byAlertCondition(request),
+                        regionFilterOnJoin(request),
+                        belongsToUnit
+                )
+                .groupBy(regionCode)
+                .orderBy(disasterAlert.id.countDistinct().desc(), regionCode.asc())
                 .fetch();
     }
 
