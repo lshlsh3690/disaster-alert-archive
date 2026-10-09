@@ -230,6 +230,44 @@ export default function KoreaMap25D({
   }, [level, metroCounts, statsQuery.data]);
 
   const countFor = useCallback((key: string) => countMap.get(key) ?? 0, [countMap]);
+
+  // 상위 단위 전체로 발송돼 하위 구역 어디에도 귀속시킬 수 없는 알림 수. 구역 건수와 섞지 않고 따로 보여 준다
+  // (섞으면 한 알림이 여러 구역에 중복돼 합계가 어긋난다). 백엔드는 "시군구코드+000"(읍면동 보기)·"시 전체 코드"(시군구 보기)로 내려준다.
+  const wideNames = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const r of sigunguQuery.data ?? []) {
+      const [, ...rest] = r.n.split(" "); // 시도명은 앞에서 뗀다
+      m.set(r.c, rest.join(" ") || r.n);
+      const city = r.c.slice(0, 4) + "0";
+      if (rest.length > 1 && !m.has(city)) m.set(city, rest[0]); // 구가 있는 시는 시 이름으로
+    }
+    return m;
+  }, [sigunguQuery.data]);
+  const wideEntry = useCallback(
+    (statKey: string, nameKey: string) => {
+      const count = countMap.get(statKey) ?? 0;
+      return count > 0 ? [{ name: wideNames.get(nameKey) ?? nameKey, count }] : [];
+    },
+    [countMap, wideNames]
+  );
+  // 읍면동 단계: 확대한 시군구(구가 있는 시는 구, 또는 시 전체)에 해당하는 전체 단위 알림
+  const emdWide = useMemo(() => {
+    if (level !== "emd" || drillSigungu === null || statsPending) return [];
+    const base = drillSigungu.padEnd(5, "0");
+    const out = wideEntry(`${base}000`, base);
+    return base.endsWith("0") ? out : [...out, ...wideEntry(`${base.slice(0, 4)}0000`, `${base.slice(0, 4)}0`)];
+  }, [level, drillSigungu, statsPending, wideEntry]);
+  // 시군구 단계: 구가 있는 시의 구 위에 올리면 "시 전체 단위" 알림을 알려 준다
+  const wideFor = useCallback(
+    (key: string) => {
+      if (statsPending) return [];
+      if (level === "emd") return emdWide;
+      if (level !== "sigungu" || key.endsWith("0")) return [];
+      const city = `${key.slice(0, 4)}0`;
+      return wideEntry(city, city);
+    },
+    [statsPending, level, emdWide, wideEntry]
+  );
   // 폴리곤이 없는 코드(예: 구가 있는 시 전체 알림)가 최댓값을 키우지 않도록 그려지는 지역만으로 계산한다.
   const maxCount = useMemo(() => {
     let max = 1;
@@ -518,6 +556,12 @@ export default function KoreaMap25D({
             </div>
           )}
 
+          {emdWide.length > 0 && (
+            <div className={styles.wideNote} role="note">
+              {emdWide.map((w) => t("dashboard.mapWideBanner", { name: w.name, count: w.count })).join(" · ")}
+            </div>
+          )}
+
           {zoomed && (
             <div className={styles.drillBar}>
               <button type="button" className={styles.drillBack} onClick={goBack}>
@@ -654,6 +698,11 @@ export default function KoreaMap25D({
               {mapLabel} <b>{statsPending ? "…" : countFor(hoveredRegion.key)}</b>
               {mapUnit}
             </div>
+            {wideFor(hoveredRegion.key).map((w) => (
+              <div key={w.name} className={styles.tipWide}>
+                {t("dashboard.mapWideTip", { name: w.name, count: w.count })}
+              </div>
+            ))}
           </div>
         )}
       </div>

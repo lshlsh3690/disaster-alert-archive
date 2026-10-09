@@ -229,11 +229,9 @@ public class DisasterAlertRepositoryImpl implements DisasterAlertRepositoryCusto
                 "function('left', {0}, " + unit.prefixLength() + ")", legalDistrict.code);
 
         // 시도 전체 코드(xx00000000, 3~5번째 자리가 000)는 시군구/읍면동 어디에도 귀속시킬 수 없어 제외한다.
-        // 읍면동은 시군구 전체 코드(6~8번째 자리가 000)도 제외한다 — 읍면동까지 특정되지 않은 알림이다.
+        // 읍면동 단위에서 시군구 전체 코드(6~8번째 자리가 000)는 "시군구코드+000"(예: 46880000) 항목으로 그대로 내려준다 —
+        // 읍면동까지 특정되지 않은 알림이라 어느 읍면동에도 속하지 않지만, 제외하면 화면이 그 알림을 0건으로 보여 주게 된다.
         BooleanExpression belongsToUnit = legalDistrict.code.substring(2, 5).ne("000");
-        if (unit == RegionCodeUnit.EMD) {
-            belongsToUnit = belongsToUnit.and(legalDistrict.code.substring(5, 8).ne("000"));
-        }
 
         return queryFactory
                 .select(Projections.constructor(DisasterAlertStatResponse.RegionCodeStat.class,

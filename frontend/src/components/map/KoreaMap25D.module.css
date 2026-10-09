@@ -117,6 +117,24 @@
   font-size: 15px;
 }
 
+/* 상위 단위 전체로 발송돼 이 구역에 귀속시킬 수 없는 알림 */
+.tipWide {
+  margin-top: 4px;
+  font-size: 12px;
+  color: #6b7280;
+}
+.wideNote {
+  max-width: 320px;
+  padding: 6px 10px;
+  border: 1px solid #fcd9d4;
+  border-radius: 8px;
+  background: #fff5f3;
+  color: #b42318;
+  font-size: 12px;
+  line-height: 1.4;
+  text-align: right;
+}
+
 /* 범례 */
 .legend {
   display: flex;
