@@ -9,7 +9,7 @@
 - **리버스 프록시**: Caddy — `api.disaster-alert-archive.co.kr` → `backend:8080` 라우팅, Let's Encrypt 인증서 자동 발급/갱신
 - **DB**: PostgreSQL + pgvector 확장 (이벤트 임베딩 저장·유사도 검색)
 - **캐시**: Redis (인증 코드, 캐시)
-- **외부 연동**: 행정안전부 재난문자 API, 기상청 API, Firebase Cloud Messaging, OpenAI 임베딩·챗·번역 API, Kakao Map API, Google/Kakao/Naver OAuth
+- **외부 연동**: 행정안전부 재난문자 API, 기상청 API, Firebase Cloud Messaging, OpenAI 임베딩·챗·번역 API, Google/Kakao/Naver OAuth
 
 시스템 아키텍처 다이어그램: [system_architecture.png](./system_architecture.png)
 
