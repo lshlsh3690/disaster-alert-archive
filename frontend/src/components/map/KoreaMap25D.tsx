@@ -1,6 +1,6 @@
 "use client";
 
-import { memo, useMemo, useRef, useState, useEffect, useCallback, useId } from "react";
+import { memo, useMemo, useRef, useState, useEffect, useLayoutEffect, useCallback, useId } from "react";
 import { useRouter } from "next/navigation";
 import { KOREA_SIDO } from "./koreaSido.data";
 import { useTranslation } from "react-i18next";
@@ -334,6 +334,8 @@ export default function KoreaMap25D({
   const [anchor, setAnchor] = useState({ x: 0, y: 0 });
   const [lineEnd, setLineEnd] = useState({ x: 0, y: 0 });
   const [side, setSide] = useState<"left" | "right">("right");
+  const tipRef = useRef<HTMLDivElement>(null);
+  const [tipShift, setTipShift] = useState(0);
 
   const hoveredRegion = useMemo(
     () => regions.find((r) => r.key === hovered) || null,
@@ -403,6 +405,24 @@ export default function KoreaMap25D({
     },
     [viewBoxSettled, hovered, raise, zoom, animateLift]
   );
+
+  // 말풍선이 지도 영역 밖으로 나가 잘리지 않도록 가로로 밀어 넣는다. 말풍선은 연결선 끝(lineEnd) 기준 좌/우에 8px 떨어져 놓이고
+  // (CSS translate), 너비는 내용에 따라 달라 그릴 때 한 번 재서 맞춘다. 좁은 사이드 패널에서는 어느 쪽에 놓아도 넘칠 수 있다.
+  useLayoutEffect(() => {
+    const tip = tipRef.current;
+    const cont = containerRef.current;
+    if (!tip || !cont || hovered === null) {
+      setTipShift(0);
+      return;
+    }
+    const w = tip.offsetWidth;
+    const edge = 8;
+    const left = side === "right" ? lineEnd.x + 8 : lineEnd.x - 8 - w;
+    let shift = 0;
+    if (left < edge) shift = edge - left;
+    else if (left + w > cont.clientWidth - edge) shift = cont.clientWidth - edge - (left + w);
+    setTipShift(shift);
+  }, [hovered, side, lineEnd.x]);
 
   const onLeave = useCallback(() => {
     cancelAnimationFrame(rafIdRef.current);
@@ -498,7 +518,7 @@ export default function KoreaMap25D({
   const displayName = (r: RenderRegion) => (level === "sido" ? sidoName(r.label) : r.label);
   const mapLabel = countLabel ?? t("dashboard.todayAlerts");
   const mapUnit = t("dashboard.count");
-  const boxStyle = { left: `${lineEnd.x}px`, top: `${lineEnd.y}px` };
+  const boxStyle = { left: `${lineEnd.x}px`, top: `${lineEnd.y}px`, marginLeft: `${tipShift}px` };
   const modeLabels: Record<MapMode, string> = {
     sido: t("dashboard.mapViewSido"),
     sigungu: t("dashboard.mapViewSigungu"),
@@ -687,6 +707,7 @@ export default function KoreaMap25D({
         {hoveredRegion && (
           <div
             key={`tip-${hovered}`}
+            ref={tipRef}
             className={`${styles.tip} ${side === "right" ? styles.tipRight : styles.tipLeft}`}
             style={boxStyle}
           >
