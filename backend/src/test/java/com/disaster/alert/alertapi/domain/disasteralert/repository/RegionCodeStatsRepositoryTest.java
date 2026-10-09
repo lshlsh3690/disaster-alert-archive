@@ -80,7 +80,7 @@ class RegionCodeStatsRepositoryTest {
     }
 
     @Test
-    void 읍면동_단위는_8자리로_묶고_시군구_전체와_시도_전체는_제외하며_리는_읍면동으로_합산한다() {
+    void 읍면동_단위는_8자리로_묶고_시군구_전체는_뒤_000_코드로_내려주며_시도_전체는_제외한다() {
         Map<String, Long> counts = counts(RegionCodeUnit.EMD);
 
         assertEquals(1L, counts.get("11110101"), "종로구 청운동");
@@ -88,8 +88,12 @@ class RegionCodeStatsRepositoryTest {
         assertEquals(1L, counts.get("41111129"), "수원시 장안구 파장동");
         // 같은 읍의 리 두 곳을 가리킨 알림은 읍면동 한 곳에 1건으로 센다(distinct)
         assertEquals(1L, counts.get("28710250"), "강화읍");
-        // 종로구 전체·서울 전체·수원시 전체 알림은 읍면동까지 특정되지 않아 제외된다
-        assertEquals(4, counts.size(), "집계 대상 읍면동은 4곳뿐이어야 한다: " + counts);
+        // 읍면동까지 특정되지 않은 시군구 전체 알림은 어느 읍면동에도 귀속시킬 수 없어 "시군구코드+000" 항목으로 따로 내려준다.
+        // 화면은 이 값을 읍면동 건수와 섞지 않고 "○○ 전체 단위 알림 N건"으로 보여 준다.
+        assertEquals(1L, counts.get("11110000"), "종로구 전체");
+        assertEquals(1L, counts.get("41110000"), "수원시 전체");
+        // 서울 전체(시도 전체 코드)는 시군구 전체 단위조차 아니라서 여전히 제외된다
+        assertEquals(6, counts.size(), "읍면동 4곳 + 시군구 전체 2곳이어야 한다: " + counts);
     }
 
     @Test
