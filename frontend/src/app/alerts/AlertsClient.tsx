@@ -429,7 +429,7 @@ function AlertsClientInner() {
           {/* 오른쪽: 폴리곤 지도 + 통계 */}
           <div className="flex w-full min-w-0 flex-col gap-4">
             <div className="overflow-hidden rounded-[var(--radius-panel-card)] border border-[var(--line)] bg-[var(--surface)] shadow-[0_10px_30px_rgba(28,39,60,0.04)]">
-              <KoreaMap25D height="520px" todayOnly={false} params={mapParams} countLabel={t("alertList.mapCountLabel")} compact onRegionSelect={onMapRegionSelect} />
+              <KoreaMap25D height="520px" todayOnly={false} params={mapParams} countLabel={t("alertList.mapCountLabel")} compact defaultMode="sido" focusSido={watchedSido || undefined} focusSigungu={watchedSigungu || undefined} onRegionSelect={onMapRegionSelect} />
             </div>
 
             {/* 재난 통계 요약 */}

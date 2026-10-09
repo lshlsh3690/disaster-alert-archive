@@ -16,7 +16,7 @@ const skRegions = KOREA_SIDO.filter((r) => r.kind === "sk");
 
 // 지도 보기 단위. 시도 경계는 위 번들 데이터(koreaSido.data.ts)를, 시군구/읍면동 경계는 public/map/**.json 을 쓴다.
 // 읍면동은 별도 보기 단위가 아니라 시군구 보기에서 구역을 눌렀을 때 그 시군구로 확대해서 보여 준다(drill-down).
-type MapMode = "sido" | "sigungu";
+export type MapMode = "sido" | "sigungu";
 // 지금 보여주는 단계. 시도 보기는 시도 → (시도를 누르면) 그 시도의 시군구 → (시군구를 누르면) 읍면동, 시군구 보기는 시군구 → 읍면동.
 type MapLevel = "sido" | "sigungu" | "emd";
 const MAP_MODES: MapMode[] = ["sido", "sigungu"];
@@ -92,6 +92,15 @@ interface KoreaMap25DProps {
    * 알림 목록 페이지처럼 이미 목록이 있는 곳에서 필터만 바꾸려는 용도. sigungu 는 "수원시 장안구 [읍면동]" 처럼 시도명을 뗀 값이다.
    */
   onRegionSelect?: (sel: { sido: string; sigungu?: string }) => void;
+  /** 처음 보여 줄 보기 단위. 기본은 시군구별 보기, 알림 목록 페이지는 시도 전체를 먼저 보여 주려고 "sido" 를 쓴다 */
+  defaultMode?: MapMode;
+  /**
+   * 바깥(예: 알림 목록의 검색 필터)에서 고른 지역으로 지도를 확대한다. 시도명("경기도")과 시군구("수원시 장안구", 읍면동이
+   * 붙어 있어도 된다)를 주면 그 시군구의 읍면동까지, 시도만 주면 그 시도의 시군구까지 확대하고, 둘 다 비우면 전체 보기로 돌아간다.
+   * 구가 있는 시 전체("수원시")처럼 지도에 단독 경계가 없는 값은 시도까지만 확대한다.
+   */
+  focusSido?: string;
+  focusSigungu?: string;
   /** 목록 페이지에 붙일 때처럼 위쪽에 제목 카드가 없으면 컨트롤을 위로 올린다 */
   compact?: boolean;
   /** 현재 보기 상태(예: "시도별 보기 › 경기도 › 수원시 장안구 › 읍면동")가 바뀔 때마다 알린다. 제목 카드에 표시하는 용도 */
@@ -108,6 +117,9 @@ export default function KoreaMap25D({
   onSelect,
   onRegionSelect,
   compact = false,
+  defaultMode = DEFAULT_MODE,
+  focusSido,
+  focusSigungu,
   onStatusChange,
 }: KoreaMap25DProps) {
   const { t } = useTranslation();
@@ -119,7 +131,7 @@ export default function KoreaMap25D({
   const shadowFilterId = `soft-${uid}`;
   const liftShadowId = `lift-${uid}`;
 
-  const [mode, setMode] = useState<MapMode>(DEFAULT_MODE);
+  const [mode, setMode] = useState<MapMode>(defaultMode);
   // 확대 단계: 시도 보기에서 누른 시도(코드 2자리) → 그 시도의 시군구 → 누른 시군구(코드 5자리) → 그 시군구의 읍면동.
   // 시군구 보기는 처음부터 시군구 단계라 drillSido 없이 drillSigungu 만 쓴다.
   const [drillSido, setDrillSido] = useState<string | null>(null);
@@ -139,12 +151,49 @@ export default function KoreaMap25D({
   const sigunguQuery = useSigunguRegions(needSigunguData);
   const emdQuery = useEmdRegions(drillSigungu !== null ? drillSigungu.slice(0, 2) : null);
 
+  // 바깥에서 고른 지역으로 확대한다. 사용자가 지도에서 직접 한 단계 올라간 것(goBack)은 focus 값이 그대로라 되돌리지 않는다.
+  const hadFocusRef = useRef(false);
+  useEffect(() => {
+    const sido = focusSido ? skRegions.find((r) => r.ko === focusSido) : undefined;
+    if (!sido) {
+      if (hadFocusRef.current) {
+        hadFocusRef.current = false;
+        setDrillSido(null);
+        setDrillSigungu(null);
+      }
+      return;
+    }
+    hadFocusRef.current = true;
+    setMode("sido");
+    setDrillSido(sido.code);
+    if (!focusSigungu) {
+      setDrillSigungu(null);
+      return;
+    }
+    // 공식 명칭("경기도 수원시 장안구")이 "시도 + 시군구[ 읍면동]" 의 앞부분과 일치하는 가장 긴 시군구를 찾는다.
+    const full = `${focusSido} ${focusSigungu} `;
+    const regions = (sigunguQuery.data ?? []).filter((r) => r.c.startsWith(sido.code));
+    const match = regions.filter((r) => full.startsWith(`${r.n} `)).sort((a, b) => b.n.length - a.n.length)[0];
+    // 구가 있는 시 전체("수원시")는 단독 경계가 없으니 그 시의 구들을 묶는 코드 앞 4자리로 확대한다.
+    const city = match ? null : regions.filter((r) => `${r.n} `.startsWith(`${focusSido} ${focusSigungu} `));
+    setDrillSigungu(match ? match.c : city && city.length > 0 ? city[0].c.slice(0, 4) : null);
+  }, [focusSido, focusSigungu, sigunguQuery.data]);
+
   const metroCounts = useMemo(() => groupToMetros(sidoData ?? []), [sidoData]);
 
-  const drilledSigungu = useMemo(
-    () => (drillSigungu !== null ? (sigunguQuery.data ?? []).find((r) => r.c === drillSigungu) ?? null : null),
-    [drillSigungu, sigunguQuery.data]
-  );
+  // 확대한 시군구. 구가 있는 시(수원시 등)는 시 전체 경계가 없어 코드 앞 4자리로 묶인 구들을 하나의 영역으로 합친다.
+  const drilledSigungu = useMemo(() => {
+    if (drillSigungu === null) return null;
+    const members = (sigunguQuery.data ?? []).filter((r) => r.c.startsWith(drillSigungu));
+    if (members.length === 0) return null;
+    if (members.length === 1) return members[0];
+    const [sido, city] = members[0].n.split(" ");
+    return {
+      n: `${sido} ${city}`,
+      d: members.map((r) => r.d).join(" "),
+      b: unionBBox(members.map((r) => r.b).filter((b): b is BBox => !!b)) ?? undefined,
+    };
+  }, [drillSigungu, sigunguQuery.data]);
   const drilledSido = useMemo(
     () => (activeSido !== null ? skRegions.find((r) => r.code === activeSido) ?? null : null),
     [activeSido]
