@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { KOREA_SIDO } from "./koreaSido.data";
 import { useTranslation } from "react-i18next";
 import { useSidoStats, useRegionCodeStats } from "@/lib/queries/useAlerts";
+import type { AlertSearchRequest } from "@/api/alertApi";
 import { useSigunguRegions, useEmdRegions } from "@/lib/queries/useMapRegions";
 import { BASE_VIEWBOX, fitViewBox, unionBBox, type BBox } from "@/lib/mapViewBox";
 import { useAnimatedViewBox } from "./useAnimatedViewBox";
@@ -81,7 +82,18 @@ interface KoreaMap25DProps {
   depth?: number; // 지도 두께(viewBox 단위)
   raise?: number; // 호버 시 솟아오르는 높이
   todayOnly?: boolean;
+  /** 건수를 셀 검색 조건. 주면 todayOnly 대신 이 조건으로 집계한다(알림 목록 페이지의 필터와 맞출 때) */
+  params?: AlertSearchRequest;
+  /** 툴팁에 붙는 건수 설명. 기본은 "오늘 재난문자" */
+  countLabel?: string;
   onSelect?: (ko: string) => void;
+  /**
+   * 주면 지역을 누를 때마다(확대하는 클릭 포함) 이 콜백을 부르고, /alerts 로 직접 이동하지 않는다.
+   * 알림 목록 페이지처럼 이미 목록이 있는 곳에서 필터만 바꾸려는 용도. sigungu 는 "수원시 장안구 [읍면동]" 처럼 시도명을 뗀 값이다.
+   */
+  onRegionSelect?: (sel: { sido: string; sigungu?: string }) => void;
+  /** 목록 페이지에 붙일 때처럼 위쪽에 제목 카드가 없으면 컨트롤을 위로 올린다 */
+  compact?: boolean;
   /** 현재 보기 상태(예: "시도별 보기 › 경기도 › 수원시 장안구 › 읍면동")가 바뀔 때마다 알린다. 제목 카드에 표시하는 용도 */
   onStatusChange?: (status: string) => void;
 }
@@ -91,7 +103,11 @@ export default function KoreaMap25D({
   depth = 10,
   raise = 16,
   todayOnly = true,
+  params,
+  countLabel,
   onSelect,
+  onRegionSelect,
+  compact = false,
   onStatusChange,
 }: KoreaMap25DProps) {
   const { t } = useTranslation();
@@ -115,7 +131,7 @@ export default function KoreaMap25D({
   const needSigunguData = level !== "sido";
 
   const today = useMemo(() => todayRange(), []);
-  const dateParams = todayOnly ? today : {};
+  const dateParams = params ?? (todayOnly ? today : {});
 
   // 시도 단계: 기존 이름 기준 시도 통계 / 시군구·읍면동 단계: 코드 기준 통계 — 폴리곤 코드와 직접 매칭
   const { data: sidoData } = useSidoStats(dateParams);
@@ -340,6 +356,11 @@ export default function KoreaMap25D({
       // 이름이 비어 있으면(경계 데이터에 이름이 없는 구역) sido="" 로 이동하게 되므로 아무것도 하지 않는다.
       if (!label.trim()) return;
       onSelect?.(label);
+      if (onRegionSelect) {
+        const [sido, ...rest] = kind === "sido" ? [label] : label.split(" ");
+        onRegionSelect({ sido, sigungu: rest.length > 0 ? rest.join(" ") : undefined });
+        return;
+      }
       const q = new URLSearchParams();
       if (kind === "sido") {
         q.set("sido", label);
@@ -356,7 +377,7 @@ export default function KoreaMap25D({
       }
       router.push(`/alerts?${q.toString()}#list`);
     },
-    [onSelect, todayOnly, today, router]
+    [onSelect, onRegionSelect, todayOnly, today, router]
   );
 
   // 시도를 누르면 그 시도의 시군구로, 시군구를 누르면 그 시군구의 읍면동으로 확대하고, 읍면동을 누르면 알림 목록으로 이동한다.
@@ -365,16 +386,18 @@ export default function KoreaMap25D({
       if (level === "sido") {
         onLeave();
         setDrillSido(r.key);
+        if (onRegionSelect) goToAlerts(r.label, "sido");
         return;
       }
       if (level === "sigungu") {
         onLeave();
         setDrillSigungu(r.key);
+        if (onRegionSelect) goToAlerts(r.label, "district");
         return;
       }
       goToAlerts(r.label, "district");
     },
-    [level, onLeave, goToAlerts]
+    [level, onLeave, goToAlerts, onRegionSelect]
   );
 
   useEffect(() => {
@@ -383,7 +406,7 @@ export default function KoreaMap25D({
 
   const sidoName = (ko: string) => t(`metros.${ko}`, { defaultValue: ko });
   const displayName = (r: RenderRegion) => (level === "sido" ? sidoName(r.label) : r.label);
-  const mapLabel = t("dashboard.todayAlerts");
+  const mapLabel = countLabel ?? t("dashboard.todayAlerts");
   const mapUnit = t("dashboard.count");
   const boxStyle = { left: `${lineEnd.x}px`, top: `${lineEnd.y}px` };
   const modeLabels: Record<MapMode, string> = {
@@ -424,7 +447,7 @@ export default function KoreaMap25D({
   return (
     <div className={`${styles.koreaMap} korea-map`}>
       <div ref={containerRef} className={`${styles.canvas} korea-map__canvas`} style={{ height }}>
-        <div className={styles.controls}>
+        <div className={`${styles.controls} ${compact ? styles.controlsCompact : ""}`}>
           {/* 보기 단위: 선택지를 접어 두지 않고 항상 펼쳐 보여 준다(드롭다운은 화살표 아래에 뭐가 있는지 알 수 없었다) */}
           <div className={styles.segmented} role="radiogroup" aria-label={t("dashboard.mapViewLabel")}>
             {MAP_MODES.map((m) => (
