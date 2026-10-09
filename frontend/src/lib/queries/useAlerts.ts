@@ -1,6 +1,6 @@
 // hooks/useAlerts.ts
 import { useQuery, keepPreviousData } from "@tanstack/react-query";
-import { fetchLatestAlerts, searchAlerts, fetchAlert, fetchStats, type AlertSearchRequest, fetchLatestAlertsBySido, fetchSigunguStats, fetchSigunguStatsBreakdown, searchCombinedAlerts, fetchDashboardSummary, fetchSigungu, fetchDailyStats, fetchHourlyStats, fetchMonthlyTypeStats, fetchDailyTypeStats, fetchWeatherCorrelation, fetchWeatherByType, fetchWeatherByRegion, fetchAlertWeather, fetchWeatherHourlyCorrelation, fetchWeatherHourlyByType, fetchWeatherHourlyByRegion } from "@/api/alertApi";
+import { fetchLatestAlerts, searchAlerts, fetchAlert, fetchStats, type AlertSearchRequest, fetchLatestAlertsBySido, fetchSigunguStats, fetchRegionCodeStats, type RegionCodeUnit, fetchSigunguStatsBreakdown, searchCombinedAlerts, fetchDashboardSummary, fetchSigungu, fetchDailyStats, fetchHourlyStats, fetchMonthlyTypeStats, fetchDailyTypeStats, fetchWeatherCorrelation, fetchWeatherByType, fetchWeatherByRegion, fetchAlertWeather, fetchWeatherHourlyCorrelation, fetchWeatherHourlyByType, fetchWeatherHourlyByRegion } from "@/api/alertApi";
 import { fetchUserAlert, fetchUserAlerts } from "@/api/userAlertApi";
 
 export function useLatestAlerts(limit = 5, lang = "ko") {
@@ -57,6 +57,15 @@ export function useSidoStats(params: AlertSearchRequest) {
     queryKey: ["alert-stats-sido", params],
     queryFn: () => fetchLatestAlertsBySido(params),
     placeholderData: keepPreviousData,
+  });
+}
+
+export function useRegionCodeStats(params: AlertSearchRequest, unit: RegionCodeUnit, enabled = true) {
+  return useQuery({
+    queryKey: ["alert-stats-region-code", unit, params],
+    queryFn: () => fetchRegionCodeStats(params, unit),
+    placeholderData: keepPreviousData,
+    enabled,
   });
 }
 

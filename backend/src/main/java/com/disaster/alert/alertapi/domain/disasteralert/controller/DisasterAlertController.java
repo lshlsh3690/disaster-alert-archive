@@ -1,6 +1,7 @@
 package com.disaster.alert.alertapi.domain.disasteralert.controller;
 
 import com.disaster.alert.alertapi.domain.disasteralert.dto.*;
+import com.disaster.alert.alertapi.domain.disasteralert.model.RegionCodeUnit;
 import com.disaster.alert.alertapi.domain.disasteralert.service.DisasterAlertService;
 import com.disaster.alert.alertapi.domain.useralert.service.UserDisasterAlertService;
 import jakarta.validation.constraints.Max;
@@ -77,6 +78,19 @@ public class DisasterAlertController {
             AlertSearchRequest request
     ) {
         return ResponseEntity.ok(disasterAlertService.countBySigungu(request));
+    }
+
+    /**
+     * 법정동 코드 기준 건수 — 대시보드 지도의 시군구(5자리)·읍면동(8자리) 보기가 폴리곤 코드와 직접 매칭하는 용도.
+     * 구가 있는 시(수원시 장안구 등)를 "시 단위"로 묶는 이름 기준 {@code /stats/sigungu} 와 달리 구 단위로 나눈다.
+     * {@code unit} 은 SIGUNGU(기본) 또는 EMD. 요청의 {@code level}(재난 등급)·기간 등 나머지 조건은 다른 통계와 같다.
+     */
+    @GetMapping("/stats/region-code")
+    public ResponseEntity<List<DisasterAlertStatResponse.RegionCodeStat>> countByRegionCode(
+            AlertSearchRequest request,
+            @RequestParam(defaultValue = "SIGUNGU") String unit
+    ) {
+        return ResponseEntity.ok(disasterAlertService.countByRegionCode(request, RegionCodeUnit.from(unit)));
     }
 
     /**

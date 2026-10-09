@@ -7,6 +7,7 @@ import com.disaster.alert.alertapi.domain.disasteralert.constant.StatsCacheNames
 import com.disaster.alert.alertapi.domain.disasteralert.dto.*;
 import com.disaster.alert.alertapi.domain.disasteralert.model.DisasterAlert;
 import com.disaster.alert.alertapi.domain.disasteralert.model.DisasterLevel;
+import com.disaster.alert.alertapi.domain.disasteralert.model.RegionCodeUnit;
 import com.disaster.alert.alertapi.domain.disasteralert.repository.DisasterAlertRepository;
 import com.disaster.alert.alertapi.domain.disasteralert.repository.DisasterAlertTranslationRepository;
 import com.disaster.alert.alertapi.domain.event.repository.EventAlertMappingRepository;
@@ -73,6 +74,7 @@ public class DisasterAlertService {
     @Transactional
     @CacheEvict(cacheNames = {
             StatsCacheNames.SUMMARY, StatsCacheNames.SIDO, StatsCacheNames.SIGUNGU, StatsCacheNames.SIGUNGU_BREAKDOWN,
+            StatsCacheNames.REGION_CODE,
             StatsCacheNames.DAILY, StatsCacheNames.HOURLY, StatsCacheNames.MONTHLY_TYPE, StatsCacheNames.DAILY_TYPE,
             StatsCacheNames.WEATHER_CORRELATION, StatsCacheNames.WEATHER_BY_TYPE,
             StatsCacheNames.WEATHER_BY_SIDO, StatsCacheNames.WEATHER_BY_SIGUNGU,
@@ -333,6 +335,7 @@ public class DisasterAlertService {
     @Transactional
     @CacheEvict(cacheNames = {
             StatsCacheNames.SUMMARY, StatsCacheNames.SIDO, StatsCacheNames.SIGUNGU, StatsCacheNames.SIGUNGU_BREAKDOWN,
+            StatsCacheNames.REGION_CODE,
             StatsCacheNames.DAILY, StatsCacheNames.HOURLY, StatsCacheNames.MONTHLY_TYPE, StatsCacheNames.DAILY_TYPE,
             StatsCacheNames.WEATHER_CORRELATION, StatsCacheNames.WEATHER_BY_TYPE,
             StatsCacheNames.WEATHER_BY_SIDO, StatsCacheNames.WEATHER_BY_SIGUNGU,
@@ -601,6 +604,13 @@ public class DisasterAlertService {
     @Cacheable(value = StatsCacheNames.SIGUNGU_BREAKDOWN, sync = true)
     public List<DisasterAlertStatResponse.RegionLevelStat> countBySigunguBreakdown(AlertSearchRequest request) {
         return disasterAlertRepository.getStatsSigunguBreakdown(request);
+    }
+
+    /** 법정동 코드(시군구 5자리 / 읍면동 8자리) 기준 건수 — 대시보드 지도 시군구·읍면동 보기용. */
+    @Transactional(readOnly = true)
+    @Cacheable(value = StatsCacheNames.REGION_CODE, sync = true)
+    public List<DisasterAlertStatResponse.RegionCodeStat> countByRegionCode(AlertSearchRequest request, RegionCodeUnit unit) {
+        return disasterAlertRepository.getStatsByRegionCode(request, unit);
     }
 
     @Cacheable(value = StatsCacheNames.DAILY, sync = true)

@@ -8,6 +8,7 @@ import com.disaster.alert.alertapi.domain.disasteralert.dto.WeatherCorrelationDt
 import com.disaster.alert.alertapi.domain.disasteralert.dto.WeatherTypeStatDto;
 import com.disaster.alert.alertapi.domain.disasteralert.dto.WeatherRegionStatDto;
 import com.disaster.alert.alertapi.domain.disasteralert.model.DisasterAlert;
+import com.disaster.alert.alertapi.domain.disasteralert.model.RegionCodeUnit;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
@@ -30,6 +31,9 @@ public interface DisasterAlertRepositoryCustom {
     List<DisasterAlertStatResponse.RegionStat> getStatsSigungu(AlertSearchRequest request);
 
     List<DisasterAlertStatResponse.RegionLevelStat> getStatsSigunguBreakdown(AlertSearchRequest request);
+
+    /** 법정동 코드 앞 N자리(시군구 5 / 읍면동 8) 기준 건수. 지도 폴리곤 코드와 직접 매칭하는 용도. */
+    List<DisasterAlertStatResponse.RegionCodeStat> getStatsByRegionCode(AlertSearchRequest request, RegionCodeUnit unit);
 
     List<DisasterAlertStatResponse.DailyStat> getStatsByDate(AlertSearchRequest request);
 
