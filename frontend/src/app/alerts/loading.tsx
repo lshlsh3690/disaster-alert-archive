@@ -63,7 +63,7 @@ export default function AlertsLoading() {
           </div>
 
           <div className="flex flex-col gap-4">
-            {/* 실제 KakaoPolygonMap과 동일한 mapHeight="520px" (AlertsClient.tsx:422) */}
+            {/* 실제 KoreaMap25D 와 동일한 height="520px" (AlertsClient.tsx) */}
             <div className="h-[520px] rounded-[var(--radius-panel-card)] border border-[var(--line)] bg-[var(--surface)] p-4 shadow-[0_10px_30px_rgba(28,39,60,0.04)]" />
             <div className="h-64 rounded-[var(--radius-panel-card)] border border-[var(--line)] bg-[var(--surface)] p-4 shadow-[0_10px_30px_rgba(28,39,60,0.04)]" />
           </div>

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { KOREA_SIDO } from "./koreaSido.data";
 import { useTranslation } from "react-i18next";
 import { useSidoStats, useRegionCodeStats } from "@/lib/queries/useAlerts";
+import type { AlertSearchRequest } from "@/api/alertApi";
 import { useSigunguRegions, useEmdRegions } from "@/lib/queries/useMapRegions";
 import { BASE_VIEWBOX, fitViewBox, unionBBox, type BBox } from "@/lib/mapViewBox";
 import { useAnimatedViewBox } from "./useAnimatedViewBox";
@@ -15,7 +16,7 @@ const skRegions = KOREA_SIDO.filter((r) => r.kind === "sk");
 
 // 지도 보기 단위. 시도 경계는 위 번들 데이터(koreaSido.data.ts)를, 시군구/읍면동 경계는 public/map/**.json 을 쓴다.
 // 읍면동은 별도 보기 단위가 아니라 시군구 보기에서 구역을 눌렀을 때 그 시군구로 확대해서 보여 준다(drill-down).
-type MapMode = "sido" | "sigungu";
+export type MapMode = "sido" | "sigungu";
 // 지금 보여주는 단계. 시도 보기는 시도 → (시도를 누르면) 그 시도의 시군구 → (시군구를 누르면) 읍면동, 시군구 보기는 시군구 → 읍면동.
 type MapLevel = "sido" | "sigungu" | "emd";
 const MAP_MODES: MapMode[] = ["sido", "sigungu"];
@@ -81,7 +82,29 @@ interface KoreaMap25DProps {
   depth?: number; // 지도 두께(viewBox 단위)
   raise?: number; // 호버 시 솟아오르는 높이
   todayOnly?: boolean;
+  /** 건수를 셀 검색 조건. 주면 todayOnly 대신 이 조건으로 집계한다(알림 목록 페이지의 필터와 맞출 때) */
+  params?: AlertSearchRequest;
+  /** 툴팁에 붙는 건수 설명. 기본은 "오늘 재난문자" */
+  countLabel?: string;
   onSelect?: (ko: string) => void;
+  /**
+   * 주면 지역을 누를 때마다(확대하는 클릭 포함) 이 콜백을 부르고, /alerts 로 직접 이동하지 않는다.
+   * 알림 목록 페이지처럼 이미 목록이 있는 곳에서 필터만 바꾸려는 용도. sigungu 는 "수원시 장안구 [읍면동]" 처럼 시도명을 뗀 값이다.
+   */
+  onRegionSelect?: (sel: { sido: string; sigungu?: string }) => void;
+  /** 시도별/시군구별 보기 전환 버튼을 보여 줄지. 보기 단위를 고정하는 곳(알림 목록 페이지)에서는 false */
+  showModeToggle?: boolean;
+  /** 처음 보여 줄 보기 단위. 기본은 시군구별 보기, 알림 목록 페이지는 시도 전체를 먼저 보여 주려고 "sido" 를 쓴다 */
+  defaultMode?: MapMode;
+  /**
+   * 바깥(예: 알림 목록의 검색 필터)에서 고른 지역으로 지도를 확대한다. 시도명("경기도")과 시군구("수원시 장안구", 읍면동이
+   * 붙어 있어도 된다)를 주면 그 시군구의 읍면동까지, 시도만 주면 그 시도의 시군구까지 확대하고, 둘 다 비우면 전체 보기로 돌아간다.
+   * 구가 있는 시 전체("수원시")처럼 지도에 단독 경계가 없는 값은 시도까지만 확대한다.
+   */
+  focusSido?: string;
+  focusSigungu?: string;
+  /** 목록 페이지에 붙일 때처럼 위쪽에 제목 카드가 없으면 컨트롤을 위로 올린다 */
+  compact?: boolean;
   /** 현재 보기 상태(예: "시도별 보기 › 경기도 › 수원시 장안구 › 읍면동")가 바뀔 때마다 알린다. 제목 카드에 표시하는 용도 */
   onStatusChange?: (status: string) => void;
 }
@@ -91,7 +114,15 @@ export default function KoreaMap25D({
   depth = 10,
   raise = 16,
   todayOnly = true,
+  params,
+  countLabel,
   onSelect,
+  onRegionSelect,
+  compact = false,
+  showModeToggle = true,
+  defaultMode = DEFAULT_MODE,
+  focusSido,
+  focusSigungu,
   onStatusChange,
 }: KoreaMap25DProps) {
   const { t } = useTranslation();
@@ -103,7 +134,7 @@ export default function KoreaMap25D({
   const shadowFilterId = `soft-${uid}`;
   const liftShadowId = `lift-${uid}`;
 
-  const [mode, setMode] = useState<MapMode>(DEFAULT_MODE);
+  const [mode, setMode] = useState<MapMode>(defaultMode);
   // 확대 단계: 시도 보기에서 누른 시도(코드 2자리) → 그 시도의 시군구 → 누른 시군구(코드 5자리) → 그 시군구의 읍면동.
   // 시군구 보기는 처음부터 시군구 단계라 drillSido 없이 drillSigungu 만 쓴다.
   const [drillSido, setDrillSido] = useState<string | null>(null);
@@ -115,7 +146,7 @@ export default function KoreaMap25D({
   const needSigunguData = level !== "sido";
 
   const today = useMemo(() => todayRange(), []);
-  const dateParams = todayOnly ? today : {};
+  const dateParams = params ?? (todayOnly ? today : {});
 
   // 시도 단계: 기존 이름 기준 시도 통계 / 시군구·읍면동 단계: 코드 기준 통계 — 폴리곤 코드와 직접 매칭
   const { data: sidoData } = useSidoStats(dateParams);
@@ -123,12 +154,49 @@ export default function KoreaMap25D({
   const sigunguQuery = useSigunguRegions(needSigunguData);
   const emdQuery = useEmdRegions(drillSigungu !== null ? drillSigungu.slice(0, 2) : null);
 
+  // 바깥에서 고른 지역으로 확대한다. 사용자가 지도에서 직접 한 단계 올라간 것(goBack)은 focus 값이 그대로라 되돌리지 않는다.
+  const hadFocusRef = useRef(false);
+  useEffect(() => {
+    const sido = focusSido ? skRegions.find((r) => r.ko === focusSido) : undefined;
+    if (!sido) {
+      if (hadFocusRef.current) {
+        hadFocusRef.current = false;
+        setDrillSido(null);
+        setDrillSigungu(null);
+      }
+      return;
+    }
+    hadFocusRef.current = true;
+    setMode("sido");
+    setDrillSido(sido.code);
+    if (!focusSigungu) {
+      setDrillSigungu(null);
+      return;
+    }
+    // 공식 명칭("경기도 수원시 장안구")이 "시도 + 시군구[ 읍면동]" 의 앞부분과 일치하는 가장 긴 시군구를 찾는다.
+    const full = `${focusSido} ${focusSigungu} `;
+    const regions = (sigunguQuery.data ?? []).filter((r) => r.c.startsWith(sido.code));
+    const match = regions.filter((r) => full.startsWith(`${r.n} `)).sort((a, b) => b.n.length - a.n.length)[0];
+    // 구가 있는 시 전체("수원시")는 단독 경계가 없으니 그 시의 구들을 묶는 코드 앞 4자리로 확대한다.
+    const city = match ? null : regions.filter((r) => `${r.n} `.startsWith(`${focusSido} ${focusSigungu} `));
+    setDrillSigungu(match ? match.c : city && city.length > 0 ? city[0].c.slice(0, 4) : null);
+  }, [focusSido, focusSigungu, sigunguQuery.data]);
+
   const metroCounts = useMemo(() => groupToMetros(sidoData ?? []), [sidoData]);
 
-  const drilledSigungu = useMemo(
-    () => (drillSigungu !== null ? (sigunguQuery.data ?? []).find((r) => r.c === drillSigungu) ?? null : null),
-    [drillSigungu, sigunguQuery.data]
-  );
+  // 확대한 시군구. 구가 있는 시(수원시 등)는 시 전체 경계가 없어 코드 앞 4자리로 묶인 구들을 하나의 영역으로 합친다.
+  const drilledSigungu = useMemo(() => {
+    if (drillSigungu === null) return null;
+    const members = (sigunguQuery.data ?? []).filter((r) => r.c.startsWith(drillSigungu));
+    if (members.length === 0) return null;
+    if (members.length === 1) return members[0];
+    const [sido, city] = members[0].n.split(" ");
+    return {
+      n: `${sido} ${city}`,
+      d: members.map((r) => r.d).join(" "),
+      b: unionBBox(members.map((r) => r.b).filter((b): b is BBox => !!b)) ?? undefined,
+    };
+  }, [drillSigungu, sigunguQuery.data]);
   const drilledSido = useMemo(
     () => (activeSido !== null ? skRegions.find((r) => r.code === activeSido) ?? null : null),
     [activeSido]
@@ -340,6 +408,11 @@ export default function KoreaMap25D({
       // 이름이 비어 있으면(경계 데이터에 이름이 없는 구역) sido="" 로 이동하게 되므로 아무것도 하지 않는다.
       if (!label.trim()) return;
       onSelect?.(label);
+      if (onRegionSelect) {
+        const [sido, ...rest] = kind === "sido" ? [label] : label.split(" ");
+        onRegionSelect({ sido, sigungu: rest.length > 0 ? rest.join(" ") : undefined });
+        return;
+      }
       const q = new URLSearchParams();
       if (kind === "sido") {
         q.set("sido", label);
@@ -356,7 +429,7 @@ export default function KoreaMap25D({
       }
       router.push(`/alerts?${q.toString()}#list`);
     },
-    [onSelect, todayOnly, today, router]
+    [onSelect, onRegionSelect, todayOnly, today, router]
   );
 
   // 시도를 누르면 그 시도의 시군구로, 시군구를 누르면 그 시군구의 읍면동으로 확대하고, 읍면동을 누르면 알림 목록으로 이동한다.
@@ -365,16 +438,18 @@ export default function KoreaMap25D({
       if (level === "sido") {
         onLeave();
         setDrillSido(r.key);
+        if (onRegionSelect) goToAlerts(r.label, "sido");
         return;
       }
       if (level === "sigungu") {
         onLeave();
         setDrillSigungu(r.key);
+        if (onRegionSelect) goToAlerts(r.label, "district");
         return;
       }
       goToAlerts(r.label, "district");
     },
-    [level, onLeave, goToAlerts]
+    [level, onLeave, goToAlerts, onRegionSelect]
   );
 
   useEffect(() => {
@@ -383,7 +458,7 @@ export default function KoreaMap25D({
 
   const sidoName = (ko: string) => t(`metros.${ko}`, { defaultValue: ko });
   const displayName = (r: RenderRegion) => (level === "sido" ? sidoName(r.label) : r.label);
-  const mapLabel = t("dashboard.todayAlerts");
+  const mapLabel = countLabel ?? t("dashboard.todayAlerts");
   const mapUnit = t("dashboard.count");
   const boxStyle = { left: `${lineEnd.x}px`, top: `${lineEnd.y}px` };
   const modeLabels: Record<MapMode, string> = {
@@ -424,22 +499,24 @@ export default function KoreaMap25D({
   return (
     <div className={`${styles.koreaMap} korea-map`}>
       <div ref={containerRef} className={`${styles.canvas} korea-map__canvas`} style={{ height }}>
-        <div className={styles.controls}>
+        <div className={`${styles.controls} ${compact ? styles.controlsCompact : ""}`}>
           {/* 보기 단위: 선택지를 접어 두지 않고 항상 펼쳐 보여 준다(드롭다운은 화살표 아래에 뭐가 있는지 알 수 없었다) */}
-          <div className={styles.segmented} role="radiogroup" aria-label={t("dashboard.mapViewLabel")}>
-            {MAP_MODES.map((m) => (
-              <button
-                key={m}
-                type="button"
-                role="radio"
-                aria-checked={mode === m}
-                className={`${styles.segment} ${mode === m ? styles.segmentActive : ""}`}
-                onClick={() => onModeChange(m)}
-              >
-                {modeLabels[m]}
-              </button>
-            ))}
-          </div>
+          {showModeToggle && (
+            <div className={styles.segmented} role="radiogroup" aria-label={t("dashboard.mapViewLabel")}>
+              {MAP_MODES.map((m) => (
+                <button
+                  key={m}
+                  type="button"
+                  role="radio"
+                  aria-checked={mode === m}
+                  className={`${styles.segment} ${mode === m ? styles.segmentActive : ""}`}
+                  onClick={() => onModeChange(m)}
+                >
+                  {modeLabels[m]}
+                </button>
+              ))}
+            </div>
+          )}
 
           {zoomed && (
             <div className={styles.drillBar}>
@@ -447,7 +524,8 @@ export default function KoreaMap25D({
                 ← {backLabel}
               </button>
               {drillTitle && <span className={styles.drillName}>{drillTitle}</span>}
-              {drillTitle && (
+              {/* 목록 페이지에 붙인 경우(onRegionSelect)는 확대하는 클릭이 이미 목록 필터를 바꾸므로 "알림 목록 보기" 가 필요 없다 */}
+              {drillTitle && !onRegionSelect && (
                 <button
                   type="button"
                   className={styles.drillGo}

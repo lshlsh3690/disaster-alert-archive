@@ -1,15 +1,15 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useEffect, useMemo, useState, useRef, useCallback } from "react";
+import { useMemo, useState, useRef, useCallback } from "react";
 import { useAlertRisk, useRegionRisk, useRegionRiskHistory } from "@/lib/queries/useRisk";
-import { fetchGeoJsonCached } from "@/lib/geojsonCache";
+import { KOREA_SIDO } from "@/components/map/koreaSido.data";
+import { useSigunguRegions } from "@/lib/queries/useMapRegions";
 import { normalizeScore, scoreToGrade, aggregateBySigungu, type ImpactGrade } from "@/lib/riskScore";
 import type { RiskHistoryPoint } from "@/types/risk";
 import { useTranslation } from "react-i18next";
-import { useLanguageStore } from "@/store/languageStore";
 
-// 지도 + Kakao SDK 코드는 무겁기 때문에 별도 청크로 분리하고,
+// 지도 코드는 무겁기 때문에 별도 청크로 분리하고,
 // 위험도 데이터가 있을 때만 클라이언트에서 로드 (초기 번들/LCP 부담 제거)
 const AlertRiskMap = dynamic(() => import("@/components/map/AlertRiskMap"), {
   ssr: false,
@@ -27,38 +27,27 @@ const GRADE_HEX = ["#22a45d", "#e0a400", "#ea7a3b", "#dc4d3f"] as const;
 const GRADE_SOFT = ["#e8f5ec", "#fbf3dd", "#fdeee3", "#fdeceb"] as const;
 
 /**
- * 지역 코드 → 지역명 (지도와 같은 geojson 캐시 재사용 → 추가 다운로드 없음).
- * 시도 전체 발송 코드(xx000, 예: 29000 광주광역시)는 시도명으로 매핑.
+ * 지역 코드 → 지역명. 지도와 같은 경계 데이터(public/map/sigungu.json)를 재사용해 추가 다운로드가 없다.
+ * 시도 전체 발송 코드(xx000, 예: 12000 전남광주통합특별시)는 시도명으로, 구가 있는 시 전체 코드(41110)는 시 이름으로 매핑한다.
+ * 시군구 이름은 한국어 공식 명칭만 있다(번역 시드는 법정동 코드 테이블에 있고 이 경계 파일에는 없다).
  */
-function useRegionNames(lang: string) {
-  const [names, setNames] = useState<Map<string, string> | null>(null);
-  useEffect(() => {
-    let cancelled = false;
-    Promise.all([
-      fetchGeoJsonCached("/sigungu.geojson"),
-      fetchGeoJsonCached("/sido.geojson"),
-    ])
-      .then(([sigunguGeo, sidoGeo]) => {
-        if (cancelled) return;
-        const m = new Map<string, string>();
-        sigunguGeo.features.forEach((f: { properties: { SIG_CD: string; SIG_KOR_NM: string; SIG_ENG_NM?: string } }) => {
-          const name = lang === "en"
-            ? f.properties.SIG_ENG_NM || f.properties.SIG_KOR_NM
-            : f.properties.SIG_KOR_NM;
-          m.set(f.properties.SIG_CD, name);
-        });
-        sidoGeo.features.forEach((f: { properties: { CTPRVN_CD: string; CTP_KOR_NM: string; CTP_ENG_NM?: string } }) => {
-          const name = lang === "en"
-            ? f.properties.CTP_ENG_NM || f.properties.CTP_KOR_NM
-            : f.properties.CTP_KOR_NM;
-          m.set(`${f.properties.CTPRVN_CD}000`, name);
-        });
-        setNames(m);
-      })
-      .catch(() => { if (!cancelled) setNames(new Map()); });
-    return () => { cancelled = true; };
-  }, [lang]);
-  return names;
+function useRegionNames() {
+  const { t } = useTranslation();
+  const { data } = useSigunguRegions(true);
+  return useMemo(() => {
+    if (!data) return null;
+    const m = new Map<string, string>();
+    for (const r of data) {
+      const [, ...rest] = r.n.split(" "); // 시도명은 앞에서 떼고 "수원시 장안구" 형태로
+      m.set(r.c, rest.join(" ") || r.n);
+      const city = r.c.slice(0, 4) + "0";
+      if (rest.length > 1 && !m.has(city)) m.set(city, rest[0]);
+    }
+    for (const sido of KOREA_SIDO) {
+      if (sido.kind === "sk") m.set(`${sido.code}000`, t(`metros.${sido.ko}`, { defaultValue: sido.ko }));
+    }
+    return m;
+  }, [data, t]);
 }
 
 const SPARK = { W: 100, H: 32, PAD: 2 };
@@ -205,9 +194,8 @@ interface Props {
  */
 export default function AlertRiskSection({ alertId, alertCreatedAt }: Props) {
   const { t } = useTranslation();
-  const language = useLanguageStore((s) => s.language);
   const { data, isLoading, isError, refetch } = useAlertRisk(alertId);
-  const regionNames = useRegionNames(language);
+  const regionNames = useRegionNames();
 
   /* ── 수치 통계 (시군구 단위, 지도 폴리곤과 동일 집계) ──
      주: 한 이벤트의 impactScore 는 모든 영향 지역이 동일(baseScore 가 이벤트 단위) →

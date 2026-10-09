@@ -19,9 +19,8 @@ import { useTranslation } from "react-i18next";
 import { useLanguageStore } from "@/store/languageStore";
 import { disasterTypeChipStyle, disasterTypePalette } from "@/ui/disasterTypeColor";
 
-// Kakao Maps SDK 로드 + 폴리곤 렌더링 코드가 무거워서 alerts 페이지 초기 JS에서 분리
-// (AlertRiskMap과 동일 패턴). 지도는 SDK를 window에서 로드하므로 ssr 렌더링 대상이 아님.
-const KakaoPolygonMap = dynamic(() => import("@/components/map/KakaoPolygonMap"), {
+// SVG 좌표 데이터 + 집계 로직이 커서 alerts 페이지 초기 JS에서 분리 (HomeClient 와 동일 패턴).
+const KoreaMap25D = dynamic(() => import("@/components/map/KoreaMap25D"), {
   ssr: false,
   loading: () => <div className="h-[520px] animate-pulse rounded-lg bg-gray-100" />,
 });
@@ -218,26 +217,16 @@ function AlertsClientInner() {
     router.push("/alerts");
   };
 
-  const onMapSidoSelect = useCallback((sido: string | null) => {
+  // 지도에서 지역을 누르면(확대하는 클릭 포함) 그 지역으로 목록 필터를 맞춘다. 시도만 눌렀으면 시군구 필터는 비운다.
+  const onMapRegionSelect = useCallback(({ sido, sigungu }: { sido: string; sigungu?: string }) => {
     setPage(0);
     const qs = new URLSearchParams(searchParams.toString());
-    if (sido) {
-      qs.set("sido", sido);
-      qs.delete("sigungu");
-    } else {
-      qs.delete("sido");
-      qs.delete("sigungu");
-    }
+    qs.set("sido", sido);
+    if (sigungu) qs.set("sigungu", sigungu);
+    else qs.delete("sigungu");
     // scroll:false — 지도 안에서 지역을 클릭한 것뿐이라 본문 스크롤 위치는 그대로 둔다.
     // Next 라우터 기본값은 push 시 스크롤을 최상단으로 리셋해, 지도를 보려고
     // 스크롤해 둔 위치가 클릭할 때마다 흐트러지는 문제가 있었음.
-    router.push(`/alerts?${qs.toString()}`, { scroll: false });
-  }, [searchParams, router]);
-
-  const onMapSigunguSelect = useCallback((sigungu: string) => {
-    setPage(0);
-    const qs = new URLSearchParams(searchParams.toString());
-    qs.set("sigungu", sigungu);
     router.push(`/alerts?${qs.toString()}`, { scroll: false });
   }, [searchParams, router]);
 
@@ -440,7 +429,7 @@ function AlertsClientInner() {
           {/* 오른쪽: 폴리곤 지도 + 통계 */}
           <div className="flex w-full min-w-0 flex-col gap-4">
             <div className="overflow-hidden rounded-[var(--radius-panel-card)] border border-[var(--line)] bg-[var(--surface)] shadow-[0_10px_30px_rgba(28,39,60,0.04)]">
-              <KakaoPolygonMap params={mapParams} mapHeight="520px" showSidebar={false} externalSido={formState.sido || undefined} onSidoSelect={onMapSidoSelect} onSigunguSelect={onMapSigunguSelect} />
+              <KoreaMap25D height="520px" todayOnly={false} params={mapParams} countLabel={t("alertList.mapCountLabel")} compact showModeToggle={false} defaultMode="sido" focusSido={watchedSido || undefined} focusSigungu={watchedSigungu || undefined} onRegionSelect={onMapRegionSelect} />
             </div>
 
             {/* 재난 통계 요약 */}

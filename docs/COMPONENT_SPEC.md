@@ -68,7 +68,6 @@
 |---|---|---|
 | `/missing` | `app/missing/page.tsx` | **미구현 스텁** — 정적 텍스트만 존재 (관련 컴포넌트 `components/MissingPerson.tsx`는 고아 코드, 아래 3절 참고) |
 | `/notifications` | `app/notifications/page.tsx` | 알림 수신 이력, 읽음 처리, 페이지네이션(20건) |
-| `/test` | `app/test/page.tsx` | ⚠️ **개발용 임시 페이지** — `KakaoPolygonTest` 렌더링만 함, 네비게이션에 연결 안 됨 |
 
 `app/layout.tsx`는 루트 레이아웃 — PWA 메타/폰트, `Header`/`Footer`/`NotificationPermissionBanner`를 전역 렌더링.
 
@@ -101,9 +100,7 @@
 | 컴포넌트 | Props | 사용처 | 비고 |
 |---|---|---|---|
 | `AlertRiskMap` | `{ impacts, mapHeight? }` | `AlertRiskSection` | 이벤트 지역 영향도 히트맵 |
-| `KakaoMetroMap` | `{ todayOnly?, zoomable?, selectedSido?, sigunguStats?, ... }` | 홈(`/`) | 시/도 단위 버블 오버레이, 시군구 드릴다운 지원 |
-| `KakaoPolygonMap` | `{ params?, mapHeight?, showSidebar?, externalSido?, onSidoSelect? }` | `/alerts` | 가장 복잡한 지도 — 시도→시군구 드릴다운 위험도 단계 색상, 실시간 기상 연동(Open-Meteo) |
-| `KakaoPolygonTest` | 없음 | `/test`만 | ⚠️ `KakaoPolygonMap`과 거의 동일하나 `mockDanger()` 가짜 데이터 사용 — 실험용 프로토타입 |
+| `KoreaMap25D` | `{ height?, todayOnly?, params?, countLabel?, onRegionSelect?, compact?, onStatusChange? }` | 홈(`/`), `/alerts` | 자체 SVG 2.5D 지도 — 시도/시군구 보기, 시도→시군구→읍면동 드릴다운(법정동 경계 `public/map/**`). `/alerts` 에서는 `params`로 필터 건수를 세고 `onRegionSelect`로 목록 필터를 바꾼다 |
 
 ### 2.5 notification/
 | 컴포넌트 | 설명 |
@@ -134,13 +131,12 @@
 | `components/MissingPerson.tsx` | 하드코딩된 목업 카드, `/missing`에서도 미사용 |
 | `components/dashboard/LatestAlerts.tsx` | `app/LatestAlertsSection.tsx`로 대체됨 |
 | `components/dashboard/StatsGraph.tsx` | `/stats` 페이지로 대체됨 |
-| `components/dashboard/RegionStatus.tsx` | `KakaoMetroMap`/`KakaoPolygonMap`으로 대체됨 |
+| `components/dashboard/RegionStatus.tsx` | `KoreaMap25D`으로 대체됨 |
 | `components/dashboard/CommunityPosts.tsx` | `/community` 페이지로 대체됨 |
 
 다섯 개 모두 하드코딩된 한글 목업 텍스트만 있는 초기 프로토타입으로 보이며, 실제 데이터 연동 버전으로 교체된 뒤 삭제되지 않고 남아있다. 삭제 전 팀 확인 필요.
 
 ### 3.3 개발용 임시 코드
-- `app/test/page.tsx` + `components/map/KakaoPolygonTest.tsx` — 네비게이션에 연결되지 않은 개발 스크래치 페이지. `KakaoPolygonMap.tsx`(실제 사용)와 로직이 대량 중복됨.
 
 ## 4. 참고
 - [PRD.md](./PRD.md), [TRD.md](./TRD.md), [REQUIREMENTS.md](./REQUIREMENTS.md), [API_SPEC.md](./API_SPEC.md), [DATA_MODEL.md](./DATA_MODEL.md)
