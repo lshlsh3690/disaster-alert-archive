@@ -34,13 +34,13 @@
 
 **우선순위 이유**: `CLAUDE.md`에 명시된 핵심 지역 매칭 규칙이며, 알림 타겟팅에서 시군구 단순 일치가 아닌 시도 레벨 코드 파생이 필요한 이유다.
 
-**독립 테스트 방법**: `2900000000`(광주광역시 전체)을 관심지역으로 등록한 회원이 있는 상태에서 시군구 레벨 코드(예: `2900101000`)를 지역으로 가진 재난문자를 트리거하면 해당 회원에게 알림이 가는지 확인.
+**독립 테스트 방법**: `1100000000`(서울특별시 전체)을 관심지역으로 등록한 회원이 있는 상태에서 시군구 레벨 코드(예: `1168010100`)를 지역으로 가진 재난문자를 트리거하면 해당 회원에게 알림이 가는지 확인.
 
 **인수 시나리오**:
 
 1. **Given** 시/군/구 드롭다운을 여는 사용자, **When** 서버가 시군구 목록을 만들 때, **Then** 첫 항목으로 `name="전체", code=<시도 10자리 코드>`가 항상 추가된다 (`backend/src/main/java/com/disaster/alert/alertapi/domain/legaldistrict/service/LegalDistrictService.java:132-134`(한국어/미지원 lang 경로), `177-179`(번역 경로)).
-2. **Given** 회원이 시도 전체 코드(예: `2900000000`)를 관심지역으로 등록한 상태, **When** `districtCode=2900101000`(광주광역시 특정 동)인 재난문자가 발송되면, **Then** `AlertNotificationService.triggerNotification`이 알림 지역코드에서 시도 레벨 코드(`code.substring(0,2) + "00000000"`)를 파생해 원본 코드와 합쳐(`allCodesToSearch`) `member_favorite_region`을 조회하므로 이 회원도 대상에 포함된다 (`backend/src/main/java/com/disaster/alert/alertapi/domain/notification/service/AlertNotificationService.java:56-68`).
-3. **Given** 위와 동일한 상황이지만 게스트 FCM 토큰이 시도 전체 코드로 등록된 경우, **When** 같은 재난문자가 발송되면, **Then** `sendToGuestTokens`가 동일한 `allCodesToSearch`로 `guest_fcm_region`을 조회해 게스트에게도 발송한다 (`AlertNotificationService.java:82,89-96`).
+2. **Given** 회원이 시도 전체 코드(예: `1100000000` 서울특별시 전체)를 관심지역으로 등록한 상태, **When** `districtCode=1168010100`(서울 강남구 특정 동)인 재난문자가 발송되면, **Then** `AlertNotificationService.triggerNotification`이 알림 지역코드에서 시도 레벨 코드(`code.substring(0,2) + "00000000"`)를 파생해 원본 코드와 합쳐(`allCodesToSearch`) `member_favorite_region`을 조회하므로 이 회원도 대상에 포함된다 (`backend/src/main/java/com/disaster/alert/alertapi/domain/notification/service/AlertNotificationService.java:77`에서 `withSidoCodes`(`:105-114`, 파생은 `:108`) 호출).
+3. **Given** 위와 동일한 상황이지만 게스트 FCM 토큰이 시도 전체 코드로 등록된 경우, **When** 같은 재난문자가 발송되면, **Then** `sendToGuestTokens`가 동일한 `allCodesToSearch`로 `guest_fcm_region`을 조회해 게스트에게도 발송한다 (`AlertNotificationService.java:87,94,200`).
 
 ---
 
@@ -73,7 +73,7 @@
 1. **Given** 신규 재난문자 알림, **When** `EventClusteringService`가 클러스터링 후보를 찾으면, **Then** 임베딩 유사도 비교 이전에 지역 hard 필터로 알림 지역코드들의 distinct 시군구 앞5자리 집합(`sigunguPrefixes`)과 교집합이 있는 기존 이벤트만 후보로 남긴다 (`backend/src/main/java/com/disaster/alert/alertapi/domain/event/service/EventClusteringService.java:229-232,738-744`).
 2. **Given** 한 알림이 임계치(`maxRegionSpan`)를 초과하는 시군구에 발송, **When** 광역 브로드캐스트로 분류되면, **Then** distinct 시도 수(`distinctSidoCount`, 앞2자리 기준)로 전국/시도광역을 나누고, 시도광역은 최다 시군구를 가진 시도 prefix + 유형을 병합 키로 쓴다 (`EventClusteringService.java:644-705`).
 3. **Given** 이벤트의 위험도 재계산, **When** `RiskCalculationService.recomputeEventRisk`가 영향 법정동 union을 만들면, **Then** 그 코드들을 시군구 단위(앞 최대 5자리, `code.substring(0, Math.min(5, code.length()))`)로 축약해 반환하고, 이 시군구 코드가 `region_risk_index`/`region_risk_daily`의 지역 키가 된다 (`backend/src/main/java/com/disaster/alert/alertapi/domain/risk/service/RiskCalculationService.java:124-146,157-179`).
-4. **Given** 재난문자 시도별 통계 조회, **When** `DisasterAlertRepositoryImpl`이 그룹핑하면, **Then** QueryDSL `LEFT(code, 2)` 표현식으로 시도 코드를 뽑되, 세종특별자치시처럼 "코드 뒤 8자리가 0"인 관례를 따르지 않는 예외 때문에 표시명은 code prefix가 아니라 `legal_district.name`을 공백으로 split한 첫 토큰으로 별도 계산한다 (`backend/src/main/java/com/disaster/alert/alertapi/domain/disasteralert/repository/DisasterAlertRepositoryImpl.java:376-396`).
+4. **Given** 재난문자 시도별 통계 조회, **When** `DisasterAlertRepositoryImpl`이 그룹핑하면, **Then** QueryDSL `LEFT(code, 2)` 표현식으로 시도 코드를 뽑되, 세종특별자치시처럼 "코드 뒤 8자리가 0"인 관례를 따르지 않는 예외 때문에 표시명은 code prefix가 아니라 `legal_district.name`을 공백으로 split한 첫 토큰으로 별도 계산한다 (`backend/src/main/java/com/disaster/alert/alertapi/domain/disasteralert/repository/DisasterAlertRepositoryImpl.java:398-420`).
 
 ---
 
@@ -99,8 +99,9 @@
 - 이미 등록된 지역 재등록 시도 → `FAVORITE_REGION_ALREADY_EXISTS` (`MemberFavoriteRegionService.java:38-40`).
 - 존재하지 않는 법정동 코드로 관심지역/사용자 제보 지역 등록 시도 → `LEGAL_DISTRICT_NOT_FOUND`(관심지역, `MemberFavoriteRegionService.java:36-37`) 또는 `INVALID_REQUEST`(제보 지역, `backend/src/main/java/com/disaster/alert/alertapi/domain/useralert/service/UserDisasterAlertService.java:62-64,133-135` — `LegalDistrictCache.existsCode()` 사용).
 - 행정구역 개편(2026-07-01, 광주광역시·전라남도 → 전남광주통합특별시 코드 재발급)으로 옛 코드가 폐지될 때 → 행을 삭제하지 않고 `is_active=false`로 전환(FK 무결성 보존). 과거 실측 데이터(재난문자 지역 태그 등)는 원칙적으로 개편 이전 옛 코드를 그대로 유지하지만, 예외적으로 재난문자/이벤트/위험도 이력 데이터는 이후 별도 마이그레이션으로 신규 코드에 전면 재매핑되었다 (`backend/src/main/resources/db/migration/V108__seed_jeonnam_gwangju_merged_legal_district.sql:1-5`, `V109__remap_favorite_and_weather_station_to_merged_codes.sql:1-7`, `V111__migrate_historical_alert_event_risk_data_to_merged_codes.sql:1-14`). 기상 관측 이력 테이블은 이 재매핑에서 제외된다.
+- 2026-10 법정동코드 재발급(인천 구 재편, 화성 구 신설, 면→읍 승격, 개명; `V123`/`V125`/`V126`, 상세는 `docs/runbooks/legal-district-reissue-2026-10.md`)은 위 전남광주 통합과 **정책이 다르다**: 옛 코드는 같은 방식으로 `is_active=false` 로 전환하지만, 관심지역(`member_favorite_region`)·게스트 FCM 지역(`guest_fcm_region`) 구독은 신규 코드로 이관하지 않고 **삭제**해 사용자가 새 지역명으로 다시 구독하게 한다(활성으로 남는 화성시 `4159000000` 구독도 함께 삭제, 앱 공지 없음). 알림 이력은 1:N 대응이 있을 때 복제하고, `region_risk_*` 이력은 이관하지 않으며(보류), 인접 그래프(`region_adjacency`)는 `V126` 이 인천 옛 코드 간선을 새 구 코드로 교체한다. 번역은 인천 새 구 252행(`V125`)과 면→읍 파생분만 시드하고 화성 구·개명 4쌍은 번역이 없어 한국어로 폴백한다.
 - 프론트 `/user/settings/regions`의 지역 클릭 이동(`handleRegionClick`)은 `regionName` 문자열이 `METROS` 공식명/별칭으로 시작하지 않으면 `legalDistrictCode` 앞 2자리를 하드코딩된 `SIDO_BY_CODE_PREFIX` 맵으로 조회해 시도명을 역산하는데, 이 맵에는 신규 통합 코드 `"12"`(전남광주통합특별시) 키가 없다 — `regionName`이 "전남광주통합특별시"로 시작하는 1차 경로가 우선 시도되지만, 이 폴백이 실제로 얼마나 자주 실행되는지, 그리고 영향받는 관심지역 행이 몇 건인지는 운영 DB 조회 없이는 미확인이다. 폴백이 실행되면 `sido`가 `undefined`가 되어 `if (!sido) return;`으로 조용히 아무 동작도 하지 않는다 (알려진 잠재 결함) (`frontend/src/app/user/settings/regions/page.tsx:21-39,108-111`).
-- `LegalDistrictController.getSigunguBySido`(`backend/src/main/java/com/disaster/alert/alertapi/domain/legaldistrict/controller/LegalDistrictController.java:33-39`)는 공용 `ApiResponse` 래퍼 없이 `ResponseEntity<List<SigunguResponse>>`를 직접 반환한다 — 헌법 원칙 II("모든 API 응답은 공용 ApiResponse/ApiErrorResponse 포맷 사용", MUST)에 대한 확인된 위반이다. 같은 서브시스템의 `MemberFavoriteRegionController`(`backend/src/main/java/com/disaster/alert/alertapi/domain/member/controller/MemberFavoriteRegionController.java:26-55`)는 `GET`/`POST`/`DELETE` 3개 엔드포인트 모두 `ApiResponse.success(...)`로 감싸고 있어, 이 위반이 코드베이스 전반의 관례가 아니라 `LegalDistrictController`에 국한된 고립된 결함임이 확인된다 (알려진 결함).
+- `LegalDistrictController.getSigunguBySido`(`backend/src/main/java/com/disaster/alert/alertapi/domain/legaldistrict/controller/LegalDistrictController.java:34-40`)는 `ResponseEntity<ApiResponse<List<SigunguResponse>>>` 를 반환하고 `ApiResponse.success(...)` 로 감싼다 — 헌법 원칙 II("모든 API 응답은 공용 ApiResponse/ApiErrorResponse 포맷 사용", MUST)를 준수한다. 이 문서의 이전 판은 이 엔드포인트가 래퍼 없이 `List` 를 직접 반환하는 "알려진 결함"이라고 적었으나 이후 해소되었다(같은 서브시스템의 `MemberFavoriteRegionController` 도 3개 엔드포인트 모두 `ApiResponse.success(...)` 로 감싼다, `MemberFavoriteRegionController.java:26-55`).
 
 ## 요구사항 *(필수)*
 
@@ -108,20 +109,20 @@
 
 - **FR-001**: 시스템은 법정동 코드를 `legal_district(code VARCHAR(10) PK, name, is_active, is_active_string)` 테이블로 관리해야 한다(MUST) (`backend/src/main/java/com/disaster/alert/alertapi/domain/legaldistrict/model/LegalDistrict.java:6-24`; `backend/src/main/resources/db/migration/V1__create_schema.sql:4-10`).
 - **FR-002**: 시스템은 애플리케이션 초기화 시 classpath CSV(`data/legal_district_init_file.csv`, 헤더 제외 49,858건)로 법정동 마스터 데이터를 적재해야 하며(MUST), 이미 존재하는 `code`는 건너뛰어야 한다(MUST) (`LegalDistrictService.java:33-74`).
-- **FR-003**: 시/도 전체 선택("전체")은 시도 코드 뒤 8자리를 `0`으로 채운 10자리 코드로 표현해야 한다(MUST) (예: `2900000000`) (`LegalDistrictService.java:132-134,177-179`; `AlertNotificationService.java:57-60`). 이 "전체" 코드는 시/군/구 목록 API(`GET /api/v1/districts/sigungu`) 응답의 첫 항목(`{name: "전체", code: <시도 10자리 코드>}`)으로도 항상 노출되어야 한다(MUST) (`LegalDistrictController.java:33-39`).
+- **FR-003**: 시/도 전체 선택("전체")은 시도 코드 뒤 8자리를 `0`으로 채운 10자리 코드로 표현해야 한다(MUST) (예: `1100000000`) (`LegalDistrictService.java:132-134,177-179`; `AlertNotificationService.java:57-60`). 이 "전체" 코드는 시/군/구 목록 API(`GET /api/v1/districts/sigungu`) 응답의 첫 항목(`{name: "전체", code: <시도 10자리 코드>}`)으로도 항상 노출되어야 한다(MUST) (`LegalDistrictController.java:33-39`).
 - **FR-004**: 시/군/구 목록 조회는 `legal_district`에서 `name LIKE '<시도> %'`인 행들의 시군구 부분을 `SPLIT_PART(name, ' ', 2)`로 추출해 distinct·정렬 반환해야 한다(MUST) (`LegalDistrictRepository.java:26-34`).
 - **FR-005**: 시스템은 회원 관심지역을 `member_favorite_region(memberId, legalDistrictCode)` 복합 PK로 저장해야 하며(MUST), 존재하지 않는 법정동 코드는 등록을 거부해야 한다(MUST) (`MemberFavoriteRegionService.java:34-47`; `ErrorCode.java:33`).
 - **FR-006**: 시스템은 `USER` 역할 회원의 관심지역을 최대 5개로 제한하고, `ADMIN` 역할은 무제한 허용해야 한다(MUST) (`MemberFavoriteRegionService.java:21,41-44,49-54`).
 - **FR-007**: 시스템은 동일 회원의 동일 지역 중복 등록을 거부해야 한다(MUST) (`MemberFavoriteRegionService.java:38-40`).
 - **FR-008**: 시스템은 비로그인 게스트가 브라우저 localStorage(zustand `persist`, 키 `disaster-alert-guest-favorites`)에 관심지역을 최대 5개까지 등록할 수 있게 해야 하며(MUST), 5개 제한·중복 거부를 서버 호출 없이 클라이언트에서 동일하게 적용해야 한다(MUST) (`frontend/src/store/guestFavoriteRegionsStore.ts:5,18-27`).
 - **FR-009**: 시스템은 로그인 성공 시 게스트 관심지역 중 서버에 없는 코드만 자동으로 서버에 등록해야 하며(MUST), 개별 등록 실패(예: 한도 초과)는 무시하고 나머지를 계속 처리해야 한다(MUST) (`frontend/src/hooks/useGuestFavoriteSync.ts:21-53`).
-- **FR-010**: 재난문자 알림 발송 시 시스템은 알림의 지역코드 목록 중 10자리 코드에서 시도 레벨 코드(`code.substring(0,2) + "00000000"`)를 파생하여, 원본 지역코드와 합친 목록으로 관심지역 대상을 조회해야 한다(MUST) — 특정 시군구가 아닌 시도 전체를 등록한 회원도 대상에 포함시키기 위함이다 (`AlertNotificationService.java:56-68`).
-- **FR-011**: 게스트 알림 대상 조회도 FR-010과 동일한 파생 지역코드 목록으로 `guest_fcm_region`을 조회해야 한다(MUST) (`AlertNotificationService.java:82,89-96`; `GuestFcmRegion.java:14-39`).
+- **FR-010**: 재난문자 알림 발송 시 시스템은 알림의 지역코드 목록 중 10자리 코드에서 시도 레벨 코드(`code.substring(0,2) + "00000000"`)를 파생하여, 원본 지역코드와 합친 목록으로 관심지역 대상을 조회해야 한다(MUST) — 특정 시군구가 아닌 시도 전체를 등록한 회원도 대상에 포함시키기 위함이다 (`AlertNotificationService.java:77,105-114`).
+- **FR-011**: 게스트 알림 대상 조회도 FR-010과 동일한 파생 지역코드 목록으로 `guest_fcm_region`을 조회해야 한다(MUST) (`AlertNotificationService.java:87,94,200`; `GuestFcmRegion.java:14-39`).
 - **FR-012**: 이벤트 클러스터링은 신규 알림의 클러스터링 후보를 시군구(법정동 코드 앞 5자리) 교집합이 있는 기존 이벤트로 hard 필터링해야 한다(MUST), 읍면동 단위 코드 grain 차이를 흡수하기 위함이다 (`EventClusteringService.java:229-232,738-744`).
 - **FR-013**: 지역앵커형 재난 유형(산불·산사태·홍수 등)과 안내성 알림의 클러스터링 병합 키는 시군구(앞 5자리)+유형(+윈도우)이어야 한다(MUST) (`EventClusteringService.java:443-509`). 이 경로는 FR-012의 시군구 hard 필터를 통과한 후보 안에서만 적용되는 더 좁은 특수 경로다 — "유형+지역이 곧 사건"인 특정 재난 유형에 한해, 일반 임베딩 유사도 비교 없이 즉시 병합을 허용하는 fast path이며 FR-012를 대체하지 않는다.
 - **FR-014**: 광역 브로드캐스트 알림(시군구 발송 수가 `maxRegionSpan` 초과)은 distinct 시도 수(코드 앞 2자리 기준)에 따라 전국(broadcast, 시도 무관 단일 키) 또는 시도광역(최다 시군구를 가진 시도 prefix+유형 키)으로 분류해야 한다(MUST) (`EventClusteringService.java:644-705`).
 - **FR-015**: 위험도 계산은 이벤트 영향 법정동 코드를 시군구 단위(앞 최대 5자리)로 축약해 `region_risk_index`/`region_risk_daily`/`region_risk_history`의 지역 키로 사용해야 한다(MUST) (`RiskCalculationService.java:124-179`).
-- **FR-016**: 재난문자 시도별 통계는 QueryDSL `LEFT(code, 2)`로 시도 코드를 추출하되, 표시명은 code prefix가 아닌 `legal_district.name`의 첫 공백 이전 토큰으로 별도 산출해야 한다(MUST) — 세종특별자치시 등 "코드 뒤 8자리가 0" 관례를 따르지 않는 예외 때문이다 (`DisasterAlertRepositoryImpl.java:376-396`).
+- **FR-016**: 재난문자 시도별 통계는 QueryDSL `LEFT(code, 2)`로 시도 코드를 추출하되, 표시명은 code prefix가 아닌 `legal_district.name`의 첫 공백 이전 토큰으로 별도 산출해야 한다(MUST) — 세종특별자치시 등 "코드 뒤 8자리가 0" 관례를 따르지 않는 예외 때문이다 (`DisasterAlertRepositoryImpl.java:398-420`).
 - **FR-017**: 법정동 다국어 번역은 `legal_district_translation(code, language_code)` 복합 PK 테이블에 저장해야 한다(MUST). 요청 언어에 번역이 없으면 영어로 폴백해야 하며(MUST), 요청 언어가 한국어이거나 미지원 값이면 번역 조회 자체를 생략하고 `null`을 반환해야 한다(MUST) (`LegalDistrictTranslationService.java:49-115`; `LegalDistrictService.java:104-139`).
 - **FR-018**: 시/군/구 다국어 목록 응답은 저장된 "시도+시군구" 풀네임 번역에서 시도 prefix를 제거해 시군구명만 반환해야 하며(MUST), prefix가 매칭되지 않으면 풀네임을 그대로 반환해야 한다(MUST) (`LegalDistrictService.java:192-207`).
 - **FR-019**: 행정구역 개편으로 법정동 코드가 폐지될 때 시스템은 해당 행을 삭제하지 않고 `is_active=false`로 전환해야 한다(MUST)(과거 데이터의 FK 무결성 보존). 대상 테이블은 두 그룹으로 나뉜다(`V109`/`V111` 마이그레이션 헤더 주석 기준):
@@ -132,6 +133,8 @@
   | 제외 (기록 당시 유효했던 코드) | `weather_observation`, `weather_daily_summary`, `weather_hourly_correlation_rollup` | 옛 코드를 그대로 유지해야 한다(MUST) |
 
   주의: `disaster_alert_region`/`event_region_impact`/`region_risk_*`(재난문자·이벤트·위험도 이력)는 원래 "기록 당시 코드 유지" 원칙(V108~V110)의 적용 대상이었으나, `V111`이 그 원칙을 뒤집어 신규 코드로 전면 재매핑하는 예외적 후속 마이그레이션을 적용했다 — 즉 이 그룹의 실제 규칙은 "과거 데이터라서 옛 코드 유지"가 아니라 "과거 데이터였지만 V111에서 예외적으로 이관됨"이다 (`V108__seed_jeonnam_gwangju_merged_legal_district.sql:1-5`; `V109__remap_favorite_and_weather_station_to_merged_codes.sql:1-30`; `V111__migrate_historical_alert_event_risk_data_to_merged_codes.sql:1-14`).
+
+  2026-10 재발급(`V123`)은 이 표의 "신규 코드로 재매핑" 그룹 중 `member_favorite_region`·`guest_fcm_region` 에 대해 재매핑 대신 **구독 삭제(재구독)** 를 택했다(정책이 V109 와 다르다). `disaster_alert_region` 은 1:N 대응 시 복제, `event_region_impact` 는 후보가 하나일 때만 갱신, `region_risk_*` 는 이관하지 않고 `region_adjacency` 만 `V126` 이 교체한다. 기상 관측소 매핑(`weather_station_mapping`)은 이관하고 화성시는 새 구 4개에 복제한다.
 - **FR-020**: 사용자 제보(`UserDisasterAlert`)의 지역 태깅은 `LegalDistrictCache`(전체 법정동을 애플리케이션 메모리에 캐싱, `code`/`name` 양쪽 Map)로 코드 존재 여부만 검증하고 참조(`entityManager.getReference`)로 연결해야 한다(MUST) — DB 재조회 없이 lazy 참조만 생성한다 (`UserDisasterAlertService.java:57-67,122-138`; `backend/src/main/java/com/disaster/alert/alertapi/global/service/LegalDistrictCache.java:19-51`).
 
 ### 주요 엔티티
@@ -153,7 +156,7 @@
 
 ## 가정
 
-- 법정동 코드는 항상 10자리 고정 길이 문자열이며, 1-2번째 자리=시도, 3-5번째=시군구, 6-8번째=읍면동, 9-10번째=리로 취급된다고 가정한다. 이 구조는 시스템이 검증·강제하는 규칙이 아니라, 여러 소비처가 `length()==10` 체크 후 고정 오프셋으로 독립적으로 전제할 뿐인 암묵적 전제다 — 총 6개 지점(백엔드 5 + 프론트엔드 1)이 각자 재구현한다: `AlertNotificationService.java:59-60`(`substring(0,2)+"00000000"`), `EventClusteringService.java:688,741`(`substring(0,2)`/`substring(0,5)`), `RiskCalculationService.java:145`(`substring(0, Math.min(5,len))`), `DisasterAlertRepositoryImpl.java:376-379`(QueryDSL `sidoCodeExpr`, `LEFT(code,2)`), `frontend/src/app/user/settings/regions/page.tsx:21-39`(`SIDO_BY_CODE_PREFIX` 하드코딩 맵). 중앙화된 공용 헬퍼는 없다(plan.md 헌법 검사 원칙 I 참고).
+- 법정동 코드는 항상 10자리 고정 길이 문자열이며, 1-2번째 자리=시도, 3-5번째=시군구, 6-8번째=읍면동, 9-10번째=리로 취급된다고 가정한다. 이 구조는 시스템이 검증·강제하는 규칙이 아니라, 여러 소비처가 `length()==10` 체크 후 고정 오프셋으로 독립적으로 전제할 뿐인 암묵적 전제다 — 총 6개 지점(백엔드 5 + 프론트엔드 1)이 각자 재구현한다: `AlertNotificationService.java:108`(`substring(0,2)+"00000000"`), `EventClusteringService.java:688,741`(`substring(0,2)`/`substring(0,5)`), `RiskCalculationService.java:145`(`substring(0, Math.min(5,len))`), `DisasterAlertRepositoryImpl.java:398-400`(QueryDSL `sidoCodeExpr`, `LEFT(code,2)`), `frontend/src/app/user/settings/regions/page.tsx:21-39`(`SIDO_BY_CODE_PREFIX` 하드코딩 맵). 이 6곳 외에도 `DisasterEventRepository`(`:145,187,222,343-347,401-405`)·`EventAlertMappingRepository:46` 의 네이티브 쿼리가 `LEFT(legal_district_code, 2|5)` 를, `DisasterAlertRepositoryImpl.getStatsByRegionCode`(`:226-229`, `GET /api/v1/alerts/stats/region-code`)가 `LEFT(code, 5|8)` 을 쓴다. 중앙화된 공용 헬퍼는 없다(plan.md 헌법 검사 원칙 I 참고).
 - CSV 시드 데이터에는 "리" 레벨(9-10번째 자리가 "00"이 아닌) 코드가 실제로 존재한다 — 전체 49,858건 중 36,497건(약 73%)이 마지막 2자리가 "00"이 아니다(부산 기장군 기장읍 동부리 `2671025021` 등, 직접 CSV를 카운트해 확인). 다만 재난문자(`disaster_alert_region`)가 실제로 이 리 레벨 코드로 태깅되는 사례가 있는지는 런타임 DB 데이터 없이는 코드만으로 확인할 수 없다. **[NEEDS CLARIFICATION: `disaster_alert_region.legal_district_code`의 실제 자리수/레벨 분포는 운영 DB 조회가 필요하며, 이 문서에서는 검증하지 못했다 — 리 레벨이 "죽은 코드"인지 실제 소비되는지 확정할 수 없다.]**
 - 시도 "전체" 코드(앞2자리+"00000000")가 실제로 `legal_district`에 존재한다는 전제 하에, `AlertNotificationService`는 DB 조회 없이 문자열을 조합해서 사용한다(`AlertNotificationService.java:60`). 반면 `LegalDistrictService.getSigunguList()`는 같은 개념을 `findByName(sido)`로 실제 DB에서 조회해 확보한다(`LegalDistrictService.java:128-130,158-160`) — 같은 "시도 전체 코드"를 만드는 두 경로가 문자열 조합과 DB 조회로 서로 다르게 구현되어 있다.
 - 세종특별자치시처럼 시군구 구분이 없는 시도가 "코드 뒤 8자리가 0" 관례의 유일한 예외로 코드 주석에 언급되어 있으나(`DisasterAlertRepositoryImpl.java:381-388`), 그 예외가 실제 CSV에서 어떤 코드 값으로 나타나는지는 별도로 조회하지 않았다.
