@@ -36,7 +36,7 @@ AI 기반 이벤트 클러스터링으로 중복 알림을 제거하고, 기상 
 | 재난 제보 / 커뮤니티 | 사용자 재난 제보 알림 작성, 커뮤니티 게시판(공지·자유), 재난 문자·제보별 댓글 |
 | 실종자 알림 병합 | 실종자 관련 재난 문자를 동일 인물 기준으로 판정해 지역을 넘어 하나의 이벤트로 병합 |
 | 공개 OpenAPI | 토큰 기반 재난 문자 공개 API (JSON/CSV) |
-| 지도 연동 | Kakao Map 기반 지역별 재난 현황 히트맵 시각화 |
+| 지도 연동 | 시도·시군구·읍면동 드릴다운 SVG 지도로 지역별 재난 현황 히트맵 시각화 |
 
 ---
 
@@ -54,7 +54,7 @@ AI 기반 이벤트 클러스터링으로 중복 알림을 제거하고, 기상 
 | 차트 | Recharts |
 | 다국어 | i18next + react-i18next (KO/EN/JA/ZH) |
 | 알림 | Firebase SDK (FCM) + PWA (`@ducanh2912/next-pwa`) |
-| 지도 | Kakao Map API |
+| 지도 | 자체 SVG 지도 (법정동 경계 정적 데이터, PostGIS 로 생성) |
 | 테스트 | Jest (`npm test`), Playwright 스크린샷 스크립트 (`scripts/`) |
 | 배포 | 맥북 셀프호스팅 (Docker Compose, `docker-compose.prod.yml`의 frontend 서비스) |
 
@@ -91,7 +91,6 @@ AI 기반 이벤트 클러스터링으로 중복 알림을 제거하고, 기상 
 | 기상청 기상 API | 관측·요약 데이터 수집 |
 | OpenAI API | 임베딩(이벤트 클러스터링), LLM 판정(이벤트 병합·cross-region·위험도 프로파일), 재난 문자 다국어 번역 |
 | Firebase Cloud Messaging | 웹 푸시 알림 |
-| Kakao Maps API | 지도·히트맵·법정동 좌표 |
 | OAuth (Google·Naver·Kakao) | 소셜 로그인 |
 
 ### Infrastructure

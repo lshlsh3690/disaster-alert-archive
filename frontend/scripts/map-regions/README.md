@@ -39,7 +39,7 @@ PSQL="docker exec -i tmp-postgis psql -U postgres -d gis" bash scripts/map-regio
 
 ## 투영 (기존 시도 지도와 겹치게 맞춘 값)
 
-기존 `koreaSido.data.ts` 의 시도별 최대 다각형 무게중심을 `public/sido.geojson` 과 비교해 구했다(오차 0.4px 미만):
+기존 `koreaSido.data.ts` 의 시도별 최대 다각형 무게중심을 옛 `public/sido.geojson`(카카오맵 제거 때 삭제, git 이력에 있음)과 비교해 구했다(오차 0.4px 미만):
 
 ```
 화면 x = 98.0650 * lon      - 12195.995
