@@ -36,18 +36,18 @@
 
 - **원칙 I (가독성과 단순성 우선) — 부분 위반, 실제 중복 확인됨.**
   "법정동 코드에서 시도/시군구 상위 레벨을 파생한다"는 동일한 목적의 로직이 6개 지점(백엔드 5 + 프론트엔드 1)에서 각자 재구현되어 있고, `LegalDistrict` 엔티티나 `LegalDistrictService`에는 이를 위한 공용 헬퍼(예: `sidoCodeOf(code)`, `sigunguCodeOf(code)`)가 전혀 없다:
-  1. `AlertNotificationService.java:60` — `code.substring(0,2) + "00000000"` (시도 10자리 코드 조합, 관심지역 매칭용)
+  1. `AlertNotificationService.java:108` — `code.substring(0,2) + "00000000"` (시도 10자리 코드 조합, 관심지역 매칭용)
   2. `EventClusteringService.java:688` (`sidoPrefix`) — `code.substring(0,2)` (2자리, 브로드캐스트 분류용)
   3. `EventClusteringService.java:741` (`sigunguPrefixes`) — `code.substring(0,5)` (5자리, 클러스터링 hard 필터용)
   4. `RiskCalculationService.java:145` — `code.substring(0, Math.min(5, code.length()))` (5자리, 위험도 지역 키용)
-  5. `DisasterAlertRepositoryImpl.java:376-379`(`sidoCodeExpr`) — QueryDSL `function('left', code, 2)` (SQL 레벨 2자리, 통계 그룹핑용)
+  5. `DisasterAlertRepositoryImpl.java:398-400`(`sidoCodeExpr`) — QueryDSL `function('left', code, 2)` (SQL 레벨 2자리, 통계 그룹핑용)
   6. (프론트) `frontend/src/app/user/settings/regions/page.tsx:21-39` — 시도 2자리 코드 → 시도명 하드코딩 맵(17개 항목), 백엔드 데이터와 무관한 별도 소스.
 
   각 사이트는 목적(시도 매칭 vs 시군구 매칭)과 언어(Java vs SQL)가 다르므로 "세 줄짜리 비슷한 코드는 섣부른 공통화보다 낫다"는 원칙 문구로 일부는 정당화될 수 있다. 그러나 **①과 ⑤는 같은 목적(시도 코드)·같은 언어(2자리 truncation)인데도 서로 다르게 구현**되어 있고, 실제로 ⑥(프론트 하드코딩 맵)은 2026-07-01 행정구역 개편(광주·전남 → 전남광주통합특별시, `12xx`) 이후에도 업데이트되지 않아 `"12"` 키가 누락된 채로 남아있다(spec.md 예외 상황 참고) — **중앙화되지 않은 파생 로직이 실제로 코드 드리프트(drift)를 만든 사례**로, 이 원칙이 방지하려는 문제가 실제로 발생했다고 봐야 한다.
   - **권고(문서화 목적, 이번 변경 범위 아님)**: `LegalDistrict` 또는 `LegalDistrictService`에 `sidoCode(String code)`/`sigunguCode(String code)` 정적 헬퍼를 두고 위 5개 백엔드 사이트를 교체하는 리팩터링을 별도 이슈로 고려할 만하다. 프론트 하드코딩 맵은 `GET /api/v1/districts/sigungu`가 이미 시도 코드를 내려주므로, 별도 상수 대신 API 응답을 캐시해 재사용하는 방향이 더 안전하다.
 
-- **원칙 II (계층형 아키텍처 준수) — 부분 위반, 확인됨.**
-  `LegalDistrictController → LegalDistrictService → LegalDistrictRepository` 3계층 분리, 예외의 `CustomException`+`ErrorCode`(`LEGAL_DISTRICT_NOT_FOUND` 등) 사용, DTO 설계(응답 형태별 단일 record, `SigunguResponse`)는 모두 준수한다. 그러나 `LegalDistrictController.getSigunguBySido`(`LegalDistrictController.java:33-39`)는 공용 `ApiResponse` 래퍼 없이 `ResponseEntity<List<SigunguResponse>>`를 직접 반환한다 — "모든 API 응답은 공용 ApiResponse/ApiErrorResponse 포맷을 사용"(MUST)이라는 헌법 원칙 II 문구에 대한 **확인된 위반**이다. 같은 서브시스템의 `MemberFavoriteRegionController`(`MemberFavoriteRegionController.java:26-55`)는 `GET`/`POST`/`DELETE` 3개 엔드포인트 전부를 `ApiResponse.success(...)`로 감싸고 있어, 이 위반이 코드베이스 전반의 관례가 아니라 `LegalDistrictController`에 고립된 결함임이 확인된다. spec.md 예외 상황 절에도 동일 내용을 남겼다.
+- **원칙 II (계층형 아키텍처 준수) — 준수.**
+  `LegalDistrictController → LegalDistrictService → LegalDistrictRepository` 3계층 분리, 예외의 `CustomException`+`ErrorCode`(`LEGAL_DISTRICT_NOT_FOUND` 등) 사용, DTO 설계(응답 형태별 단일 record, `SigunguResponse`)는 모두 준수한다. `LegalDistrictController.getSigunguBySido`(`LegalDistrictController.java:34-40`)도 `ApiResponse.success(...)` 로 감싸 공용 응답 포맷을 따른다(이전 판은 래퍼 없이 `List` 를 직접 반환하는 위반이라고 적었으나 해소됨). 같은 서브시스템의 `MemberFavoriteRegionController`(`MemberFavoriteRegionController.java:26-55`)도 3개 엔드포인트 전부 `ApiResponse.success(...)` 로 감싼다.
 
 - **원칙 III (검증 가능한 변경) — 위반(테스트 공백 확인).**
   `backend/src/test`에 `LegalDistrict*`/`MemberFavoriteRegion*` 관련 테스트가 전혀 없다. 시도 전체 코드 파생(FR-010), 시군구 hard 필터(FR-012), 위험도 지역 키 축약(FR-015) 같은 핵심 규칙이 전부 코드 리딩으로만 검증 가능한 상태다.
@@ -103,7 +103,8 @@ backend/src/main/resources/
     ├── V1__create_schema.sql                     # legal_district 테이블 생성
     ├── V6__create_legal_district_translation.sql
     ├── V7/V15/V16__seed_legal_district_translation_{en,ja,zh}.sql
-    └── V108/V109/V111/V113__*jeonnam_gwangju*.sql # 2026-07-01 행정구역 개편 반영
+    └── V108/V109/V110/V111/V113__*jeonnam_gwangju*.sql # 2026-07-01 행정구역 개편 반영
+    └── V123/V125/V126__*incheon_hwaseong*.sql # 2026-10 법정동코드 재발급(인천 구 재편·화성 구 신설·면→읍), 구독 삭제 정책
 
 frontend/src/
 ├── api/alertApi.ts                # fetchSigungu() → GET /api/v1/districts/sigungu
