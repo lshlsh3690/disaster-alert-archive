@@ -69,8 +69,8 @@
   position: absolute;
   pointer-events: none;
   background: #fff;
-  border-radius: 10px;
-  padding: 6px 10px;
+  border-radius: 14px;
+  padding: 10px 16px;
   box-shadow: 0 10px 26px rgba(15, 23, 42, 0.16);
   /* 지도 영역보다 넓어지면 줄바꿈한다(좁은 사이드 패널에서 긴 지역명이 잘리지 않게) */
   width: max-content;
@@ -97,8 +97,8 @@
 .tipRegion {
   display: flex;
   align-items: center;
-  gap: 5px;
-  font-size: 12px;
+  gap: 7px;
+  font-size: 15px;
   font-weight: 700;
   color: #111827;
 }
@@ -109,20 +109,41 @@
   border: 1px solid rgba(0, 0, 0, 0.08);
 }
 .tipCount {
-  margin-top: 3px;
-  font-size: 11px;
+  margin-top: 6px;
+  font-size: 13px;
   color: #4b5563;
 }
 .tipCount b {
   color: #dc2626;
   font-weight: 700;
+  font-size: 15px;
+}
+
+/* 알림 목록처럼 좁은 패널(compact)에서는 말풍선이 지도를 덜 가리도록 작게 그린다. 메인 페이지 값은 위 기본값 그대로다 */
+.tip.tipCompact {
+  border-radius: 10px;
+  padding: 6px 10px;
+}
+.tip.tipCompact .tipRegion {
+  gap: 5px;
   font-size: 12px;
+}
+.tip.tipCompact .tipCount {
+  margin-top: 3px;
+  font-size: 11px;
+}
+.tip.tipCompact .tipCount b {
+  font-size: 12px;
+}
+.tip.tipCompact .tipWide {
+  margin-top: 2px;
+  font-size: 10px;
 }
 
 /* 상위 단위 전체로 발송돼 이 구역에 귀속시킬 수 없는 알림 */
 .tipWide {
-  margin-top: 2px;
-  font-size: 10px;
+  margin-top: 4px;
+  font-size: 12px;
   color: #6b7280;
 }
 .wideNote {

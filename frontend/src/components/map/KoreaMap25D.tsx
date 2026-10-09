@@ -708,7 +708,7 @@ export default function KoreaMap25D({
           <div
             key={`tip-${hovered}`}
             ref={tipRef}
-            className={`${styles.tip} ${side === "right" ? styles.tipRight : styles.tipLeft}`}
+            className={`${styles.tip} ${side === "right" ? styles.tipRight : styles.tipLeft} ${compact ? styles.tipCompact : ""}`}
             style={boxStyle}
           >
             <div className={styles.tipRegion}>
