@@ -92,6 +92,8 @@ interface KoreaMap25DProps {
    * 알림 목록 페이지처럼 이미 목록이 있는 곳에서 필터만 바꾸려는 용도. sigungu 는 "수원시 장안구 [읍면동]" 처럼 시도명을 뗀 값이다.
    */
   onRegionSelect?: (sel: { sido: string; sigungu?: string }) => void;
+  /** 시도별/시군구별 보기 전환 버튼을 보여 줄지. 보기 단위를 고정하는 곳(알림 목록 페이지)에서는 false */
+  showModeToggle?: boolean;
   /** 처음 보여 줄 보기 단위. 기본은 시군구별 보기, 알림 목록 페이지는 시도 전체를 먼저 보여 주려고 "sido" 를 쓴다 */
   defaultMode?: MapMode;
   /**
@@ -117,6 +119,7 @@ export default function KoreaMap25D({
   onSelect,
   onRegionSelect,
   compact = false,
+  showModeToggle = true,
   defaultMode = DEFAULT_MODE,
   focusSido,
   focusSigungu,
@@ -498,20 +501,22 @@ export default function KoreaMap25D({
       <div ref={containerRef} className={`${styles.canvas} korea-map__canvas`} style={{ height }}>
         <div className={`${styles.controls} ${compact ? styles.controlsCompact : ""}`}>
           {/* 보기 단위: 선택지를 접어 두지 않고 항상 펼쳐 보여 준다(드롭다운은 화살표 아래에 뭐가 있는지 알 수 없었다) */}
-          <div className={styles.segmented} role="radiogroup" aria-label={t("dashboard.mapViewLabel")}>
-            {MAP_MODES.map((m) => (
-              <button
-                key={m}
-                type="button"
-                role="radio"
-                aria-checked={mode === m}
-                className={`${styles.segment} ${mode === m ? styles.segmentActive : ""}`}
-                onClick={() => onModeChange(m)}
-              >
-                {modeLabels[m]}
-              </button>
-            ))}
-          </div>
+          {showModeToggle && (
+            <div className={styles.segmented} role="radiogroup" aria-label={t("dashboard.mapViewLabel")}>
+              {MAP_MODES.map((m) => (
+                <button
+                  key={m}
+                  type="button"
+                  role="radio"
+                  aria-checked={mode === m}
+                  className={`${styles.segment} ${mode === m ? styles.segmentActive : ""}`}
+                  onClick={() => onModeChange(m)}
+                >
+                  {modeLabels[m]}
+                </button>
+              ))}
+            </div>
+          )}
 
           {zoomed && (
             <div className={styles.drillBar}>
