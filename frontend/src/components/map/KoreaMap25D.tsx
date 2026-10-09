@@ -519,7 +519,8 @@ export default function KoreaMap25D({
                 ← {backLabel}
               </button>
               {drillTitle && <span className={styles.drillName}>{drillTitle}</span>}
-              {drillTitle && (
+              {/* 목록 페이지에 붙인 경우(onRegionSelect)는 확대하는 클릭이 이미 목록 필터를 바꾸므로 "알림 목록 보기" 가 필요 없다 */}
+              {drillTitle && !onRegionSelect && (
                 <button
                   type="button"
                   className={styles.drillGo}
