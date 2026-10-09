@@ -8,7 +8,7 @@ import { Alert } from "@/types/alerts";
 import { LEVEL_OPTIONS, levelTextToCode } from "@/ui/level";
 import { zodResolver } from "@hookform/resolvers/zod";
 import Link from "next/link";
-import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import DatePicker from "@/components/form/DatePicker";
 import { z } from "zod";
@@ -81,11 +81,27 @@ function AlertsClientInner() {
   });
 
   const watchedSido = watch("sido");
+  const watchedSigungu = watch("sigungu");
   const { data: sigunguList } = useSigungu(watchedSido || undefined);
 
+  // 시도가 바뀌면 이전 시도의 시군구 선택은 의미가 없으므로 비운다. 단, 첫 렌더에서는 비우지 않는다 — 대시보드 지도 등에서
+  // `?sido=경기도&sigungu=수원시 장안구` 로 들어왔을 때 URL 의 시군구 값이 폼에서 지워져, 목록은 필터돼 있는데 선택 칸만 비어 보였다.
+  const prevSidoRef = useRef(watchedSido);
   useEffect(() => {
+    if (prevSidoRef.current === watchedSido) return;
+    prevSidoRef.current = watchedSido;
     setValue("sigungu", "");
   }, [watchedSido, setValue]);
+
+  // URL 로 들어온 시군구 값이 목록에 있으면 목록이 도착한 뒤 select 에 다시 반영한다. 폼 값은 처음부터 URL 값이지만, select 는
+  // 그 값이 들어 있는 option 이 아직 없을 때 값을 담지 못해 목록이 늦게 도착하면 선택 칸이 비어 보였다. 사용자가 이미 다른 값을
+  // 골랐다면(폼 값이 URL 값과 다르면) 건드리지 않는다.
+  const urlSigunguRef = useRef(formState.sigungu);
+  useEffect(() => {
+    const urlValue = urlSigunguRef.current;
+    if (!sigunguList || !urlValue || watchedSigungu !== urlValue) return;
+    if (sigunguList.some((s) => s.name === urlValue)) setValue("sigungu", urlValue);
+  }, [sigunguList, watchedSigungu, setValue]);
 
   const params = useMemo(
     () => buildAlertsListParams(formState as AlertsSearchForm, page, size),
@@ -270,6 +286,11 @@ function AlertsClientInner() {
                       {s.translatedName ?? s.name}
                     </option>
                   ))}
+                  {/* 지도에서 읍면동을 눌러 온 경우처럼 값이 시군구 목록에 없을 때도(예: "수원시 장안구 파장동") 선택된 값으로 보이게 한다.
+                      없으면 select 가 값을 담지 못해 폼을 다시 제출할 때 필터가 사라진다. 목록을 아직 받는 중에도 같은 이유로 보여 준다. */}
+                  {watchedSigungu && !sigunguList?.some((s) => s.name === watchedSigungu) && (
+                    <option value={watchedSigungu}>{watchedSigungu}</option>
+                  )}
                 </select>
               </div>
               <div className="flex flex-col gap-1">
