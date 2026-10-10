@@ -230,6 +230,11 @@ public interface DisasterEventRepository extends JpaRepository<DisasterEvent, Lo
             @Param("sinceTime") LocalDateTime sinceTime
     );
 
+    // Red 단계 뼈대 — 구현은 Green 에서 (findFireAdvisoryMergeTarget 일반화 예정)
+    default Optional<Long> findAdvisoryMergeTarget(String type, String[] sigunguCodes, LocalDateTime since) {
+        return Optional.empty();
+    }
+
     /**
      * 광역 broadcast 이벤트 머지 대상 검색 — 같은 시도 + 같은 유형 + 윈도우 안의 broadcast 이벤트 1개.
      *
