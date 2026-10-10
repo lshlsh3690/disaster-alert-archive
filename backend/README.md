@@ -134,8 +134,8 @@ Q-클래스는 컴파일 시 `src/main/generated` 에 생성된다 (`build.gradl
   실행을 동시에 해서 알림이 중복된다. 과거에 고친 버그이므로 이 필드를 되살리지 말 것.
 - **클러스터링 임계값은 실데이터로 튜닝된 값** — `application.yml` 의 `clustering.*` 블록에 각 값의 존재
   이유가 한국어 주석으로 달려 있다. 바꾸기 전에 반드시 읽을 것.
-- **클러스터링 기능 플래그는 기본 `false`** — `CLUSTERING_ENABLED`, `LLM_FALLBACK_ENABLED`,
-  `CROSS_REGION_ENABLED`. 어떤 코드 경로가 실제로 도는지는 대상 환경의 플래그를 확인해야 안다.
+- **클러스터링·LLM 폴백·cross-region 은 항상 켜져 있다** — on/off 환경변수는 2026-10-10 에 삭제했다.
+  새 알림마다 임베딩 호출이 들고, 백필 recluster 도 borderline 사고성 건은 LLM 을 호출한다.
 - **번역 대상 언어는 EN/JA/ZH 세 개다** — 법정동 명칭 시드와 같은 범위로 맞춘 것이다. VI/TH 는
   2026-08-11 에 제거했다(시드가 없어 지역명이 영어로 나오는 반쪽 상태였고 오역 검증 수단도 없었다).
   새 언어를 추가할 땐 `SupportedLanguage`, `OpenAiTranslationClient.LANGUAGE_NAMES`, 법정동 시드

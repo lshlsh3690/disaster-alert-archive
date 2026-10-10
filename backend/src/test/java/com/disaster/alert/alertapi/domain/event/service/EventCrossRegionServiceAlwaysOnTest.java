@@ -16,7 +16,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
- * cross-region 연결이 설정(플래그) 없이 항상 동작하는지 검증한다. enabled 필드는 건드리지 않는다.
+ * cross-region 연결이 on/off 설정 없이 항상 동작하는지 검증한다(CROSS_REGION_ENABLED 는 2026-10-10 삭제).
  */
 @ExtendWith(MockitoExtension.class)
 class EventCrossRegionServiceAlwaysOnTest {

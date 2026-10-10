@@ -114,7 +114,6 @@ spring.ai:
 # 지역 hard 필터: 같은 시군구 후보만, 코사인 유사도 >= similarity-threshold 면 머지.
 # (cross-region 자동병합은 폭염 등 템플릿형 메시지에서 다지역 blob 을 만들어 제거 — 실데이터 검증)
 clustering:
-  enabled: ${CLUSTERING_ENABLED:false}
   similarity-threshold: 0.85
   candidate-time-window-hours: 168
   # 한 알림이 이 수 초과 시군구에 발송되면 광역 브로드캐스트로 보고 단독 이벤트 처리 (blob 다리 차단)
@@ -137,16 +136,14 @@ clustering:
   # '사고성' 사건을 LLM 으로 동일 사건 판정해 묶는다. "서소문 고가 붕괴"처럼 같은 사고를 여러
   # 기관이 다른 측면(도로통제/KTX/경의선)으로 보내 본문 임베딩이 갈리는 케이스 대응.
   # 폭염·호우 등 기상특보는 발효/해제 반복이 borderline 에 걸려 LLM 이 과병합하므로 화이트리스트로 제외.
-  # recluster 시에도 enabled=true 면 동작(임베딩 임계 튜닝만 할 땐 false 로 두면 LLM 호출 0=공짜).
+  # 실시간·백필(recluster 포함) 모두 항상 동작 — recluster 도 borderline 사고성 건은 LLM 을 호출한다.
   llm-fallback:
-    enabled: ${LLM_FALLBACK_ENABLED:false}   # 실시간/백필 공용 토글 (clustering.enabled 와 별개)
     distance-ceil: 0.40                        # (mergeMaxDistance=0.15, 0.40] 구간 후보만 LLM 에 질의
     # 특정 장소·시설의 일회성 사고만 (실데이터 borderline 분석 기반). 기타는 동물·실종 게이트로 추가 제외.
     accident-types: "기타,화재,산불,붕괴,교통사고,교통통제,교통,환경오염사고,정전,통신,테러,지진,지진해일,수도"
   # cross-region LLM 병합 — 지역 이동 사건(탈출 동물 등 비정형)을 LLM 으로 같은 사건 판정해 묶음.
-  # clusterNewAlert(local+broadcast)와 분리된 별도 단계라 recluster(공짜 튜닝)에 LLM 안 섞임.
+  # clusterNewAlert(local+broadcast)와 분리된 별도 단계라 백필 recluster 에는 이 LLM 단계가 안 섞임.
   cross-region:
-    enabled: ${CROSS_REGION_ENABLED:false}   # 실시간 토글 (clustering.enabled 와 별개)
     candidate-window-hours: 336               # 14일 (실종·이동은 며칠~몇 주)
     top-k: 5                                  # 임베딩 후보 상위 K (LLM 에 배치로 전달)
     similarity-floor: 0.6                     # 무관한 기타 거름용 (동일인 판정은 LLM 몫)

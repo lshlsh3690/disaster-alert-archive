@@ -208,7 +208,6 @@ npm run dev
 | `DISASTER_ALERT_SERVICE_KEY` | 행안부 Open API 키 |
 | `KMA_ASOS_API_KEY` | 기상청 Open API 키 |
 | `OPENAI_API_KEY` | Spring AI — 임베딩·LLM 판정·번역 공용 키 |
-| `CLUSTERING_ENABLED` / `LLM_FALLBACK_ENABLED` / `CROSS_REGION_ENABLED` | 이벤트 클러스터링 기능 플래그 (모두 기본값 `false`) |
 | `GOOGLE_OAUTH_CLIENT_ID` / `_SECRET` | Google OAuth2 |
 | `KAKAO_OAUTH_CLIENT_ID` / `_SECRET` | Kakao OAuth2 |
 | `NAVER_OAUTH_CLIENT_ID` / `_SECRET` | Naver OAuth2 |

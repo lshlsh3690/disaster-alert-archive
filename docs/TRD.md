@@ -44,7 +44,7 @@
 - `EventClusteringService`: 같은 시군구 후보 중 코사인 유사도 ≥ `clustering.similarity-threshold`(기본 0.85)면 병합
 - `EventCrossRegionService`: 실종자·탈출 동물처럼 지역을 이동하는 사건을 LLM으로 판정해 교차 지역 병합
 - `EventFragmentMergeService`: 30분 주기 스케줄러 — 파편화된 소규모 이벤트를 같은 유형/시도의 이벤트로 다중 메시지 LLM 비교를 통해 재흡수
-- `EventLLMDecisionService`: 위 서비스들의 공용 LLM 판정 호출부, 비용 관리를 위해 config 플래그(`llm-fallback.enabled`, `cross-region.enabled` 등)로 on/off
+- `EventLLMDecisionService`: 위 서비스들의 공용 LLM 판정 호출부. on/off 플래그 없이 항상 동작하며, 사고성 유형 화이트리스트·borderline 거리 구간·이동 키워드 게이트로 호출 대상을 좁힌다
 - `DisasterCooldown`: 진행 중 사건의 반복 알림이 중복 푸시를 유발하지 않도록 지역/유형별 쿨다운 관리. 계절성 안전안내 문자는 쿨다운을 갱신하지 않도록 별도 필터링(`incident-specific-check`)
 
 모든 임계값·키워드는 `application.yml`의 `clustering.*`에 있으며, 실데이터 튜닝 근거가 주석으로 남아있다. 대부분 기능은 환경변수 플래그로 기본 비활성화되어 있어, 배포 환경별로 on/off 여부를 확인해야 한다.

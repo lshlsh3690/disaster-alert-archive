@@ -43,9 +43,9 @@ public class DisasterFetchScheduler {
             translationService.translateAndSaveAsync(alertId);
             // FCM 알림 트리거
             alertNotificationService.triggerNotification(alertId);
-            // 이벤트 클러스터링 (clustering.enabled=false 시 no-op)
+            // 이벤트 클러스터링
             eventClusteringService.clusterNewAlert(alertId);
-            // 기타(지역 이동 유형) cross-region LLM 병합 (clustering.cross-region.enabled=false 시 no-op)
+            // 기타(지역 이동 유형) cross-region LLM 병합
             eventCrossRegionService.linkCrossRegion(alertId);
         });
     }

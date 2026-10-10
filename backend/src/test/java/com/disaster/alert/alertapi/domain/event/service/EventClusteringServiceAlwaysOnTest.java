@@ -24,14 +24,13 @@ import java.util.Optional;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
-import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
- * 클러스터링·LLM 폴백이 설정(플래그) 없이 항상 동작하는지 검증한다.
- * enabled / llmFallbackEnabled 필드는 일부러 건드리지 않는다 — 기본값(false)인 상태에서도 동작해야 한다.
+ * 클러스터링·LLM 폴백이 on/off 설정 없이 항상 동작하는지 검증한다
+ * (CLUSTERING_ENABLED·LLM_FALLBACK_ENABLED 는 2026-10-10 삭제).
  */
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
@@ -51,7 +50,7 @@ class EventClusteringServiceAlwaysOnTest {
     void setUp() {
         service = new EventClusteringService(embeddingModel, disasterAlertRepository, disasterEventRepository,
                 eventAlertMappingRepository, alertEmbeddingRepository, eventPublisher, llmDecisionService);
-        // application.yml 기본값 (플래그 필드는 설정하지 않는다)
+        // application.yml 기본값
         ReflectionTestUtils.setField(service, "similarityThreshold", 0.85);
         ReflectionTestUtils.setField(service, "candidateWindowHours", 168);
         ReflectionTestUtils.setField(service, "maxRegionSpan", 10);

@@ -44,8 +44,6 @@ import java.util.stream.Collectors;
  *   <li>후보 이벤트 검색 (7일 윈도우 + 지역 교집합 + 코사인 최소)</li>
  *   <li>최소 거리 &le; (1 - threshold) → 기존 이벤트 머지. 아니면 신규 이벤트.</li>
  * </ol>
- *
- * <p>{@code clustering.enabled=false} 인 경우 no-op (코드만 머지된 상태에서 안전 가드).
  */
 @Service
 @RequiredArgsConstructor
@@ -59,9 +57,6 @@ public class EventClusteringService {
     private final AlertEmbeddingRepository alertEmbeddingRepository;
     private final ApplicationEventPublisher eventPublisher;
     private final EventLLMDecisionService llmDecisionService;
-
-    @Value("${clustering.enabled:false}")
-    private boolean enabled;
 
     @Value("${clustering.similarity-threshold:0.85}")
     private double similarityThreshold;
@@ -80,10 +75,6 @@ public class EventClusteringService {
     /** 실종 인물 신원 클러스터링 윈도우(시간). 같은 사람 재신고를 한 이벤트로 보는 간격. 기본 14일. */
     @Value("${clustering.person-window-hours:336}")
     private int personWindowHours;
-
-    /** local borderline LLM 폴백 스위치 — 임베딩 임계 미만이지만 같은 사건일 수 있는 사고성 알림을 LLM 으로 판정. */
-    @Value("${clustering.llm-fallback.enabled:false}")
-    private boolean llmFallbackEnabled;
 
     /** LLM 폴백 후보 거리 상한(코사인). (mergeMaxDistance, ceil] 구간 후보만 LLM 에 묻는다. */
     @Value("${clustering.llm-fallback.distance-ceil:0.40}")
@@ -131,15 +122,11 @@ public class EventClusteringService {
     /**
      * 신규 알림에 대해 임베딩 생성 + 클러스터링 수행.
      *
-     * <p>{@code clustering.enabled=false} 또는 alert/message 가 비어있으면 조용히 skip.
+     * <p>alert/message 가 비어있으면 조용히 skip.
      * 외부 API 실패 시 예외 던지지 않음 — 수집 스케줄러의 다음 사이클이나 백필 도구로 복구.
      */
     @Transactional
     public void clusterNewAlert(Long alertId) {
-        if (!enabled) {
-            return;
-        }
-
         Optional<DisasterAlert> opt = disasterAlertRepository.findById(alertId);
         if (opt.isEmpty()) {
             log.warn("clusterNewAlert: alertId={} 조회 실패", alertId);
@@ -258,14 +245,14 @@ public class EventClusteringService {
     /**
      * borderline 후보(임베딩 임계 미만, ceil 이내)를 LLM 으로 동일 사건 판정해 머지 시도.
      *
-     * <p>게이트: {@code llm-fallback.enabled} + 사고성 유형(화이트리스트) + 동물·비정형 아님
+     * <p>게이트: 사고성 유형(화이트리스트) + 동물·비정형 아님
      * (동물은 cross-region 단계, 인물은 {@link #clusterPerson} 앞단에서 이미 분기). 후보가 없거나
      * LLM 이 NONE(보수적)이면 false → 신규 이벤트로 진행.
      *
      * @return LLM 이 같은 사건으로 판정해 머지하면 true
      */
     private boolean tryLlmFallback(DisasterAlert alert, List<Object[]> candidates, double mergeMaxDistance) {
-        if (!llmFallbackEnabled || !isAccidentType(alert.getDisasterType()) || isAnimalCase(alert.getMessage())) {
+        if (!isAccidentType(alert.getDisasterType()) || isAnimalCase(alert.getMessage())) {
             return false;
         }
 

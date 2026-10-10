@@ -23,7 +23,7 @@
 
 **우선순위 이유**: 다른 모든 분기(인물, 전국유형, 지역앵커유형, 브로드캐스트)는 이 임베딩 경로가 만들어내던 오류(과소병합/과병합)를 실측 데이터로 발견하고 보완하기 위해 파생된 특수 경로다. 이 경로가 없으면 나머지 로직도 존재 이유가 없다.
 
-**독립 테스트 방법**: `clustering.enabled=true`인 환경에서 같은 시군구·비슷한 시각·유사한 본문의 알림 2건을 순서대로 수집시키면 동일 `disaster_event`로 묶이는지 확인.
+**독립 테스트 방법**: 같은 시군구·비슷한 시각·유사한 본문의 알림 2건을 순서대로 수집시키면 동일 `disaster_event`로 묶이는지 확인.
 
 **인수 시나리오**:
 
@@ -102,7 +102,7 @@
 
 **우선순위 이유**: 발생 건수가 적고(멧돼지·들개 등 한정된 종) LLM 비용이 드는 borderline 경로라 전체 파이프라인에서 차지하는 비중은 낮지만, 정형 키가 없는 유일한 이동성 사건 유형이라 별도 서비스(`EventCrossRegionService`)로 분리돼 있다.
 
-**독립 테스트 방법**: `clustering.cross-region.enabled=true`인 환경에서 같은 멧돼지 출몰 알림을 인접 시군구 2곳에서 발송시키면 두 이벤트가 하나로 합쳐지는지 확인.
+**독립 테스트 방법**: 같은 멧돼지 출몰 알림을 인접 시군구 2곳에서 발송시키면 두 이벤트가 하나로 합쳐지는지 확인.
 
 **인수 시나리오**:
 
@@ -118,11 +118,11 @@
 
 **우선순위 이유**: 로컬 임베딩 경로의 미세 보정 장치로, 적용 범위가 좁게 게이트돼 있어(유형 화이트리스트 + 거리 구간 + 동물 제외) 발동 빈도는 낮다.
 
-**독립 테스트 방법**: `clustering.llm-fallback.enabled=true`인 환경에서 같은 시군구·같은 사고를 다르게 서술한 "교통통제" 알림 2건을 수집시키면 LLM 판정을 거쳐 하나로 묶이는지 확인.
+**독립 테스트 방법**: 같은 시군구·같은 사고를 다르게 서술한 "교통통제" 알림 2건을 수집시키면 LLM 판정을 거쳐 하나로 묶이는지 확인.
 
 **인수 시나리오**:
 
-1. **Given** `llm-fallback.enabled=true`이고 알림 유형이 사고성 화이트리스트에 속하며 동물 키워드(`탈출|출몰|멧돼지|들개|늑대`)에 매칭되지 않으면, **When** `tryLlmFallback`이 호출되면, **Then** 코사인 거리가 (0.15, 0.40](`llm-fallback.distance-ceil`) 구간인 같은 지역 후보만 LLM 질의 대상이 된다 (`EventClusteringService.java:267-283`).
+1. **Given** 알림 유형이 사고성 화이트리스트에 속하며 동물 키워드(`탈출|출몰|멧돼지|들개|늑대`)에 매칭되지 않으면, **When** `tryLlmFallback`이 호출되면, **Then** 코사인 거리가 (0.15, 0.40](`llm-fallback.distance-ceil`) 구간인 같은 지역 후보만 LLM 질의 대상이 된다 (`EventClusteringService.java:254-270`).
 2. **Given** borderline 후보 이벤트의 대표(seed) 유형도 사고성 화이트리스트에 속해야만, **When** LLM 후보 목록을 구성하면, **Then** 그 후보가 LLM 프롬프트에 포함된다 — 화이트리스트 알림이 기상특보 이벤트에 흡수되는 과병합을 차단 (`EventClusteringService.java:285-303`).
 3. **Given** LLM이 특정 후보를 "동일 사건"으로 지목하면, **When** `pickSameGeneralIncident`가 응답을 파싱하면, **Then** `MergeMethod.LLM_FALLBACK`으로 병합한다. LLM 호출 실패·응답이 "NONE"·응답 번호가 후보 범위를 벗어나면 모두 보수적으로 null 처리해 신규 이벤트로 진행한다 (`EventClusteringService.java:305-314`, `EventLLMDecisionService.java:115-140`).
 
@@ -161,7 +161,7 @@
 
 ### 예외 상황
 
-- **클러스터링 비활성화**(`clustering.enabled=false`, 기본값): `clusterNewAlert`가 알림을 조회하지도 않고 즉시 반환한다(no-op) (`EventClusteringService.java:138-141`).
+- **클러스터링은 끌 수 없다**: 2026-10-10 에 `clustering.enabled`·`llm-fallback.enabled`·`cross-region.enabled` 와 대응 환경변수를 삭제했다. `clusterNewAlert`·`linkCrossRegion` 은 알림이 존재하고 본문이 비어있지 않으면 항상 실행된다 (`EventClusteringService.java:129`, `EventCrossRegionService.java:68`). 클러스터링이 꺼지면 이벤트가 생기지 않아 위험도(`AlertClusteredEvent` 구독)에도 새 알림이 반영되지 않았기 때문이다.
 - **알림 본문이 비어 있음**: `alert.getMessage()`가 null/blank면 경고 로그만 남기고 skip한다 (`EventClusteringService.java:149-152`).
 - **알림 조회 실패**(존재하지 않는 alertId): 경고 로그 후 조용히 반환한다 (`EventClusteringService.java:143-147`).
 - **클러스터링 처리 중 예외 발생**(OpenAI 임베딩 API 실패 등): 개별 알림 단위에서 예외를 잡아 로그만 남기고 스케줄러 사이클 전체를 막지 않는다. 예외를 재던지지 않으므로 실패한 알림은 다음 수집 사이클이나 백필 도구로만 복구된다 (`EventClusteringService.java:154-159`, `EventCrossRegionService.java:83-88`).
@@ -179,9 +179,9 @@
 **공통 게이트 / 트리거**
 
 - **FR-001**: 시스템은 재난문자 수집 스케줄러(`DisasterFetchScheduler`, 10분 주기 cron `0 0/10 * * * *`)가 새 알림을 저장한 직후, 알림마다 순서대로 번역 → FCM 알림 트리거 → `EventClusteringService.clusterNewAlert` → `EventCrossRegionService.linkCrossRegion`을 호출해야 한다(MUST) (`DisasterFetchScheduler.java:29-51`).
-- **FR-002**: 시스템은 `clustering.enabled`(환경변수 `CLUSTERING_ENABLED`, 기본값 `false`)가 꺼져 있으면 `clusterNewAlert`를 완전한 no-op으로 만들어야 한다(MUST) (`EventClusteringService.java:63-64`, `138-141`; `application.yml:124`).
-- **FR-003**: 시스템은 `clustering.cross-region.enabled`(환경변수 `CROSS_REGION_ENABLED`, 기본값 `false`)가 꺼져 있으면 `linkCrossRegion`을 no-op으로 만들어야 한다(MUST) (`EventCrossRegionService.java:48-49`, `72-74`).
-- **FR-004**: 시스템은 `clustering.llm-fallback.enabled`(환경변수 `LLM_FALLBACK_ENABLED`, 기본값 `false`)가 꺼져 있으면 로컬 borderline LLM 폴백을 시도하지 않아야 한다(MUST) (`EventClusteringService.java:85-86`, `267-270`).
+- **FR-002**: 시스템은 설정 플래그 없이 모든 신규 알림에 대해 `clusterNewAlert`를 실행해야 한다(MUST) (`EventClusteringService.java:129`). 2026-10-10 이전에는 `CLUSTERING_ENABLED`(기본 `false`)가 꺼져 있으면 no-op 이었다.
+- **FR-003**: 시스템은 설정 플래그 없이 `linkCrossRegion`을 실행해야 하며, 동물·비정형 키워드 게이트(`isAnimalCase`)만으로 대상을 거른다(MUST) (`EventCrossRegionService.java:68`, `74`). 2026-10-10 이전에는 `CROSS_REGION_ENABLED`(기본 `false`) 게이트가 있었다.
+- **FR-004**: 시스템은 설정 플래그 없이 로컬 borderline LLM 폴백을 시도해야 하며, 대상은 FR-025 의 유형·거리 게이트로만 좁힌다(MUST) (`EventClusteringService.java:254-255`). 2026-10-10 이전에는 `LLM_FALLBACK_ENABLED`(기본 `false`) 게이트가 있었다.
 
 **임베딩 기반 로컬 클러스터링**
 
@@ -224,7 +224,7 @@
 
 **사고성 사건 LLM 폴백**
 
-- **FR-025**: 시스템은 `llm-fallback.enabled=true`이고 알림 유형이 `llm-fallback.accident-types`(기본 `"기타,화재,산불,붕괴,교통사고,교통통제,교통,환경오염사고,정전,통신,테러,지진,지진해일,수도"`)에 속하며 동물 키워드(`탈출|출몰|멧돼지|들개|늑대`)에 매칭되지 않을 때만 LLM 폴백을 시도해야 한다(MUST) (`EventClusteringService.java:92-94`, `267-270`).
+- **FR-025**: 시스템은 알림 유형이 `llm-fallback.accident-types`(기본 `"기타,화재,산불,붕괴,교통사고,교통통제,교통,환경오염사고,정전,통신,테러,지진,지진해일,수도"`)에 속하며 동물 키워드(`탈출|출몰|멧돼지|들개|늑대`)에 매칭되지 않을 때만 LLM 폴백을 시도해야 한다(MUST) (`EventClusteringService.java:84-85`, `254-257`).
 - **FR-026**: 시스템은 코사인 거리가 `(mergeMaxDistance, llm-fallback.distance-ceil]`(기본 `(0.15, 0.40]`) 구간인 같은 지역 후보만 LLM 질의 대상으로 삼아야 한다(MUST). 후보 이벤트의 대표(seed) 유형도 사고성 화이트리스트에 속해야 한다(MUST) (`EventClusteringService.java:88-90`, `272-303`). 또한 알림 유형이 "화재"이면 후보 이벤트의 마지막 알림이 알림 시각보다 72시간(`DisasterCooldown.hoursFor("화재")`) 넘게 이전이거나 알림이 이벤트 시작보다 이른 경우 후보에서 제외해야 한다(MUST) — 같은 시군구의 별개 화재를 한 사건으로 합치는 오병합 방지(운영 데이터 분석 2026-10, 화재 폴백 오병합 약 30%); 마지막 알림 기준이라 후속 알림이 계속 오는 대형 화재는 잘리지 않는다 (`DisasterCooldown.java:57-75`, `EventClusteringService.java:294-298`).
 - **FR-027**: 시스템은 LLM이 후보를 "동일 사건"으로 지목하면 `MergeMethod.LLM_FALLBACK`으로 병합해야 한다(MUST). LLM 호출 실패, 응답에 "NONE" 포함, 응답에서 숫자를 못 찾음, 또는 응답 번호가 후보 범위를 벗어나면 모두 매칭 없음(null)으로 처리해 병합하지 않아야 한다(MUST) — 모호할 때는 병합하지 않는 보수적 정책 (`EventClusteringService.java:305-313`; `EventLLMDecisionService.java:115-140`).
 
@@ -264,14 +264,14 @@
 ### 측정 가능한 결과
 
 - **운영 지표 미수집**: 이 파이프라인에 대한 정량적 운영 지표(병합 정확도, 파편화율, false-merge율 등)를 수집·집계하는 코드나 대시보드는 코드베이스 내에 존재하지 않는다. 소스에 남은 근거는 개발 과정에서 수동으로 확인한 실측 사례(예: "산청 산불 16조각", "산불 6,639건 중 안내 ~5,658/사건 ~981", "동명이인 임베딩 0.897 > 동일인 0.834")에 대한 코드 주석뿐이며, 이는 튜닝 근거 기록이지 지속적으로 수집되는 운영 지표가 아니다. 따라서 SC-001 이하는 **수치 목표를 임의로 만들지 않고, 코드가 실제로 보장하는 정성적 동작 기준**으로 기술한다.
-- **SC-001 (정성)**: `clustering.enabled=true`인 환경에서, 같은 시군구·7일 이내·코사인 유사도 0.85 이상인 재난문자는 하나의 이벤트로 병합되도록 코드 경로상 작성되어 있음(자동화 검증 없음) — `backend/src/test/.../domain/event/` 디렉터리가 존재하지 않아(plan.md 헌법 검사 III 참고) 이 동작은 코드 리딩으로만 확인했으며, 운영 성공률 측정치도 없다.
+- **SC-001 (정성)**: 같은 시군구·7일 이내·코사인 유사도 0.85 이상인 재난문자는 하나의 이벤트로 병합되도록 코드 경로상 작성되어 있음(자동화 검증 없음) — `backend/src/test/.../domain/event/` 디렉터리가 존재하지 않아(plan.md 헌법 검사 III 참고) 이 동작은 코드 리딩으로만 확인했으며, 운영 성공률 측정치도 없다.
 - **SC-002 (정성)**: 산불·산사태·홍수 알림은 지역앵커 유형 경로에 의해 본문 텍스트 차이와 무관하게 같은 시군구·유형·윈도우 안에서 항상 하나의 이벤트로 유지된다(코드 경로상 보장).
 - **SC-003 (정성)**: LLM 판정이 개입하는 모든 경로(`LLM`, `LLM_FALLBACK`)는 실패·모호·범위 초과 시 예외 없이 병합하지 않는(false) 쪽으로 수렴한다 — 즉 "모르면 합치지 않는다"는 보수적 정책이 코드 전 경로에서 일관되게 적용된다.
 - **SC-004 (정성)**: 파이프라인의 모든 진입점(`clusterNewAlert`, `linkCrossRegion`, 백필 도구)은 알림 1건의 처리 실패가 나머지 알림이나 스케줄러 사이클 전체의 실행을 막지 않는다(각 진입점에서 try/catch로 격리).
 
 ## 가정
 
-- **환경변수 플래그가 기본적으로 모두 꺼져 있다**: `CLUSTERING_ENABLED`/`LLM_FALLBACK_ENABLED`/`CROSS_REGION_ENABLED`는 코드상 기본값이 모두 `false`다(`application.yml:124`, `149`, `156`). 이 문서는 각 경로가 **켜져 있다고 가정했을 때**의 동작을 서술하며, 실제 운영/개발 환경에서 어떤 플래그가 켜져 있는지는 이 문서 작성 시점에 별도로 확인하지 않았다 — 특정 경로가 실제로 실행 중이라고 가정하기 전에 대상 환경의 값을 확인해야 한다.
+- **on/off 플래그는 없다(2026-10-10 삭제)**: 예전의 `CLUSTERING_ENABLED`/`LLM_FALLBACK_ENABLED`/`CROSS_REGION_ENABLED`(기본 `false`)는 제거됐고, 이 문서가 서술하는 경로는 모든 환경에서 항상 실행된다. 비용 통제는 유형 화이트리스트·거리 구간·키워드 게이트로만 한다.
 - **자동 로컬 병합은 항상 동일 시군구(코드 앞 5자리) 내에서만 발생한다.** 인접 시군구로의 확산은 오직 cross-region 동물 케이스(`EventCrossRegionService`)에서 `region_adjacency` 테이블의 1-hop 직접 인접만으로 이루어지며, 산불·지진 등 일반 재난 유형에는 인접 확산(다단계 BFS 등) 로직이 전혀 없다. (아래 "발견된 문서-코드 불일치" 참고.)
 - **인물(실종)과 태풍/지역앵커 유형은 임베딩을 전혀 쓰지 않는다.** 신원/유형 자체가 결정적 키이므로 재클러스터링 시 OpenAI 비용이 들지 않는다.
 - **`ClusteringProperties`라는 단일 `@ConfigurationProperties` 바인딩 클래스는 존재하지 않는다.** `clustering.*` 설정은 `EventClusteringService`와 `EventCrossRegionService`에 개별 `@Value` 필드로 흩어져 바인딩돼 있다. (아래 "발견된 문서-코드 불일치" 참고.)
