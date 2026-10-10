@@ -79,7 +79,7 @@ AI 기반 이벤트 클러스터링으로 중복 알림을 제거하고, 기상 
 
 | 분류 | 기술 |
 |------|------|
-| 메인 DB | PostgreSQL + pgvector (VECTOR 1536) — 로컬은 `pgvector/pgvector:pg15`, 운영은 맥북의 `pgvector/pgvector:pg16` 컨테이너 |
+| 메인 DB | PostgreSQL + pgvector (VECTOR 1536) — 로컬·운영(맥북) 모두 `pgvector/pgvector:pg16` 컨테이너 |
 | 캐시 | Redis 7 |
 | 마이그레이션 | Flyway (`backend/src/main/resources/db/migration`, `ddl-auto: validate`) |
 
