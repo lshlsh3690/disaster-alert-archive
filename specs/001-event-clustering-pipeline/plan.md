@@ -13,7 +13,7 @@
 - **임베딩 기반 로컬 클러스터링**을 기본 경로로 삼되(OpenAI `text-embedding-3-small` + pgvector 코사인 유사도, 같은 시군구·7일 윈도우·임계값 0.85), 실측 데이터에서 드러난 실패 모드마다 **결정적 규칙 기반 특수 경로를 우선 분기**시켜 임베딩 경로 앞에서 가로챈다: 인물 신원(IDENTITY) → 전국 통합 유형(GLOBAL_TYPE) → 지역앵커 유형(REGIONAL_TYPE) → (그 다음 광역 span 게이트) → 로컬 임베딩(EMBEDDING) → LLM 폴백(LLM_FALLBACK).
 - **광역/전국 브로드캐스트**는 별도 판정(시군구 span > 10, 시도 span 기준 8)으로 로컬 이벤트와 영구히 분리해(`is_broadcast` 플래그) 다지역 blob을 원천 차단한다.
 - **동물 등 비정형 이동 사건**은 로컬 클러스터링 이후 별도 서비스(`EventCrossRegionService`)가 종(species) 하드게이트 + 지역 인접 + LLM(`gpt-4o-mini`) 판정으로 사후 병합한다.
-- **비용이 드는 LLM 경로(cross-region, local borderline fallback)는 모두 기본 비활성(`enabled=false`) 플래그 뒤에 있다.**
+- **비용이 드는 LLM 경로(cross-region, local borderline fallback)는 on/off 플래그 없이 항상 동작한다**(2026-10-10 플래그 삭제). 호출 대상은 유형 화이트리스트·borderline 거리 구간·동물 키워드 게이트로 좁힌다.
 - **"진행 중" 상태는 저장하지 않고 조회 시점에 유형별 cooldown으로 파생 계산**해, 행안부가 주지 않는 "사건 종료" 신호를 대체한다.
 - **백필 도구**(`backfill` 프로파일 전용)가 임베딩 생성과 클러스터링을 분리해, 임계값 튜닝 시 OpenAI 재호출 없이 반복 재구성할 수 있게 한다.
 
@@ -27,7 +27,7 @@
 
 **테스트**: 없음 — `backend/src/test/java/.../domain/event/` 디렉터리 자체가 존재하지 않는다(전체 backend 테스트 8개 파일 중 이 도메인은 0개). `@SpringBootTest` + `.env.test` 통합 테스트 관례가 프로젝트에 있으나 이 서브시스템에는 적용된 바 없다. (아래 헌법 검사 III 참고.)
 
-**대상 플랫폼**: 백엔드 서버 프로세스 내부 백그라운드 파이프라인(HTTP API 아님) — `@Scheduled` 스케줄러(10분 주기)와 `ApplicationRunner`(백필, `backfill` 프로파일 전용)로만 트리거됨. 사용자에게 직접 노출되는 컨트롤러 엔드포인트는 없다(조회는 `EventQueryService`/`EventController`가 담당하며 이 파이프라인의 산출물을 읽기만 함 — 별도 스코프).
+**대상 플랫폼**: 백엔드 서버 프로세스 내부 백그라운드 파이프라인(HTTP API 아님) — `@Scheduled` 스케줄러(1분 주기)와 `ApplicationRunner`(백필, `backfill` 프로파일 전용)로만 트리거됨. 사용자에게 직접 노출되는 컨트롤러 엔드포인트는 없다(조회는 `EventQueryService`/`EventController`가 담당하며 이 파이프라인의 산출물을 읽기만 함 — 별도 스코프).
 
 **성능 목표**: 코드/설정에 명시된 목표치 없음. 백필 도구 주석에 "OpenAI 임베딩 배치 200건씩, 전체 4.3만 건이 분 단위"(일화적 관찰치, SLA 아님)라는 실측 경험치가 있을 뿐, SLA로 정의된 값은 아니다 (`EventClusteringBackfillTool.java:31`).
 
@@ -72,7 +72,7 @@ specs/001-event-clustering-pipeline/
 ```text
 backend/src/main/java/com/disaster/alert/alertapi/
 ├── scheduler/
-│   └── DisasterFetchScheduler.java          # 진입점 — 10분 cron, 알림 저장 후 클러스터링 호출
+│   └── DisasterFetchScheduler.java          # 진입점 — 1분 cron, 알림 저장 후 클러스터링 호출
 ├── domain/event/
 │   ├── service/
 │   │   ├── EventClusteringService.java      # 메인 클러스터링 (로컬 임베딩 + 인물/전국유형/지역앵커/광역 분기)

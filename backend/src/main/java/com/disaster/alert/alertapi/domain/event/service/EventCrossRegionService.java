@@ -31,7 +31,7 @@ import java.util.Set;
  * <p>실종 인물은 신원(이름+나이+키)으로 {@link EventClusteringService#clusterNewAlert} 에서 결정적으로
  * 클러스터링되므로 여기서 다루지 않는다. 이 서비스는 <b>탈출 동물 등 정형 키가 없는</b> 이동 사건만
  * 임베딩 top-K + LLM 으로 판정·병합한다. {@code clusterNewAlert}(local) 와 분리된 별도 단계라
- * recluster(공짜 튜닝 루프)에 LLM 이 안 섞인다. {@code clustering.cross-region.enabled=false} 면 no-op.
+ * 백필의 recluster 모드에는 이 단계가 섞이지 않는다(백필은 {@code --backfill.cross-region} 으로 따로 실행).
  */
 @Service
 @RequiredArgsConstructor
@@ -44,9 +44,6 @@ public class EventCrossRegionService {
     private final EventAlertMappingRepository eventAlertMappingRepository;
     private final EventLLMDecisionService llmDecisionService;
     private final EventClusteringService eventClusteringService;
-
-    @Value("${clustering.cross-region.enabled:false}")
-    private boolean enabled;
 
     @Value("${clustering.cross-region.candidate-window-hours:336}")
     private int windowHours;
@@ -69,9 +66,6 @@ public class EventCrossRegionService {
      */
     @Transactional
     public void linkCrossRegion(Long alertId) {
-        if (!enabled) {
-            return;
-        }
         Optional<DisasterAlert> opt = disasterAlertRepository.findById(alertId);
         if (opt.isEmpty()) {
             return;

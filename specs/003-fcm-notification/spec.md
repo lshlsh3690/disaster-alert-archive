@@ -39,7 +39,7 @@
 
 1. **Given** 회원이 시군구 단위 지역(예: 법정동 코드 10자리 `2900300000`)을 관심지역으로
    등록했고 알림 설정이 `PUSH`(기본값), **When** 그 지역 코드를 포함한 재난문자가 수집되어
-   `DisasterFetchScheduler`가 10분 주기로 `alertNotificationService.triggerNotification(alertId)`를
+   `DisasterFetchScheduler`가 1분 주기로 `alertNotificationService.triggerNotification(alertId)`를
    호출하면 (`backend/.../scheduler/DisasterFetchScheduler.java:29,45`), **Then** 해당 회원의
    등록된 FCM 토큰으로 `title`/`body`/`notificationType`/`alertId`를 담은 data-only 메시지가
    발송되고 `UserNotificationLog`에 `SENT`로 기록된다
@@ -247,7 +247,7 @@
 네이티브 채널 설정(AndroidConfig.setNotification)이 서로 다른 층위의 규칙이라, 후자를
 "금지되지 않은 선택 사항"으로 정확히 구분해 서술하기 위함이다. -->
 
-- **FR-001**: 시스템은 재난문자 공공데이터를 10분 주기로 수집한 직후, 새로 저장된 각
+- **FR-001**: 시스템은 재난문자 공공데이터를 1분 주기로 수집한 직후, 새로 저장된 각
   재난문자마다 알림 발송을 비동기로 트리거해야 한다(MUST)
   (`backend/.../scheduler/DisasterFetchScheduler.java:29,41-45`).
 - **FR-002**: 시스템은 관리자용 수동 트리거 엔드포인트(`POST /api/v1/admin/trigger-fetch`)로
@@ -409,7 +409,7 @@
   없다 — Firebase Admin SDK 호출 결과를 `log.info`/`log.error`로만 남기며
   (`FcmSendService.java:32,36,64-65,69`), 별도 메트릭/대시보드로 집계되지 않는다. 실측된
   성공 기준을 제시할 수 없으므로 지표를 지어내지 않고 이 사실을 그대로 기록한다.
-- **SC-002**: 알림 트리거는 재난문자 수집 스케줄러(10분 주기)에 종속되어 실행되며
+- **SC-002**: 알림 트리거는 재난문자 수집 스케줄러(1분 주기)에 종속되어 실행되며
   (`DisasterFetchScheduler.java:29`), 발송 자체는 `@Async`로 비동기 실행되어 스케줄러의
   다음 작업(클러스터링 등)을 블로킹하지 않는다(`AlertNotificationService.java:50`) — 이는
   실측 지연시간이 아니라 코드 구조상의 설계 사실이다.

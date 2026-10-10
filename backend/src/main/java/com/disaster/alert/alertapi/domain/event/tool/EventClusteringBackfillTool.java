@@ -24,20 +24,21 @@ import java.util.Map;
  * <ul>
  *   <li>기본: {@code embedding IS NULL} 알림을 1건씩 임베딩+클러스터링 (순차, 느림)</li>
  *   <li>{@code --backfill.embed-only=true}: 임베딩만 <b>배치</b>로 생성·저장 (빠름, 클러스터링 X)</li>
- *   <li>{@code --backfill.recluster=true}: 저장된 임베딩으로 재클러스터링 (OpenAI 호출 X, 튜닝용)</li>
+ *   <li>{@code --backfill.recluster=true}: 저장된 임베딩으로 재클러스터링 (임베딩 호출 X, 튜닝용).
+ *       단 사고성 유형의 borderline 후보는 LLM 폴백(gpt-4o-mini)을 호출하므로 완전히 공짜는 아니다</li>
  * </ul>
  *
  * <p><b>권장 절차 (전체 백필/검증)</b>
  * <pre>
- * export CLUSTERING_ENABLED=true SPRING_PROFILES_ACTIVE=backfill
+ * export SPRING_PROFILES_ACTIVE=backfill
  * cd backend && set -a && source ../.env.dev && set +a
  * # 1) 배치 임베딩 (전체, ~분 단위)
  * ./gradlew bootRun --args='--backfill.embed-only=true'
  * # 2) 이벤트 비우고
  * #    psql -c "TRUNCATE event_alert_mapping, disaster_events RESTART IDENTITY;"
- * # 3) 저장 벡터로 클러스터링 (OpenAI 호출 X, ~분 단위)
+ * # 3) 저장 벡터로 클러스터링 (임베딩 호출 X, borderline 사고성 건만 LLM 호출, ~분 단위)
  * ./gradlew bootRun --args='--backfill.recluster=true'
- * # 4) 임계값 튜닝: application.yml 수정 → (2)~(3) 반복 (공짜)
+ * # 4) 임계값 튜닝: application.yml 수정 → (2)~(3) 반복 (임베딩 비용 없음, LLM 폴백 비용만)
  * </pre>
  *
  * <p><b>처리 흐름</b>: disaster_alert 를 created_at ASC 로 정렬해 클러스터링.
@@ -78,7 +79,7 @@ public class EventClusteringBackfillTool implements ApplicationRunner {
         log.info("EventClusteringBackfillTool 시작: 대상 {}건 (limit={}, recluster={})",
                 alertIds.size(), limit, recluster);
         if (recluster) {
-            log.info("  recluster 모드: 저장된 임베딩 재사용(OpenAI 호출 X). " +
+            log.info("  recluster 모드: 저장된 임베딩 재사용(임베딩 호출 X, borderline 사고성 건은 LLM 폴백 호출). " +
                     "이벤트 테이블을 먼저 비웠는지 확인하세요 (TRUNCATE event_alert_mapping, disaster_events).");
         }
 
@@ -163,8 +164,7 @@ public class EventClusteringBackfillTool implements ApplicationRunner {
      * cross-region LLM 병합 백필 (recluster <b>후</b> 실행). 임베딩된 '기타' 알림을 created_at ASC 로
      * 순회하며 {@link EventCrossRegionService#linkCrossRegion} 호출 — mover 게이트·LLM 판정은 내부에서.
      *
-     * <p>{@code clustering.cross-region.enabled=true} 필요(아니면 전건 no-op). recluster 처럼
-     * 단일 프로세스로 실행. 비용은 mover 후보가 있는 건만 LLM(gpt-4o-mini) 호출.
+     * <p>recluster 처럼 단일 프로세스로 실행. 비용은 mover 후보가 있는 건만 LLM(gpt-4o-mini) 호출.
      */
     private void runCrossRegion(Integer limit) {
         String sql = "SELECT disaster_alert_id FROM disaster_alert "

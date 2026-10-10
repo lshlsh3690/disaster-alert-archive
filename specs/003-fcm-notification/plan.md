@@ -12,7 +12,7 @@
 
 ## 요약
 
-재난문자가 수집될 때마다(10분 주기 스케줄러 또는 관리자 수동 트리거), 해당 재난문자의
+재난문자가 수집될 때마다(1분 주기 스케줄러 또는 관리자 수동 트리거), 해당 재난문자의
 법정동 코드(및 시도 전체 파생 코드)와 일치하는 관심지역을 등록한 회원과, 동일 지역을
 등록한 비로그인(게스트) FCM 토큰에게 Firebase Admin SDK로 **data-only** 푸시 메시지를
 비동기 발송한다. 회원 경로는 알림 설정(`NONE`/`PUSH`)과 발송 이력
@@ -162,7 +162,7 @@ backend/src/main/java/com/disaster/alert/alertapi/
 │   ├── repository/MemberFavoriteRegionRepository.java
 │   └── service/MemberFavoriteRegionService.java
 ├── domain/disasteralert/model/DisasterAlert*.java # 알림 트리거의 소스(법정동 코드 목록)
-├── scheduler/DisasterFetchScheduler.java          # 10분 주기 수집→번역→알림트리거→클러스터링
+├── scheduler/DisasterFetchScheduler.java          # 1분 주기 수집→번역→알림트리거→클러스터링
 └── global/
     ├── config/SecurityConfig.java                 # 게스트 엔드포인트 permitAll 규칙
     └── controller/AdminController.java            # 수동 발송 트리거(permitAll)

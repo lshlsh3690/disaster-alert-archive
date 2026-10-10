@@ -101,8 +101,8 @@
 동일 유형에 대해 LLM을 다시 호출하지 않는다.
 
 **우선순위 이유**: 신규/희귀 유형 처리를 위한 fallback이며, 호출 빈도가 낮고(이벤트당
-1회, 캐시 hit 후 0회) 클러스터링 도메인의 `llm-fallback.enabled` 같은 별도 게이팅
-플래그 없이 항상 활성 상태다.
+1회, 캐시 hit 후 0회) 별도 게이팅 플래그 없이 항상 활성 상태다(클러스터링 쪽 LLM 도
+2026-10-10 플래그 삭제로 항상 활성).
 
 **독립 테스트 방법**: `disaster_risk_profile`에 없는 새 유형의 이벤트로
 `recomputeEventRisk`를 호출했을 때 `LlmRiskProfiler.resolveForEvent`가 호출되고,
@@ -217,7 +217,7 @@
 
 - **활성 윈도우 값의 이중 사용**: `RiskConstants.ACTIVE_WINDOW_DAYS = 30`은 "위험도 계산에 반영할 이벤트의 최대 나이"와 "과거 기여 이벤트 검색 확장 범위" 양쪽에 재사용된다. 다만 `RegionRiskQueryRepository.findHistoricalEvents`의 주석은 "7일(ACTIVE_WINDOW_DAYS)"라고 적혀 있어 실제 값(30일)과 불일치한다 — 코드 동작은 30일 기준이며 주석이 stale하다(`backend/.../risk/repository/RegionRiskQueryRepository.java:74-76`).
 - **운영자 보정 기능은 미사용(고아 코드)**: `DisasterRiskProfile.applyOperatorOverride(...)`는 프로파일을 수동 보정하는 메서드로 존재하지만, 이를 호출하는 컨트롤러/서비스/관리자 API가 저장소 어디에도 없다. `operator_confirmed=true`는 V33 seed 데이터에서만 설정되고, LLM 생성분(`operator_confirmed=false`)을 운영 중 수동 확정할 경로는 현재 구현되어 있지 않다.
-- **LLM 프로파일 생성에는 클러스터링 도메인과 달리 별도 게이팅 플래그가 없다**: `EventLLMDecisionService` 등 클러스터링 쪽 LLM 호출은 `llm-fallback.enabled`/`cross-region.enabled` 같은 설정 플래그 뒤에 있지만, `LlmRiskProfiler`는 그런 `@ConditionalOnProperty`/설정 검사가 코드에 없다 — 35종에 없는 유형이 처음 감지되는 즉시 항상 LLM을 호출한다(단, 유형당 최초 1회만).
+- **LLM 프로파일 생성에는 별도 게이팅 플래그가 없다**: 클러스터링 쪽 LLM 호출도 2026-10-10 에 on/off 플래그가 삭제돼 같은 상태다. `LlmRiskProfiler`에는 `@ConditionalOnProperty`/설정 검사가 없다 — 35종에 없는 유형이 처음 감지되는 즉시 항상 LLM을 호출한다(단, 유형당 최초 1회만).
 - **공간 확산은 "정부 broadcast 영향 법정동 자체"에는 적용되지 않는다**: FR-007에서 보듯 이벤트의 1차 영향 법정동은 알림에 포함된 법정동 그대로 사용하고 공간 추론을 하지 않는다. 공간 확산(BFS, 유형별 spread_coeff)은 오직 "시군구 source → effective" 단계에만 적용된다 — 두 개념(법정동 broadcast 집합 vs 시군구 인접 전파)이 서로 다른 레이어임을 전제한다.
 - **클러스터링 도메인과의 완전한 결합도 분리**: 위험도 계산은 `AlertClusteredEvent`라는 단일 이벤트 payload(`eventId`, `alertId`)만 받으며, 클러스터링 임계값·병합 방식(EMBEDDING/BROADCAST/REGIONAL_TYPE/ADVISORY 등)에 대해 전혀 알지 못한다는 것을 전제로 설계되어 있다.
 - **`AlertClusteredEvent` 발행 지점은 저장소 전체에 3곳뿐이다**: `domain/event/service/EventClusteringService.java:516,589,606`(신규 안내성 이벤트 생성, 기존 이벤트 병합, 신규 이벤트 생성). `CLAUDE.md`가 언급하는 `EventFragmentMergeService`(파편 이벤트 정합화 스케줄러)는 조사 시점 기준 이 저장소의 `domain/event/service/`에 실제로 존재하지 않는다 — 해당 패키지에는 `EventClusteringService`, `EventCrossRegionService`, `EventLLMDecisionService`, `EventQueryService`, `EventTranslationService`만 있다. 따라서 이벤트 병합/파편 흡수가 `event_region_impact`를 갱신하는 별도 경로는 현재 코드베이스에 존재하지 않는다(향후 해당 서비스가 추가되면 `AlertClusteredEvent` 재발행 여부를 함께 검토해야 한다).

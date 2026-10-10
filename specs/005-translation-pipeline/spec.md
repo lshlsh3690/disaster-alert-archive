@@ -35,7 +35,7 @@ lazy 번역(P2)은 캐시 미스 보정용으로만 쓰인다. 이 경로가 막
 
 **인수 시나리오**:
 
-1. **Given** 수집 스케줄러가 10분 주기로 기동됨(`@Scheduled(cron = "0 0/10 * * * *")`), **When** `alertService.saveData(raw)`가 신규 알림 ID 목록을 반환함, **Then** 각 ID에 대해 `translationService.translateAndSaveAsync(alertId)`가 호출된다 — `backend/src/main/java/com/disaster/alert/alertapi/scheduler/DisasterFetchScheduler.java:29,39,43`
+1. **Given** 수집 스케줄러가 1분 주기로 기동됨(`@Scheduled(cron = "0 * * * * *")`), **When** `alertService.saveData(raw)`가 신규 알림 ID 목록을 반환함, **Then** 각 ID에 대해 `translationService.translateAndSaveAsync(alertId)`가 호출된다 — `backend/src/main/java/com/disaster/alert/alertapi/scheduler/DisasterFetchScheduler.java:29,39,43`
 2. **Given** `translateAndSaveAsync` 호출, **When** `@Async("translationExecutor")`로 별도 스레드 풀에 위임됨, **Then** `SupportedLanguage.values()` 전체(EN/JA/ZH)에 대해 순차 번역이 시도된다 — `backend/src/main/java/com/disaster/alert/alertapi/global/translation/TranslationService.java:54,57`
 3. **Given** 3개 언어 중 하나가 번역 API 오류로 실패, **When** 해당 언어의 예외가 발생함, **Then** 그 언어만 `warn` 로그로 스킵하고 나머지 언어는 계속 진행한다 — `TranslationService.java:60-62`
 
