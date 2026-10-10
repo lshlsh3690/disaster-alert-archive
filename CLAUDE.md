@@ -39,7 +39,7 @@ npm test         # jest (testEnvironment: node). 현재 src/api/alertApi.test.ts
 ### 로컬 인프라
 
 ```bash
-docker compose -f docker-compose.dev.yml up postgres redis   # Postgres(pgvector/pgvector:pg15) + Redis만, --profile docker 불필요
+docker compose -f docker-compose.dev.yml up postgres redis   # Postgres(pgvector/pgvector:pg16, 운영과 동일) + Redis만, --profile docker 불필요
 ```
 `docker-compose.dev.yml`의 `frontend`/`backend` 서비스는 `docker` 프로필에 묶여 있습니다 — 로컬 개발 시에는 Postgres/Redis만 compose로 띄우고 백엔드/프론트엔드는 직접 실행하세요 (`./gradlew bootRun`, `npm run dev`).
 
