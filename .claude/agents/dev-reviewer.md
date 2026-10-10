@@ -29,7 +29,7 @@ model: sonnet
 
 ### 이벤트 클러스터링 / 위험도 도메인
 - `clustering.*`, 위험도 관련 임계값을 바꿨다면, `application.yml`의 한글 주석과 `specs/001-event-clustering-pipeline/`, `specs/002-risk-scoring/`의 근거를 먼저 읽었는지 — 대부분 임의 값이 아니라 실제 사건 데이터로 튜닝됨.
-- `CLUSTERING_ENABLED`/`LLM_FALLBACK_ENABLED`/`CROSS_REGION_ENABLED` 같은 플래그 뒤 코드가 실제로 그 환경에서 켜져 있다고 가정하지 않았는지.
+- 클러스터링·LLM 폴백·cross-region 은 플래그 없이 항상 동작한다(2026-10-10 플래그 삭제). 수집 루프나 백필에 OpenAI 호출을 늘리는 변경이면 호출 수·비용 증가를 의식했는지.
 
 ### FCM 알림
 - FCM 메시지 빌더에 `.setNotification()`을 호출하지 않는지 (data-only 하드 제약 — 어기면 Chrome에서 알림 중복 표시 재발).

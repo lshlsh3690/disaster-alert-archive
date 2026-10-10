@@ -67,12 +67,12 @@ docker compose -f docker-compose.dev.yml up postgres redis   # Postgres(pgvector
 원본 알림(`disasteralert`)은 임베딩 기반 클러스터링을 통해 `DisasterEvent`로 그룹핑됩니다. 관련 로직은 `domain/event/service/`에 모여 있습니다.
 - `EventClusteringService` — 메인 클러스터링 진입점. 지역(같은 시군구)으로 후보를 하드 필터링하고, 시간 윈도우 내에서 코사인 유사도가 `clustering.similarity-threshold`(0.85) 이상이어야 기존 이벤트에 병합됩니다.
 - `EventCrossRegionService` — 실종자, 탈출 동물처럼 지역을 넘나드는 알림을 위한 별도 패스. `mover-keywords`/`animal-keywords`로 게이트하며 LLM이 판정합니다.
-- `EventLLMDecisionService` — 위 서비스들이 borderline 병합 판정에 공용으로 사용하는 LLM 판정 호출부 (Spring AI + `gpt-4o-mini`). 호출당 비용이 들기 때문에 config 플래그(`llm-fallback.enabled`, `cross-region.enabled`) 뒤에 감춰져 있습니다.
+- `EventLLMDecisionService` — 위 서비스들이 borderline 병합 판정에 공용으로 사용하는 LLM 판정 호출부 (Spring AI + `gpt-4o-mini`). 호출당 비용이 들지만 on/off 플래그 없이 항상 동작하며, 사고성 유형 화이트리스트(`llm-fallback.accident-types`)·borderline 거리 구간(`llm-fallback.distance-ceil`)·이동 키워드(`mover-keywords`/`animal-keywords`) 게이트로 호출 대상을 좁힙니다.
 - `application.yml`의 `clustering.*` 블록 값들은 별도 `@ConfigurationProperties` 클래스 없이 `EventClusteringService`/`EventCrossRegionService`에 개별 `@Value` 필드로 흩어져 바인딩됩니다. 각 임계값/키워드 목록이 존재하는 이유(blob 방지, 유형별 머지 윈도우 등)가 한국어 주석으로 설명되어 있습니다. **클러스터링 임계값을 변경하기 전에 반드시 그 주석들을 먼저 읽으세요** — 대부분의 값은 임의가 아니라 실제 사건 데이터로 튜닝된 값입니다. (인접 시군구 BFS 확산 전파는 클러스터링이 아니라 `domain/risk`의 `RiskCalculationService.propagateEffective()`에 있습니다 — 아래 위험도 계산 절 참고.)
 - `EventClusteringBackfillTool` — 현재 클러스터링 설정으로 과거 알림을 재처리하는 도구. 임계값 튜닝 시 사용.
 - `DisasterCooldown` — 지역/유형별 쿨다운으로, 진행 중인 이벤트에 대한 반복 알림이 중복 알림을 만들지 않도록 함. 계절성 안전안내 문자(예: 봄철 산불 예방 안내) 같은 일반 안내성 메시지는 `clustering.advisory-split-types`(현재 `산불`만 등록)에 해당하면 실제 사건 이벤트와 별도의 "안내성"(advisory) 이벤트로 분리 생성되어, 실제 사건의 쿨다운을 갱신하지 않음 (`EventClusteringService.clusterFireAdvisory`/`isAdvisorySplitType`).
 
-대부분의 클러스터링 기능은 환경변수 기반 플래그(`CLUSTERING_ENABLED`, `LLM_FALLBACK_ENABLED`, `CROSS_REGION_ENABLED`)로 기본값이 `false`입니다 — 특정 코드 경로가 실제로 실행된다고 가정하기 전에 대상 환경에서 어떤 플래그가 켜져 있는지 확인하세요.
+클러스터링·LLM 폴백·cross-region 은 **항상 켜져 있습니다** — 2026-10-10 에 on/off 환경변수(`CLUSTERING_ENABLED`, `LLM_FALLBACK_ENABLED`, `CROSS_REGION_ENABLED`)를 삭제했습니다. 클러스터링이 꺼지면 이벤트가 생기지 않고, 위험도 계산은 이벤트(`AlertClusteredEvent`) 단위라 새 알림이 위험도에 반영되지 않기 때문입니다. 대신 새 알림마다 임베딩 호출이 들고 수집 루프(`DisasterFetchScheduler`) 안에서 동기로 실행되며, 백필 recluster 모드도 borderline 사고성 건은 LLM 을 호출합니다(완전히 공짜인 튜닝 루프가 아님).
 
 이 서브시스템의 as-built 상세 동작(37개 기능 요구사항, file:line 근거 포함)은 `specs/001-event-clustering-pipeline/spec.md`·`plan.md` 참고.
 
