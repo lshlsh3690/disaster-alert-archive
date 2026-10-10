@@ -178,7 +178,7 @@
 
 **공통 게이트 / 트리거**
 
-- **FR-001**: 시스템은 재난문자 수집 스케줄러(`DisasterFetchScheduler`, 10분 주기 cron `0 0/10 * * * *`)가 새 알림을 저장한 직후, 알림마다 순서대로 번역 → FCM 알림 트리거 → `EventClusteringService.clusterNewAlert` → `EventCrossRegionService.linkCrossRegion`을 호출해야 한다(MUST) (`DisasterFetchScheduler.java:29-51`).
+- **FR-001**: 시스템은 재난문자 수집 스케줄러(`DisasterFetchScheduler`, 1분 주기 cron `0 * * * * *`)가 새 알림을 저장한 직후, 알림마다 순서대로 번역 → FCM 알림 트리거 → `EventClusteringService.clusterNewAlert` → `EventCrossRegionService.linkCrossRegion`을 호출해야 한다(MUST) (`DisasterFetchScheduler.java:29-51`).
 - **FR-002**: 시스템은 설정 플래그 없이 모든 신규 알림에 대해 `clusterNewAlert`를 실행해야 한다(MUST) (`EventClusteringService.java:129`). 2026-10-10 이전에는 `CLUSTERING_ENABLED`(기본 `false`)가 꺼져 있으면 no-op 이었다.
 - **FR-003**: 시스템은 설정 플래그 없이 `linkCrossRegion`을 실행해야 하며, 동물·비정형 키워드 게이트(`isAnimalCase`)만으로 대상을 거른다(MUST) (`EventCrossRegionService.java:68`, `74`). 2026-10-10 이전에는 `CROSS_REGION_ENABLED`(기본 `false`) 게이트가 있었다.
 - **FR-004**: 시스템은 설정 플래그 없이 로컬 borderline LLM 폴백을 시도해야 하며, 대상은 FR-025 의 유형·거리 게이트로만 좁힌다(MUST) (`EventClusteringService.java:254-255`). 2026-10-10 이전에는 `LLM_FALLBACK_ENABLED`(기본 `false`) 게이트가 있었다.

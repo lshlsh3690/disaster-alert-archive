@@ -27,7 +27,7 @@
 
 **테스트**: 없음 — `backend/src/test/java/.../domain/event/` 디렉터리 자체가 존재하지 않는다(전체 backend 테스트 8개 파일 중 이 도메인은 0개). `@SpringBootTest` + `.env.test` 통합 테스트 관례가 프로젝트에 있으나 이 서브시스템에는 적용된 바 없다. (아래 헌법 검사 III 참고.)
 
-**대상 플랫폼**: 백엔드 서버 프로세스 내부 백그라운드 파이프라인(HTTP API 아님) — `@Scheduled` 스케줄러(10분 주기)와 `ApplicationRunner`(백필, `backfill` 프로파일 전용)로만 트리거됨. 사용자에게 직접 노출되는 컨트롤러 엔드포인트는 없다(조회는 `EventQueryService`/`EventController`가 담당하며 이 파이프라인의 산출물을 읽기만 함 — 별도 스코프).
+**대상 플랫폼**: 백엔드 서버 프로세스 내부 백그라운드 파이프라인(HTTP API 아님) — `@Scheduled` 스케줄러(1분 주기)와 `ApplicationRunner`(백필, `backfill` 프로파일 전용)로만 트리거됨. 사용자에게 직접 노출되는 컨트롤러 엔드포인트는 없다(조회는 `EventQueryService`/`EventController`가 담당하며 이 파이프라인의 산출물을 읽기만 함 — 별도 스코프).
 
 **성능 목표**: 코드/설정에 명시된 목표치 없음. 백필 도구 주석에 "OpenAI 임베딩 배치 200건씩, 전체 4.3만 건이 분 단위"(일화적 관찰치, SLA 아님)라는 실측 경험치가 있을 뿐, SLA로 정의된 값은 아니다 (`EventClusteringBackfillTool.java:31`).
 
@@ -72,7 +72,7 @@ specs/001-event-clustering-pipeline/
 ```text
 backend/src/main/java/com/disaster/alert/alertapi/
 ├── scheduler/
-│   └── DisasterFetchScheduler.java          # 진입점 — 10분 cron, 알림 저장 후 클러스터링 호출
+│   └── DisasterFetchScheduler.java          # 진입점 — 1분 cron, 알림 저장 후 클러스터링 호출
 ├── domain/event/
 │   ├── service/
 │   │   ├── EventClusteringService.java      # 메인 클러스터링 (로컬 임베딩 + 인물/전국유형/지역앵커/광역 분기)
