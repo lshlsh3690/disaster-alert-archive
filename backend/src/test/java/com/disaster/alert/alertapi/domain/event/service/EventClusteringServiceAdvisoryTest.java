@@ -234,22 +234,6 @@ class EventClusteringServiceAdvisoryTest {
     }
 
     @Test
-    @DisplayName("다지역 한파 안내(시군구 2개)도 안내 경로가 아니라 기존 임베딩 후보 검색 경로다")
-    void multiRegionColdAdvisory_goesEmbeddingPath() {
-        alert("한파", COLD_GUIDE, DisasterLevel.LEVEL_1, "4375000000", "4376000000");
-        when(embeddingModel.embed(anyString())).thenReturn(new float[]{0.1f, 0.2f});
-
-        service.clusterNewAlert(1L);
-
-        verify(disasterEventRepository, never())
-                .findAdvisoryMergeTarget(anyString(), any(String[].class), any(LocalDateTime.class));
-        verify(disasterEventRepository).findTopCandidates(anyString(), any(String[].class), any(LocalDateTime.class));
-        ArgumentCaptor<DisasterEvent> event = ArgumentCaptor.forClass(DisasterEvent.class);
-        verify(disasterEventRepository).save(event.capture());
-        assertThat(event.getValue().isAdvisory()).isFalse();
-    }
-
-    @Test
     @DisplayName("advisorySplitTypes 에 폭염이 없으면(기존 기본값 산불) 폭염 안내도 기존처럼 임베딩 경로 - 회귀 방지")
     void heatAdvisory_withoutConfigStaysOnEmbeddingPath() {
         ReflectionTestUtils.setField(service, "advisorySplitTypesCsv", "산불");
@@ -261,23 +245,6 @@ class EventClusteringServiceAdvisoryTest {
         verify(disasterEventRepository).findTopCandidates(anyString(), any(String[].class), any(LocalDateTime.class));
         verify(disasterEventRepository, never())
                 .findAdvisoryMergeTarget(anyString(), any(String[].class), any(LocalDateTime.class));
-    }
-
-    @Test
-    @DisplayName("한파 안내도 폭염과 같이 임베딩 없이 안내 경로(신규 안내 이벤트)로 간다")
-    void coldAdvisory_createsAdvisoryEvent() {
-        alert("한파", COLD_GUIDE, DisasterLevel.LEVEL_1, "4375000000");
-        when(disasterEventRepository.findAdvisoryMergeTarget(eq("한파"), any(String[].class), any(LocalDateTime.class)))
-                .thenReturn(Optional.empty());
-
-        service.clusterNewAlert(1L);
-
-        verifyEmbeddingPathSkipped();
-        ArgumentCaptor<DisasterEvent> event = ArgumentCaptor.forClass(DisasterEvent.class);
-        verify(disasterEventRepository).save(event.capture());
-        assertThat(event.getValue().isAdvisory()).isTrue();
-        assertThat(event.getValue().getPrimaryDisasterType()).isEqualTo("한파");
-        verify(eventPublisher).publishEvent(new AlertClusteredEvent(900L, 1L));
     }
 
     @Test

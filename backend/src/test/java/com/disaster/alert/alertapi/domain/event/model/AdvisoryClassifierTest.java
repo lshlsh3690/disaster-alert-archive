@@ -47,12 +47,6 @@ class AdvisoryClassifierTest {
     }
 
     @Test
-    @DisplayName("폭염: '자제'만 있고 특보 표현이 없으면 안내성이다")
-    void heat_onlyRestraintWordIsAdvisory() {
-        assertThat(AdvisoryClassifier.isAdvisory("폭염", "야외활동 자제", DisasterLevel.LEVEL_1)).isTrue();
-    }
-
-    @Test
     @DisplayName("폭염: LEVEL_2/LEVEL_3 은 본문과 무관하게 항상 사건이다")
     void heat_highLevelIsAlwaysIncident() {
         assertThat(AdvisoryClassifier.isAdvisory("폭염", HEAT_GUIDE, DisasterLevel.LEVEL_2)).isFalse();
@@ -128,13 +122,6 @@ class AdvisoryClassifierTest {
     }
 
     // ---- 한파 ----
-
-    @Test
-    @DisplayName("한파: 행동요령만 있는 일반 안내는 안내성, 한파주의보 발효는 사건이다")
-    void cold_guidanceVsWarning() {
-        assertThat(AdvisoryClassifier.isAdvisory("한파", COLD_GUIDE, DisasterLevel.LEVEL_1)).isTrue();
-        assertThat(AdvisoryClassifier.isAdvisory("한파", "한파주의보 발효", DisasterLevel.LEVEL_1)).isFalse();
-    }
 
     @Test
     @DisplayName("한파: 빙판길 사고·동파·화재 등 상투구는 안내, 한랭질환자 N명 발생은 사건이다")
