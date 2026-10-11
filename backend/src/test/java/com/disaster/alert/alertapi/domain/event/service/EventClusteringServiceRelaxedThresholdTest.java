@@ -88,6 +88,7 @@ class EventClusteringServiceRelaxedThresholdTest {
         ReflectionTestUtils.setField(service, "advisorySplitTypesCsv", "산불,폭염,한파");
         ReflectionTestUtils.setField(service, "relaxedThresholdTypesCsv", "폭염,한파,대설,강풍,가축질병");
         ReflectionTestUtils.setField(service, "relaxedSimilarityThreshold", 0.65);
+        ReflectionTestUtils.setField(service, "episodicTypesCsv", "");
 
         when(disasterEventRepository.save(any(DisasterEvent.class))).thenAnswer(inv -> {
             DisasterEvent e = inv.getArgument(0);

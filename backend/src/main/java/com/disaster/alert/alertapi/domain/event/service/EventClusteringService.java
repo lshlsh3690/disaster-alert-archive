@@ -107,11 +107,11 @@ public class EventClusteringService {
 
     /**
      * 안내성 분리 적용 유형(쉼표 구분) — 안내성(예방·캠페인·일반 행동요령)이 실사건과 독립적이고 시즌 내내
-     * 반복돼 사건 버킷을 늘리는 유형만. 산불·폭염·한파 — 산사태·홍수는 안내(조기경보)가 같은 호우
-     * episode 에 강결합이라 분리하면 타임라인이 깨진다(실데이터). 산불은 regional-types 윈도우를,
-     * 폭염·한파(regional-types 에 없음)는 유형 cooldown 을 머지 윈도우로 쓴다.
+     * 반복돼 사건 버킷을 늘리는 유형만. 현재 산불뿐 — 산사태·홍수는 안내(조기경보)가 같은 호우
+     * episode 에 강결합이라 분리하면 타임라인이 깨진다(실데이터). 머지 윈도우는 regional-types 를 쓴다.
+     * 폭염·한파는 안내를 분리하지 않고 episodic-types 로 특보와 한 이벤트에 합친다.
      */
-    @Value("${clustering.advisory-split-types:산불,폭염,한파}")
+    @Value("${clustering.advisory-split-types:산불}")
     private String advisorySplitTypesCsv;
 
     /** 임베딩 병합 임계값을 완화할 에피소드형 유형(쉼표 구분). 폭염·한파·대설·강풍·가축질병. */
@@ -122,7 +122,6 @@ public class EventClusteringService {
     @Value("${clustering.relaxed-similarity-threshold:0.65}")
     private double relaxedSimilarityThreshold;
 
-    // Red 단계 뼈대 — 구현은 Green 에서 (판정 로직에서는 아직 사용하지 않음)
     /** 에피소드형 유형(쉼표 구분) — "유형 + 시군구" 단위 하나의 이벤트로 이어 가는 유형. */
     @Value("${clustering.episodic-types:폭염,한파,대설,강풍,가축질병}")
     private String episodicTypesCsv;
@@ -137,6 +136,7 @@ public class EventClusteringService {
     private Map<String, Integer> regionalTypeWindows;
     private Set<String> advisorySplitTypes;
     private Set<String> relaxedThresholdTypes;
+    private Set<String> episodicTypes;
 
     /**
      * 신규 알림에 대해 임베딩 생성 + 클러스터링 수행.
@@ -205,11 +205,10 @@ public class EventClusteringService {
             return;
         }
 
-        // 0.8 폭염·한파 일반 안내 — regional-types 에는 못 넣는 유형(매일 발령 → 윈도우 체인 blob)이라
-        //     clusterRegionalType 밖에서 안내 이벤트로만 분리한다. 특보 발효·피해 문구는 여기서 false 라
-        //     아래 임베딩 경로 그대로. 임베딩·LLM 호출 전에 분기해 비용도 들지 않는다. 시군구 1개짜리만
-        //     대상 — 다지역 알림은 footprint 교집합 머지로 안내 이벤트를 도 단위 blob 으로 키운다(실측 약 8%).
-        if (clusterWeatherAdvisory(alert)) {
+        // 0.8 에피소드형 유형(폭염·한파·대설·강풍·가축질병) — 같은 시군구·같은 유형의 발령이 끊김 없이
+        //     이어지는 동안은 안내/특보·문장 유사도와 무관하게 하나의 이벤트. 임베딩·LLM 호출 전에 분기해
+        //     비용도 들지 않는다. 시군구가 정확히 1개인 알림만 대상(다지역·광역은 아래 기존 경로).
+        if (clusterEpisodicType(alert)) {
             return;
         }
 
@@ -510,28 +509,48 @@ public class EventClusteringService {
     }
 
     /**
-     * regional-types 에 없는 안내 분리 유형(폭염·한파)의 일반 안내를 안내 이벤트로 보낸다. 윈도우는 별도
-     * 설정 없이 유형 cooldown(폭염·한파 168h) — 길이 상한은 두지 않는다(윈도우 안이면 계속 롤링).
-     * 시군구가 정확히 1개일 때만 처리한다 — 2개 이상(광역 포함)·지역 없음은 false → 기존 임베딩/broadcast 경로.
-     * findAdvisoryMergeTarget 이 footprint 교집합으로 머지해 다지역 알림이 안내 이벤트를 도 단위 blob 으로
-     * 키우기 때문이다(실측 다지역 안내 약 8%).
+     * 에피소드형 유형(폭염·한파·대설·강풍·가축질병) 클러스터링 — "유형 + 시군구"가 곧 하나의 이벤트.
+     * 같은 시군구에서 같은 유형의 발령이 끊김 없이 이어지는 동안은 문장 유사도와 무관하게 합친다
+     * (연쇄 병합은 의도). 끊김 기준은 마지막 알림 이후 {@code episodic-window-hours}. 본문은 보지 않는다.
      *
-     * @return 안내 이벤트로 처리하면 true
+     * <p>시군구가 정확히 1개일 때만 처리한다 — 다지역 알림은 footprint 교집합 머지로 이벤트가 도 단위로
+     * 커질 위험이 있어 false 를 돌려 기존 임베딩 경로(완화 임계값)로, 광역은 기존 broadcast 경로로 보낸다.
+     *
+     * @return 에피소드형으로 처리하면 true
      */
-    private boolean clusterWeatherAdvisory(DisasterAlert alert) {
+    private boolean clusterEpisodicType(DisasterAlert alert) {
         String type = alert.getDisasterType();
-        if (!isAdvisorySplitType(type)) {
+        if (!isEpisodicType(type)) {
             return false;
         }
         String[] regionCodes = extractRegionCodes(alert);
-        if (distinctSigunguCount(regionCodes) != 1) {
+        if (regionCodes.length == 0 || distinctSigunguCount(regionCodes) != 1) {
             return false;
         }
-        if (!AdvisoryClassifier.isAdvisory(type, alert.getMessage(), alert.getEmergencyLevel())) {
-            return false;
+        LocalDateTime since = alert.getCreatedAt().minusHours(episodicWindowHours);
+        Optional<Long> target = disasterEventRepository.findRegionalTypeMergeTarget(
+                type, sigunguPrefixes(regionCodes), since);
+        if (target.isPresent()) {
+            mergeIntoExisting(target.get(), alert, null, MergeMethod.REGIONAL_TYPE);
+            log.info("clusterNewAlert(에피소드형): alertId={} → event={} 유형+시군구 머지({}, window={}h)",
+                    alert.getId(), target.get(), type, episodicWindowHours);
+        } else {
+            createNewEvent(alert, regionCodes[0], extractFirstRegionName(alert), false);
+            log.info("clusterNewAlert(에피소드형): alertId={} → 신규 이벤트({}, window={}h)",
+                    alert.getId(), type, episodicWindowHours);
         }
-        clusterAdvisory(alert, regionCodes, DisasterCooldown.hoursFor(type));
         return true;
+    }
+
+    /** 에피소드형 유형 매칭. 유형 null 이거나 목록이 비어 있으면 적용하지 않는다. */
+    private boolean isEpisodicType(String type) {
+        if (type == null) {
+            return false;
+        }
+        if (episodicTypes == null) {
+            episodicTypes = parseCsvSet(episodicTypesCsv);
+        }
+        return episodicTypes.contains(type.trim());
     }
 
     /**
