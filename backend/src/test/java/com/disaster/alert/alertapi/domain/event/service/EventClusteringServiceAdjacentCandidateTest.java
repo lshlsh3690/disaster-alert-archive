@@ -136,6 +136,17 @@ class EventClusteringServiceAdjacentCandidateTest {
         lenient().when(disasterEventRepository.findById(eventId)).thenReturn(Optional.of(ev));
     }
 
+    /** 후보 이벤트 로드 스텁 — firstAlertAt 을 직접 지정(이벤트 나이 상한 가드 검증용). */
+    private void candidateEvent(long eventId, String type, LocalDateTime firstAlertAt, LocalDateTime lastAlertAt) {
+        DisasterEvent ev = DisasterEvent.builder()
+                .primaryDisasterType(type)
+                .firstAlertAt(firstAlertAt)
+                .lastAlertAt(lastAlertAt)
+                .build();
+        ReflectionTestUtils.setField(ev, "id", eventId);
+        lenient().when(disasterEventRepository.findById(eventId)).thenReturn(Optional.of(ev));
+    }
+
     private void assertMergedEmbedding(long eventId) {
         ArgumentCaptor<EventAlertMapping> mapping = ArgumentCaptor.forClass(EventAlertMapping.class);
         verify(eventAlertMappingRepository).save(mapping.capture());
@@ -313,6 +324,85 @@ class EventClusteringServiceAdjacentCandidateTest {
         sameRegionCandidates();
         adjacentCandidates(0.10);
         when(disasterEventRepository.findById(ADJACENT_EVENT_ID)).thenReturn(Optional.empty());
+
+        service.clusterNewAlert(1L);
+
+        assertNewEventCreated();
+    }
+
+    @Test
+    @DisplayName("m) 기타 후보 이벤트 첫 알림이 100h 전(마지막 5h 전): 이벤트 나이 상한 72h 초과로 병합하지 않고 신규 이벤트")
+    void adjacentCandidateOlderThanMaxEventAge_createsNewEvent() {
+        alert("기타", FIRE);
+        sameRegionCandidates();
+        adjacentCandidates(0.10);
+        candidateEvent(ADJACENT_EVENT_ID, "기타", now.minusHours(100), now.minusHours(5));
+
+        service.clusterNewAlert(1L);
+
+        assertNewEventCreated();
+    }
+
+    @Test
+    @DisplayName("n) 기타 후보 이벤트 첫 알림이 71h 전: 병합 [회귀 방지]")
+    void adjacentCandidateWithinMaxEventAge_merges() {
+        alert("기타", FIRE);
+        sameRegionCandidates();
+        adjacentCandidates(0.10);
+        candidateEvent(ADJACENT_EVENT_ID, "기타", now.minusHours(71), now.minusHours(5));
+
+        service.clusterNewAlert(1L);
+
+        assertMergedEmbedding(ADJACENT_EVENT_ID);
+    }
+
+    @Test
+    @DisplayName("o) 기타 후보 이벤트 첫 알림이 정확히 72h 전: 경계 포함으로 병합 [회귀 방지]")
+    void adjacentCandidateExactlyMaxEventAge_merges() {
+        alert("기타", FIRE);
+        sameRegionCandidates();
+        adjacentCandidates(0.10);
+        candidateEvent(ADJACENT_EVENT_ID, "기타", now.minusHours(72), now.minusHours(5));
+
+        service.clusterNewAlert(1L);
+
+        assertMergedEmbedding(ADJACENT_EVENT_ID);
+    }
+
+    @Test
+    @DisplayName("p) 기타 후보 이벤트 첫 알림이 72h + 1분 전: 상한 초과로 병합하지 않고 신규 이벤트")
+    void adjacentCandidateOneMinuteOverMaxEventAge_createsNewEvent() {
+        alert("기타", FIRE);
+        sameRegionCandidates();
+        adjacentCandidates(0.10);
+        candidateEvent(ADJACENT_EVENT_ID, "기타", now.minusHours(72).minusMinutes(1), now.minusHours(5));
+
+        service.clusterNewAlert(1L);
+
+        assertNewEventCreated();
+    }
+
+    @Test
+    @DisplayName("q) 첫 후보(첫 알림 100h 전)는 나이 가드로 건너뛰고 두 번째 후보(10h 전)로 병합")
+    void firstCandidateTooOld_mergesIntoSecondCandidate() {
+        alert("기타", FIRE);
+        sameRegionCandidates();
+        adjacentCandidates(0.10, 0.12);
+        candidateEvent(ADJACENT_EVENT_ID, "기타", now.minusHours(100), now.minusHours(5));
+        candidateEvent(ADJACENT_EVENT_ID + 1, "기타", now.minusHours(10), now.minusHours(5));
+
+        service.clusterNewAlert(1L);
+
+        assertMergedEmbedding(ADJACENT_EVENT_ID + 1);
+    }
+
+    @Test
+    @DisplayName("r) 화재 후보 이벤트: 마지막 알림은 10h 전이어도 첫 알림이 80h 전이면 나이 상한으로 병합하지 않는다")
+    void adjacentFireCandidateOlderThanMaxEventAge_createsNewEvent() {
+        alert("화재", FIRE);
+        sameRegionCandidates();
+        adjacentCandidates(0.10);
+        candidateEvent(ADJACENT_EVENT_ID, "화재", now.minusHours(80), now.minusHours(10));
 
         service.clusterNewAlert(1L);
 
