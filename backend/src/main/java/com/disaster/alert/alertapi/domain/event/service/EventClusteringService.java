@@ -134,7 +134,7 @@ public class EventClusteringService {
     @Value("${clustering.adjacent-window-hours:48}")
     private int adjacentWindowHours;
 
-    /** 인접 시군구 병합 허용 이벤트 나이 상한(시간) — 후보 이벤트 첫 알림부터 새 알림까지. Red 단계 뼈대 — 사용은 Green 에서. */
+    /** 인접 시군구 병합 허용 이벤트 나이 상한(시간) — 후보 이벤트 첫 알림부터 새 알림까지. Red 단계 뼈대 — 인접 경로 전용. */
     @Value("${clustering.adjacent-max-event-age-hours:72}")
     private int adjacentMaxEventAgeHours;
 
@@ -313,12 +313,25 @@ public class EventClusteringService {
                 continue;
             }
             // 가드 실패 후보는 건너뛰고 다음(더 먼) 후보를 본다.
-            if (allowsAccidentMerge(alert, disasterEventRepository.findById(eventId).orElse(null))) {
+            DisasterEvent ev = disasterEventRepository.findById(eventId).orElse(null);
+            if (allowsAccidentMerge(alert, ev) && withinAdjacentEventAge(alert, ev)) {
                 mergeIntoExisting(eventId, alert, 1.0 - dist, MergeMethod.EMBEDDING);
                 return true;
             }
         }
         return false;
+    }
+
+    /**
+     * 인접 병합 전용 이벤트 나이 상한 — 후보 이벤트 첫 알림부터 새 알림까지 adjacent-max-event-age-hours 이내(경계 포함).
+     * 인접 병합이 last_alert_at 윈도우를 계속 밀어 안내문이 44일·7개 시군구로 연쇄 병합되던 문제(평가 DB 실측) 차단.
+     * 첫 알림 시각을 모르면 나이를 증명할 수 없으므로 거부한다. 같은 시군구 경로(tryLlmFallback)에는 적용하지 않는다.
+     */
+    private boolean withinAdjacentEventAge(DisasterAlert alert, DisasterEvent ev) {
+        if (ev == null || ev.getFirstAlertAt() == null) {
+            return false;
+        }
+        return !alert.getCreatedAt().isAfter(ev.getFirstAlertAt().plusHours(adjacentMaxEventAgeHours));
     }
 
     /**

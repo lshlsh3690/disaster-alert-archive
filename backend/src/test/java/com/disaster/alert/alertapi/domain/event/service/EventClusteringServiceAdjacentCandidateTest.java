@@ -88,6 +88,7 @@ class EventClusteringServiceAdjacentCandidateTest {
         ReflectionTestUtils.setField(service, "relaxedSimilarityThreshold", 0.65);
         ReflectionTestUtils.setField(service, "episodicTypesCsv", "");
         ReflectionTestUtils.setField(service, "adjacentWindowHours", 48);
+        ReflectionTestUtils.setField(service, "adjacentMaxEventAgeHours", 72);
 
         when(disasterEventRepository.save(any(DisasterEvent.class))).thenAnswer(inv -> {
             DisasterEvent e = inv.getArgument(0);
