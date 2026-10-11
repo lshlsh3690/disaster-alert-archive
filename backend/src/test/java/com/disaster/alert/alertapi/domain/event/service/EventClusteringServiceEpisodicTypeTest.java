@@ -43,7 +43,9 @@ import static org.mockito.Mockito.when;
  *
  * <p>같은 시군구에서 같은 유형의 알림이 끊김 없이 이어지는 동안은 문장 유사도·안내/특보 구분과 무관하게
  * 하나의 이벤트로 합친다(연쇄 병합은 의도). 끊김 기준은 마지막 알림 이후 {@code episodic-window-hours}(기본 168h).
- * 시군구가 정확히 1개일 때만 적용하고, 다지역·광역은 기존 임베딩/broadcast 경로를 유지한다.
+ * 시군구가 정확히 1개일 때만 앵커링하고, 다지역(2개 이상)·광역 알림은 지역 이벤트 후보에서 제외해
+ * broadcast 경로로 보낸다(시군구 간 다리로 이벤트가 도 단위 blob 이 되는 것 방지). 사고성 유형의 다지역은
+ * 전파 허용을 위해 기존 임베딩 경로를 유지한다.
  *
  * <p>순수 Mockito 단위 테스트(DB·Spring 컨텍스트 없음). 폭염·한파의 안내성 분리는 이 규칙으로 대체되므로
  * {@code advisorySplitTypesCsv} 는 새 기본값 "산불" 로 둔다.
@@ -259,12 +261,192 @@ class EventClusteringServiceEpisodicTypeTest {
         assertMergedRegionalType(EXISTING_EVENT_ID);
     }
 
-    @ParameterizedTest(name = "6) 다지역 시군구 {0}개: 앵커링하지 않고 기존 임베딩 경로 [현재 동작과 같아 뼈대도 통과]")
+    // ===== 다지역 에피소드형 → broadcast (시군구 간 다리 차단) =====
+
+    private static final String[] SAME_SIDO_CODES = {"4375000000", "4376000000", "4377000000"}; // 충북 3개 시군구
+    private static final String[] WIDE_CODES = {"1111000000", "1114000000", "1117000000", "1120000000", "1121000000",
+            "1123000000", "1126000000", "1129000000", "1130000000", "1132000000", "1135000000"}; // 서울 11개 > 10
+    private static final String[] NATIONWIDE_CODES = {"1111000000", "2611000000", "2711000000", "2811000000",
+            "3011000000", "3111000000", "3611000000", "4111000000"}; // 8개 시도 >= nationwideSidoSpan(8)
+    private static final String[] SIDO_WIDE_CODES = {"1111000000", "1114000000", "4111000000"}; // 서울 2 + 경기 1
+
+    private DisasterEvent broadcastEvent(long id) {
+        return DisasterEvent.builder().id(id).primaryDisasterType("폭염").broadcast(true).build();
+    }
+
+    private void givenSidoBroadcastTarget() {
+        when(disasterEventRepository
+                .findFirstByBroadcastTrueAndPrimaryDisasterTypeAndPrimaryRegionCodeStartingWithAndLastAlertAtAfterOrderByLastAlertAtDesc(
+                        anyString(), anyString(), any(LocalDateTime.class)))
+                .thenReturn(Optional.of(broadcastEvent(EXISTING_EVENT_ID)));
+    }
+
+    private void givenNationwideBroadcastTarget() {
+        when(disasterEventRepository
+                .findFirstByBroadcastTrueAndPrimaryDisasterTypeAndPrimaryRegionCodeIsNullAndLastAlertAtAfterOrderByLastAlertAtDesc(
+                        anyString(), any(LocalDateTime.class)))
+                .thenReturn(Optional.of(broadcastEvent(EXISTING_EVENT_ID)));
+    }
+
+    /** 지역 이벤트 후보 조회·앵커 조회·임베딩이 전혀 일어나지 않았음 — 지역 이벤트 footprint 를 넓힐 경로가 없다. */
+    private void verifyLocalPathsUntouched() {
+        verifyEmbeddingPathSkipped();
+        verify(disasterEventRepository, never())
+                .findRegionalTypeMergeTarget(anyString(), any(String[].class), any(LocalDateTime.class));
+    }
+
+    private void assertMergedBroadcast(long eventId) {
+        ArgumentCaptor<EventAlertMapping> mapping = ArgumentCaptor.forClass(EventAlertMapping.class);
+        verify(eventAlertMappingRepository).save(mapping.capture());
+        assertThat(mapping.getValue().getMergeMethod()).isEqualTo(MergeMethod.BROADCAST);
+        verify(disasterEventRepository).incrementOnMerge(eventId, now);
+        verify(eventPublisher).publishEvent(new AlertClusteredEvent(eventId, 1L));
+        verify(disasterEventRepository, never()).save(any(DisasterEvent.class));
+    }
+
+    private DisasterEvent assertSavedOnlyBroadcastEvent() {
+        ArgumentCaptor<DisasterEvent> event = ArgumentCaptor.forClass(DisasterEvent.class);
+        verify(disasterEventRepository).save(event.capture());
+        assertThat(event.getValue().isBroadcast()).isTrue();
+        return event.getValue();
+    }
+
+    @ParameterizedTest(name = "6) 다지역 에피소드형(폭염) 시군구 {0}개 + 같은 시도 broadcast 이벤트 있음: 임베딩·지역 조회 없이 BROADCAST 머지")
     @ValueSource(ints = {2, 3})
-    void multiRegion_goesEmbeddingPath(int count) {
-        String[] all = {"4480000000", "4375000000", "4376000000"};
-        String[] codes = java.util.Arrays.copyOf(all, count);
-        alert("폭염", HEAT_WARNING, codes);
+    void multiRegionEpisodic_mergesIntoBroadcastEvent(int count) {
+        alert("폭염", HEAT_WARNING, java.util.Arrays.copyOf(SAME_SIDO_CODES, count));
+        givenSidoBroadcastTarget();
+        givenMergeTarget();
+
+        service.clusterNewAlert(1L);
+
+        verifyLocalPathsUntouched();
+        verify(disasterEventRepository)
+                .findFirstByBroadcastTrueAndPrimaryDisasterTypeAndPrimaryRegionCodeStartingWithAndLastAlertAtAfterOrderByLastAlertAtDesc(
+                        eq("폭염"), eq("43"), eq(now.minusHours(168)));
+        assertMergedBroadcast(EXISTING_EVENT_ID);
+    }
+
+    @ParameterizedTest(name = "6a) 다지역 에피소드형(폭염) 시군구 {0}개 + broadcast 이벤트 없음: 임베딩·지역 조회 없이 신규 broadcast 이벤트")
+    @ValueSource(ints = {2, 3})
+    void multiRegionEpisodic_createsNewBroadcastEvent(int count) {
+        alert("폭염", HEAT_WARNING, java.util.Arrays.copyOf(SAME_SIDO_CODES, count));
+        givenMergeTarget();
+        when(disasterEventRepository
+                .findFirstByBroadcastTrueAndPrimaryDisasterTypeAndPrimaryRegionCodeStartingWithAndLastAlertAtAfterOrderByLastAlertAtDesc(
+                        anyString(), anyString(), any(LocalDateTime.class)))
+                .thenReturn(Optional.empty());
+
+        service.clusterNewAlert(1L);
+
+        verifyLocalPathsUntouched();
+        assertSavedOnlyBroadcastEvent();
+        verify(disasterEventRepository, never()).incrementOnMerge(any(), any());
+    }
+
+    @Test
+    @DisplayName("6b) 광역(11개 시군구 > maxRegionSpan) 에피소드형도 broadcast - 새 에피소드형 단계가 처리해 임베딩·후보 조회 미호출")
+    void wideRegionEpisodic_goesBroadcastPath() {
+        alert("폭염", HEAT_WARNING, WIDE_CODES);
+        givenMergeTarget();
+
+        service.clusterNewAlert(1L);
+
+        verifyLocalPathsUntouched();
+        assertSavedOnlyBroadcastEvent();
+    }
+
+    @Test
+    @DisplayName("6c) 시도 span >= nationwideSidoSpan 인 다지역 에피소드형은 '전국' broadcast - 유형만 키, primary_region_code null")
+    void nationwideEpisodic_goesNationwideBroadcast() {
+        alert("폭염", HEAT_WARNING, NATIONWIDE_CODES);
+        givenNationwideBroadcastTarget();
+        givenMergeTarget();
+
+        service.clusterNewAlert(1L);
+
+        verifyLocalPathsUntouched();
+        verify(disasterEventRepository)
+                .findFirstByBroadcastTrueAndPrimaryDisasterTypeAndPrimaryRegionCodeIsNullAndLastAlertAtAfterOrderByLastAlertAtDesc(
+                        eq("폭염"), eq(now.minusHours(168)));
+        assertMergedBroadcast(EXISTING_EVENT_ID);
+    }
+
+    @Test
+    @DisplayName("6d) 전국 broadcast 대상이 없으면 primary_region_code null, 라벨 '전국' 의 신규 broadcast 이벤트")
+    void nationwideEpisodic_createsNewNationwideBroadcast() {
+        alert("폭염", HEAT_WARNING, NATIONWIDE_CODES);
+        when(disasterEventRepository
+                .findFirstByBroadcastTrueAndPrimaryDisasterTypeAndPrimaryRegionCodeIsNullAndLastAlertAtAfterOrderByLastAlertAtDesc(
+                        anyString(), any(LocalDateTime.class)))
+                .thenReturn(Optional.empty());
+
+        service.clusterNewAlert(1L);
+
+        verifyLocalPathsUntouched();
+        DisasterEvent saved = assertSavedOnlyBroadcastEvent();
+        assertThat(saved.getPrimaryRegionCode()).isNull();
+        assertThat(saved.getPrimaryRegionName()).isEqualTo("전국");
+    }
+
+    @Test
+    @DisplayName("6e) 시도 span 이 nationwideSidoSpan 미만이면 시도 광역 - 최다 시군구 시도(서울=11) 키로 조회")
+    void sidoWideEpisodic_usesDominantSidoKey() {
+        alert("폭염", HEAT_WARNING, SIDO_WIDE_CODES);
+        givenSidoBroadcastTarget();
+        givenMergeTarget();
+
+        service.clusterNewAlert(1L);
+
+        verifyLocalPathsUntouched();
+        verify(disasterEventRepository)
+                .findFirstByBroadcastTrueAndPrimaryDisasterTypeAndPrimaryRegionCodeStartingWithAndLastAlertAtAfterOrderByLastAlertAtDesc(
+                        eq("폭염"), eq("11"), eq(now.minusHours(168)));
+        verify(disasterEventRepository, never())
+                .findFirstByBroadcastTrueAndPrimaryDisasterTypeAndPrimaryRegionCodeIsNullAndLastAlertAtAfterOrderByLastAlertAtDesc(
+                        anyString(), any(LocalDateTime.class));
+        assertMergedBroadcast(EXISTING_EVENT_ID);
+    }
+
+    @ParameterizedTest(name = "6f) 에피소드형 유형 {0} 도 다지역이면 broadcast 로 간다")
+    @CsvSource(delimiter = '|', value = {
+            "폭염|폭염경보 발효, 야외활동 자제 바랍니다.",
+            "한파|한파경보 발효, 보온에 유의 바랍니다.",
+            "대설|대설주의보 발효 중, 차량 운행에 주의 바랍니다.",
+            "강풍|강풍주의보 발효 중, 시설물 관리에 유의 바랍니다.",
+            "가축질병|구제역 발생, 축산농가 이동 제한 및 소독 바랍니다."
+    })
+    void allEpisodicTypes_multiRegionGoBroadcast(String type, String message) {
+        alert(type, message, SAME_SIDO_CODES);
+        givenMergeTarget();
+
+        service.clusterNewAlert(1L);
+
+        verifyLocalPathsUntouched();
+        assertSavedOnlyBroadcastEvent();
+    }
+
+    @Test
+    @DisplayName("6g) 다지역 에피소드형은 지역 이벤트를 넓히지 않는다 - 후보·앵커 조회가 없어 REGIONAL_TYPE/EMBEDDING 머지 불가, 저장되는 이벤트는 broadcast 뿐")
+    void multiRegionEpisodic_neverWidensLocalEvent() {
+        alert("폭염", HEAT_WARNING, SAME_SIDO_CODES);
+        givenMergeTarget();
+        when(disasterEventRepository.findTopCandidates(anyString(), any(String[].class), any(LocalDateTime.class)))
+                .thenReturn(java.util.Collections.singletonList(new Object[]{EXISTING_EVENT_ID, 0.01}));
+
+        service.clusterNewAlert(1L);
+
+        verifyLocalPathsUntouched();
+        verify(eventAlertMappingRepository, never()).save(org.mockito.ArgumentMatchers.argThat(
+                m -> m.getMergeMethod() == MergeMethod.EMBEDDING || m.getMergeMethod() == MergeMethod.REGIONAL_TYPE));
+        verify(disasterEventRepository, never()).incrementOnMerge(eq(EXISTING_EVENT_ID), any());
+        assertSavedOnlyBroadcastEvent();
+    }
+
+    @ParameterizedTest(name = "6h) 사고성 유형(화재) 다지역 {0}개는 전파 허용 - 기존 임베딩 경로, broadcast 아님 [현재 동작과 같아 통과]")
+    @ValueSource(ints = {2, 3})
+    void accidentMultiRegion_staysOnEmbeddingPath(int count) {
+        alert("화재", "공장 화재 발생, 인근 주민은 대피 바랍니다.", java.util.Arrays.copyOf(SAME_SIDO_CODES, count));
         givenMergeTarget();
 
         service.clusterNewAlert(1L);
@@ -272,26 +454,36 @@ class EventClusteringServiceEpisodicTypeTest {
         verifyEmbeddingPathTaken();
         ArgumentCaptor<DisasterEvent> event = ArgumentCaptor.forClass(DisasterEvent.class);
         verify(disasterEventRepository).save(event.capture());
-        assertThat(event.getValue().isAdvisory()).isFalse();
+        assertThat(event.getValue().isBroadcast()).isFalse();
     }
 
-    @Test
-    @DisplayName("6b) 광역(11개 시군구 > maxRegionSpan)은 앵커링하지 않고 기존 broadcast 경로 [현재 동작과 같아 뼈대도 통과]")
-    void wideRegion_goesBroadcastPath() {
-        String[] codes = {"1111000000", "1114000000", "1117000000", "1120000000", "1121000000", "1123000000",
-                "1126000000", "1129000000", "1130000000", "1132000000", "1135000000"};
-        alert("폭염", HEAT_WARNING, codes);
+    @ParameterizedTest(name = "6i) 비대상 유형(호우) 다지역 {0}개도 기존 임베딩 경로 [현재 동작과 같아 통과]")
+    @ValueSource(ints = {2, 3})
+    void nonEpisodicMultiRegion_staysOnEmbeddingPath(int count) {
+        alert("호우", "호우주의보 발효 중, 하천 접근을 자제 바랍니다.", java.util.Arrays.copyOf(SAME_SIDO_CODES, count));
         givenMergeTarget();
 
         service.clusterNewAlert(1L);
 
-        verify(disasterEventRepository, never())
-                .findRegionalTypeMergeTarget(anyString(), any(String[].class), any(LocalDateTime.class));
-        verify(disasterEventRepository, never())
-                .findTopCandidates(anyString(), any(String[].class), any(LocalDateTime.class));
+        verifyEmbeddingPathTaken();
         ArgumentCaptor<DisasterEvent> event = ArgumentCaptor.forClass(DisasterEvent.class);
         verify(disasterEventRepository).save(event.capture());
-        assertThat(event.getValue().isBroadcast()).isTrue();
+        assertThat(event.getValue().isBroadcast()).isFalse();
+    }
+
+    @Test
+    @DisplayName("6j) episodicTypesCsv 가 빈 문자열이면 폭염 다지역도 기존 임베딩 경로 [현재 동작과 같아 통과]")
+    void emptyEpisodicTypes_multiRegionHeatGoesEmbeddingPath() {
+        ReflectionTestUtils.setField(service, "episodicTypesCsv", "");
+        alert("폭염", HEAT_WARNING, SAME_SIDO_CODES);
+        givenMergeTarget();
+
+        service.clusterNewAlert(1L);
+
+        verifyEmbeddingPathTaken();
+        ArgumentCaptor<DisasterEvent> event = ArgumentCaptor.forClass(DisasterEvent.class);
+        verify(disasterEventRepository).save(event.capture());
+        assertThat(event.getValue().isBroadcast()).isFalse();
     }
 
     @ParameterizedTest(name = "7) 대상이 아닌 유형 {0}: 앵커링하지 않고 기존 경로 [현재 동작과 같아 뼈대도 통과]")
