@@ -38,7 +38,7 @@ public class EventController {
      * @param startDate    기간 시작 (yyyy-MM-dd, overlap)
      * @param endDate      기간 끝 (yyyy-MM-dd, overlap)
      * @param keyword      제목 키워드 (event_title contains)
-     * @param advisory     null=전체(기존 호환), false=사건만, true=안내성만 (산불 예방안내 분리)
+     * @param advisory     null=전체(기존 호환), false=사건만, true=안내성만 (산불·폭염·한파 안내성 분리)
      */
     @GetMapping
     public ResponseEntity<Page<EventListResponse>> list(

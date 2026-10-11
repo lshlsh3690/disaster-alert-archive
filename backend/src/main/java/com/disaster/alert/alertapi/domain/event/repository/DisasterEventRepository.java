@@ -168,7 +168,7 @@ public interface DisasterEventRepository extends JpaRepository<DisasterEvent, Lo
      * #findTopCandidates}와 동일한 EXISTS 필터). {@code is_broadcast=false}만 — 광역 산불은 호출 측이
      * span 게이트로 걸러 broadcast 경로로 보낸다. 동률(같은 윈도우 다수 후보)은 last_alert_at DESC 로 결정적.
      *
-     * @param type         새 알림 유형 (예: "산불")
+     * @param type         새 알림 유형 (예: "산불", "폭염")
      * @param sigunguCodes 새 알림 시군구 코드(앞 5자) 배열 — footprint 교집합 키
      * @param sinceTime    윈도우 하한 (유형별: 산불 14일 / 산사태·홍수 7일 전)
      * @return 머지할 이벤트 id, 없으면 empty(신규 이벤트)
@@ -197,8 +197,8 @@ public interface DisasterEventRepository extends JpaRepository<DisasterEvent, Lo
 
     /**
      * 안내성 롤링 이벤트 머지 대상 검색 — 같은 유형 + 같은 시군구(footprint 교집합) + 윈도우 안의
-     * {@code is_advisory=true} 이벤트 중 가장 최근 1개. 산불 건조특보·소각금지·예방캠페인 등 안내 알림을
-     * 시군구별 "{시군구} 산불예방안내" 하나로 모은다.
+     * {@code is_advisory=true} 이벤트 중 가장 최근 1개. 산불 건조특보·소각금지·예방캠페인, 폭염·한파 일반 안내 등을
+     * 시군구별 안내 이벤트 하나로 모은다.
      *
      * <p>{@link #findRegionalTypeMergeTarget}(사건, is_advisory=false)의 거울상 — 같은 시군구·유형·윈도우
      * 키이되 안내성 이벤트만 대상이라, 안내성과 사건이 서로의 버킷에 섞이지 않는다. 같은 시군구의 연속
@@ -224,16 +224,11 @@ public interface DisasterEventRepository extends JpaRepository<DisasterEvent, Lo
             ORDER BY e.last_alert_at DESC
             LIMIT 1
             """, nativeQuery = true)
-    Optional<Long> findFireAdvisoryMergeTarget(
+    Optional<Long> findAdvisoryMergeTarget(
             @Param("type") String type,
             @Param("sigunguCodes") String[] sigunguCodes,
             @Param("sinceTime") LocalDateTime sinceTime
     );
-
-    // Red 단계 뼈대 — 구현은 Green 에서 (findFireAdvisoryMergeTarget 일반화 예정)
-    default Optional<Long> findAdvisoryMergeTarget(String type, String[] sigunguCodes, LocalDateTime since) {
-        return Optional.empty();
-    }
 
     /**
      * 광역 broadcast 이벤트 머지 대상 검색 — 같은 시도 + 같은 유형 + 윈도우 안의 broadcast 이벤트 1개.

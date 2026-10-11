@@ -3,10 +3,10 @@ package com.disaster.alert.alertapi.domain.event.service;
 import com.disaster.alert.alertapi.domain.disasteralert.model.DisasterAlert;
 import com.disaster.alert.alertapi.domain.disasteralert.model.DisasterAlertRegion;
 import com.disaster.alert.alertapi.domain.disasteralert.repository.DisasterAlertRepository;
+import com.disaster.alert.alertapi.domain.event.model.AdvisoryClassifier;
 import com.disaster.alert.alertapi.domain.event.model.DisasterCooldown;
 import com.disaster.alert.alertapi.domain.event.model.DisasterEvent;
 import com.disaster.alert.alertapi.domain.event.model.EventAlertMapping;
-import com.disaster.alert.alertapi.domain.event.model.FireAlertClassifier;
 import com.disaster.alert.alertapi.domain.event.model.MergeMethod;
 import com.disaster.alert.alertapi.domain.event.model.MissingPersonIdentity;
 import com.disaster.alert.alertapi.domain.event.repository.AlertEmbeddingRepository;
@@ -106,11 +106,12 @@ public class EventClusteringService {
     private String regionalTypesCsv;
 
     /**
-     * 안내성 분리 적용 유형(쉼표 구분) — 안내성(예방·캠페인)이 실사건과 독립적이고 시즌 내내 반복돼
-     * 사건 버킷을 blob 으로 만드는 유형만. 산불만 해당 — 산사태·홍수는 안내(조기경보)가 같은 호우
-     * episode 에 강결합이라 분리하면 타임라인이 깨진다(실데이터). regional-types 의 부분집합이어야 한다.
+     * 안내성 분리 적용 유형(쉼표 구분) — 안내성(예방·캠페인·일반 행동요령)이 실사건과 독립적이고 시즌 내내
+     * 반복돼 사건 버킷을 늘리는 유형만. 산불·폭염·한파 — 산사태·홍수는 안내(조기경보)가 같은 호우
+     * episode 에 강결합이라 분리하면 타임라인이 깨진다(실데이터). 산불은 regional-types 윈도우를,
+     * 폭염·한파(regional-types 에 없음)는 유형 cooldown 을 머지 윈도우로 쓴다.
      */
-    @Value("${clustering.advisory-split-types:산불}")
+    @Value("${clustering.advisory-split-types:산불,폭염,한파}")
     private String advisorySplitTypesCsv;
 
     private Set<String> accidentTypes;
@@ -183,6 +184,14 @@ public class EventClusteringService {
         //     며칠 burst 로 쏟아질 때 본문 텍스트가 갈려(코사인<0.85) 임베딩 경로가 한 사건을 수십 개로
         //     파편화하던 것을 차단. 태풍(GLOBAL_TYPE)과 같은 철학이되 전국이 아니라 시군구 스코프(blob 방지).
         if (clusterRegionalType(alert)) {
+            return;
+        }
+
+        // 0.8 폭염·한파 일반 안내 — regional-types 에는 못 넣는 유형(매일 발령 → 윈도우 체인 blob)이라
+        //     clusterRegionalType 밖에서 안내 이벤트로만 분리한다. 특보 발효·피해 문구는 여기서 false 라
+        //     아래 임베딩 경로 그대로. 임베딩·LLM 호출 전에 분기해 비용도 들지 않는다. 시군구 1개짜리만
+        //     대상 — 다지역 알림은 footprint 교집합 머지로 안내 이벤트를 도 단위 blob 으로 키운다(실측 약 8%).
+        if (clusterWeatherAdvisory(alert)) {
             return;
         }
 
@@ -461,8 +470,8 @@ public class EventClusteringService {
         //   태우지 않고 시군구별 롤링 안내 이벤트로 모은다. 안내성이 14일 윈도우로 시즌 내내 체이닝돼
         //   사건 버킷을 blob(span 130일+)으로 만들고 소수 실사건을 오염시키던 것을 발생 지점에서 차단.
         if (isAdvisorySplitType(alert.getDisasterType())
-                && FireAlertClassifier.isAdvisory(alert.getMessage(), alert.getEmergencyLevel())) {
-            clusterFireAdvisory(alert, regionCodes, windowHours);
+                && AdvisoryClassifier.isAdvisory(alert.getDisasterType(), alert.getMessage(), alert.getEmergencyLevel())) {
+            clusterAdvisory(alert, regionCodes, windowHours);
             return true;
         }
 
@@ -483,13 +492,38 @@ public class EventClusteringService {
     }
 
     /**
+     * regional-types 에 없는 안내 분리 유형(폭염·한파)의 일반 안내를 안내 이벤트로 보낸다. 윈도우는 별도
+     * 설정 없이 유형 cooldown(폭염·한파 168h) — 길이 상한은 두지 않는다(윈도우 안이면 계속 롤링).
+     * 시군구가 정확히 1개일 때만 처리한다 — 2개 이상(광역 포함)·지역 없음은 false → 기존 임베딩/broadcast 경로.
+     * findAdvisoryMergeTarget 이 footprint 교집합으로 머지해 다지역 알림이 안내 이벤트를 도 단위 blob 으로
+     * 키우기 때문이다(실측 다지역 안내 약 8%).
+     *
+     * @return 안내 이벤트로 처리하면 true
+     */
+    private boolean clusterWeatherAdvisory(DisasterAlert alert) {
+        String type = alert.getDisasterType();
+        if (!isAdvisorySplitType(type)) {
+            return false;
+        }
+        String[] regionCodes = extractRegionCodes(alert);
+        if (distinctSigunguCount(regionCodes) != 1) {
+            return false;
+        }
+        if (!AdvisoryClassifier.isAdvisory(type, alert.getMessage(), alert.getEmergencyLevel())) {
+            return false;
+        }
+        clusterAdvisory(alert, regionCodes, DisasterCooldown.hoursFor(type));
+        return true;
+    }
+
+    /**
      * 안내성 알림을 시군구별 롤링 안내 이벤트에 머지(없으면 신규). 같은 유형·같은 시군구·윈도우 안의
      * {@code is_advisory=true} 이벤트만 대상이라 사건 버킷과 섞이지 않는다. 임베딩·LLM 안 봄.
      */
-    private void clusterFireAdvisory(DisasterAlert alert, String[] regionCodes, int windowHours) {
+    private void clusterAdvisory(DisasterAlert alert, String[] regionCodes, int windowHours) {
         String[] sigungu = sigunguPrefixes(regionCodes);
         LocalDateTime since = alert.getCreatedAt().minusHours(windowHours);
-        Optional<Long> target = disasterEventRepository.findFireAdvisoryMergeTarget(
+        Optional<Long> target = disasterEventRepository.findAdvisoryMergeTarget(
                 alert.getDisasterType(), sigungu, since);
         if (target.isPresent()) {
             mergeIntoExisting(target.get(), alert, null, MergeMethod.ADVISORY);
