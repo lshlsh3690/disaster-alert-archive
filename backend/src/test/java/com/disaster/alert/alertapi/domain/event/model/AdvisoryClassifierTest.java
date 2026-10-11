@@ -87,14 +87,41 @@ class AdvisoryClassifierTest {
     }
 
     @Test
-    @DisplayName("폭염: 실제 피해/사고 표현(사망/사고/피해/정전/환자 발생)이 있으면 사건이다")
+    @DisplayName("폭염: 실제 발생을 말하는 표현(사망/사상자/부상/환자 발생)이 있으면 사건이다")
     void heat_damageExpressionIsIncident() {
         for (String msg : new String[]{
                 "폭염으로 온열질환자 사망, 야외활동 자제",
-                "폭염 관련 사고 발생, 유의 바랍니다",
-                "폭염 피해 접수 중, 유의",
-                "폭염으로 정전 발생, 자제 바랍니다",
+                "폭염으로 사상자 발생, 유의 바랍니다",
+                "폭염으로 부상자 접수 중, 유의",
+                "온열질환자 3명 발생, 자제 바랍니다",
                 "온열질환 환자 발생, 주의 바랍니다"}) {
+            assertThat(AdvisoryClassifier.isAdvisory("폭염", msg, DisasterLevel.LEVEL_1))
+                    .as(msg).isFalse();
+        }
+    }
+
+    @Test
+    @DisplayName("폭염: '사고'/'피해'/'정전' 일반 단어는 안내문 상투구라 사건 신호가 아니다")
+    void heat_genericWordsAreStillAdvisory() {
+        for (String msg : new String[]{
+                "물놀이 안전사고 주의",
+                "수상 안전사고 예방(음주 후 입수금지)",
+                "낙상사고 주의, 야외활동 자제",
+                "폭염 피해 예방을 위해 무더위쉼터를 이용하시기 바랍니다",
+                "정전 시 한전(123)에 신고하고 냉방기 사용을 자제해 주세요"}) {
+            assertThat(AdvisoryClassifier.isAdvisory("폭염", msg, DisasterLevel.LEVEL_1))
+                    .as(msg).isTrue();
+        }
+    }
+
+    @Test
+    @DisplayName("폭염: 실제 발생 표현은 사건이다 - 온열질환자 N명 발생 / 온열질환자가 발생 / 사망 / 사상자 발생")
+    void heat_actualOccurrenceIsIncident() {
+        for (String msg : new String[]{
+                "온열질환자 3명 발생",
+                "온열질환자가 발생했습니다",
+                "폭염으로 1명 사망",
+                "사상자 발생 야외활동 자제"}) {
             assertThat(AdvisoryClassifier.isAdvisory("폭염", msg, DisasterLevel.LEVEL_1))
                     .as(msg).isFalse();
         }
@@ -107,6 +134,17 @@ class AdvisoryClassifierTest {
     void cold_guidanceVsWarning() {
         assertThat(AdvisoryClassifier.isAdvisory("한파", COLD_GUIDE, DisasterLevel.LEVEL_1)).isTrue();
         assertThat(AdvisoryClassifier.isAdvisory("한파", "한파주의보 발효", DisasterLevel.LEVEL_1)).isFalse();
+    }
+
+    @Test
+    @DisplayName("한파: 빙판길 사고·동파·화재 등 상투구는 안내, 한랭질환자 N명 발생은 사건이다")
+    void cold_genericWordsAdvisoryButOccurrenceIncident() {
+        assertThat(AdvisoryClassifier.isAdvisory("한파",
+                "빙판길 사고와 수도 동파, 난방기구 화재 등 안전에 유의", DisasterLevel.LEVEL_1)).isTrue();
+        assertThat(AdvisoryClassifier.isAdvisory("한파",
+                "한랭질환자 2명 발생", DisasterLevel.LEVEL_1)).isFalse();
+        assertThat(AdvisoryClassifier.isAdvisory("한파",
+                "한파로 사망자 발생", DisasterLevel.LEVEL_1)).isFalse();
     }
 
     // ---- 경계 ----

@@ -211,6 +211,45 @@ class EventClusteringServiceAdvisoryTest {
     }
 
     @Test
+    @DisplayName("다지역 폭염 안내(시군구 2개/3개)는 안내 경로가 아니라 기존 임베딩 후보 검색 경로다 - 안내 이벤트 blob 방지")
+    void multiRegionHeatAdvisory_goesEmbeddingPath() {
+        String[][] cases = {
+                {"4480000000", "4375000000"},
+                {"4480000000", "4375000000", "4376000000"}};
+        for (String[] codes : cases) {
+            org.mockito.Mockito.clearInvocations(disasterEventRepository, embeddingModel, eventPublisher);
+            alert("폭염", HEAT_GUIDE, DisasterLevel.LEVEL_1, codes);
+            when(embeddingModel.embed(anyString())).thenReturn(new float[]{0.1f, 0.2f});
+
+            service.clusterNewAlert(1L);
+
+            verify(disasterEventRepository, never())
+                    .findAdvisoryMergeTarget(anyString(), any(String[].class), any(LocalDateTime.class));
+            verify(disasterEventRepository)
+                    .findTopCandidates(anyString(), any(String[].class), any(LocalDateTime.class));
+            ArgumentCaptor<DisasterEvent> event = ArgumentCaptor.forClass(DisasterEvent.class);
+            verify(disasterEventRepository).save(event.capture());
+            assertThat(event.getValue().isAdvisory()).as(String.valueOf(codes.length)).isFalse();
+        }
+    }
+
+    @Test
+    @DisplayName("다지역 한파 안내(시군구 2개)도 안내 경로가 아니라 기존 임베딩 후보 검색 경로다")
+    void multiRegionColdAdvisory_goesEmbeddingPath() {
+        alert("한파", COLD_GUIDE, DisasterLevel.LEVEL_1, "4375000000", "4376000000");
+        when(embeddingModel.embed(anyString())).thenReturn(new float[]{0.1f, 0.2f});
+
+        service.clusterNewAlert(1L);
+
+        verify(disasterEventRepository, never())
+                .findAdvisoryMergeTarget(anyString(), any(String[].class), any(LocalDateTime.class));
+        verify(disasterEventRepository).findTopCandidates(anyString(), any(String[].class), any(LocalDateTime.class));
+        ArgumentCaptor<DisasterEvent> event = ArgumentCaptor.forClass(DisasterEvent.class);
+        verify(disasterEventRepository).save(event.capture());
+        assertThat(event.getValue().isAdvisory()).isFalse();
+    }
+
+    @Test
     @DisplayName("advisorySplitTypes 에 폭염이 없으면(기존 기본값 산불) 폭염 안내도 기존처럼 임베딩 경로 - 회귀 방지")
     void heatAdvisory_withoutConfigStaysOnEmbeddingPath() {
         ReflectionTestUtils.setField(service, "advisorySplitTypesCsv", "산불");
