@@ -134,11 +134,11 @@ public class EventClusteringService {
     @Value("${clustering.adjacent-window-hours:48}")
     private int adjacentWindowHours;
 
-    /** 인접 시군구 병합 허용 이벤트 나이 상한(시간) — 후보 이벤트 첫 알림부터 새 알림까지. Red 단계 뼈대 — 인접 경로 전용. */
+    /** 인접 시군구 병합 허용 이벤트 나이 상한(시간) — 후보 이벤트 첫 알림부터 새 알림까지. 인접 경로 전용. */
     @Value("${clustering.adjacent-max-event-age-hours:72}")
     private int adjacentMaxEventAgeHours;
 
-    /** 안내 이벤트 병합 윈도우(시간) — 안내성 유형(기타 등) 전용. Red 단계 뼈대 — 구현은 Green 에서. */
+    /** 안내 이벤트 병합 윈도우(시간) — 안내성 유형(기타 등) 전용. 산불은 regional-types 윈도우를 쓴다. */
     @Value("${clustering.advisory-window-hours:168}")
     private int advisoryWindowHours;
 
@@ -633,10 +633,33 @@ public class EventClusteringService {
 
     /**
      * 안내성 유형(advisory-split-types, 산불 제외 — 산불은 clusterRegionalType 에서 처리)의 안내 알림을
-     * 시군구별 안내 이벤트로 모은다. Red 단계 뼈대 — 구현은 Green 에서(항상 false → 동작 불변).
+     * 시군구별 안내 이벤트로 모은다. 평가 DB 에서 "기타" 물놀이 안내문이 인접 시군구 병합으로 이어 붙어
+     * 7개 시군구·44일짜리 이벤트가 된 것이 실측됐다. 안내문은 사건이 아니므로 임베딩·후보 조회·LLM 을 거치지
+     * 않고 시군구별 안내 이벤트(is_advisory=true)로 직접 모은다. 이웃 시군구 병합은 후보 검색이
+     * is_advisory=false 만 보기 때문에 안내 이벤트가 사건 후보가 되지 않아 차단된다.
+     *
+     * <p>산불은 지역앵커 유형이라 clusterRegionalType 이 유형별 윈도우로 처리하므로 여기서 제외한다.
+     * 다지역(시군구 2개 이상) 안내문은 시군구 사이 다리를 만들지 않도록 광역 경로로 보낸다.
+     *
+     * @return 안내성으로 처리하면 true (대상 아님/지역코드 없음이면 false)
      */
     private boolean clusterAdvisoryType(DisasterAlert alert) {
-        return false;
+        String type = alert.getDisasterType();
+        if (!isAdvisorySplitType(type) || regionalTypeWindowHours(type) != null
+                || !AdvisoryClassifier.isAdvisory(type, alert.getMessage(), alert.getEmergencyLevel())) {
+            return false;
+        }
+        String[] regionCodes = extractRegionCodes(alert);
+        if (regionCodes.length == 0) {
+            return false;
+        }
+        int sigunguSpan = distinctSigunguCount(regionCodes);
+        if (sigunguSpan > 1) {
+            clusterBroadcast(alert, regionCodes, sigunguSpan);
+        } else {
+            clusterAdvisory(alert, regionCodes, advisoryWindowHours);
+        }
+        return true;
     }
 
     /** 에피소드형 유형 매칭. 유형 null 이거나 목록이 비어 있으면 적용하지 않는다. */
