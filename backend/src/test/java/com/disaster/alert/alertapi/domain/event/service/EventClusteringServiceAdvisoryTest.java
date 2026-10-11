@@ -4,12 +4,9 @@ import com.disaster.alert.alertapi.domain.disasteralert.model.DisasterAlert;
 import com.disaster.alert.alertapi.domain.disasteralert.model.DisasterLevel;
 import com.disaster.alert.alertapi.domain.disasteralert.repository.DisasterAlertRepository;
 import com.disaster.alert.alertapi.domain.event.model.DisasterEvent;
-import com.disaster.alert.alertapi.domain.event.model.EventAlertMapping;
-import com.disaster.alert.alertapi.domain.event.model.MergeMethod;
 import com.disaster.alert.alertapi.domain.event.repository.AlertEmbeddingRepository;
 import com.disaster.alert.alertapi.domain.event.repository.DisasterEventRepository;
 import com.disaster.alert.alertapi.domain.event.repository.EventAlertMappingRepository;
-import com.disaster.alert.alertapi.domain.risk.event.AlertClusteredEvent;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -36,11 +33,12 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
- * 안내성 분리를 산불 외 폭염·한파로 확장한 라우팅 검증.
+ * 안내성 분리(산불) 라우팅 검증.
  *
- * <p>가정: 레포 메서드 {@code findFireAdvisoryMergeTarget} 을 {@code findAdvisoryMergeTarget(type, sigunguCodes, since)}
- * 로 일반화. 머지 윈도우는 별도 설정값이 아니라 유형별 {@code DisasterCooldown.hoursFor}(폭염·한파 168h)이고,
- * 산불 안내는 기존 regional-types 윈도우(336h)를 그대로 쓴다.
+ * <p>폭염·한파의 안내성 분리는 에피소드형 유형 앵커링({@link EventClusteringServiceEpisodicTypeTest})으로
+ * 대체되어 이 클래스에서 다루지 않는다. 안내성 분리는 {@code advisory-split-types} 기본값 "산불" 만 대상이며,
+ * 레포 메서드 {@code findAdvisoryMergeTarget(type, sigunguCodes, since)} 의 윈도우는 산불의 regional-types
+ * 윈도우(336h)다.
  */
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
@@ -49,9 +47,6 @@ class EventClusteringServiceAdvisoryTest {
     private static final String HEAT_GUIDE =
             "오늘 무더위가 예상됩니다.▲낮 시간 논·밭작업 및 야외활동 자제▲무더위쉼터 이용"
                     + "▲폭염안전수칙(물,그늘,휴식)을 준수하여 건강관리에 유의하시기 바랍니다.[홍성군]";
-    private static final String COLD_GUIDE =
-            "강한 한파 지속 ▲방한용품 착용 ▲한랭질환 주의 ... 안전에 유의 [영동군]";
-    private static final String HEAT_WARNING = "폭염경보 발효, 야외활동 자제 바랍니다.[홍성군]";
 
     @Mock EmbeddingModel embeddingModel;
     @Mock DisasterAlertRepository disasterAlertRepository;
@@ -78,9 +73,9 @@ class EventClusteringServiceAdvisoryTest {
         ReflectionTestUtils.setField(service, "animalKeywords", "탈출|출몰|멧돼지|들개|늑대");
         ReflectionTestUtils.setField(service, "globalTypesCsv", "태풍");
         ReflectionTestUtils.setField(service, "globalWindowHours", 168);
-        // 폭염·한파는 regional-types 에 넣지 않는다(매일 발령 -> 윈도우 체인 blob).
         ReflectionTestUtils.setField(service, "regionalTypesCsv", "산불:336,산사태:168,홍수:168");
-        ReflectionTestUtils.setField(service, "advisorySplitTypesCsv", "산불,폭염,한파");
+        // 폭염·한파는 더 이상 안내성 분리를 하지 않는다(에피소드형 앵커링으로 대체) — 새 기본값 "산불".
+        ReflectionTestUtils.setField(service, "advisorySplitTypesCsv", "산불");
 
         when(disasterEventRepository.save(any(DisasterEvent.class))).thenAnswer(inv -> {
             DisasterEvent e = inv.getArgument(0);
@@ -101,94 +96,6 @@ class EventClusteringServiceAdvisoryTest {
         }
         when(disasterAlertRepository.findById(1L)).thenReturn(Optional.of(a));
         return a;
-    }
-
-    private void verifyEmbeddingPathSkipped() {
-        verify(embeddingModel, never()).embed(anyString());
-        verify(disasterEventRepository, never())
-                .findTopCandidates(anyString(), any(String[].class), any(LocalDateTime.class));
-    }
-
-    @Test
-    @DisplayName("폭염 안내: 같은 시군구 안내 이벤트가 윈도우 안에 있으면 임베딩 없이 ADVISORY 머지 + incrementOnMerge + 이벤트 발행")
-    void heatAdvisory_mergesIntoExistingAdvisoryEvent() {
-        alert("폭염", HEAT_GUIDE, DisasterLevel.LEVEL_1, "4480000000");
-        when(disasterEventRepository.findAdvisoryMergeTarget(eq("폭염"), any(String[].class), any(LocalDateTime.class)))
-                .thenReturn(Optional.of(55L));
-        when(eventAlertMappingRepository.countByEventId(55L)).thenReturn(3);
-
-        service.clusterNewAlert(1L);
-
-        verifyEmbeddingPathSkipped();
-        ArgumentCaptor<EventAlertMapping> mapping = ArgumentCaptor.forClass(EventAlertMapping.class);
-        verify(eventAlertMappingRepository).save(mapping.capture());
-        assertThat(mapping.getValue().getMergeMethod()).isEqualTo(MergeMethod.ADVISORY);
-        assertThat(mapping.getValue().getSequenceNo()).isEqualTo(4);
-        verify(disasterEventRepository).incrementOnMerge(55L, now);
-        verify(eventPublisher).publishEvent(new AlertClusteredEvent(55L, 1L));
-    }
-
-    @Test
-    @DisplayName("폭염 안내: 대상이 없으면 createAdvisory 로 신규 안내 이벤트 + SEED 매핑 + AlertClusteredEvent 발행")
-    void heatAdvisory_createsNewAdvisoryEventWhenNoTarget() {
-        alert("폭염", HEAT_GUIDE, DisasterLevel.LEVEL_1, "4480000000");
-        when(disasterEventRepository.findAdvisoryMergeTarget(anyString(), any(String[].class), any(LocalDateTime.class)))
-                .thenReturn(Optional.empty());
-
-        service.clusterNewAlert(1L);
-
-        verifyEmbeddingPathSkipped();
-        ArgumentCaptor<DisasterEvent> event = ArgumentCaptor.forClass(DisasterEvent.class);
-        verify(disasterEventRepository).save(event.capture());
-        assertThat(event.getValue().isAdvisory()).isTrue();
-        assertThat(event.getValue().getPrimaryDisasterType()).isEqualTo("폭염");
-        ArgumentCaptor<EventAlertMapping> mapping = ArgumentCaptor.forClass(EventAlertMapping.class);
-        verify(eventAlertMappingRepository).save(mapping.capture());
-        assertThat(mapping.getValue().getMergeMethod()).isEqualTo(MergeMethod.SEED);
-        verify(eventPublisher).publishEvent(new AlertClusteredEvent(900L, 1L));
-    }
-
-    @Test
-    @DisplayName("안내 윈도우: 폭염 since 는 알림 시각 - DisasterCooldown.hoursFor(폭염)=168h 로 조회한다")
-    void heatAdvisory_usesCooldownWindow168h() {
-        alert("폭염", HEAT_GUIDE, DisasterLevel.LEVEL_1, "4480000000");
-        when(disasterEventRepository.findAdvisoryMergeTarget(anyString(), any(String[].class), any(LocalDateTime.class)))
-                .thenReturn(Optional.empty());
-
-        service.clusterNewAlert(1L);
-
-        ArgumentCaptor<LocalDateTime> since = ArgumentCaptor.forClass(LocalDateTime.class);
-        verify(disasterEventRepository).findAdvisoryMergeTarget(eq("폭염"), eq(new String[]{"44800"}), since.capture());
-        assertThat(since.getValue()).isEqualTo(now.minusHours(168));
-    }
-
-    @Test
-    @DisplayName("안내 윈도우: 한파도 168h, 윈도우 밖(레포가 대상 없음 반환)이면 신규 안내 이벤트를 만든다")
-    void coldAdvisory_usesCooldownWindow168h_andCreatesNewWhenOutside() {
-        alert("한파", COLD_GUIDE, DisasterLevel.LEVEL_1, "4375000000");
-        when(disasterEventRepository.findAdvisoryMergeTarget(anyString(), any(String[].class), any(LocalDateTime.class)))
-                .thenReturn(Optional.empty());
-
-        service.clusterNewAlert(1L);
-
-        ArgumentCaptor<LocalDateTime> since = ArgumentCaptor.forClass(LocalDateTime.class);
-        verify(disasterEventRepository).findAdvisoryMergeTarget(eq("한파"), any(String[].class), since.capture());
-        assertThat(since.getValue()).isEqualTo(now.minusHours(168));
-        verify(disasterEventRepository).save(any(DisasterEvent.class));
-        verify(disasterEventRepository, never()).incrementOnMerge(any(), any());
-    }
-
-    @Test
-    @DisplayName("폭염이라도 특보 발효 문구는 안내 경로를 타지 않고 기존 임베딩 후보 검색 경로로 간다")
-    void heatWarning_goesThroughEmbeddingPath() {
-        alert("폭염", HEAT_WARNING, DisasterLevel.LEVEL_1, "4480000000");
-        when(embeddingModel.embed(anyString())).thenReturn(new float[]{0.1f, 0.2f});
-
-        service.clusterNewAlert(1L);
-
-        verify(disasterEventRepository).findTopCandidates(anyString(), any(String[].class), any(LocalDateTime.class));
-        verify(disasterEventRepository, never())
-                .findAdvisoryMergeTarget(anyString(), any(String[].class), any(LocalDateTime.class));
     }
 
     @Test
@@ -231,20 +138,6 @@ class EventClusteringServiceAdvisoryTest {
             verify(disasterEventRepository).save(event.capture());
             assertThat(event.getValue().isAdvisory()).as(String.valueOf(codes.length)).isFalse();
         }
-    }
-
-    @Test
-    @DisplayName("advisorySplitTypes 에 폭염이 없으면(기존 기본값 산불) 폭염 안내도 기존처럼 임베딩 경로 - 회귀 방지")
-    void heatAdvisory_withoutConfigStaysOnEmbeddingPath() {
-        ReflectionTestUtils.setField(service, "advisorySplitTypesCsv", "산불");
-        alert("폭염", HEAT_GUIDE, DisasterLevel.LEVEL_1, "4480000000");
-        when(embeddingModel.embed(anyString())).thenReturn(new float[]{0.1f, 0.2f});
-
-        service.clusterNewAlert(1L);
-
-        verify(disasterEventRepository).findTopCandidates(anyString(), any(String[].class), any(LocalDateTime.class));
-        verify(disasterEventRepository, never())
-                .findAdvisoryMergeTarget(anyString(), any(String[].class), any(LocalDateTime.class));
     }
 
     @Test

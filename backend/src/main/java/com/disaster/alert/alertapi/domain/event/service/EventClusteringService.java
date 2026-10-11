@@ -122,6 +122,15 @@ public class EventClusteringService {
     @Value("${clustering.relaxed-similarity-threshold:0.65}")
     private double relaxedSimilarityThreshold;
 
+    // Red 단계 뼈대 — 구현은 Green 에서 (판정 로직에서는 아직 사용하지 않음)
+    /** 에피소드형 유형(쉼표 구분) — "유형 + 시군구" 단위 하나의 이벤트로 이어 가는 유형. */
+    @Value("${clustering.episodic-types:폭염,한파,대설,강풍,가축질병}")
+    private String episodicTypesCsv;
+
+    /** 에피소드형 유형의 끊김 기준(시간) — 같은 유형+시군구의 마지막 알림 이후 이 시간이 지나면 새 이벤트. */
+    @Value("${clustering.episodic-window-hours:168}")
+    private int episodicWindowHours;
+
     private Set<String> accidentTypes;
     private Pattern animalPattern;
     private Set<String> globalTypes;
