@@ -130,6 +130,10 @@ public class EventClusteringService {
     @Value("${clustering.episodic-window-hours:168}")
     private int episodicWindowHours;
 
+    /** 사고성 유형의 인접 시군구 후보 조회 윈도우(시간) — Red 단계 뼈대, 사용 로직은 Green 에서. */
+    @Value("${clustering.adjacent-window-hours:48}")
+    private int adjacentWindowHours;
+
     private Set<String> accidentTypes;
     private Pattern animalPattern;
     private Set<String> globalTypes;

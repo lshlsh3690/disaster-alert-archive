@@ -155,6 +155,14 @@ public interface DisasterEventRepository extends JpaRepository<DisasterEvent, Lo
     );
 
     /**
+     * 사고성 유형의 인접 시군구 후보 검색 — {@link #findTopCandidates} 와 같은 반환 형태({eventId, minDistance}).
+     * Red 단계 뼈대 — Green 에서 @Query 로 교체.
+     */
+    default List<Object[]> findTopAdjacentCandidates(String newEmbedding, String[] sigunguCodes, LocalDateTime sinceTime) {
+        return List.of();
+    }
+
+    /**
      * 지역앵커 유형 머지 대상 검색 — 같은 유형 + 같은 시군구(footprint 교집합) + 윈도우 안의
      * non-broadcast 이벤트 중 가장 최근 1개. 산불·산사태·홍수처럼 "유형+시군구가 곧 사건"인 이산
      * 재난용.
