@@ -113,9 +113,6 @@ public class EventClusteringService {
     @Value("${clustering.advisory-split-types:산불}")
     private String advisorySplitTypesCsv;
 
-    // Red 단계 뼈대 — 구현은 Green 에서 (폭염·한파 안내 gap 윈도우, 기본 72h)
-    private int advisoryWindowHours = 72;
-
     private Set<String> accidentTypes;
     private Pattern animalPattern;
     private Set<String> globalTypes;
