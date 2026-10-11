@@ -114,7 +114,6 @@ public class EventClusteringService {
     @Value("${clustering.advisory-split-types:산불,폭염,한파}")
     private String advisorySplitTypesCsv;
 
-    // Red 단계 뼈대 — 구현은 Green 에서 (아래 두 필드는 아직 판정 로직에서 사용하지 않는다)
     /** 임베딩 병합 임계값을 완화할 에피소드형 유형(쉼표 구분). 폭염·한파·대설·강풍·가축질병. */
     @Value("${clustering.relaxed-threshold-types:폭염,한파,대설,강풍,가축질병}")
     private String relaxedThresholdTypesCsv;
@@ -128,6 +127,7 @@ public class EventClusteringService {
     private Set<String> globalTypes;
     private Map<String, Integer> regionalTypeWindows;
     private Set<String> advisorySplitTypes;
+    private Set<String> relaxedThresholdTypes;
 
     /**
      * 신규 알림에 대해 임베딩 생성 + 클러스터링 수행.
@@ -240,7 +240,7 @@ public class EventClusteringService {
         logCandidates(alert.getId(), candidates);
 
         // 5. 임계값 판정 — 같은 지역 후보 중 코사인 유사도 >= threshold 면 머지
-        double mergeMaxDistance = 1.0 - similarityThreshold;
+        double mergeMaxDistance = mergeMaxDistanceFor(alert.getDisasterType());
         for (Object[] row : candidates) {
             Long eventId = ((Number) row[0]).longValue();
             double dist = ((Number) row[1]).doubleValue();
@@ -555,11 +555,42 @@ public class EventClusteringService {
             return false;
         }
         if (advisorySplitTypes == null) {
-            advisorySplitTypes = Arrays.stream(advisorySplitTypesCsv.split(","))
-                    .map(String::trim).filter(s -> !s.isEmpty())
-                    .collect(Collectors.toSet());
+            advisorySplitTypes = parseCsvSet(advisorySplitTypesCsv);
         }
         return advisorySplitTypes.contains(type.trim());
+    }
+
+    /**
+     * 임베딩 병합 거리 상한. 에피소드형 유형(폭염·한파 등)은 같은 행동요령을 표현만 바꿔 되풀이해 거리가
+     * 0.15 를 넘기 쉬우므로 완화 상한을, 그 외는 기본 상한을 쓴다. LLM 폴백(borderline 구간 시작점)에도
+     * 같은 값을 넘겨 "머지 불가 구간"의 기준을 알림 단위로 일관되게 유지한다.
+     */
+    private double mergeMaxDistanceFor(String type) {
+        if (isRelaxedThresholdType(type)) {
+            return 1.0 - relaxedSimilarityThreshold;
+        }
+        return 1.0 - similarityThreshold;
+    }
+
+    /** 병합 임계값 완화 대상 유형 매칭. 유형 null 이거나 목록이 비어 있으면 완화하지 않는다. */
+    private boolean isRelaxedThresholdType(String type) {
+        if (type == null) {
+            return false;
+        }
+        if (relaxedThresholdTypes == null) {
+            relaxedThresholdTypes = parseCsvSet(relaxedThresholdTypesCsv);
+        }
+        return relaxedThresholdTypes.contains(type.trim());
+    }
+
+    /** 쉼표 구분 목록 → 집합. null/빈 값은 빈 집합(설정이 없으면 해당 기능을 적용하지 않는다). */
+    private static Set<String> parseCsvSet(String csv) {
+        if (csv == null) {
+            return Set.of();
+        }
+        return Arrays.stream(csv.split(","))
+                .map(String::trim).filter(s -> !s.isEmpty())
+                .collect(Collectors.toSet());
     }
 
     /**
