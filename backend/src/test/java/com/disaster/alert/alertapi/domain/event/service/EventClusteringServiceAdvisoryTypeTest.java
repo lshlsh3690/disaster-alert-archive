@@ -240,4 +240,86 @@ class EventClusteringServiceAdvisoryTypeTest {
 
         verifyAdvisoryBranchNotTaken();
     }
+
+    // ---- 안내 다지역(시군구 2개 이상): 시도+안내 키 광역 병합 ----
+
+    private static final String[] NATIONWIDE_CODES = {
+            "1111000000", "2611000000", "2711000000", "2811000000",
+            "3011000000", "3111000000", "4111000000", "4311000000"};
+
+    private DisasterEvent existingAdvisoryBroadcast() {
+        DisasterEvent e = DisasterEvent.createAdvisory("기타", "4375000000", "충청북도", now.minusHours(10));
+        ReflectionTestUtils.setField(e, "id", EXISTING_EVENT_ID);
+        return e;
+    }
+
+    @Test
+    @DisplayName("g) 안내 다지역 + 같은 시도 안내 광역 이벤트 있음: BROADCAST 병합, 신규 저장 없음, window=알림 시각-168h")
+    void multiRegionAdvisory_mergesIntoSidoAdvisoryBroadcast() {
+        alert("기타", WATER_GUIDE, DisasterLevel.LEVEL_1, SAME_SIDO_CODES);
+        when(disasterEventRepository.findAdvisoryBroadcastBySido(anyString(), anyString(), any(LocalDateTime.class)))
+                .thenReturn(Optional.of(existingAdvisoryBroadcast()));
+
+        service.clusterNewAlert(1L);
+
+        verify(disasterEventRepository).findAdvisoryBroadcastBySido(eq("기타"), eq("43"), eq(now.minusHours(168)));
+        ArgumentCaptor<EventAlertMapping> mapping = ArgumentCaptor.forClass(EventAlertMapping.class);
+        verify(eventAlertMappingRepository).save(mapping.capture());
+        assertThat(mapping.getValue().getMergeMethod()).isEqualTo(MergeMethod.BROADCAST);
+        verify(disasterEventRepository).incrementOnMerge(EXISTING_EVENT_ID, now);
+        verify(disasterEventRepository, never()).save(any(DisasterEvent.class));
+    }
+
+    @Test
+    @DisplayName("h) 안내 다지역 + 대상 없음: 신규 이벤트가 is_advisory=true 이면서 is_broadcast=true")
+    void multiRegionAdvisory_createsAdvisoryBroadcastEvent() {
+        alert("기타", WATER_GUIDE, DisasterLevel.LEVEL_1, SAME_SIDO_CODES);
+
+        service.clusterNewAlert(1L);
+
+        ArgumentCaptor<DisasterEvent> event = ArgumentCaptor.forClass(DisasterEvent.class);
+        verify(disasterEventRepository).save(event.capture());
+        assertThat(event.getValue().isBroadcast()).isTrue();
+        assertThat(event.getValue().isAdvisory()).isTrue();
+    }
+
+    @Test
+    @DisplayName("i) 전국급(시도 span >= nationwideSidoSpan) 안내는 시도 키가 아니라 전국 키 finder 로 병합")
+    void nationwideAdvisory_usesNationwideKey() {
+        alert("기타", WATER_GUIDE, DisasterLevel.LEVEL_1, NATIONWIDE_CODES);
+        DisasterEvent existing = existingAdvisoryBroadcast();
+        when(disasterEventRepository.findAdvisoryBroadcastNationwide(anyString(), any(LocalDateTime.class)))
+                .thenReturn(Optional.of(existing));
+
+        service.clusterNewAlert(1L);
+
+        verify(disasterEventRepository).findAdvisoryBroadcastNationwide(eq("기타"), eq(now.minusHours(168)));
+        verify(disasterEventRepository, never())
+                .findAdvisoryBroadcastBySido(anyString(), anyString(), any(LocalDateTime.class));
+        ArgumentCaptor<EventAlertMapping> mapping = ArgumentCaptor.forClass(EventAlertMapping.class);
+        verify(eventAlertMappingRepository).save(mapping.capture());
+        assertThat(mapping.getValue().getMergeMethod()).isEqualTo(MergeMethod.BROADCAST);
+        verify(disasterEventRepository, never()).save(any(DisasterEvent.class));
+    }
+
+    @Test
+    @DisplayName("j) 안내 아닌 기타 광역(시군구 > maxRegionSpan)은 안내 광역 finder 미호출 + 기존대로 새 광역 이벤트 [회귀 보호]")
+    void nonAdvisoryBroadcast_doesNotUseAdvisoryBroadcastFinder() {
+        String[] manyCodes = new String[11];
+        for (int i = 0; i < manyCodes.length; i++) {
+            manyCodes[i] = "43" + (110 + i * 10) + "00000";
+        }
+        alert("기타", "철도 노조 파업으로 일부 열차 운행이 지연되고 있습니다.", DisasterLevel.LEVEL_1, manyCodes);
+
+        service.clusterNewAlert(1L);
+
+        verify(disasterEventRepository, never())
+                .findAdvisoryBroadcastBySido(anyString(), anyString(), any(LocalDateTime.class));
+        verify(disasterEventRepository, never())
+                .findAdvisoryBroadcastNationwide(anyString(), any(LocalDateTime.class));
+        ArgumentCaptor<DisasterEvent> event = ArgumentCaptor.forClass(DisasterEvent.class);
+        verify(disasterEventRepository).save(event.capture());
+        assertThat(event.getValue().isBroadcast()).isTrue();
+        assertThat(event.getValue().isAdvisory()).isFalse();
+    }
 }
