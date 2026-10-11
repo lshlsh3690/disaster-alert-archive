@@ -23,6 +23,10 @@ public class EvaluationAssignmentReader {
     public record AlertSnapshot(LocalDateTime createdAt, boolean hasEmbedding) {
     }
 
+    /** b 시점 후보 중 가장 가까운 이벤트와 그 이벤트의 최소 임베딩 코사인 거리. */
+    public record CandidateDistance(long eventId, double distance) {
+    }
+
     private final JdbcTemplate jdbc;
 
     public Optional<AlertSnapshot> findSnapshot(long alertId) {
@@ -78,5 +82,10 @@ public class EvaluationAssignmentReader {
                         LIMIT 3
                         """,
                 Long.class, before, before, since, alertBId, alertBId);
+    }
+
+    // Red 단계 뼈대 — 구현은 Green 에서
+    public Optional<CandidateDistance> findTopCandidate(long alertBId, LocalDateTime bCreatedAt, int windowHours) {
+        return Optional.empty();
     }
 }
