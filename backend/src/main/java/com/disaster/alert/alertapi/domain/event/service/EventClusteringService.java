@@ -138,6 +138,10 @@ public class EventClusteringService {
     @Value("${clustering.adjacent-max-event-age-hours:72}")
     private int adjacentMaxEventAgeHours;
 
+    /** 안내 이벤트 병합 윈도우(시간) — 안내성 유형(기타 등) 전용. Red 단계 뼈대 — 구현은 Green 에서. */
+    @Value("${clustering.advisory-window-hours:168}")
+    private int advisoryWindowHours;
+
     private Set<String> accidentTypes;
     private Pattern animalPattern;
     private Set<String> globalTypes;
@@ -218,6 +222,11 @@ public class EventClusteringService {
         //     비용도 들지 않는다. 시군구 1개는 앵커링, 2개 이상(다지역)은 지역 이벤트와 섞이지 않게
         //     곧바로 광역(broadcast) 경로로 보낸다(시군구 간 다리 방지). 사고성은 전파 허용이라 대상 아님.
         if (clusterEpisodicType(alert)) {
+            return;
+        }
+
+        // 0.9 안내성 알림(물놀이·수상안전 예방 안내 등) — 시군구별 안내 이벤트로 모으고 이웃 병합은 안 한다.
+        if (clusterAdvisoryType(alert)) {
             return;
         }
 
@@ -620,6 +629,14 @@ public class EventClusteringService {
                     alert.getId(), type, episodicWindowHours);
         }
         return true;
+    }
+
+    /**
+     * 안내성 유형(advisory-split-types, 산불 제외 — 산불은 clusterRegionalType 에서 처리)의 안내 알림을
+     * 시군구별 안내 이벤트로 모은다. Red 단계 뼈대 — 구현은 Green 에서(항상 false → 동작 불변).
+     */
+    private boolean clusterAdvisoryType(DisasterAlert alert) {
+        return false;
     }
 
     /** 에피소드형 유형 매칭. 유형 null 이거나 목록이 비어 있으면 적용하지 않는다. */
