@@ -285,6 +285,7 @@ public class EventClusteringService {
      * <p>임계값(mergeMaxDistance)만 쓰고 LLM 폴백은 태우지 않는다 — 지역 제약이 느슨해진 만큼 borderline 까지
      * 넓히면 별개 사고를 합칠 위험이 커서다. 윈도우도 같은 시군구보다 짧은 adjacent-window-hours 를 쓴다.
      * 비사고성(폭염·호우 등 템플릿형)은 시군구 간 다리(blob)가 생기므로 대상이 아니다.
+     * 후보 이벤트에도 LLM 폴백과 같은 두 가드(사고성 유형, 화재 72h)를 적용한다 — 별개 화재 오병합 방지와 같은 이유.
      *
      * @return 인접 이벤트에 병합했으면 true
      */
@@ -304,7 +305,11 @@ public class EventClusteringService {
         for (Object[] row : adjacent) {
             Long eventId = ((Number) row[0]).longValue();
             double dist = ((Number) row[1]).doubleValue();
-            if (dist <= mergeMaxDistance) {
+            if (dist > mergeMaxDistance) {
+                continue;
+            }
+            // 가드 실패 후보는 건너뛰고 다음(더 먼) 후보를 본다.
+            if (allowsAccidentMerge(alert, disasterEventRepository.findById(eventId).orElse(null))) {
                 mergeIntoExisting(eventId, alert, 1.0 - dist, MergeMethod.EMBEDDING);
                 return true;
             }
@@ -344,13 +349,7 @@ public class EventClusteringService {
         Map<Long, String> repMessages = representativeMessages(borderlineIds);
         List<EventLLMDecisionService.Candidate> cands = new ArrayList<>(borderlineIds.size());
         for (Long id : borderlineIds) {
-            DisasterEvent ev = disasterEventRepository.findById(id).orElse(null);
-            if (ev == null || !isAccidentType(ev.getPrimaryDisasterType())) {
-                continue;
-            }
-            // 화재는 별개 화재를 합치는 오병합이 많아 이벤트 마지막 알림 72h 초과 시 후보 제외(운영 데이터 분석 2026-10)
-            if (!DisasterCooldown.allowsLlmFallbackMerge(alert.getDisasterType(),
-                    ev.getFirstAlertAt(), ev.getLastAlertAt(), alert.getCreatedAt())) {
+            if (!allowsAccidentMerge(alert, disasterEventRepository.findById(id).orElse(null))) {
                 continue;
             }
             cands.add(new EventLLMDecisionService.Candidate(id, repMessages.getOrDefault(id, "")));
@@ -368,6 +367,18 @@ public class EventClusteringService {
                 alert.getId(), targetEventId, alert.getDisasterType(), cands.size());
         mergeIntoExisting(targetEventId, alert, null, MergeMethod.LLM_FALLBACK);
         return true;
+    }
+
+    /**
+     * 후보 이벤트가 사고성 유형 병합 대상인지 — LLM 폴백과 인접 병합이 공유하는 두 가드.
+     * (1) 후보 이벤트도 사고성 유형이어야 한다(기상특보 이벤트에 화재 알림이 흡수되는 과병합 차단).
+     * (2) 화재는 별개 화재를 합치는 오병합이 많아 이벤트 마지막 알림 72h 초과 시 제외(운영 데이터 분석 2026-10).
+     */
+    private boolean allowsAccidentMerge(DisasterAlert alert, DisasterEvent ev) {
+        return ev != null
+                && isAccidentType(ev.getPrimaryDisasterType())
+                && DisasterCooldown.allowsLlmFallbackMerge(alert.getDisasterType(),
+                        ev.getFirstAlertAt(), ev.getLastAlertAt(), alert.getCreatedAt());
     }
 
     /** 사고성 유형 화이트리스트 매칭 (LLM 폴백 적용 대상). */

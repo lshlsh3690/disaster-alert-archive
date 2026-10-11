@@ -158,8 +158,10 @@ public interface DisasterEventRepository extends JpaRepository<DisasterEvent, Lo
      * 사고성 유형의 인접 시군구 후보 검색 — {@link #findTopCandidates} 와 같은 반환 형태({eventId, minDistance}).
      *
      * <p>지역 조건만 다르다 — 이벤트 알림의 시군구가 새 알림 시군구의 {@code region_adjacency} 이웃이어야 한다
-     * (기존 cross-region 시군구 쿼리와 같은 방향: region_code=새 알림, neighbor_code=이벤트). 같은 시군구
-     * 이벤트는 앞 단계({@link #findTopCandidates})에서 이미 봤으므로 이 쿼리는 이웃만 대상으로 한다.
+     * (기존 cross-region 시군구 쿼리와 같은 방향: region_code=새 알림, neighbor_code=이벤트).
+     * 대상은 "이벤트 알림 중 하나라도 이웃 시군구에 속하는 이벤트"라서, 같은 시군구 알림이 섞인 이벤트나
+     * 다지역 알림이 섞인 이벤트도 포함될 수 있다(이웃만 대상인 것은 아니다).
+     * 인접 병합된 이벤트의 primary_region_code 는 첫 알림 지역으로 고정된다.
      */
     @Query(value = """
             SELECT e.id AS event_id,
