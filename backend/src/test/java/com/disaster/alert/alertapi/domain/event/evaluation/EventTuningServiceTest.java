@@ -181,15 +181,17 @@ class EventTuningServiceTest {
         map(event(), tb, 1);
         label(ta, tb, EvaluationLabelType.DIFF, EvaluationStratum.TRAP);
         // BOUNDARY: SAME, top-1 거리 약 0.20 -> t=0.40 에서 tp
-        long ba = alert(T.minusHours(2), vec(0.8, 0.6));
-        long bb = alert(T, vec(1, 0));
+        // 같은 시군구의 세 쌍이 서로의 후보(top-1)가 되지 않도록 벡터 방향을 분리한다:
+        // TRAP 은 x축 근처, BOUNDARY 는 y축 근처, GENERAL 은 z축(나머지와 직교, 거리 1.0).
+        long ba = alert(T.minusHours(2), vec(0.6, 0.8));
+        long bb = alert(T, vec(0, 1));
         map(event(), ba, 1);
         map(event(), bb, 1);
         label(ba, bb, EvaluationLabelType.SAME, EvaluationStratum.BOUNDARY);
         // GENERAL: 이미 같은 이벤트 SAME -> 항상 tp
         long e = event();
-        long ga = alert(T.minusHours(2), vec(1, 0));
-        long gb = alert(T, vec(1, 0));
+        long ga = alert(T.minusHours(2), vec(0, 0, 1));
+        long gb = alert(T, vec(0, 0, 1));
         map(e, ga, 1);
         map(e, gb, 2);
         label(ga, gb, EvaluationLabelType.SAME, EvaluationStratum.GENERAL);
