@@ -114,6 +114,15 @@ public class EventClusteringService {
     @Value("${clustering.advisory-split-types:산불,폭염,한파}")
     private String advisorySplitTypesCsv;
 
+    // Red 단계 뼈대 — 구현은 Green 에서 (아래 두 필드는 아직 판정 로직에서 사용하지 않는다)
+    /** 임베딩 병합 임계값을 완화할 에피소드형 유형(쉼표 구분). 폭염·한파·대설·강풍·가축질병. */
+    @Value("${clustering.relaxed-threshold-types:폭염,한파,대설,강풍,가축질병}")
+    private String relaxedThresholdTypesCsv;
+
+    /** 완화 대상 유형에 적용할 병합 유사도 하한(거리 상한 = 1 - 값). 기본 0.65 → 거리 0.35. */
+    @Value("${clustering.relaxed-similarity-threshold:0.65}")
+    private double relaxedSimilarityThreshold;
+
     private Set<String> accidentTypes;
     private Pattern animalPattern;
     private Set<String> globalTypes;
