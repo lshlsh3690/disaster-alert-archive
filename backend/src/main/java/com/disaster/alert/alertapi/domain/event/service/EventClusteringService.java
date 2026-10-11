@@ -134,6 +134,10 @@ public class EventClusteringService {
     @Value("${clustering.adjacent-window-hours:48}")
     private int adjacentWindowHours;
 
+    /** 인접 시군구 병합 허용 이벤트 나이 상한(시간) — 후보 이벤트 첫 알림부터 새 알림까지. Red 단계 뼈대 — 사용은 Green 에서. */
+    @Value("${clustering.adjacent-max-event-age-hours:72}")
+    private int adjacentMaxEventAgeHours;
+
     private Set<String> accidentTypes;
     private Pattern animalPattern;
     private Set<String> globalTypes;
