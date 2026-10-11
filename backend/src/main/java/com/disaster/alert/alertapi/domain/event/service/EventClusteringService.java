@@ -207,7 +207,8 @@ public class EventClusteringService {
 
         // 0.8 에피소드형 유형(폭염·한파·대설·강풍·가축질병) — 같은 시군구·같은 유형의 발령이 끊김 없이
         //     이어지는 동안은 안내/특보·문장 유사도와 무관하게 하나의 이벤트. 임베딩·LLM 호출 전에 분기해
-        //     비용도 들지 않는다. 시군구가 정확히 1개인 알림만 대상(다지역·광역은 아래 기존 경로).
+        //     비용도 들지 않는다. 시군구 1개는 앵커링, 2개 이상(다지역)은 지역 이벤트와 섞이지 않게
+        //     곧바로 광역(broadcast) 경로로 보낸다(시군구 간 다리 방지). 사고성은 전파 허용이라 대상 아님.
         if (clusterEpisodicType(alert)) {
             return;
         }
@@ -513,10 +514,13 @@ public class EventClusteringService {
      * 같은 시군구에서 같은 유형의 발령이 끊김 없이 이어지는 동안은 문장 유사도와 무관하게 합친다
      * (연쇄 병합은 의도). 끊김 기준은 마지막 알림 이후 {@code episodic-window-hours}. 본문은 보지 않는다.
      *
-     * <p>시군구가 정확히 1개일 때만 처리한다 — 다지역 알림은 footprint 교집합 머지로 이벤트가 도 단위로
-     * 커질 위험이 있어 false 를 돌려 기존 임베딩 경로(완화 임계값)로, 광역은 기존 broadcast 경로로 보낸다.
+     * <p>시군구가 정확히 1개면 위 앵커링, 2개 이상(다지역)이면 지역 이벤트 후보에서 빼고 곧바로 광역
+     * (broadcast) 경로로 보낸다(span 이 maxRegionSpan 이하든 초과든 동일). 다지역 알림을 임베딩 경로에 두면
+     * footprint 교집합 머지가 서로 다른 시군구의 지역 이벤트를 이어 붙여(시군구 간 다리) 폭염 이벤트 하나가
+     * 43개 시군구·7개 시도·612건까지 커졌기 때문이다. 사고성·비대상 유형은 사고 전파를 허용해야 하므로
+     * 이 분기를 타지 않는다.
      *
-     * @return 에피소드형으로 처리하면 true
+     * @return 에피소드형으로 처리하면 true (지역코드가 없으면 false)
      */
     private boolean clusterEpisodicType(DisasterAlert alert) {
         String type = alert.getDisasterType();
@@ -524,8 +528,13 @@ public class EventClusteringService {
             return false;
         }
         String[] regionCodes = extractRegionCodes(alert);
-        if (regionCodes.length == 0 || distinctSigunguCount(regionCodes) != 1) {
+        if (regionCodes.length == 0) {
             return false;
+        }
+        int sigunguSpan = distinctSigunguCount(regionCodes);
+        if (sigunguSpan > 1) {
+            clusterBroadcast(alert, regionCodes, sigunguSpan);
+            return true;
         }
         LocalDateTime since = alert.getCreatedAt().minusHours(episodicWindowHours);
         Optional<Long> target = disasterEventRepository.findRegionalTypeMergeTarget(
