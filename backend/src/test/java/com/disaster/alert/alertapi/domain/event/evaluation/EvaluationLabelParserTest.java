@@ -16,9 +16,12 @@ class EvaluationLabelParserTest {
     }
 
     private static void assertRejected(String text, String... expectedInMessage) {
-        assertThatThrownBy(() -> EvaluationLabelParser.parse(text))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContainingAll(expectedInMessage);
+        var thrown = assertThatThrownBy(() -> EvaluationLabelParser.parse(text))
+                .isInstanceOf(IllegalArgumentException.class);
+        // AssertJ 는 빈 배열로 hasMessageContainingAll 을 부르면 예외를 던지므로 기대 문자열이 있을 때만 검증한다.
+        if (expectedInMessage.length > 0) {
+            thrown.hasMessageContainingAll(expectedInMessage);
+        }
     }
 
     @Test
