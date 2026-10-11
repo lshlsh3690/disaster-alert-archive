@@ -294,6 +294,26 @@ public interface DisasterEventRepository extends JpaRepository<DisasterEvent, Lo
             String primaryDisasterType, LocalDateTime lastAlertAt);
 
     /**
+     * 안내 광역 이벤트(is_broadcast=true AND is_advisory=true) 머지 대상 — 같은 유형 + 같은 시도 + 윈도우 안 1개.
+     *
+     * <p>Red 단계 뼈대 — 구현은 Green 에서 (현재는 항상 empty). 일반 broadcast(is_advisory=false)와 섞이지 않아야 한다.
+     */
+    default Optional<DisasterEvent> findAdvisoryBroadcastBySido(
+            String primaryDisasterType, String sidoPrefix, LocalDateTime lastAlertAt) {
+        return Optional.empty();
+    }
+
+    /**
+     * 전국 안내 광역 이벤트(primary_region_code IS NULL, is_broadcast+is_advisory) 머지 대상 — 같은 유형 + 윈도우 안 1개.
+     *
+     * <p>Red 단계 뼈대 — 구현은 Green 에서 (현재는 항상 empty).
+     */
+    default Optional<DisasterEvent> findAdvisoryBroadcastNationwide(
+            String primaryDisasterType, LocalDateTime lastAlertAt) {
+        return Optional.empty();
+    }
+
+    /**
      * 새 알림이 머지된 후 이벤트의 last_alert_at, alert_count 갱신.
      *
      * <p>JPA Dirty Checking 도 가능하지만 동시성 + 명시성 위해 native UPDATE 사용.
