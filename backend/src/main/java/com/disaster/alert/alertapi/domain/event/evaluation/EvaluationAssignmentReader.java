@@ -29,6 +29,34 @@ public class EvaluationAssignmentReader {
 
     private final JdbcTemplate jdbc;
 
+    private static final String MIN_DISTANCE = "MIN(da.embedding <=> b.embedding)";
+
+    // b 의 임베딩은 JOIN 으로만 참조해 앱으로 가져오지 않는다. 파라미터 순서: b id, before, before, since, b id.
+    private static final String CANDIDATE_FROM_WHERE = """
+            FROM disaster_events e
+            JOIN event_alert_mapping m ON m.event_id = e.id
+            JOIN disaster_alert da ON da.disaster_alert_id = m.alert_id
+            JOIN disaster_alert b ON b.disaster_alert_id = ?
+            WHERE e.is_broadcast = false
+              AND e.is_advisory = false
+              AND da.created_at < ?
+              AND da.embedding IS NOT NULL
+              AND EXISTS (
+                  SELECT 1 FROM event_alert_mapping m3
+                  JOIN disaster_alert d3 ON d3.disaster_alert_id = m3.alert_id
+                  WHERE m3.event_id = e.id AND d3.created_at < ? AND d3.created_at > ?
+              )
+              AND EXISTS (
+                  SELECT 1 FROM disaster_alert_region dar
+                  WHERE dar.disaster_alert_id = da.disaster_alert_id
+                    AND LEFT(dar.legal_district_code, 5) IN (
+                        SELECT LEFT(br.legal_district_code, 5)
+                        FROM disaster_alert_region br WHERE br.disaster_alert_id = ?)
+              )
+            GROUP BY e.id
+            """;
+
+
     public Optional<AlertSnapshot> findSnapshot(long alertId) {
         return jdbc.query("""
                         SELECT created_at, embedding IS NOT NULL
@@ -53,39 +81,25 @@ public class EvaluationAssignmentReader {
      * 동률은 event id 오름차순으로 결정적이다.
      */
     public List<Long> findTopCandidateEventIds(long alertBId, LocalDateTime bCreatedAt, int windowHours) {
-        Timestamp before = Timestamp.valueOf(bCreatedAt);
-        Timestamp since = Timestamp.valueOf(bCreatedAt.minusHours(windowHours));
-        return jdbc.queryForList("""
-                        SELECT e.id
-                        FROM disaster_events e
-                        JOIN event_alert_mapping m ON m.event_id = e.id
-                        JOIN disaster_alert da ON da.disaster_alert_id = m.alert_id
-                        WHERE e.is_broadcast = false
-                          AND e.is_advisory = false
-                          AND da.created_at < ?
-                          AND da.embedding IS NOT NULL
-                          AND EXISTS (
-                              SELECT 1 FROM event_alert_mapping m3
-                              JOIN disaster_alert d3 ON d3.disaster_alert_id = m3.alert_id
-                              WHERE m3.event_id = e.id AND d3.created_at < ? AND d3.created_at > ?
-                          )
-                          AND EXISTS (
-                              SELECT 1 FROM disaster_alert_region dar
-                              WHERE dar.disaster_alert_id = da.disaster_alert_id
-                                AND LEFT(dar.legal_district_code, 5) IN (
-                                    SELECT LEFT(br.legal_district_code, 5)
-                                    FROM disaster_alert_region br WHERE br.disaster_alert_id = ?)
-                          )
-                        GROUP BY e.id
-                        ORDER BY MIN(da.embedding <=> (SELECT embedding FROM disaster_alert WHERE disaster_alert_id = ?)) ASC,
-                                 e.id ASC
-                        LIMIT 3
-                        """,
-                Long.class, before, before, since, alertBId, alertBId);
+        return jdbc.queryForList(
+                "SELECT e.id " + CANDIDATE_FROM_WHERE + " ORDER BY " + MIN_DISTANCE + " ASC, e.id ASC LIMIT 3",
+                Long.class, candidateParams(alertBId, bCreatedAt, windowHours));
     }
 
-    // Red 단계 뼈대 — 구현은 Green 에서
+    /**
+     * {@link #findTopCandidateEventIds} 와 같은 후보 정의에서 top-1 이벤트와 그 최소 거리를 돌려준다.
+     * 거리는 DB 가 계산한 double 을 그대로 넘긴다(임계값 경계 비교를 float 반올림으로 흐리지 않기 위해).
+     */
     public Optional<CandidateDistance> findTopCandidate(long alertBId, LocalDateTime bCreatedAt, int windowHours) {
-        return Optional.empty();
+        return jdbc.query(
+                "SELECT e.id, " + MIN_DISTANCE + " " + CANDIDATE_FROM_WHERE + " ORDER BY 2 ASC, e.id ASC LIMIT 1",
+                (rs, i) -> new CandidateDistance(rs.getLong(1), rs.getDouble(2)),
+                candidateParams(alertBId, bCreatedAt, windowHours)).stream().findFirst();
+    }
+
+    private static Object[] candidateParams(long alertBId, LocalDateTime bCreatedAt, int windowHours) {
+        Timestamp before = Timestamp.valueOf(bCreatedAt);
+        Timestamp since = Timestamp.valueOf(bCreatedAt.minusHours(windowHours));
+        return new Object[]{alertBId, before, before, since, alertBId};
     }
 }
