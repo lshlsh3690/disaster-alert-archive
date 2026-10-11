@@ -156,11 +156,36 @@ public interface DisasterEventRepository extends JpaRepository<DisasterEvent, Lo
 
     /**
      * 사고성 유형의 인접 시군구 후보 검색 — {@link #findTopCandidates} 와 같은 반환 형태({eventId, minDistance}).
-     * Red 단계 뼈대 — Green 에서 @Query 로 교체.
+     *
+     * <p>지역 조건만 다르다 — 이벤트 알림의 시군구가 새 알림 시군구의 {@code region_adjacency} 이웃이어야 한다
+     * (기존 cross-region 시군구 쿼리와 같은 방향: region_code=새 알림, neighbor_code=이벤트). 같은 시군구
+     * 이벤트는 앞 단계({@link #findTopCandidates})에서 이미 봤으므로 이 쿼리는 이웃만 대상으로 한다.
      */
-    default List<Object[]> findTopAdjacentCandidates(String newEmbedding, String[] sigunguCodes, LocalDateTime sinceTime) {
-        return List.of();
-    }
+    @Query(value = """
+            SELECT e.id AS event_id,
+                   MIN(da.embedding <=> CAST(:newEmbedding AS vector)) AS min_distance
+            FROM disaster_events e
+            JOIN event_alert_mapping m ON m.event_id = e.id
+            JOIN disaster_alert da ON da.disaster_alert_id = m.alert_id
+            WHERE e.last_alert_at > :sinceTime
+              AND e.is_broadcast = false
+              AND e.is_advisory = false
+              AND da.embedding IS NOT NULL
+              AND EXISTS (
+                  SELECT 1 FROM disaster_alert_region dar
+                  JOIN region_adjacency ra ON ra.neighbor_code = LEFT(dar.legal_district_code, 5)
+                  WHERE dar.disaster_alert_id = da.disaster_alert_id
+                    AND ra.region_code = ANY(CAST(:sigunguCodes AS varchar[]))
+              )
+            GROUP BY e.id
+            ORDER BY min_distance ASC
+            LIMIT 3
+            """, nativeQuery = true)
+    List<Object[]> findTopAdjacentCandidates(
+            @Param("newEmbedding") String newEmbedding,
+            @Param("sigunguCodes") String[] sigunguCodes,
+            @Param("sinceTime") LocalDateTime sinceTime
+    );
 
     /**
      * 지역앵커 유형 머지 대상 검색 — 같은 유형 + 같은 시군구(footprint 교집합) + 윈도우 안의

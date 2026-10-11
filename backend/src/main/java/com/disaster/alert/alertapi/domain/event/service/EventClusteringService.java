@@ -130,7 +130,7 @@ public class EventClusteringService {
     @Value("${clustering.episodic-window-hours:168}")
     private int episodicWindowHours;
 
-    /** 사고성 유형의 인접 시군구 후보 조회 윈도우(시간) — Red 단계 뼈대, 사용 로직은 Green 에서. */
+    /** 사고성 유형의 인접 시군구 후보 조회 윈도우(시간) — 같은 시군구 윈도우보다 짧게. */
     @Value("${clustering.adjacent-window-hours:48}")
     private int adjacentWindowHours;
 
@@ -263,6 +263,11 @@ public class EventClusteringService {
             }
         }
 
+        // 5.2 인접 시군구 후보 — 사고성 유형만, 임계값 병합만(LLM 폴백 없음).
+        if (tryMergeAdjacent(alert, embeddingText, regionCodes, mergeMaxDistance)) {
+            return;
+        }
+
         // 5.5 LLM 폴백 — 임베딩은 임계 미만이지만 같은 사건일 수 있는 사고성 알림을 LLM 으로 판정.
         //     "서소문 고가 붕괴"처럼 같은 사고를 여러 기관이 다른 측면(도로통제/열차중지)으로 보내
         //     본문 임베딩이 갈리는 케이스를 묶는다. 폭염 등 기상특보는 화이트리스트에서 제외(과병합 방지).
@@ -271,6 +276,40 @@ public class EventClusteringService {
         }
 
         createNewEvent(alert, regionCodes[0], extractFirstRegionName(alert), false);
+    }
+
+    /**
+     * 사고성 유형의 인접 시군구 후보 병합 — 같은 사고가 시군구 경계를 넘어 인접 시군구로 번지면 시군구가
+     * 달라 같은 시군구 hard 필터에서 갈라지던 것을 잡는다.
+     *
+     * <p>임계값(mergeMaxDistance)만 쓰고 LLM 폴백은 태우지 않는다 — 지역 제약이 느슨해진 만큼 borderline 까지
+     * 넓히면 별개 사고를 합칠 위험이 커서다. 윈도우도 같은 시군구보다 짧은 adjacent-window-hours 를 쓴다.
+     * 비사고성(폭염·호우 등 템플릿형)은 시군구 간 다리(blob)가 생기므로 대상이 아니다.
+     *
+     * @return 인접 이벤트에 병합했으면 true
+     */
+    private boolean tryMergeAdjacent(DisasterAlert alert, String embeddingText, String[] regionCodes,
+                                     double mergeMaxDistance) {
+        if (!isAccidentType(alert.getDisasterType())) {
+            return false;
+        }
+        LocalDateTime adjacentSince = alert.getCreatedAt().minusHours(adjacentWindowHours);
+        List<Object[]> adjacent = disasterEventRepository.findTopAdjacentCandidates(
+                embeddingText, sigunguPrefixes(regionCodes), adjacentSince);
+        log.info("clusterNewAlert: alertId={} 인접 시군구 후보 {}건 (윈도우 {}h)",
+                alert.getId(), adjacent.size(), adjacentWindowHours);
+        logCandidates(alert.getId(), adjacent);
+
+        // 거리 오름차순이므로 임계 이내의 첫 후보가 가장 가까운 이벤트.
+        for (Object[] row : adjacent) {
+            Long eventId = ((Number) row[0]).longValue();
+            double dist = ((Number) row[1]).doubleValue();
+            if (dist <= mergeMaxDistance) {
+                mergeIntoExisting(eventId, alert, 1.0 - dist, MergeMethod.EMBEDDING);
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
