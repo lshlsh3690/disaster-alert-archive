@@ -39,7 +39,8 @@ import static org.mockito.Mockito.when;
  * 안내성 분리를 산불 외 폭염·한파로 확장한 라우팅 검증.
  *
  * <p>가정: 레포 메서드 {@code findFireAdvisoryMergeTarget} 을 {@code findAdvisoryMergeTarget(type, sigunguCodes, since)}
- * 로 일반화, 윈도우 설정 필드 {@code advisoryWindowHours}(기본 72, 폭염·한파 gap 윈도우).
+ * 로 일반화. 머지 윈도우는 별도 설정값이 아니라 유형별 {@code DisasterCooldown.hoursFor}(폭염·한파 168h)이고,
+ * 산불 안내는 기존 regional-types 윈도우(336h)를 그대로 쓴다.
  */
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
@@ -80,7 +81,6 @@ class EventClusteringServiceAdvisoryTest {
         // 폭염·한파는 regional-types 에 넣지 않는다(매일 발령 -> 윈도우 체인 blob).
         ReflectionTestUtils.setField(service, "regionalTypesCsv", "산불:336,산사태:168,홍수:168");
         ReflectionTestUtils.setField(service, "advisorySplitTypesCsv", "산불,폭염,한파");
-        ReflectionTestUtils.setField(service, "advisoryWindowHours", 72);
 
         when(disasterEventRepository.save(any(DisasterEvent.class))).thenAnswer(inv -> {
             DisasterEvent e = inv.getArgument(0);
@@ -149,30 +149,31 @@ class EventClusteringServiceAdvisoryTest {
     }
 
     @Test
-    @DisplayName("안내 윈도우: since 는 알림 시각 - advisoryWindowHours(72h)로 조회한다")
-    void heatAdvisory_usesAdvisoryWindowHours() {
+    @DisplayName("안내 윈도우: 폭염 since 는 알림 시각 - DisasterCooldown.hoursFor(폭염)=168h 로 조회한다")
+    void heatAdvisory_usesCooldownWindow168h() {
         alert("폭염", HEAT_GUIDE, DisasterLevel.LEVEL_1, "4480000000");
         when(disasterEventRepository.findAdvisoryMergeTarget(anyString(), any(String[].class), any(LocalDateTime.class)))
                 .thenReturn(Optional.empty());
 
         service.clusterNewAlert(1L);
 
-        verify(disasterEventRepository).findAdvisoryMergeTarget(
-                eq("폭염"), eq(new String[]{"44800"}), eq(now.minusHours(72)));
+        ArgumentCaptor<LocalDateTime> since = ArgumentCaptor.forClass(LocalDateTime.class);
+        verify(disasterEventRepository).findAdvisoryMergeTarget(eq("폭염"), eq(new String[]{"44800"}), since.capture());
+        assertThat(since.getValue()).isEqualTo(now.minusHours(168));
     }
 
     @Test
-    @DisplayName("안내 윈도우 밖이면(레포가 대상 없음 반환) 신규 안내 이벤트를 만들고, 윈도우를 48h 로 바꾸면 since 도 따라간다")
-    void heatAdvisory_outsideWindowCreatesNew_andWindowIsConfigurable() {
-        ReflectionTestUtils.setField(service, "advisoryWindowHours", 48);
-        alert("폭염", HEAT_GUIDE, DisasterLevel.LEVEL_1, "4480000000");
+    @DisplayName("안내 윈도우: 한파도 168h, 윈도우 밖(레포가 대상 없음 반환)이면 신규 안내 이벤트를 만든다")
+    void coldAdvisory_usesCooldownWindow168h_andCreatesNewWhenOutside() {
+        alert("한파", COLD_GUIDE, DisasterLevel.LEVEL_1, "4375000000");
         when(disasterEventRepository.findAdvisoryMergeTarget(anyString(), any(String[].class), any(LocalDateTime.class)))
                 .thenReturn(Optional.empty());
 
         service.clusterNewAlert(1L);
 
-        verify(disasterEventRepository).findAdvisoryMergeTarget(
-                eq("폭염"), any(String[].class), eq(now.minusHours(48)));
+        ArgumentCaptor<LocalDateTime> since = ArgumentCaptor.forClass(LocalDateTime.class);
+        verify(disasterEventRepository).findAdvisoryMergeTarget(eq("한파"), any(String[].class), since.capture());
+        assertThat(since.getValue()).isEqualTo(now.minusHours(168));
         verify(disasterEventRepository).save(any(DisasterEvent.class));
         verify(disasterEventRepository, never()).incrementOnMerge(any(), any());
     }
