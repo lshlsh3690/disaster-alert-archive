@@ -34,6 +34,7 @@ import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -124,6 +125,17 @@ class EventClusteringServiceAdjacentCandidateTest {
                 .thenReturn(rows(ADJACENT_EVENT_ID, distances));
     }
 
+    /** 후보 이벤트 로드(findById) 스텁 — 가드(사고성 유형, 72h 쿨다운)가 이 이벤트의 필드로 판정한다. */
+    private void candidateEvent(long eventId, String type, LocalDateTime lastAlertAt) {
+        DisasterEvent ev = DisasterEvent.builder()
+                .primaryDisasterType(type)
+                .firstAlertAt(lastAlertAt.minusHours(5))
+                .lastAlertAt(lastAlertAt)
+                .build();
+        ReflectionTestUtils.setField(ev, "id", eventId);
+        lenient().when(disasterEventRepository.findById(eventId)).thenReturn(Optional.of(ev));
+    }
+
     private void assertMergedEmbedding(long eventId) {
         ArgumentCaptor<EventAlertMapping> mapping = ArgumentCaptor.forClass(EventAlertMapping.class);
         verify(eventAlertMappingRepository).save(mapping.capture());
@@ -147,6 +159,7 @@ class EventClusteringServiceAdjacentCandidateTest {
         alert("화재", FIRE);
         sameRegionCandidates();
         adjacentCandidates(0.10);
+        candidateEvent(ADJACENT_EVENT_ID, "화재", now.minusHours(10));
 
         service.clusterNewAlert(1L);
 
@@ -218,6 +231,7 @@ class EventClusteringServiceAdjacentCandidateTest {
         alert("화재", FIRE);
         sameRegionCandidates();
         adjacentCandidates(0.12, 0.14, 0.30);
+        candidateEvent(ADJACENT_EVENT_ID, "화재", now.minusHours(10));
 
         service.clusterNewAlert(1L);
 
@@ -231,10 +245,77 @@ class EventClusteringServiceAdjacentCandidateTest {
         alert("화재", FIRE);
         sameRegionCandidates(0.30); // 0.15 < 0.30 <= 0.40 : LLM 폴백 대상
         adjacentCandidates(0.10);
+        candidateEvent(ADJACENT_EVENT_ID, "화재", now.minusHours(10));
 
         service.clusterNewAlert(1L);
 
         verify(llmDecisionService, never()).pickSameGeneralIncident(anyString(), anyList());
         assertMergedEmbedding(ADJACENT_EVENT_ID);
+    }
+
+    @Test
+    @DisplayName("h) 임계 이내 인접 후보지만 후보 이벤트가 비사고성(호우): 병합하지 않고 신규 이벤트")
+    void adjacentCandidateEventNotAccidentType_createsNewEvent() {
+        alert("화재", FIRE);
+        sameRegionCandidates();
+        adjacentCandidates(0.10);
+        candidateEvent(ADJACENT_EVENT_ID, "호우", now.minusHours(10));
+
+        service.clusterNewAlert(1L);
+
+        assertNewEventCreated();
+    }
+
+    @Test
+    @DisplayName("i) 화재 알림 + 후보 이벤트 마지막 알림이 72h 초과 과거: 쿨다운 가드로 병합하지 않고 신규 이벤트")
+    void adjacentFireCandidateOlderThanCooldown_createsNewEvent() {
+        alert("화재", FIRE);
+        sameRegionCandidates();
+        adjacentCandidates(0.10);
+        candidateEvent(ADJACENT_EVENT_ID, "화재", now.minusHours(73));
+
+        service.clusterNewAlert(1L);
+
+        assertNewEventCreated();
+    }
+
+    @Test
+    @DisplayName("j) 첫 후보(0.10)가 가드 실패(호우)여도 건너뛰고 두 번째 후보(0.12, 임계 이내 + 가드 통과)로 병합")
+    void firstCandidateFailsGuard_mergesIntoSecondCandidate() {
+        alert("화재", FIRE);
+        sameRegionCandidates();
+        adjacentCandidates(0.10, 0.12);
+        candidateEvent(ADJACENT_EVENT_ID, "호우", now.minusHours(10));
+        candidateEvent(ADJACENT_EVENT_ID + 1, "화재", now.minusHours(10));
+
+        service.clusterNewAlert(1L);
+
+        assertMergedEmbedding(ADJACENT_EVENT_ID + 1);
+    }
+
+    @Test
+    @DisplayName("k) 화재 + 후보 이벤트 마지막 알림이 72h 이내(10h 전): 병합 [회귀 방지: 뼈대도 통과]")
+    void adjacentFireCandidateWithinCooldown_merges() {
+        alert("화재", FIRE);
+        sameRegionCandidates();
+        adjacentCandidates(0.10);
+        candidateEvent(ADJACENT_EVENT_ID, "화재", now.minusHours(10));
+
+        service.clusterNewAlert(1L);
+
+        assertMergedEmbedding(ADJACENT_EVENT_ID);
+    }
+
+    @Test
+    @DisplayName("l) 후보 이벤트 findById 가 empty: 건너뛰고 신규 이벤트")
+    void adjacentCandidateEventMissing_createsNewEvent() {
+        alert("화재", FIRE);
+        sameRegionCandidates();
+        adjacentCandidates(0.10);
+        when(disasterEventRepository.findById(ADJACENT_EVENT_ID)).thenReturn(Optional.empty());
+
+        service.clusterNewAlert(1L);
+
+        assertNewEventCreated();
     }
 }
