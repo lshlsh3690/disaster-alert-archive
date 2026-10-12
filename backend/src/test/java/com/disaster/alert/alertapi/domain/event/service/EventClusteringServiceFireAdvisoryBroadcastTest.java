@@ -180,10 +180,10 @@ class EventClusteringServiceFireAdvisoryBroadcastTest {
 
         verify(disasterEventRepository).findAdvisoryBroadcastBySido(eq("산불"), eq("47"), eq(now.minusHours(336)));
         verify(disasterEventRepository, never())
-                .findFirstByBroadcastTrueAndPrimaryDisasterTypeAndPrimaryRegionCodeStartingWithAndLastAlertAtAfterOrderByLastAlertAtDesc(
+                .findLatestGeneralBroadcastBySido(
                         anyString(), anyString(), any(LocalDateTime.class));
         verify(disasterEventRepository, never())
-                .findFirstByBroadcastTrueAndPrimaryDisasterTypeAndPrimaryRegionCodeIsNullAndLastAlertAtAfterOrderByLastAlertAtDesc(
+                .findLatestGeneralBroadcastNationwide(
                         anyString(), any(LocalDateTime.class));
         ArgumentCaptor<DisasterEvent> event = ArgumentCaptor.forClass(DisasterEvent.class);
         verify(disasterEventRepository).save(event.capture());
