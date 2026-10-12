@@ -558,19 +558,20 @@ public class EventClusteringService {
         if (regionCodes.length == 0) {
             return false;  // 지역 없으면 시군구 키 못 만듦 → 임베딩 경로(신규 생성)로
         }
+        // 안내성 분리(산불): 건조특보·소각금지·예방캠페인 등 실제 화재가 아닌 안내 알림은 사건 머지에
+        //   태우지 않고 안내 이벤트로 모은다. 안내성이 14일 윈도우로 시즌 내내 체이닝돼
+        //   사건 버킷을 blob(span 130일+)으로 만들고 소수 실사건을 오염시키던 것을 발생 지점에서 차단.
+        // span 게이트보다 먼저 판정한다 — 안내가 게이트에서 return false 로 일반 광역 경로에 새면 안내가 섞인다.
+        if (isAdvisorySplitType(alert.getDisasterType())
+                && AdvisoryClassifier.isAdvisory(alert.getDisasterType(), alert.getMessage(), alert.getEmergencyLevel())) {
+            clusterRegionalAdvisory(alert, regionCodes, windowHours);
+            return true;
+        }
+
         // 광역 broadcast(다수 시군구)는 여기서 안 잡고 기존 broadcast 경로가 (시도+유형/전국) 키로 격리.
         // 전국 산불이 시군구마다 쪼개지지 않게 — span 게이트는 local 경로와 동일 기준.
         if (distinctSigunguCount(regionCodes) > maxRegionSpan) {
             return false;
-        }
-
-        // 안내성 분리(산불): 건조특보·소각금지·예방캠페인 등 실제 화재가 아닌 안내 알림은 사건 머지에
-        //   태우지 않고 시군구별 롤링 안내 이벤트로 모은다. 안내성이 14일 윈도우로 시즌 내내 체이닝돼
-        //   사건 버킷을 blob(span 130일+)으로 만들고 소수 실사건을 오염시키던 것을 발생 지점에서 차단.
-        if (isAdvisorySplitType(alert.getDisasterType())
-                && AdvisoryClassifier.isAdvisory(alert.getDisasterType(), alert.getMessage(), alert.getEmergencyLevel())) {
-            clusterAdvisory(alert, regionCodes, windowHours);
-            return true;
         }
 
         String[] sigungu = sigunguPrefixes(regionCodes);
@@ -587,6 +588,20 @@ public class EventClusteringService {
                     alert.getId(), alert.getDisasterType(), windowHours);
         }
         return true;
+    }
+
+    /**
+     * 지역앵커 유형(산불)의 안내 알림 라우팅 — 시군구 1개면 시군구 안내 이벤트, 2개 이상이면 안내 광역 이벤트.
+     * 다지역 안내를 시군구 footprint 교집합({@link #clusterAdvisory})으로 모으면 이웃 시군구 안내 이벤트를
+     * 이어 붙이는 다리가 생겨, 실측 이벤트 698(360건·148일·29개 시군구)이 만들어졌다. 그래서 다지역은
+     * 시도/전국+유형 키의 안내 광역으로 보낸다(span 이 maxRegionSpan 을 넘어도 동일).
+     */
+    private void clusterRegionalAdvisory(DisasterAlert alert, String[] regionCodes, int windowHours) {
+        if (distinctSigunguCount(regionCodes) > 1) {
+            clusterAdvisoryBroadcast(alert, regionCodes, windowHours);
+        } else {
+            clusterAdvisory(alert, regionCodes, windowHours);
+        }
     }
 
     /**
@@ -655,7 +670,7 @@ public class EventClusteringService {
         }
         int sigunguSpan = distinctSigunguCount(regionCodes);
         if (sigunguSpan > 1) {
-            clusterAdvisoryBroadcast(alert, regionCodes);
+            clusterAdvisoryBroadcast(alert, regionCodes, advisoryWindowHours);
         } else {
             clusterAdvisory(alert, regionCodes, advisoryWindowHours);
         }
@@ -667,10 +682,12 @@ public class EventClusteringService {
      * 유형 '기타' 는 V7 에서 uninformative 라 {@link #clusterBroadcast} 가 병합 없이 매번 단발 광역 이벤트를
      * 만들어, 다지역 물놀이 안내마다 이벤트가 늘었다(평가 DB 51개). 안내는 본문이 달라도 같은 묶음이므로
      * 안내 윈도우 안에서 병합하되, 일반 '기타' 광역 이벤트와 섞이지 않게 is_advisory=true 인 것만 대상으로 삼는다.
+     *
+     * @param windowHours 병합 윈도우 — '기타' 는 advisoryWindowHours(168h), 산불은 regional-types 의 유형별 윈도우(336h)
      */
-    private void clusterAdvisoryBroadcast(DisasterAlert alert, String[] regionCodes) {
+    private void clusterAdvisoryBroadcast(DisasterAlert alert, String[] regionCodes, int windowHours) {
         String type = alert.getDisasterType();
-        LocalDateTime since = alert.getCreatedAt().minusHours(advisoryWindowHours);
+        LocalDateTime since = alert.getCreatedAt().minusHours(windowHours);
         boolean nationwide = distinctSidoCount(regionCodes) >= nationwideSidoSpan;
         String sido = nationwide ? null : dominantSidoPrefix(regionCodes);
         Optional<DisasterEvent> target = nationwide
