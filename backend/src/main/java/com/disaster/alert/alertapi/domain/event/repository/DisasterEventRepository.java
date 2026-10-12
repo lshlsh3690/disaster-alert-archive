@@ -155,6 +155,41 @@ public interface DisasterEventRepository extends JpaRepository<DisasterEvent, Lo
     );
 
     /**
+     * 사고성 유형의 인접 시군구 후보 검색 — {@link #findTopCandidates} 와 같은 반환 형태({eventId, minDistance}).
+     *
+     * <p>지역 조건만 다르다 — 이벤트 알림의 시군구가 새 알림 시군구의 {@code region_adjacency} 이웃이어야 한다
+     * (기존 cross-region 시군구 쿼리와 같은 방향: region_code=새 알림, neighbor_code=이벤트).
+     * 대상은 "이벤트 알림 중 하나라도 이웃 시군구에 속하는 이벤트"라서, 같은 시군구 알림이 섞인 이벤트나
+     * 다지역 알림이 섞인 이벤트도 포함될 수 있다(이웃만 대상인 것은 아니다).
+     * 인접 병합된 이벤트의 primary_region_code 는 첫 알림 지역으로 고정된다.
+     */
+    @Query(value = """
+            SELECT e.id AS event_id,
+                   MIN(da.embedding <=> CAST(:newEmbedding AS vector)) AS min_distance
+            FROM disaster_events e
+            JOIN event_alert_mapping m ON m.event_id = e.id
+            JOIN disaster_alert da ON da.disaster_alert_id = m.alert_id
+            WHERE e.last_alert_at > :sinceTime
+              AND e.is_broadcast = false
+              AND e.is_advisory = false
+              AND da.embedding IS NOT NULL
+              AND EXISTS (
+                  SELECT 1 FROM disaster_alert_region dar
+                  JOIN region_adjacency ra ON ra.neighbor_code = LEFT(dar.legal_district_code, 5)
+                  WHERE dar.disaster_alert_id = da.disaster_alert_id
+                    AND ra.region_code = ANY(CAST(:sigunguCodes AS varchar[]))
+              )
+            GROUP BY e.id
+            ORDER BY min_distance ASC
+            LIMIT 3
+            """, nativeQuery = true)
+    List<Object[]> findTopAdjacentCandidates(
+            @Param("newEmbedding") String newEmbedding,
+            @Param("sigunguCodes") String[] sigunguCodes,
+            @Param("sinceTime") LocalDateTime sinceTime
+    );
+
+    /**
      * 지역앵커 유형 머지 대상 검색 — 같은 유형 + 같은 시군구(footprint 교집합) + 윈도우 안의
      * non-broadcast 이벤트 중 가장 최근 1개. 산불·산사태·홍수처럼 "유형+시군구가 곧 사건"인 이산
      * 재난용.
@@ -168,7 +203,7 @@ public interface DisasterEventRepository extends JpaRepository<DisasterEvent, Lo
      * #findTopCandidates}와 동일한 EXISTS 필터). {@code is_broadcast=false}만 — 광역 산불은 호출 측이
      * span 게이트로 걸러 broadcast 경로로 보낸다. 동률(같은 윈도우 다수 후보)은 last_alert_at DESC 로 결정적.
      *
-     * @param type         새 알림 유형 (예: "산불")
+     * @param type         새 알림 유형 (예: "산불", "폭염")
      * @param sigunguCodes 새 알림 시군구 코드(앞 5자) 배열 — footprint 교집합 키
      * @param sinceTime    윈도우 하한 (유형별: 산불 14일 / 산사태·홍수 7일 전)
      * @return 머지할 이벤트 id, 없으면 empty(신규 이벤트)
@@ -197,8 +232,8 @@ public interface DisasterEventRepository extends JpaRepository<DisasterEvent, Lo
 
     /**
      * 안내성 롤링 이벤트 머지 대상 검색 — 같은 유형 + 같은 시군구(footprint 교집합) + 윈도우 안의
-     * {@code is_advisory=true} 이벤트 중 가장 최근 1개. 산불 건조특보·소각금지·예방캠페인 등 안내 알림을
-     * 시군구별 "{시군구} 산불예방안내" 하나로 모은다.
+     * {@code is_advisory=true} 이벤트 중 가장 최근 1개. 산불 건조특보·소각금지·예방캠페인, 폭염·한파 일반 안내 등을
+     * 시군구별 안내 이벤트 하나로 모은다.
      *
      * <p>{@link #findRegionalTypeMergeTarget}(사건, is_advisory=false)의 거울상 — 같은 시군구·유형·윈도우
      * 키이되 안내성 이벤트만 대상이라, 안내성과 사건이 서로의 버킷에 섞이지 않는다. 같은 시군구의 연속
@@ -224,16 +259,11 @@ public interface DisasterEventRepository extends JpaRepository<DisasterEvent, Lo
             ORDER BY e.last_alert_at DESC
             LIMIT 1
             """, nativeQuery = true)
-    Optional<Long> findFireAdvisoryMergeTarget(
+    Optional<Long> findAdvisoryMergeTarget(
             @Param("type") String type,
             @Param("sigunguCodes") String[] sigunguCodes,
             @Param("sinceTime") LocalDateTime sinceTime
     );
-
-    // Red 단계 뼈대 — 구현은 Green 에서 (findFireAdvisoryMergeTarget 일반화 예정)
-    default Optional<Long> findAdvisoryMergeTarget(String type, String[] sigunguCodes, LocalDateTime since) {
-        return Optional.empty();
-    }
 
     /**
      * 광역 broadcast 이벤트 머지 대상 검색 — 같은 시도 + 같은 유형 + 윈도우 안의 broadcast 이벤트 1개.
@@ -262,6 +292,40 @@ public interface DisasterEventRepository extends JpaRepository<DisasterEvent, Lo
      */
     Optional<DisasterEvent> findFirstByBroadcastTrueAndPrimaryDisasterTypeAndPrimaryRegionCodeIsNullAndLastAlertAtAfterOrderByLastAlertAtDesc(
             String primaryDisasterType, LocalDateTime lastAlertAt);
+
+    /**
+     * 안내 광역 이벤트(is_broadcast=true AND is_advisory=true) 머지 대상 — 같은 유형 + 같은 시도 + 윈도우 안 1개.
+     *
+     * <p>기존 broadcast finder 는 is_advisory 를 거르지 않아 일반 '기타' 광역 이벤트와 섞이므로, 안내 전용으로 따로 둔다.
+     */
+    @Query(value = """
+            SELECT * FROM disaster_events
+            WHERE is_broadcast = true AND is_advisory = true
+              AND primary_disaster_type = :type
+              AND primary_region_code LIKE CONCAT(:sidoPrefix, '%')
+              AND last_alert_at > :since
+            ORDER BY last_alert_at DESC
+            LIMIT 1
+            """, nativeQuery = true)
+    Optional<DisasterEvent> findAdvisoryBroadcastBySido(
+            @Param("type") String type, @Param("sidoPrefix") String sidoPrefix, @Param("since") LocalDateTime since);
+
+    /**
+     * 전국 안내 광역 이벤트(primary_region_code IS NULL, is_broadcast+is_advisory) 머지 대상 — 같은 유형 + 윈도우 안 1개.
+     *
+     * <p>일반 전국 broadcast(is_advisory=false)와 섞이지 않도록 is_advisory=true 로 제한한다.
+     */
+    @Query(value = """
+            SELECT * FROM disaster_events
+            WHERE is_broadcast = true AND is_advisory = true
+              AND primary_disaster_type = :type
+              AND primary_region_code IS NULL
+              AND last_alert_at > :since
+            ORDER BY last_alert_at DESC
+            LIMIT 1
+            """, nativeQuery = true)
+    Optional<DisasterEvent> findAdvisoryBroadcastNationwide(
+            @Param("type") String type, @Param("since") LocalDateTime since);
 
     /**
      * 새 알림이 머지된 후 이벤트의 last_alert_at, alert_count 갱신.

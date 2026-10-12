@@ -38,9 +38,9 @@ public enum MergeMethod {
      */
     REGIONAL_TYPE,
     /**
-     * 안내성 머지 — 산불의 건조특보·소각금지·예방캠페인 등 실제 화재가 아닌 안내 알림을 시군구별
-     * 롤링 안내 이벤트("{시군구} 산불예방안내", is_advisory=true)에 모은다. {@link FireAlertClassifier}
-     * 로 사건(REGIONAL_TYPE)과 분리해, 안내성이 사건 버킷에 체이닝돼 시즌 blob을 만드는 것을 차단.
+     * 안내성 머지 — 산불의 건조특보·소각금지·예방캠페인, 폭염·한파 일반 안내 등 실사건이 아닌 안내 알림을
+     * 시군구별 롤링 안내 이벤트(is_advisory=true)에 모은다. {@link AdvisoryClassifier}
+     * 로 사건(REGIONAL_TYPE 등)과 분리해, 안내성이 사건 버킷에 체이닝돼 시즌 blob을 만드는 것을 차단.
      */
     ADVISORY
 }

@@ -3,19 +3,15 @@ package com.disaster.alert.alertapi.domain.event.model;
 import com.disaster.alert.alertapi.domain.disasteralert.model.DisasterLevel;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * {@link AdvisoryClassifier} 테스트 — 유형별 안내성 분류 진입점. 외부 의존성 없는 순수 로직.
+ * {@link AdvisoryClassifier} 테스트 — 유형별 안내성 분류 진입점(산불 위임). 폭염·한파는 에피소드형 앵커링으로 대체되어 다루지 않는다. 외부 의존성 없는 순수 로직.
  */
 class AdvisoryClassifierTest {
-
-    private static final String HEAT_GUIDE =
-            "오늘 무더위가 예상됩니다.▲낮 시간 논·밭작업 및 야외활동 자제▲무더위쉼터 이용"
-                    + "▲폭염안전수칙(물,그늘,휴식)을 준수하여 건강관리에 유의하시기 바랍니다.[홍성군]";
-    private static final String COLD_GUIDE =
-            "강한 한파 지속 ▲방한용품 착용 ▲한랭질환 주의 ... 안전에 유의 [영동군]";
 
     // ---- 산불: FireAlertClassifier 위임 ----
 
@@ -38,75 +34,50 @@ class AdvisoryClassifierTest {
         assertThat(AdvisoryClassifier.isAdvisory("산불", null, DisasterLevel.LEVEL_1)).isTrue();
     }
 
-    // ---- 폭염 ----
+    // ---- 기타: 물놀이·수상안전 예방 안내문 ----
 
-    @Test
-    @DisplayName("폭염: 특보·피해 표현 없이 행동요령만 있는 일반 안내는 안내성이다")
-    void heat_generalGuidanceIsAdvisory() {
-        assertThat(AdvisoryClassifier.isAdvisory("폭염", HEAT_GUIDE, DisasterLevel.LEVEL_1)).isTrue();
+    @ParameterizedTest(name = "기타 물놀이·수상안전 예방 안내문은 안내성이다: {0}")
+    @ValueSource(strings = {
+            "수상안전사고 예방을 위해 ▲구명조끼 착용 ▲위험구역 진입금지 ▲야간, 음주수영 금지 ▲어린이는 반드시 보호자 동반 등 안전수칙을 준수하시기 바랍니다. [옥천군]",
+            "물놀이 안전사고 예방을 위해 △준비운동, 구명조끼 필수 △야간 및 음주 수영 금지 △지정된 장소에서만 물놀이 등 안전수칙 준수 바랍니다. [울산광역시]",
+            "수난사고로 인한 인명피해 예방을 위하여 안전한 장소에서 안전장비를 착용하고 안전수칙을 준수하여 주시기 바랍니다. [통영시]"
+    })
+    void etcWaterSafetyGuide_isAdvisory(String message) {
+        assertThat(AdvisoryClassifier.isAdvisory("기타", message, DisasterLevel.LEVEL_1)).isTrue();
+    }
+
+    @ParameterizedTest(name = "기타 비안내 문구는 안내성이 아니다: {0}")
+    @ValueSource(strings = {
+            "광명시 옥길동151 인근 사슴5마리 탈출. 주민께서는 안전에 유의하시고 발견 시 신고 바랍니다. [광명시]",
+            "시내버스 파업으로 운행이 중단됩니다. 셔틀버스를 이용해 주시기 바랍니다. [OO시]",
+            "도로 결빙이 예상되오니 출퇴근길 안전운전에 유의하시기 바랍니다. [OO시]",
+            "금일 10:03 금왕읍 삼봉리 641 일원에서 화학 물질 유출로 인근 주민은 즉시 대피하시기 바랍니다. [음성군]",
+            "계곡에서 익수 사고가 발생하여 구조 중입니다. 물놀이 안전수칙 준수 바랍니다"
+    })
+    void etcNonAdvisoryMessages_areNotAdvisory(String message) {
+        assertThat(AdvisoryClassifier.isAdvisory("기타", message, DisasterLevel.LEVEL_1)).isFalse();
     }
 
     @Test
-    @DisplayName("폭염: '자제'만 있고 특보 표현이 없으면 안내성이다")
-    void heat_onlyRestraintWordIsAdvisory() {
-        assertThat(AdvisoryClassifier.isAdvisory("폭염", "야외활동 자제", DisasterLevel.LEVEL_1)).isTrue();
+    @DisplayName("기타 안내 문구여도 긴급도 LEVEL_2 이상이면 사건이다")
+    void etcWaterSafetyGuide_highLevelIsNotAdvisory() {
+        String msg = "물놀이 안전사고 예방을 위해 구명조끼 착용 등 안전수칙 준수 바랍니다. [울산광역시]";
+        assertThat(AdvisoryClassifier.isAdvisory("기타", msg, DisasterLevel.LEVEL_2)).isFalse();
+        assertThat(AdvisoryClassifier.isAdvisory("기타", msg, DisasterLevel.LEVEL_3)).isFalse();
     }
 
     @Test
-    @DisplayName("폭염: LEVEL_2/LEVEL_3 은 본문과 무관하게 항상 사건이다")
-    void heat_highLevelIsAlwaysIncident() {
-        assertThat(AdvisoryClassifier.isAdvisory("폭염", HEAT_GUIDE, DisasterLevel.LEVEL_2)).isFalse();
-        assertThat(AdvisoryClassifier.isAdvisory("폭염", HEAT_GUIDE, DisasterLevel.LEVEL_3)).isFalse();
+    @DisplayName("기타 본문이 null/blank 이면 안내가 아니다 (산불과 다름)")
+    void etcNullOrBlankMessage_isNotAdvisory() {
+        assertThat(AdvisoryClassifier.isAdvisory("기타", null, DisasterLevel.LEVEL_1)).isFalse();
+        assertThat(AdvisoryClassifier.isAdvisory("기타", "   ", DisasterLevel.LEVEL_1)).isFalse();
     }
 
     @Test
-    @DisplayName("폭염: 본문이 null/blank 면 안내가 아니다 - 판단 불가는 기존 경로 유지(산불의 null=안내와 반대)")
-    void heat_nullOrBlankMessageIsNotAdvisory() {
-        assertThat(AdvisoryClassifier.isAdvisory("폭염", null, DisasterLevel.LEVEL_1)).isFalse();
-        assertThat(AdvisoryClassifier.isAdvisory("폭염", "   ", DisasterLevel.LEVEL_1)).isFalse();
-    }
-
-    @Test
-    @DisplayName("폭염: 특보 자체를 알리는 문자(발효/발령/해제/격상/주의보/경보/특보)는 사건이다")
-    void heat_warningNoticeIsIncident() {
-        for (String msg : new String[]{
-                "폭염주의보 발효, 야외활동 자제 바랍니다",
-                "폭염경보 해제",
-                "폭염특보 격상",
-                "오늘 14시 폭염 발령"}) {
-            assertThat(AdvisoryClassifier.isAdvisory("폭염", msg, DisasterLevel.LEVEL_1))
-                    .as(msg).isFalse();
-        }
-    }
-
-    @Test
-    @DisplayName("폭염: 특보 표현과 안내 표현이 섞이면 보수적으로 사건 - 특보 표현이 있으면 기존 경로 유지")
-    void heat_mixedWarningAndGuidanceIsIncident() {
-        assertThat(AdvisoryClassifier.isAdvisory("폭염",
-                "폭염경보 발령, 야외활동 자제 및 건강관리에 유의하시기 바랍니다", DisasterLevel.LEVEL_1)).isFalse();
-    }
-
-    @Test
-    @DisplayName("폭염: 실제 피해/사고 표현(사망/사고/피해/정전/환자 발생)이 있으면 사건이다")
-    void heat_damageExpressionIsIncident() {
-        for (String msg : new String[]{
-                "폭염으로 온열질환자 사망, 야외활동 자제",
-                "폭염 관련 사고 발생, 유의 바랍니다",
-                "폭염 피해 접수 중, 유의",
-                "폭염으로 정전 발생, 자제 바랍니다",
-                "온열질환 환자 발생, 주의 바랍니다"}) {
-            assertThat(AdvisoryClassifier.isAdvisory("폭염", msg, DisasterLevel.LEVEL_1))
-                    .as(msg).isFalse();
-        }
-    }
-
-    // ---- 한파 ----
-
-    @Test
-    @DisplayName("한파: 행동요령만 있는 일반 안내는 안내성, 한파주의보 발효는 사건이다")
-    void cold_guidanceVsWarning() {
-        assertThat(AdvisoryClassifier.isAdvisory("한파", COLD_GUIDE, DisasterLevel.LEVEL_1)).isTrue();
-        assertThat(AdvisoryClassifier.isAdvisory("한파", "한파주의보 발효", DisasterLevel.LEVEL_1)).isFalse();
+    @DisplayName("기타가 아닌 유형(호우)은 같은 물놀이 안내 문구여도 안내가 아니다")
+    void waterSafetyGuide_otherTypeIsNotAdvisory() {
+        String msg = "물놀이 안전사고 예방을 위해 구명조끼 착용 등 안전수칙 준수 바랍니다. [울산광역시]";
+        assertThat(AdvisoryClassifier.isAdvisory("호우", msg, DisasterLevel.LEVEL_1)).isFalse();
     }
 
     // ---- 경계 ----
@@ -114,9 +85,9 @@ class AdvisoryClassifierTest {
     @Test
     @DisplayName("대상 외 유형, 빈/null 유형은 안내가 아니다")
     void otherOrMissingTypeIsNotAdvisory() {
-        assertThat(AdvisoryClassifier.isAdvisory("호우", HEAT_GUIDE, DisasterLevel.LEVEL_1)).isFalse();
+        assertThat(AdvisoryClassifier.isAdvisory("호우", "오늘 무더위가 예상됩니다.▲야외활동 자제[홍성군]", DisasterLevel.LEVEL_1)).isFalse();
         assertThat(AdvisoryClassifier.isAdvisory("교통통제", "우회 바랍니다 유의", DisasterLevel.LEVEL_1)).isFalse();
-        assertThat(AdvisoryClassifier.isAdvisory("", HEAT_GUIDE, DisasterLevel.LEVEL_1)).isFalse();
-        assertThat(AdvisoryClassifier.isAdvisory(null, HEAT_GUIDE, DisasterLevel.LEVEL_1)).isFalse();
+        assertThat(AdvisoryClassifier.isAdvisory("", "오늘 무더위가 예상됩니다.▲야외활동 자제[홍성군]", DisasterLevel.LEVEL_1)).isFalse();
+        assertThat(AdvisoryClassifier.isAdvisory(null, "오늘 무더위가 예상됩니다.▲야외활동 자제[홍성군]", DisasterLevel.LEVEL_1)).isFalse();
     }
 }
