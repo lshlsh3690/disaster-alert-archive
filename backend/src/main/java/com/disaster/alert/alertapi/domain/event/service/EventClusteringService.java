@@ -493,7 +493,7 @@ public class EventClusteringService {
         LocalDateTime since = alert.getCreatedAt().minusHours(globalWindowHours);
         // 전국 broadcast(region_code=null) 이벤트만 키로 — broadcast 격리 규칙과 일관(local 과 안 섞임).
         Optional<DisasterEvent> target = disasterEventRepository
-                .findFirstByBroadcastTrueAndPrimaryDisasterTypeAndPrimaryRegionCodeIsNullAndLastAlertAtAfterOrderByLastAlertAtDesc(
+                .findLatestGeneralBroadcastNationwide(
                         type, since);
         if (target.isPresent()) {
             mergeIntoExisting(target.get().getId(), alert, null, MergeMethod.GLOBAL_TYPE);
@@ -908,7 +908,7 @@ public class EventClusteringService {
         if (sidoSpan >= nationwideSidoSpan) {
             if (informative) {
                 Optional<DisasterEvent> target = disasterEventRepository
-                        .findFirstByBroadcastTrueAndPrimaryDisasterTypeAndPrimaryRegionCodeIsNullAndLastAlertAtAfterOrderByLastAlertAtDesc(
+                        .findLatestGeneralBroadcastNationwide(
                                 type, since);
                 if (target.isPresent()) {
                     log.info("clusterNewAlert: alertId={} 전국({}시도) → broadcast event={} 유형 머지({})",
@@ -926,7 +926,7 @@ public class EventClusteringService {
         String sido = dominantSidoPrefix(regionCodes);
         if (informative) {
             Optional<DisasterEvent> target = disasterEventRepository
-                    .findFirstByBroadcastTrueAndPrimaryDisasterTypeAndPrimaryRegionCodeStartingWithAndLastAlertAtAfterOrderByLastAlertAtDesc(
+                    .findLatestGeneralBroadcastBySido(
                             type, sido, since);
             if (target.isPresent()) {
                 log.info("clusterNewAlert: alertId={} 광역({}시군구) → broadcast event={} 시도+유형 머지({} {})",

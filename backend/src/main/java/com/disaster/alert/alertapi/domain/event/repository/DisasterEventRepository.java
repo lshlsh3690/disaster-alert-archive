@@ -286,8 +286,8 @@ public interface DisasterEventRepository extends JpaRepository<DisasterEvent, Lo
      * @param lastAlertAt         윈도우 하한 (이 시각 이후 last_alert_at 인 이벤트만)
      *
      * <p>{@code is_advisory=false} 만 본다. 산불 안내 광역 이벤트(is_advisory=true)가 일반 광역 이벤트와 섞이면
-     * 안내가 사건 광역에 이어 붙기 때문이다. 기존 테스트가 이 메서드명을 스텁하므로 파생 쿼리 이름을 바꾸지 않고
-     * {@code @Query} 로 조건을 추가했다(이름은 호환용으로 보존).
+     * 안내가 사건 광역에 이어 붙기 때문이다. 이름의 "General" 이 그 뜻이다 — 안내 광역은
+     * {@link #findAdvisoryBroadcastBySido} 로 따로 찾는다.
      */
     @Query(value = """
             SELECT * FROM disaster_events
@@ -298,7 +298,7 @@ public interface DisasterEventRepository extends JpaRepository<DisasterEvent, Lo
             ORDER BY last_alert_at DESC
             LIMIT 1
             """, nativeQuery = true)
-    Optional<DisasterEvent> findFirstByBroadcastTrueAndPrimaryDisasterTypeAndPrimaryRegionCodeStartingWithAndLastAlertAtAfterOrderByLastAlertAtDesc(
+    Optional<DisasterEvent> findLatestGeneralBroadcastBySido(
             @Param("primaryDisasterType") String primaryDisasterType,
             @Param("sidoPrefix") String sidoPrefix,
             @Param("lastAlertAt") LocalDateTime lastAlertAt);
@@ -311,7 +311,7 @@ public interface DisasterEventRepository extends JpaRepository<DisasterEvent, Lo
      * 전체에 발송되는 알림이 시도별로 흩어지지 않게 하나로 통합.
      *
      * <p>시도 버전과 같은 이유로 {@code is_advisory=false} 만 본다(전국 안내 광역은 {@link #findAdvisoryBroadcastNationwide}).
-     * 메서드명은 기존 테스트 스텁 호환을 위해 보존하고 {@code @Query} 로 조건을 건다.
+     * 이름의 "General" 이 그 뜻이다(안내 광역 제외).
      */
     @Query(value = """
             SELECT * FROM disaster_events
@@ -322,7 +322,7 @@ public interface DisasterEventRepository extends JpaRepository<DisasterEvent, Lo
             ORDER BY last_alert_at DESC
             LIMIT 1
             """, nativeQuery = true)
-    Optional<DisasterEvent> findFirstByBroadcastTrueAndPrimaryDisasterTypeAndPrimaryRegionCodeIsNullAndLastAlertAtAfterOrderByLastAlertAtDesc(
+    Optional<DisasterEvent> findLatestGeneralBroadcastNationwide(
             @Param("primaryDisasterType") String primaryDisasterType,
             @Param("lastAlertAt") LocalDateTime lastAlertAt);
 

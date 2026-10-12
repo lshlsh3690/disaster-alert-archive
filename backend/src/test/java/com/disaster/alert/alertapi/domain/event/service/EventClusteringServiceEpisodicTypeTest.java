@@ -276,14 +276,14 @@ class EventClusteringServiceEpisodicTypeTest {
 
     private void givenSidoBroadcastTarget() {
         when(disasterEventRepository
-                .findFirstByBroadcastTrueAndPrimaryDisasterTypeAndPrimaryRegionCodeStartingWithAndLastAlertAtAfterOrderByLastAlertAtDesc(
+                .findLatestGeneralBroadcastBySido(
                         anyString(), anyString(), any(LocalDateTime.class)))
                 .thenReturn(Optional.of(broadcastEvent(EXISTING_EVENT_ID)));
     }
 
     private void givenNationwideBroadcastTarget() {
         when(disasterEventRepository
-                .findFirstByBroadcastTrueAndPrimaryDisasterTypeAndPrimaryRegionCodeIsNullAndLastAlertAtAfterOrderByLastAlertAtDesc(
+                .findLatestGeneralBroadcastNationwide(
                         anyString(), any(LocalDateTime.class)))
                 .thenReturn(Optional.of(broadcastEvent(EXISTING_EVENT_ID)));
     }
@@ -322,7 +322,7 @@ class EventClusteringServiceEpisodicTypeTest {
 
         verifyLocalPathsUntouched();
         verify(disasterEventRepository)
-                .findFirstByBroadcastTrueAndPrimaryDisasterTypeAndPrimaryRegionCodeStartingWithAndLastAlertAtAfterOrderByLastAlertAtDesc(
+                .findLatestGeneralBroadcastBySido(
                         eq("폭염"), eq("43"), eq(now.minusHours(168)));
         assertMergedBroadcast(EXISTING_EVENT_ID);
     }
@@ -333,7 +333,7 @@ class EventClusteringServiceEpisodicTypeTest {
         alert("폭염", HEAT_WARNING, java.util.Arrays.copyOf(SAME_SIDO_CODES, count));
         givenMergeTarget();
         when(disasterEventRepository
-                .findFirstByBroadcastTrueAndPrimaryDisasterTypeAndPrimaryRegionCodeStartingWithAndLastAlertAtAfterOrderByLastAlertAtDesc(
+                .findLatestGeneralBroadcastBySido(
                         anyString(), anyString(), any(LocalDateTime.class)))
                 .thenReturn(Optional.empty());
 
@@ -367,7 +367,7 @@ class EventClusteringServiceEpisodicTypeTest {
 
         verifyLocalPathsUntouched();
         verify(disasterEventRepository)
-                .findFirstByBroadcastTrueAndPrimaryDisasterTypeAndPrimaryRegionCodeIsNullAndLastAlertAtAfterOrderByLastAlertAtDesc(
+                .findLatestGeneralBroadcastNationwide(
                         eq("폭염"), eq(now.minusHours(168)));
         assertMergedBroadcast(EXISTING_EVENT_ID);
     }
@@ -377,7 +377,7 @@ class EventClusteringServiceEpisodicTypeTest {
     void nationwideEpisodic_createsNewNationwideBroadcast() {
         alert("폭염", HEAT_WARNING, NATIONWIDE_CODES);
         when(disasterEventRepository
-                .findFirstByBroadcastTrueAndPrimaryDisasterTypeAndPrimaryRegionCodeIsNullAndLastAlertAtAfterOrderByLastAlertAtDesc(
+                .findLatestGeneralBroadcastNationwide(
                         anyString(), any(LocalDateTime.class)))
                 .thenReturn(Optional.empty());
 
@@ -400,10 +400,10 @@ class EventClusteringServiceEpisodicTypeTest {
 
         verifyLocalPathsUntouched();
         verify(disasterEventRepository)
-                .findFirstByBroadcastTrueAndPrimaryDisasterTypeAndPrimaryRegionCodeStartingWithAndLastAlertAtAfterOrderByLastAlertAtDesc(
+                .findLatestGeneralBroadcastBySido(
                         eq("폭염"), eq("11"), eq(now.minusHours(168)));
         verify(disasterEventRepository, never())
-                .findFirstByBroadcastTrueAndPrimaryDisasterTypeAndPrimaryRegionCodeIsNullAndLastAlertAtAfterOrderByLastAlertAtDesc(
+                .findLatestGeneralBroadcastNationwide(
                         anyString(), any(LocalDateTime.class));
         assertMergedBroadcast(EXISTING_EVENT_ID);
     }
