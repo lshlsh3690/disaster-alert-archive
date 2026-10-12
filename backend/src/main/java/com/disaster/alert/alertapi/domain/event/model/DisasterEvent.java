@@ -206,8 +206,25 @@ public class DisasterEvent {
             String regionName,
             LocalDateTime alertAt
     ) {
+        return createAdvisory(disasterType, regionCode, regionName, alertAt, false);
+    }
+
+    /**
+     * 안내 이벤트 팩토리. {@code broadcast=true} 는 시군구 2개 이상에 걸친 안내문을 시도/전국 단위로 모으는 용도로,
+     * 일반 광역 이벤트와 {@code is_advisory} 로만 구분된다.
+     */
+    public static DisasterEvent createAdvisory(
+            String disasterType,
+            String regionCode,
+            String regionName,
+            LocalDateTime alertAt,
+            boolean broadcast
+    ) {
         String safeRegion = regionName == null ? "지역미상" : regionName;
-        String label = isInformativeType(disasterType) ? disasterType : "재난";
+        // '기타' 안내 판별 규칙(AdvisoryClassifier)이 물놀이·수상안전 한 가지뿐이라 라벨을 고정한다.
+        // 규칙이 늘면 본문에서 라벨을 뽑도록 바꿔야 한다.
+        String label = "기타".equals(disasterType) ? "물놀이"
+                : isInformativeType(disasterType) ? disasterType : "재난";
         return DisasterEvent.builder()
                 .eventTitle(advisoryTitle(safeRegion, label))
                 .primaryDisasterType(disasterType == null ? "UNKNOWN" : disasterType)
@@ -217,7 +234,7 @@ public class DisasterEvent {
                 .lastAlertAt(alertAt)
                 .alertCount(1)
                 .cooldownHours(DisasterCooldown.hoursFor(disasterType))
-                .broadcast(false)
+                .broadcast(broadcast)
                 .advisory(true)
                 .build();
     }

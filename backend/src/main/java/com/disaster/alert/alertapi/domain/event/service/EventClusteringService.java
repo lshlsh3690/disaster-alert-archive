@@ -655,11 +655,42 @@ public class EventClusteringService {
         }
         int sigunguSpan = distinctSigunguCount(regionCodes);
         if (sigunguSpan > 1) {
-            clusterBroadcast(alert, regionCodes, sigunguSpan);
+            clusterAdvisoryBroadcast(alert, regionCodes);
         } else {
             clusterAdvisory(alert, regionCodes, advisoryWindowHours);
         }
         return true;
+    }
+
+    /**
+     * 다지역(시군구 2개 이상) 안내문을 시도(또는 전국) + 유형 키의 안내 광역 이벤트로 모은다.
+     * 유형 '기타' 는 V7 에서 uninformative 라 {@link #clusterBroadcast} 가 병합 없이 매번 단발 광역 이벤트를
+     * 만들어, 다지역 물놀이 안내마다 이벤트가 늘었다(평가 DB 51개). 안내는 본문이 달라도 같은 묶음이므로
+     * 안내 윈도우 안에서 병합하되, 일반 '기타' 광역 이벤트와 섞이지 않게 is_advisory=true 인 것만 대상으로 삼는다.
+     */
+    private void clusterAdvisoryBroadcast(DisasterAlert alert, String[] regionCodes) {
+        String type = alert.getDisasterType();
+        LocalDateTime since = alert.getCreatedAt().minusHours(advisoryWindowHours);
+        boolean nationwide = distinctSidoCount(regionCodes) >= nationwideSidoSpan;
+        String sido = nationwide ? null : dominantSidoPrefix(regionCodes);
+        Optional<DisasterEvent> target = nationwide
+                ? disasterEventRepository.findAdvisoryBroadcastNationwide(type, since)
+                : disasterEventRepository.findAdvisoryBroadcastBySido(type, sido, since);
+        if (target.isPresent()) {
+            mergeIntoExisting(target.get().getId(), alert, null, MergeMethod.BROADCAST);
+            log.info("clusterNewAlert(안내 광역): alertId={} → event={} 머지({} {})",
+                    alert.getId(), target.get().getId(), nationwide ? "전국" : sido, type);
+            return;
+        }
+        DisasterEvent event = DisasterEvent.createAdvisory(type,
+                nationwide ? null : firstCodeOfSido(regionCodes, sido),
+                nationwide ? "전국" : sidoNameForPrefix(alert, sido),
+                alert.getCreatedAt(), true);
+        DisasterEvent saved = disasterEventRepository.save(event);
+        eventAlertMappingRepository.save(EventAlertMapping.of(saved.getId(), alert.getId(), 1, null, MergeMethod.SEED));
+        eventPublisher.publishEvent(new AlertClusteredEvent(saved.getId(), alert.getId()));
+        log.info("clusterNewAlert(안내 광역): alertId={} → 신규 안내 광역 event={} (title='{}')",
+                alert.getId(), saved.getId(), saved.getEventTitle());
     }
 
     /** 에피소드형 유형 매칭. 유형 null 이거나 목록이 비어 있으면 적용하지 않는다. */

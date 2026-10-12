@@ -296,22 +296,36 @@ public interface DisasterEventRepository extends JpaRepository<DisasterEvent, Lo
     /**
      * 안내 광역 이벤트(is_broadcast=true AND is_advisory=true) 머지 대상 — 같은 유형 + 같은 시도 + 윈도우 안 1개.
      *
-     * <p>Red 단계 뼈대 — 구현은 Green 에서 (현재는 항상 empty). 일반 broadcast(is_advisory=false)와 섞이지 않아야 한다.
+     * <p>기존 broadcast finder 는 is_advisory 를 거르지 않아 일반 '기타' 광역 이벤트와 섞이므로, 안내 전용으로 따로 둔다.
      */
-    default Optional<DisasterEvent> findAdvisoryBroadcastBySido(
-            String primaryDisasterType, String sidoPrefix, LocalDateTime lastAlertAt) {
-        return Optional.empty();
-    }
+    @Query(value = """
+            SELECT * FROM disaster_events
+            WHERE is_broadcast = true AND is_advisory = true
+              AND primary_disaster_type = :type
+              AND primary_region_code LIKE CONCAT(:sidoPrefix, '%')
+              AND last_alert_at > :since
+            ORDER BY last_alert_at DESC
+            LIMIT 1
+            """, nativeQuery = true)
+    Optional<DisasterEvent> findAdvisoryBroadcastBySido(
+            @Param("type") String type, @Param("sidoPrefix") String sidoPrefix, @Param("since") LocalDateTime since);
 
     /**
      * 전국 안내 광역 이벤트(primary_region_code IS NULL, is_broadcast+is_advisory) 머지 대상 — 같은 유형 + 윈도우 안 1개.
      *
-     * <p>Red 단계 뼈대 — 구현은 Green 에서 (현재는 항상 empty).
+     * <p>일반 전국 broadcast(is_advisory=false)와 섞이지 않도록 is_advisory=true 로 제한한다.
      */
-    default Optional<DisasterEvent> findAdvisoryBroadcastNationwide(
-            String primaryDisasterType, LocalDateTime lastAlertAt) {
-        return Optional.empty();
-    }
+    @Query(value = """
+            SELECT * FROM disaster_events
+            WHERE is_broadcast = true AND is_advisory = true
+              AND primary_disaster_type = :type
+              AND primary_region_code IS NULL
+              AND last_alert_at > :since
+            ORDER BY last_alert_at DESC
+            LIMIT 1
+            """, nativeQuery = true)
+    Optional<DisasterEvent> findAdvisoryBroadcastNationwide(
+            @Param("type") String type, @Param("since") LocalDateTime since);
 
     /**
      * 새 알림이 머지된 후 이벤트의 last_alert_at, alert_count 갱신.
