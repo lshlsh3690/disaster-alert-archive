@@ -224,7 +224,7 @@ class EventClusteringServiceFireAdvisoryBroadcastTest {
     }
 
     @Test
-    @DisplayName("f) 산불 사건(안내 아님) + 시군구 3개: 안내 광역 finder 미호출, 지역앵커 경로 [회귀 보호]")
+    @DisplayName("f) 산불 사건(안내 아님) + 시군구 3개: 안내 광역 finder 미호출, 지역 한정 경로 [회귀 보호]")
     void fireIncidentMultiRegion_staysRegionalAnchor() {
         alert("산불", FIRE_INCIDENT, DisasterLevel.LEVEL_1, SAME_SIDO_CODES);
 
