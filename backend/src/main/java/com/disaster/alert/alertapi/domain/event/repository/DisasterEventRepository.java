@@ -205,7 +205,7 @@ public interface DisasterEventRepository extends JpaRepository<DisasterEvent, Lo
      *
      * @param type         새 알림 유형 (예: "산불", "폭염")
      * @param sigunguCodes 새 알림 시군구 코드(앞 5자) 배열 — footprint 교집합 키
-     * @param sinceTime    윈도우 하한 (유형별: 산불 14일 / 산사태·홍수 7일 전)
+     * @param sinceTime    윈도우 하한 (유형별: 현재 산불·산사태·홍수 모두 7일 전)
      * @return 머지할 이벤트 id, 없으면 empty(신규 이벤트)
      */
     @Query(value = """

@@ -98,11 +98,11 @@ public class EventClusteringService {
 
     /**
      * 지역앵커 유형(유형:윈도우시간 CSV) — 산불·산사태·홍수처럼 유형+시군구가 곧 사건인 이산 재난.
-     * 태풍(global-types, 전국)과 달리 시군구 스코프. 윈도우는 유형별로 다르다 — 산불은 재발화 주기가
-     * 길어 14일(336h), 호우성(산사태·홍수)은 같은 날 burst 라 7일(168h). 계절 연속형(폭염·호우특보 등)은
+     * 태풍(global-types, 전국)과 달리 시군구 스코프. 윈도우는 유형별로 지정한다 — 현재 산불·산사태·홍수
+     * 모두 7일(168h)(산불은 14일(336h)에서 줄임). 계절 연속형(폭염·호우특보 등)은
      * 절대 넣지 말 것(같은 시군구 매일 발령 → span blob).
      */
-    @Value("${clustering.regional-types:산불:336,산사태:168,홍수:168}")
+    @Value("${clustering.regional-types:산불:168,산사태:168,홍수:168}")
     private String regionalTypesCsv;
 
     /**
@@ -543,7 +543,7 @@ public class EventClusteringService {
      * 것과 달리 <b>시군구 스코프</b>라 전국 blob 이 안 생긴다. episode 간 갭이 윈도우보다 커서(실측: 산불
      * 재발화 7~30일, 호우성 같은 날 burst 후 9~25일) 서로 다른 episode 는 자연 분리된다.
      *
-     * <p>윈도우는 유형별 — 산불 14일(재발화 길다), 산사태·홍수 7일(같은 날 burst). 광역 broadcast
+     * <p>윈도우는 유형별 — 현재 산불·산사태·홍수 모두 7일. 광역 broadcast
      * (span&gt;{@code maxRegionSpan})·지역 없음은 여기서 처리하지 않고 false → 기존 broadcast/임베딩
      * 경로로 넘긴다(전국 산불이 시군구로 안 쪼개지게 격리 유지).
      *
@@ -683,7 +683,7 @@ public class EventClusteringService {
      * 만들어, 다지역 물놀이 안내마다 이벤트가 늘었다(평가 DB 51개). 안내는 본문이 달라도 같은 묶음이므로
      * 안내 윈도우 안에서 병합하되, 일반 '기타' 광역 이벤트와 섞이지 않게 is_advisory=true 인 것만 대상으로 삼는다.
      *
-     * @param windowHours 병합 윈도우 — '기타' 는 advisoryWindowHours(168h), 산불은 regional-types 의 유형별 윈도우(336h)
+     * @param windowHours 병합 윈도우 — '기타' 는 advisoryWindowHours(168h), 산불은 regional-types 의 유형별 윈도우(168h)
      */
     private void clusterAdvisoryBroadcast(DisasterAlert alert, String[] regionCodes, int windowHours) {
         String type = alert.getDisasterType();

@@ -39,11 +39,11 @@
 
 **우선순위 이유**: 임베딩 경로 다음으로 실제 트래픽의 상당 비중(산불류)에 적용되며, 튜닝 이력(주석)에 근거가 가장 상세히 남아 있는 핵심 보정 로직이다.
 
-**독립 테스트 방법**: 같은 시군구에 "산불" 유형 알림 2건을 본문을 다르게 하여 14일 이내 순서대로 수집시키면 하나의 이벤트로 묶이는지 확인.
+**독립 테스트 방법**: 같은 시군구에 "산불" 유형 알림 2건을 본문을 다르게 하여 7일 이내 순서대로 수집시키면 하나의 이벤트로 묶이는지 확인.
 
 **인수 시나리오**:
 
-1. **Given** `clustering.regional-types`(`산불:336,산사태:168,홍수:168`)에 매핑된 유형의 알림이 수집되고, 같은 시군구(footprint 교집합)에 해당 유형·`is_broadcast=false`·`is_advisory=false`인 기존 이벤트가 유형별 윈도우(산불 336h/14일, 산사태·홍수 168h/7일) 이내에 있으면, **When** `clusterRegionalType`이 호출되면, **Then** 임베딩 비교 없이 `MergeMethod.REGIONAL_TYPE`으로 그 이벤트에 병합된다 (`EventClusteringService.java:458-496`, 주석 `442-457`, `DisasterEventRepository.java:176-196`).
+1. **Given** `clustering.regional-types`(`산불:168,산사태:168,홍수:168`)에 매핑된 유형의 알림이 수집되고, 같은 시군구(footprint 교집합)에 해당 유형·`is_broadcast=false`·`is_advisory=false`인 기존 이벤트가 유형별 윈도우(산불·산사태·홍수 모두 168h/7일; 산불은 2026-10-14 에 336h/14일에서 줄임) 이내에 있으면, **When** `clusterRegionalType`이 호출되면, **Then** 임베딩 비교 없이 `MergeMethod.REGIONAL_TYPE`으로 그 이벤트에 병합된다 (`EventClusteringService.java:458-496`, 주석 `442-457`, `DisasterEventRepository.java:176-196`).
 2. **Given** 산불 알림 지역이 걸친 시군구 수가 `clustering.max-region-span`(10)을 초과하면, **When** `clusterRegionalType`이 호출되면, **Then** 지역앵커 경로를 타지 않고(`false` 반환) 광역 broadcast 경로로 넘어간다 — 전국 단위 산불이 시군구별로 쪼개지는 것을 막기 위함 (`EventClusteringService.java:467-471`).
 3. **Given** 알림이 산불이고 `FireAlertClassifier.isAdvisory(message, emergencyLevel)`가 true(건조특보/소각금지/예방캠페인 등 실화재 아님)이면, **When** `clusterRegionalType`이 호출되면, **Then** 사건 버킷이 아니라 시군구별 롤링 안내 이벤트(`is_advisory=true`)에 별도로 합류한다 (`EventClusteringService.java:473-480`, `502-520`, `FireAlertClassifier.java:63-84`).
 
@@ -204,7 +204,7 @@
 
 **지역앵커 유형(산불·산사태·홍수)**
 
-- **FR-015**: 시스템은 알림 유형이 `clustering.regional-types`(기본 `"산불:336,산사태:168,홍수:168"`)에 매핑돼 있으면, 지역 정보가 있고 걸친 시군구 수가 `max-region-span` 이하인 경우, 같은 시군구·같은 유형·유형별 윈도우(산불 336시간/14일, 산사태·홍수 168시간/7일) 안의 `is_broadcast=false & is_advisory=false` 이벤트에 임베딩·LLM 없이 `MergeMethod.REGIONAL_TYPE`으로 병합해야 한다(MUST). 이 `is_broadcast=false` 조건도 FR-006과 동일하게 병합 후 영구 유지되는 제외 규칙이다(FR-011 참고) (`EventClusteringService.java:114-115`, `458-496`; `DisasterEventRepository.java:176-196`).
+- **FR-015**: 시스템은 알림 유형이 `clustering.regional-types`(기본 `"산불:168,산사태:168,홍수:168"`)에 매핑돼 있으면, 지역 정보가 있고 걸친 시군구 수가 `max-region-span` 이하인 경우, 같은 시군구·같은 유형·유형별 윈도우(산불·산사태·홍수 모두 168시간/7일; 산불은 2026-10-14 에 336시간/14일에서 줄임) 안의 `is_broadcast=false & is_advisory=false` 이벤트에 임베딩·LLM 없이 `MergeMethod.REGIONAL_TYPE`으로 병합해야 한다(MUST). 이 `is_broadcast=false` 조건도 FR-006과 동일하게 병합 후 영구 유지되는 제외 규칙이다(FR-011 참고) (`EventClusteringService.java:114-115`, `458-496`; `DisasterEventRepository.java:176-196`).
 - **FR-017a**: 시스템은 `clustering.regional-types` CSV의 `유형:시간` 토큰이 잘못된 형식(콜론 누락, 숫자가 아닌 시간값 등)이면 해당 토큰만 건너뛰고 나머지 토큰은 정상 파싱해야 한다(MUST) — 설정 일부의 파싱 실패가 전체 설정 로딩을 막지 않는다(부분 실패 격리) (`EventClusteringService.java:545-553`).
 - **FR-016**: 시스템은 알림 유형이 `clustering.advisory-split-types`(기본 `"산불"`, `regional-types`의 부분집합)에 속하고 `FireAlertClassifier.isAdvisory(message, emergencyLevel)`가 true이면, 사건 버킷이 아니라 같은 시군구·같은 유형·같은 윈도우의 `is_advisory=true` 롤링 안내 이벤트(제목 `"{지역명} {유형}예방안내"`)에 합류시켜야 한다(MUST) (`EventClusteringService.java:122-123`, `473-520`; `DisasterEventRepository.java:212-231`).
 - **FR-017**: 시스템은 산불 알림을 다음 기준으로 사건(INCIDENT)/안내(ADVISORY)로 분류해야 한다(MUST): 긴급/위급재난문자(`DisasterLevel.LEVEL_2`/`LEVEL_3`)이거나, 강신호 키워드(`대피|진화|진압|완진|소진|주불|불길`)가 있으면 사건. 그 외에는 미세위치 패턴(`산N`, `N번지`, `{리/동/읍/면}+번지꼴`) + 화재 언급(`산불|화재`)이 있으면서 안내 조건문(`발생위험|예방|소각|건조특보|위기경보|위험지수` 등)이 없을 때만 사건으로 판정해야 한다(MUST) (`FireAlertClassifier.java:33-84`).
