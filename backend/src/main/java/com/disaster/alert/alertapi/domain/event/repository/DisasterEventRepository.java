@@ -190,7 +190,7 @@ public interface DisasterEventRepository extends JpaRepository<DisasterEvent, Lo
     );
 
     /**
-     * 지역앵커 유형 머지 대상 검색 — 같은 유형 + 같은 시군구(footprint 교집합) + 윈도우 안의
+     * 지역 한정 유형 머지 대상 검색 — 같은 유형 + 같은 시군구(footprint 교집합) + 윈도우 안의
      * non-broadcast 이벤트 중 가장 최근 1개. 산불·산사태·홍수처럼 "유형+시군구가 곧 사건"인 이산
      * 재난용.
      *

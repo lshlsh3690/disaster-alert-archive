@@ -19,9 +19,9 @@
 
 ### 사용자 스토리 1 - 동일 시군구 내 유사 알림의 임베딩 기반 자동 병합 (우선순위: P1)
 
-새 재난문자가 수집되면 OpenAI 임베딩(`text-embedding-3-small`, 1536차원)을 생성하고, 같은 시군구(법정동 코드 앞 5자리)에서 발송된 최근 7일 이내 이벤트들과 코사인 유사도를 비교한다. 가장 유사한 후보가 임계값(0.85) 이상이면 그 이벤트에 새 알림을 합류시키고, 아니면 새 이벤트를 만든다. 이는 전체 파이프라인의 기본 경로(default path)로, 인물/전국유형/지역앵커유형/광역 등 다른 모든 특수 경로가 먼저 걸러지지 않은 알림이 최종적으로 도달하는 지점이다.
+새 재난문자가 수집되면 OpenAI 임베딩(`text-embedding-3-small`, 1536차원)을 생성하고, 같은 시군구(법정동 코드 앞 5자리)에서 발송된 최근 7일 이내 이벤트들과 코사인 유사도를 비교한다. 가장 유사한 후보가 임계값(0.85) 이상이면 그 이벤트에 새 알림을 합류시키고, 아니면 새 이벤트를 만든다. 이는 전체 파이프라인의 기본 경로(default path)로, 인물/전국유형/지역 한정 유형/광역 등 다른 모든 특수 경로가 먼저 걸러지지 않은 알림이 최종적으로 도달하는 지점이다.
 
-**우선순위 이유**: 다른 모든 분기(인물, 전국유형, 지역앵커유형, 브로드캐스트)는 이 임베딩 경로가 만들어내던 오류(과소병합/과병합)를 실측 데이터로 발견하고 보완하기 위해 파생된 특수 경로다. 이 경로가 없으면 나머지 로직도 존재 이유가 없다.
+**우선순위 이유**: 다른 모든 분기(인물, 전국유형, 지역 한정 유형, 브로드캐스트)는 이 임베딩 경로가 만들어내던 오류(과소병합/과병합)를 실측 데이터로 발견하고 보완하기 위해 파생된 특수 경로다. 이 경로가 없으면 나머지 로직도 존재 이유가 없다.
 
 **독립 테스트 방법**: 같은 시군구·비슷한 시각·유사한 본문의 알림 2건을 순서대로 수집시키면 동일 `disaster_event`로 묶이는지 확인.
 
@@ -33,7 +33,7 @@
 
 ---
 
-### 사용자 스토리 2 - 지역앵커 유형(산불·산사태·홍수)의 유형+시군구 기반 병합 (우선순위: P2)
+### 사용자 스토리 2 - 지역 한정 유형(산불·산사태·홍수)의 유형+시군구 기반 병합 (우선순위: P2)
 
 산불·산사태·홍수처럼 "유형과 시군구 조합 자체가 곧 하나의 사건"인 이산적 재난은, 같은 시군구·같은 유형·유형별 시간 윈도우 안이면 본문 임베딩을 전혀 보지 않고 하나의 이벤트로 묶는다. 실데이터 검증에서 한 산불 사건이 며칠에 걸쳐 burst로 발송되며 본문 텍스트가 달라져(코사인 유사도 0.85 미만) 임베딩 경로가 같은 사건을 최대 16개 조각으로 파편화한 문제(산청 산불 사례)를 차단하기 위한 경로다.
 
@@ -44,7 +44,7 @@
 **인수 시나리오**:
 
 1. **Given** `clustering.regional-types`(`산불:168,산사태:168,홍수:168`)에 매핑된 유형의 알림이 수집되고, 같은 시군구(footprint 교집합)에 해당 유형·`is_broadcast=false`·`is_advisory=false`인 기존 이벤트가 유형별 윈도우(산불·산사태·홍수 모두 168h/7일; 산불은 2026-10-14 에 336h/14일에서 줄임) 이내에 있으면, **When** `clusterRegionalType`이 호출되면, **Then** 임베딩 비교 없이 `MergeMethod.REGIONAL_TYPE`으로 그 이벤트에 병합된다 (`EventClusteringService.java:458-496`, 주석 `442-457`, `DisasterEventRepository.java:176-196`).
-2. **Given** 산불 알림 지역이 걸친 시군구 수가 `clustering.max-region-span`(10)을 초과하면, **When** `clusterRegionalType`이 호출되면, **Then** 지역앵커 경로를 타지 않고(`false` 반환) 광역 broadcast 경로로 넘어간다 — 전국 단위 산불이 시군구별로 쪼개지는 것을 막기 위함 (`EventClusteringService.java:467-471`).
+2. **Given** 산불 알림 지역이 걸친 시군구 수가 `clustering.max-region-span`(10)을 초과하면, **When** `clusterRegionalType`이 호출되면, **Then** 지역 한정 경로를 타지 않고(`false` 반환) 광역 broadcast 경로로 넘어간다 — 전국 단위 산불이 시군구별로 쪼개지는 것을 막기 위함 (`EventClusteringService.java:467-471`).
 3. **Given** 알림이 산불이고 `FireAlertClassifier.isAdvisory(message, emergencyLevel)`가 true(건조특보/소각금지/예방캠페인 등 실화재 아님)이면, **When** `clusterRegionalType`이 호출되면, **Then** 사건 버킷이 아니라 시군구별 롤링 안내 이벤트(`is_advisory=true`)에 별도로 합류한다 (`EventClusteringService.java:473-480`, `502-520`, `FireAlertClassifier.java:63-84`).
 
 ---
@@ -194,7 +194,7 @@
 
 - **FR-009**: 시스템은 알림이 걸친 distinct 시군구 수가 `clustering.max-region-span`(기본 10)을 초과하면 로컬 임베딩 경로 대신 브로드캐스트 경로(`clusterBroadcast`)로 분기해야 한다(MUST) (`EventClusteringService.java:73-74`, `222-226`).
 - **FR-010**: 시스템은 브로드캐스트 알림이 걸친 distinct 시도 수가 `clustering.nationwide-sido-span`(기본 8) 이상이면 지역 무관 "전국 {유형}" 키(`primary_region_code=null`)로, 미만이면 "최다 시군구를 차지한 시도 + 유형" 키로 병합/생성해야 한다(MUST) (`EventClusteringService.java:76-78`, `644-684`).
-- **FR-011**: (FR-006·FR-015의 `is_broadcast=false` 조건에 대한 공통 보강 규칙 — 술어 재기술 대신 상호 참조로 대체) 시스템은 `is_broadcast=true` 플래그를 병합 이후에도 계속 유지해야 한다(MUST) — 이 플래그가 FR-006(로컬 임베딩 후보 검색)과 FR-015(지역앵커 유형 후보 검색) 양쪽 모두에서 해당 이벤트를 영구히 제외시켜, broadcast와 local 이벤트가 절대 섞이지 않도록 보장한다 (`DisasterEventRepository.java:139`, `179`).
+- **FR-011**: (FR-006·FR-015의 `is_broadcast=false` 조건에 대한 공통 보강 규칙 — 술어 재기술 대신 상호 참조로 대체) 시스템은 `is_broadcast=true` 플래그를 병합 이후에도 계속 유지해야 한다(MUST) — 이 플래그가 FR-006(로컬 임베딩 후보 검색)과 FR-015(지역 한정 유형 후보 검색) 양쪽 모두에서 해당 이벤트를 영구히 제외시켜, broadcast와 local 이벤트가 절대 섞이지 않도록 보장한다 (`DisasterEventRepository.java:139`, `179`).
 - **FR-012**: 시스템은 브로드캐스트 알림의 유형이 정보성이 아니면("기타"/null, `DisasterEvent.isInformativeType`이 false) 기존 broadcast 이벤트와 병합을 시도하지 않고 항상 신규 이벤트를 생성해야 한다(MUST) (`EventClusteringService.java:646`, `652-666`, `670-679`; `DisasterEvent.java:142-146`).
 
 **전국 통합 유형(태풍 등)**
@@ -202,7 +202,7 @@
 - **FR-013**: 시스템은 알림 유형이 `clustering.global-types`(기본 `"태풍"`, 쉼표 구분)에 속하면, 지역·임베딩과 무관하게 `clustering.global-window-hours`(기본 168시간) 이내의 `is_broadcast=true & primary_region_code IS NULL & 같은 유형` 이벤트에 `MergeMethod.GLOBAL_TYPE`으로 병합해야 한다(MUST). 없으면 `primary_region_code=null`, 제목 "전국"인 신규 broadcast 이벤트를 생성해야 한다(MUST) (`EventClusteringService.java:101-106`, `394-414`).
 - **FR-014**: 시스템은 태풍 알림 본문에서 정규식(`제N호 태풍 [「『(''"]이름` 또는 `태풍 [「『(''"]이름`)으로 고유명을 추출할 수 있고, 이벤트 제목이 아직 기본값("전국 태풍")이면 "태풍 {이름}"으로 조건부 승급해야 한다(MUST). 이미 이름이 붙어 있으면 갱신하지 않아야 한다(MUST NOT) (`DisasterEvent.java:99-131`, `134-136`; `DisasterEventRepository.java:283-291`).
 
-**지역앵커 유형(산불·산사태·홍수)**
+**지역 한정 유형(산불·산사태·홍수)**
 
 - **FR-015**: 시스템은 알림 유형이 `clustering.regional-types`(기본 `"산불:168,산사태:168,홍수:168"`)에 매핑돼 있으면, 지역 정보가 있고 걸친 시군구 수가 `max-region-span` 이하인 경우, 같은 시군구·같은 유형·유형별 윈도우(산불·산사태·홍수 모두 168시간/7일; 산불은 2026-10-14 에 336시간/14일에서 줄임) 안의 `is_broadcast=false & is_advisory=false` 이벤트에 임베딩·LLM 없이 `MergeMethod.REGIONAL_TYPE`으로 병합해야 한다(MUST). 이 `is_broadcast=false` 조건도 FR-006과 동일하게 병합 후 영구 유지되는 제외 규칙이다(FR-011 참고) (`EventClusteringService.java:114-115`, `458-496`; `DisasterEventRepository.java:176-196`).
 - **FR-017a**: 시스템은 `clustering.regional-types` CSV의 `유형:시간` 토큰이 잘못된 형식(콜론 누락, 숫자가 아닌 시간값 등)이면 해당 토큰만 건너뛰고 나머지 토큰은 정상 파싱해야 한다(MUST) — 설정 일부의 파싱 실패가 전체 설정 로딩을 막지 않는다(부분 실패 격리) (`EventClusteringService.java:545-553`).
@@ -254,7 +254,7 @@
 - **DisasterEvent** (`disaster_events` 테이블): 시간 흐름에 따라 N개 재난문자가 누적된 사건 단위. `primaryDisasterType`/`primaryRegionCode`/`primaryRegionName`은 첫 알림 기준 캐시, `eventTitle`은 자동 생성. `cooldownHours`는 생성 시 1회 산정 후 불변, `active`는 저장하지 않고 파생 계산. `broadcast`/`advisory` 플래그로 로컬 사건 버킷과 영구히 분리 (`DisasterEvent.java`).
 - **EventAlertMapping** (`event_alert_mapping` 테이블): 하나의 `DisasterEvent`에 어떤 `DisasterAlert`가 몇 번째(`sequence_no`)로, 어떤 방식(`merge_method`)으로, 어떤 유사도(`similarity`, nullable)로 합류했는지 기록. LLM 병합의 유일한 재구성 근거 (`EventAlertMapping.java`, `MergeMethod.java`).
 - **DisasterAlert** (외부 도메인, `disaster_alert` 테이블): 원본 재난문자. `embedding`(pgvector, 1536차원), `disasterType`, `message`, `disasterAlertRegions`(발송 대상 법정동 코드 목록)를 클러스터링이 소비.
-- **MergeMethod** (enum): 알림이 이벤트에 합류한 방식 표식 — `SEED`(첫 알림)/`EMBEDDING`(코사인 유사도)/`BROADCAST`(광역)/`IDENTITY`(인물 신원)/`LLM`(cross-region 판정)/`LLM_FALLBACK`(사고성 borderline)/`GLOBAL_TYPE`(태풍 등 전국유형)/`REGIONAL_TYPE`(산불 등 지역앵커유형)/`ADVISORY`(안내성 롤링).
+- **MergeMethod** (enum): 알림이 이벤트에 합류한 방식 표식 — `SEED`(첫 알림)/`EMBEDDING`(코사인 유사도)/`BROADCAST`(광역)/`IDENTITY`(인물 신원)/`LLM`(cross-region 판정)/`LLM_FALLBACK`(사고성 borderline)/`GLOBAL_TYPE`(태풍 등 전국유형)/`REGIONAL_TYPE`(산불 등 지역 한정 유형)/`ADVISORY`(안내성 롤링).
 - **DisasterCooldown** (정적 규칙 테이블, 엔티티 아님): 재난 유형 문자열 → cooldown 시간(hour)의 고정 매핑. `DisasterEvent.cooldownHours` 산정에만 쓰이는 순수 룩업 로직 (`DisasterCooldown.java`).
 
 > **참고(이 목록의 범위)**: `FireAlertClassifier`/`MissingPersonIdentity`/`AnimalIdentity`도 `DisasterCooldown`과 마찬가지로 데이터를 저장하지 않는 순수 규칙 클래스이지만(엔티티 아님) 여기에는 포함하지 않았다 — 이들은 각각 FR-017(산불 사건/안내 분류), FR-018(실종자 신원 추출), FR-020(동물 종 식별) 단일 FR의 판정 로직에만 쓰이는 단일 목적 클래스인 반면, `DisasterCooldown`은 이벤트 생성 전반(모든 사용자 스토리에서 공통으로 발생하는 FR-028)에 걸쳐 적용되는 값이라 "주요 엔티티" 수준으로 별도 포함했다. 나머지 셋의 상세 규칙은 각자의 FR/코드 인용에서 확인할 수 있다.
@@ -265,7 +265,7 @@
 
 - **운영 지표 미수집**: 이 파이프라인에 대한 정량적 운영 지표(병합 정확도, 파편화율, false-merge율 등)를 수집·집계하는 코드나 대시보드는 코드베이스 내에 존재하지 않는다. 소스에 남은 근거는 개발 과정에서 수동으로 확인한 실측 사례(예: "산청 산불 16조각", "산불 6,639건 중 안내 ~5,658/사건 ~981", "동명이인 임베딩 0.897 > 동일인 0.834")에 대한 코드 주석뿐이며, 이는 튜닝 근거 기록이지 지속적으로 수집되는 운영 지표가 아니다. 따라서 SC-001 이하는 **수치 목표를 임의로 만들지 않고, 코드가 실제로 보장하는 정성적 동작 기준**으로 기술한다.
 - **SC-001 (정성)**: 같은 시군구·7일 이내·코사인 유사도 0.85 이상인 재난문자는 하나의 이벤트로 병합되도록 코드 경로상 작성되어 있음(자동화 검증 없음) — `backend/src/test/.../domain/event/` 디렉터리가 존재하지 않아(plan.md 헌법 검사 III 참고) 이 동작은 코드 리딩으로만 확인했으며, 운영 성공률 측정치도 없다.
-- **SC-002 (정성)**: 산불·산사태·홍수 알림은 지역앵커 유형 경로에 의해 본문 텍스트 차이와 무관하게 같은 시군구·유형·윈도우 안에서 항상 하나의 이벤트로 유지된다(코드 경로상 보장).
+- **SC-002 (정성)**: 산불·산사태·홍수 알림은 지역 한정 유형 경로에 의해 본문 텍스트 차이와 무관하게 같은 시군구·유형·윈도우 안에서 항상 하나의 이벤트로 유지된다(코드 경로상 보장).
 - **SC-003 (정성)**: LLM 판정이 개입하는 모든 경로(`LLM`, `LLM_FALLBACK`)는 실패·모호·범위 초과 시 예외 없이 병합하지 않는(false) 쪽으로 수렴한다 — 즉 "모르면 합치지 않는다"는 보수적 정책이 코드 전 경로에서 일관되게 적용된다.
 - **SC-004 (정성)**: 파이프라인의 모든 진입점(`clusterNewAlert`, `linkCrossRegion`, 백필 도구)은 알림 1건의 처리 실패가 나머지 알림이나 스케줄러 사이클 전체의 실행을 막지 않는다(각 진입점에서 try/catch로 격리).
 
@@ -273,7 +273,7 @@
 
 - **on/off 플래그는 없다(2026-10-10 삭제)**: 예전의 `CLUSTERING_ENABLED`/`LLM_FALLBACK_ENABLED`/`CROSS_REGION_ENABLED`(기본 `false`)는 제거됐고, 이 문서가 서술하는 경로는 모든 환경에서 항상 실행된다. 비용 통제는 유형 화이트리스트·거리 구간·키워드 게이트로만 한다.
 - **자동 로컬 병합은 항상 동일 시군구(코드 앞 5자리) 내에서만 발생한다.** 인접 시군구로의 확산은 오직 cross-region 동물 케이스(`EventCrossRegionService`)에서 `region_adjacency` 테이블의 1-hop 직접 인접만으로 이루어지며, 산불·지진 등 일반 재난 유형에는 인접 확산(다단계 BFS 등) 로직이 전혀 없다. (아래 "발견된 문서-코드 불일치" 참고.)
-- **인물(실종)과 태풍/지역앵커 유형은 임베딩을 전혀 쓰지 않는다.** 신원/유형 자체가 결정적 키이므로 재클러스터링 시 OpenAI 비용이 들지 않는다.
+- **인물(실종)과 태풍/지역 한정 유형은 임베딩을 전혀 쓰지 않는다.** 신원/유형 자체가 결정적 키이므로 재클러스터링 시 OpenAI 비용이 들지 않는다.
 - **`ClusteringProperties`라는 단일 `@ConfigurationProperties` 바인딩 클래스는 존재하지 않는다.** `clustering.*` 설정은 `EventClusteringService`와 `EventCrossRegionService`에 개별 `@Value` 필드로 흩어져 바인딩돼 있다. (아래 "발견된 문서-코드 불일치" 참고.)
 - **`EventFragmentMergeService`(30분 주기 파편 이벤트 정합화 스케줄러)는 코드베이스에 존재하지 않는다.** `git log --all`로 전체 히스토리를 확인해도 해당 이름의 파일이 추가된 이력이 없다. `application.yml`의 Sentry 섹션 주석(`application.yml:165`)에 "fragment-merge"라는 표현이 남아 있을 뿐 실제 서비스/스케줄러/설정 키(`FRAGMENT_MERGE_ENABLED`, `incident-specific-check`)는 어디에도 없다. (아래 "발견된 문서-코드 불일치" 참고.)
 - **계절성 안전안내의 쿨다운 억제는 "쿨다운 갱신을 건너뛰는" 방식이 아니라 "안내성 알림을 아예 별도의 이벤트 버킷(`is_advisory=true`)으로 분리"하는 방식으로 구현돼 있다.** 안내 이벤트 자체는 자신의 `cooldownHours`를 정상적으로 가지며(`DisasterEvent.java:219`), 다만 사건(incident) 이벤트의 `last_alert_at`을 안내성 알림이 갱신하지 않을 뿐이다. 현재 이 분리는 산불(`clustering.advisory-split-types`)에만 적용돼 있다.

@@ -119,7 +119,7 @@
 - **FR-010**: 재난문자 알림 발송 시 시스템은 알림의 지역코드 목록 중 10자리 코드에서 시도 레벨 코드(`code.substring(0,2) + "00000000"`)를 파생하여, 원본 지역코드와 합친 목록으로 관심지역 대상을 조회해야 한다(MUST) — 특정 시군구가 아닌 시도 전체를 등록한 회원도 대상에 포함시키기 위함이다 (`AlertNotificationService.java:77,105-114`).
 - **FR-011**: 게스트 알림 대상 조회도 FR-010과 동일한 파생 지역코드 목록으로 `guest_fcm_region`을 조회해야 한다(MUST) (`AlertNotificationService.java:87,94,200`; `GuestFcmRegion.java:14-39`).
 - **FR-012**: 이벤트 클러스터링은 신규 알림의 클러스터링 후보를 시군구(법정동 코드 앞 5자리) 교집합이 있는 기존 이벤트로 hard 필터링해야 한다(MUST), 읍면동 단위 코드 grain 차이를 흡수하기 위함이다 (`EventClusteringService.java:229-232,738-744`).
-- **FR-013**: 지역앵커형 재난 유형(산불·산사태·홍수 등)과 안내성 알림의 클러스터링 병합 키는 시군구(앞 5자리)+유형(+윈도우)이어야 한다(MUST) (`EventClusteringService.java:443-509`). 이 경로는 FR-012의 시군구 hard 필터를 통과한 후보 안에서만 적용되는 더 좁은 특수 경로다 — "유형+지역이 곧 사건"인 특정 재난 유형에 한해, 일반 임베딩 유사도 비교 없이 즉시 병합을 허용하는 fast path이며 FR-012를 대체하지 않는다.
+- **FR-013**: 지역 한정형 재난 유형(산불·산사태·홍수 등)과 안내성 알림의 클러스터링 병합 키는 시군구(앞 5자리)+유형(+윈도우)이어야 한다(MUST) (`EventClusteringService.java:443-509`). 이 경로는 FR-012의 시군구 hard 필터를 통과한 후보 안에서만 적용되는 더 좁은 특수 경로다 — "유형+지역이 곧 사건"인 특정 재난 유형에 한해, 일반 임베딩 유사도 비교 없이 즉시 병합을 허용하는 fast path이며 FR-012를 대체하지 않는다.
 - **FR-014**: 광역 브로드캐스트 알림(시군구 발송 수가 `maxRegionSpan` 초과)은 distinct 시도 수(코드 앞 2자리 기준)에 따라 전국(broadcast, 시도 무관 단일 키) 또는 시도광역(최다 시군구를 가진 시도 prefix+유형 키)으로 분류해야 한다(MUST) (`EventClusteringService.java:644-705`).
 - **FR-015**: 위험도 계산은 이벤트 영향 법정동 코드를 시군구 단위(앞 최대 5자리)로 축약해 `region_risk_index`/`region_risk_daily`/`region_risk_history`의 지역 키로 사용해야 한다(MUST) (`RiskCalculationService.java:124-179`).
 - **FR-016**: 재난문자 시도별 통계는 QueryDSL `LEFT(code, 2)`로 시도 코드를 추출하되, 표시명은 code prefix가 아닌 `legal_district.name`의 첫 공백 이전 토큰으로 별도 산출해야 한다(MUST) — 세종특별자치시 등 "코드 뒤 8자리가 0" 관례를 따르지 않는 예외 때문이다 (`DisasterAlertRepositoryImpl.java:398-420`).

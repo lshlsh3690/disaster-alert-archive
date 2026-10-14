@@ -39,11 +39,11 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
- * 에피소드형 유형(폭염·한파·대설·강풍·가축질병)의 "유형 + 시군구" 앵커링 검증.
+ * 에피소드형 유형(폭염·한파·대설·강풍·가축질병)의 "유형 + 시군구" 키 병합 검증.
  *
  * <p>같은 시군구에서 같은 유형의 알림이 끊김 없이 이어지는 동안은 문장 유사도·안내/특보 구분과 무관하게
  * 하나의 이벤트로 합친다(연쇄 병합은 의도). 끊김 기준은 마지막 알림 이후 {@code episodic-window-hours}(기본 168h).
- * 시군구가 정확히 1개일 때만 앵커링하고, 다지역(2개 이상)·광역 알림은 지역 이벤트 후보에서 제외해
+ * 시군구가 정확히 1개일 때만 키 병합하고, 다지역(2개 이상)·광역 알림은 지역 이벤트 후보에서 제외해
  * broadcast 경로로 보낸다(시군구 간 다리로 이벤트가 도 단위 blob 이 되는 것 방지). 사고성 유형의 다지역은
  * 전파 허용을 위해 기존 임베딩 경로를 유지한다.
  *
@@ -228,7 +228,7 @@ class EventClusteringServiceEpisodicTypeTest {
         assertMergedRegionalType(EXISTING_EVENT_ID);
     }
 
-    @ParameterizedTest(name = "5) 에피소드형 유형 {0}: 앵커링되어 머지")
+    @ParameterizedTest(name = "5) 에피소드형 유형 {0}: 키 병합되어 머지")
     @CsvSource(delimiter = '|', value = {
             "폭염|폭염경보 발효, 야외활동 자제 바랍니다.[홍성군]",
             "한파|한파경보 발효, 보온에 유의 바랍니다.[홍성군]",
@@ -249,7 +249,7 @@ class EventClusteringServiceEpisodicTypeTest {
     }
 
     @Test
-    @DisplayName("5b) episodicTypesCsv 의 공백(\"폭염, 한파\")은 trim 되어 한파도 앵커링된다")
+    @DisplayName("5b) episodicTypesCsv 의 공백(\"폭염, 한파\")은 trim 되어 한파도 키 병합된다")
     void episodicTypesCsv_trimsWhitespace() {
         ReflectionTestUtils.setField(service, "episodicTypesCsv", "폭염, 한파");
         alert("한파", "한파경보 발효, 보온에 유의 바랍니다.[홍성군]", REGION);
@@ -288,7 +288,7 @@ class EventClusteringServiceEpisodicTypeTest {
                 .thenReturn(Optional.of(broadcastEvent(EXISTING_EVENT_ID)));
     }
 
-    /** 지역 이벤트 후보 조회·앵커 조회·임베딩이 전혀 일어나지 않았음 — 지역 이벤트 footprint 를 넓힐 경로가 없다. */
+    /** 지역 이벤트 후보 조회·키 병합 대상 조회·임베딩이 전혀 일어나지 않았음 — 지역 이벤트 footprint 를 넓힐 경로가 없다. */
     private void verifyLocalPathsUntouched() {
         verifyEmbeddingPathSkipped();
         verify(disasterEventRepository, never())
@@ -427,7 +427,7 @@ class EventClusteringServiceEpisodicTypeTest {
     }
 
     @Test
-    @DisplayName("6g) 다지역 에피소드형은 지역 이벤트를 넓히지 않는다 - 후보·앵커 조회가 없어 REGIONAL_TYPE/EMBEDDING 머지 불가, 저장되는 이벤트는 broadcast 뿐")
+    @DisplayName("6g) 다지역 에피소드형은 지역 이벤트를 넓히지 않는다 - 후보·키 병합 대상 조회가 없어 REGIONAL_TYPE/EMBEDDING 머지 불가, 저장되는 이벤트는 broadcast 뿐")
     void multiRegionEpisodic_neverWidensLocalEvent() {
         alert("폭염", HEAT_WARNING, SAME_SIDO_CODES);
         givenMergeTarget();
@@ -486,7 +486,7 @@ class EventClusteringServiceEpisodicTypeTest {
         assertThat(event.getValue().isBroadcast()).isFalse();
     }
 
-    @ParameterizedTest(name = "7) 대상이 아닌 유형 {0}: 앵커링하지 않고 기존 경로 [현재 동작과 같아 뼈대도 통과]")
+    @ParameterizedTest(name = "7) 대상이 아닌 유형 {0}: 키 병합하지 않고 기존 경로 [현재 동작과 같아 뼈대도 통과]")
     @CsvSource(delimiter = '|', value = {
             "호우|호우주의보 발효 중, 하천 접근을 자제 바랍니다.[홍성군]",
             "화재|홍성군 OO동 공장 화재 발생, 인근 주민은 대피 바랍니다."
@@ -501,7 +501,7 @@ class EventClusteringServiceEpisodicTypeTest {
     }
 
     @Test
-    @DisplayName("8) episodicTypesCsv 가 빈 문자열이면 폭염도 앵커링되지 않고 임베딩 경로 [현재 동작과 같아 뼈대도 통과]")
+    @DisplayName("8) episodicTypesCsv 가 빈 문자열이면 폭염도 키 병합되지 않고 임베딩 경로 [현재 동작과 같아 뼈대도 통과]")
     void emptyEpisodicTypes_heatGoesEmbeddingPath() {
         ReflectionTestUtils.setField(service, "episodicTypesCsv", "");
         alert("폭염", HEAT_WARNING, REGION);
@@ -512,7 +512,7 @@ class EventClusteringServiceEpisodicTypeTest {
         verifyEmbeddingPathTaken();
     }
 
-    @ParameterizedTest(name = "9) 폭염 \"{0}\": 안내성 분리로 가지 않는다 - findAdvisoryMergeTarget 미호출, 비안내 이벤트, 앵커 조회 1회")
+    @ParameterizedTest(name = "9) 폭염 \"{0}\": 안내성 분리로 가지 않는다 - findAdvisoryMergeTarget 미호출, 비안내 이벤트, 키 병합 대상 조회 1회")
     @ValueSource(strings = {HEAT_GUIDE, HEAT_WARNING})
     void heat_noLongerSplitAsAdvisory(String message) {
         alert("폭염", message, REGION);
@@ -551,7 +551,7 @@ class EventClusteringServiceEpisodicTypeTest {
     }
 
     @Test
-    @DisplayName("10) 지역코드가 없는 알림은 앵커링 대상이 아니다 - 기존 임베딩 경로의 '지역 없음' 신규 이벤트 [현재 동작과 같아 뼈대도 통과]")
+    @DisplayName("10) 지역코드가 없는 알림은 키 병합 대상이 아니다 - 기존 임베딩 경로의 '지역 없음' 신규 이벤트 [현재 동작과 같아 뼈대도 통과]")
     void noRegion_isNotAnchored() {
         alert("폭염", HEAT_WARNING);
         givenMergeTarget();

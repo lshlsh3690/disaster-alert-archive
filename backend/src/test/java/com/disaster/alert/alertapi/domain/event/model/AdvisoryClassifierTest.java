@@ -9,7 +9,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * {@link AdvisoryClassifier} 테스트 — 유형별 안내성 분류 진입점(산불 위임). 폭염·한파는 에피소드형 앵커링으로 대체되어 다루지 않는다. 외부 의존성 없는 순수 로직.
+ * {@link AdvisoryClassifier} 테스트 — 유형별 안내성 분류 진입점(산불 위임). 폭염·한파는 에피소드형 키 병합으로 대체되어 다루지 않는다. 외부 의존성 없는 순수 로직.
  */
 class AdvisoryClassifierTest {
 

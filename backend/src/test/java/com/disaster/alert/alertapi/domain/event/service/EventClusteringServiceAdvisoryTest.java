@@ -35,7 +35,7 @@ import static org.mockito.Mockito.when;
 /**
  * 안내성 분리(산불) 라우팅 검증.
  *
- * <p>폭염·한파의 안내성 분리는 에피소드형 유형 앵커링({@link EventClusteringServiceEpisodicTypeTest})으로
+ * <p>폭염·한파의 안내성 분리는 에피소드형 유형 키 병합({@link EventClusteringServiceEpisodicTypeTest})으로
  * 대체되어 이 클래스에서 다루지 않는다. 안내성 분리는 {@code advisory-split-types} 기본값 "산불" 만 대상이며,
  * 레포 메서드 {@code findAdvisoryMergeTarget(type, sigunguCodes, since)} 의 윈도우는 산불의 regional-types
  * 윈도우(336h)다.
@@ -74,7 +74,7 @@ class EventClusteringServiceAdvisoryTest {
         ReflectionTestUtils.setField(service, "globalTypesCsv", "태풍");
         ReflectionTestUtils.setField(service, "globalWindowHours", 168);
         ReflectionTestUtils.setField(service, "regionalTypesCsv", "산불:336,산사태:168,홍수:168");
-        // 폭염·한파는 더 이상 안내성 분리를 하지 않는다(에피소드형 앵커링으로 대체) — 새 기본값 "산불".
+        // 폭염·한파는 더 이상 안내성 분리를 하지 않는다(에피소드형 키 병합으로 대체) — 새 기본값 "산불".
         ReflectionTestUtils.setField(service, "advisorySplitTypesCsv", "산불");
 
         when(disasterEventRepository.save(any(DisasterEvent.class))).thenAnswer(inv -> {

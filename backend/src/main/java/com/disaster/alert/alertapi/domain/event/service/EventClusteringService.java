@@ -97,7 +97,7 @@ public class EventClusteringService {
     private int globalWindowHours;
 
     /**
-     * 지역앵커 유형(유형:윈도우시간 CSV) — 산불·산사태·홍수처럼 유형+시군구가 곧 사건인 이산 재난.
+     * 지역 한정 유형(유형:윈도우시간 CSV) — 산불·산사태·홍수처럼 유형+시군구가 곧 사건인 이산 재난.
      * 태풍(global-types, 전국)과 달리 시군구 스코프. 윈도우는 유형별로 지정한다 — 현재 산불·산사태·홍수
      * 모두 7일(168h)(산불은 14일(336h)에서 줄임). 계절 연속형(폭염·호우특보 등)은
      * 절대 넣지 말 것(같은 시군구 매일 발령 → span blob).
@@ -209,7 +209,7 @@ public class EventClusteringService {
             return;
         }
 
-        // 0.7 지역앵커 유형(산불·산사태·홍수) — 유형+시군구가 곧 사건. 같은 시군구·같은 유형·유형별
+        // 0.7 지역 한정 유형(산불·산사태·홍수) — 유형+시군구가 곧 사건. 같은 시군구·같은 유형·유형별
         //     윈도우 안이면 임베딩 무관하게 단일 이벤트로 묶는다. 한 산불/호우 episode 가 같은 시군구에서
         //     며칠 burst 로 쏟아질 때 본문 텍스트가 갈려(코사인<0.85) 임베딩 경로가 한 사건을 수십 개로
         //     파편화하던 것을 차단. 태풍(GLOBAL_TYPE)과 같은 철학이되 전국이 아니라 시군구 스코프(blob 방지).
@@ -219,7 +219,7 @@ public class EventClusteringService {
 
         // 0.8 에피소드형 유형(폭염·한파·대설·강풍·가축질병) — 같은 시군구·같은 유형의 발령이 끊김 없이
         //     이어지는 동안은 안내/특보·문장 유사도와 무관하게 하나의 이벤트. 임베딩·LLM 호출 전에 분기해
-        //     비용도 들지 않는다. 시군구 1개는 앵커링, 2개 이상(다지역)은 지역 이벤트와 섞이지 않게
+        //     비용도 들지 않는다. 시군구 1개는 키 병합, 2개 이상(다지역)은 지역 이벤트와 섞이지 않게
         //     곧바로 광역(broadcast) 경로로 보낸다(시군구 간 다리 방지). 사고성은 전파 허용이라 대상 아님.
         if (clusterEpisodicType(alert)) {
             return;
@@ -534,7 +534,7 @@ public class EventClusteringService {
     }
 
     /**
-     * 지역앵커 유형 클러스터링 — 산불·산사태·홍수처럼 "유형+지역이 곧 사건"인 이산 재난을, 같은 시군구·
+     * 지역 한정 유형 클러스터링 — 산불·산사태·홍수처럼 "유형+지역이 곧 사건"인 이산 재난을, 같은 시군구·
      * 같은 유형·유형별 윈도우 안의 기존 이벤트에 머지(없으면 신규). 지역·유형은 보되 임베딩·LLM 은 안 본다.
      *
      * <p>이 유형들은 한 사건(산불/호우 episode)이 같은 시군구에서 며칠 burst 로 쏟아지며 본문 텍스트가
@@ -547,7 +547,7 @@ public class EventClusteringService {
      * (span&gt;{@code maxRegionSpan})·지역 없음은 여기서 처리하지 않고 false → 기존 broadcast/임베딩
      * 경로로 넘긴다(전국 산불이 시군구로 안 쪼개지게 격리 유지).
      *
-     * @return 지역앵커 유형으로 처리하면 true, 아니면(일반 유형·광역·지역없음) false → 임베딩 경로로.
+     * @return 지역 한정 유형으로 처리하면 true, 아니면(일반 유형·광역·지역없음) false → 임베딩 경로로.
      */
     private boolean clusterRegionalType(DisasterAlert alert) {
         Integer windowHours = regionalTypeWindowHours(alert.getDisasterType());
@@ -580,18 +580,18 @@ public class EventClusteringService {
                 alert.getDisasterType(), sigungu, since);
         if (target.isPresent()) {
             mergeIntoExisting(target.get(), alert, null, MergeMethod.REGIONAL_TYPE);
-            log.info("clusterNewAlert(지역앵커): alertId={} → event={} 유형+시군구 머지({}, window={}h)",
+            log.info("clusterNewAlert(지역 한정): alertId={} → event={} 유형+시군구 머지({}, window={}h)",
                     alert.getId(), target.get(), alert.getDisasterType(), windowHours);
         } else {
             createNewEvent(alert, regionCodes[0], extractFirstRegionName(alert), false);
-            log.info("clusterNewAlert(지역앵커): alertId={} → 신규 이벤트({}, window={}h)",
+            log.info("clusterNewAlert(지역 한정): alertId={} → 신규 이벤트({}, window={}h)",
                     alert.getId(), alert.getDisasterType(), windowHours);
         }
         return true;
     }
 
     /**
-     * 지역앵커 유형(산불)의 안내 알림 라우팅 — 시군구 1개면 시군구 안내 이벤트, 2개 이상이면 안내 광역 이벤트.
+     * 지역 한정 유형(산불)의 안내 알림 라우팅 — 시군구 1개면 시군구 안내 이벤트, 2개 이상이면 안내 광역 이벤트.
      * 다지역 안내를 시군구 footprint 교집합({@link #clusterAdvisory})으로 모으면 이웃 시군구 안내 이벤트를
      * 이어 붙이는 다리가 생겨, 실측 이벤트 698(360건·148일·29개 시군구)이 만들어졌다. 그래서 다지역은
      * 시도/전국+유형 키의 안내 광역으로 보낸다(span 이 maxRegionSpan 을 넘어도 동일).
@@ -609,7 +609,7 @@ public class EventClusteringService {
      * 같은 시군구에서 같은 유형의 발령이 끊김 없이 이어지는 동안은 문장 유사도와 무관하게 합친다
      * (연쇄 병합은 의도). 끊김 기준은 마지막 알림 이후 {@code episodic-window-hours}. 본문은 보지 않는다.
      *
-     * <p>시군구가 정확히 1개면 위 앵커링, 2개 이상(다지역)이면 지역 이벤트 후보에서 빼고 곧바로 광역
+     * <p>시군구가 정확히 1개면 위 키 병합, 2개 이상(다지역)이면 지역 이벤트 후보에서 빼고 곧바로 광역
      * (broadcast) 경로로 보낸다(span 이 maxRegionSpan 이하든 초과든 동일). 다지역 알림을 임베딩 경로에 두면
      * footprint 교집합 머지가 서로 다른 시군구의 지역 이벤트를 이어 붙여(시군구 간 다리) 폭염 이벤트 하나가
      * 43개 시군구·7개 시도·612건까지 커졌기 때문이다. 사고성·비대상 유형은 사고 전파를 허용해야 하므로
@@ -653,7 +653,7 @@ public class EventClusteringService {
      * 않고 시군구별 안내 이벤트(is_advisory=true)로 직접 모은다. 이웃 시군구 병합은 후보 검색이
      * is_advisory=false 만 보기 때문에 안내 이벤트가 사건 후보가 되지 않아 차단된다.
      *
-     * <p>산불은 지역앵커 유형이라 clusterRegionalType 이 유형별 윈도우로 처리하므로 여기서 제외한다.
+     * <p>산불은 지역 한정 유형이라 clusterRegionalType 이 유형별 윈도우로 처리하므로 여기서 제외한다.
      * 다지역(시군구 2개 이상) 안내문은 시군구 사이 다리를 만들지 않도록 광역 경로로 보낸다.
      *
      * @return 안내성으로 처리하면 true (대상 아님/지역코드 없음이면 false)
@@ -790,7 +790,7 @@ public class EventClusteringService {
     }
 
     /**
-     * 지역앵커 유형이면 유형별 머지 윈도우(시간), 아니면 null. CSV {@code "유형:시간,유형:시간"} 1회 파싱.
+     * 지역 한정 유형이면 유형별 머지 윈도우(시간), 아니면 null. CSV {@code "유형:시간,유형:시간"} 1회 파싱.
      * 잘못된 토큰은 건너뛴다(부분 실패가 전체를 막지 않게).
      */
     private Integer regionalTypeWindowHours(String type) {
