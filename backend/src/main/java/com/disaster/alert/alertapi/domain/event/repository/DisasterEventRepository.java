@@ -231,6 +231,17 @@ public interface DisasterEventRepository extends JpaRepository<DisasterEvent, Lo
     );
 
     /**
+     * 같은 시군구에 대상이 없을 때, 인접 시군구의 진행 중인 사건(비안내·비광역) 이벤트 중 last_alert_at 이
+     * 가장 최근인 1개를 찾는다.
+     *
+     * <p>Red 단계 뼈대 — 쿼리는 Green 에서 작성한다. 지금은 항상 빈 값을 반환한다.
+     */
+    default Optional<Long> findRegionalTypeAdjacentMergeTarget(
+            String type, String[] sigunguCodes, LocalDateTime since) {
+        return Optional.empty();
+    }
+
+    /**
      * 안내성 롤링 이벤트 머지 대상 검색 — 같은 유형 + 같은 시군구(footprint 교집합) + 윈도우 안의
      * {@code is_advisory=true} 이벤트 중 가장 최근 1개. 산불 건조특보·소각금지·예방캠페인, 폭염·한파 일반 안내 등을
      * 시군구별 안내 이벤트 하나로 모은다.

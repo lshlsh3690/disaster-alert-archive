@@ -105,6 +105,14 @@ public class EventClusteringService {
     @Value("${clustering.regional-types:산불:168,산사태:168,홍수:168}")
     private String regionalTypesCsv;
 
+    /** 인접 시군구 병합을 허용하는 지역 한정 유형(쉼표 구분) — Red 뼈대, 사용 로직은 Green 에서. */
+    @Value("${clustering.regional-adjacent-types:산불}")
+    private String regionalAdjacentTypesCsv;
+
+    /** 인접 시군구 이벤트의 마지막 알림이 이 시간 이내여야 병합 — Red 뼈대, 사용 로직은 Green 에서. */
+    @Value("${clustering.regional-adjacent-window-hours:24}")
+    private int regionalAdjacentWindowHours;
+
     /**
      * 안내성 분리 적용 유형(쉼표 구분) — 안내성(예방·캠페인·일반 행동요령)이 실사건과 독립적이고 시즌 내내
      * 반복돼 사건 버킷을 늘리는 유형만. 현재 산불뿐 — 산사태·홍수는 안내(조기경보)가 같은 호우
