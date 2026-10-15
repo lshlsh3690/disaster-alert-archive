@@ -234,12 +234,42 @@ public interface DisasterEventRepository extends JpaRepository<DisasterEvent, Lo
      * 같은 시군구에 대상이 없을 때, 인접 시군구의 진행 중인 사건(비안내·비광역) 이벤트 중 last_alert_at 이
      * 가장 최근인 1개를 찾는다.
      *
-     * <p>Red 단계 뼈대 — 쿼리는 Green 에서 작성한다. 지금은 항상 빈 값을 반환한다.
+     * <p>2025-03 경북 대형 산불(의성→안동→청송→영양→영덕)이 시군구별 5개 이벤트로 쪼개진 것을 잇기 위한
+     * 쿼리다. 같은 시군구 이벤트({@link #findRegionalTypeMergeTarget})가 없을 때만 호출 측이 쓴다.
+     *
+     * <p>시군구 개수 상한은 두지 않고 {@code last_alert_at > since}(호출 측이 24h) 조건만 둔다 — 실제 확산은
+     * 며칠 사이 여러 시군구를 건너므로 개수로 자르면 연쇄가 끊기고, 별개의 산불은 마지막 알림이 24h 안에
+     * 겹치지 않아 시간 조건만으로 걸러진다. {@code region_adjacency} 는 양방향(대칭) 저장이라
+     * {@code region_code = 새 알림 시군구} 로 보면 그 이웃({@code neighbor_code})의 이벤트가 잡힌다.
+     * 안내·광역 이벤트는 {@link #findRegionalTypeMergeTarget} 와 같은 이유로 제외한다.
+     *
+     * @param type         새 알림 유형 (예: "산불")
+     * @param sigunguCodes 새 알림 시군구 코드(앞 5자) 배열
+     * @param since        이벤트 마지막 알림 시각 하한
+     * @return 머지할 이벤트 id, 없으면 empty
      */
-    default Optional<Long> findRegionalTypeAdjacentMergeTarget(
-            String type, String[] sigunguCodes, LocalDateTime since) {
-        return Optional.empty();
-    }
+    @Query(value = """
+            SELECT e.id
+            FROM disaster_events e
+            WHERE e.is_broadcast = false
+              AND e.is_advisory = false
+              AND e.primary_disaster_type = :type
+              AND e.last_alert_at > :since
+              AND EXISTS (
+                  SELECT 1 FROM event_alert_mapping m
+                  JOIN disaster_alert_region dar ON dar.disaster_alert_id = m.alert_id
+                  JOIN region_adjacency ra ON ra.neighbor_code = LEFT(dar.legal_district_code, 5)
+                  WHERE m.event_id = e.id
+                    AND ra.region_code = ANY(CAST(:sigunguCodes AS varchar[]))
+              )
+            ORDER BY e.last_alert_at DESC
+            LIMIT 1
+            """, nativeQuery = true)
+    Optional<Long> findRegionalTypeAdjacentMergeTarget(
+            @Param("type") String type,
+            @Param("sigunguCodes") String[] sigunguCodes,
+            @Param("since") LocalDateTime since
+    );
 
     /**
      * 안내성 롤링 이벤트 머지 대상 검색 — 같은 유형 + 같은 시군구(footprint 교집합) + 윈도우 안의
