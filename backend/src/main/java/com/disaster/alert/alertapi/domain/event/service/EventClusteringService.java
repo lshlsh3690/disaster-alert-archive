@@ -105,6 +105,14 @@ public class EventClusteringService {
     @Value("${clustering.regional-types:산불:168,산사태:168,홍수:168}")
     private String regionalTypesCsv;
 
+    /** 인접 시군구 병합을 허용하는 지역 한정 유형(쉼표 구분) — Red 뼈대, 사용 로직은 Green 에서. */
+    @Value("${clustering.regional-adjacent-types:산불}")
+    private String regionalAdjacentTypesCsv;
+
+    /** 인접 시군구 이벤트의 마지막 알림이 이 시간 이내여야 병합 — Red 뼈대, 사용 로직은 Green 에서. */
+    @Value("${clustering.regional-adjacent-window-hours:24}")
+    private int regionalAdjacentWindowHours;
+
     /**
      * 안내성 분리 적용 유형(쉼표 구분) — 안내성(예방·캠페인·일반 행동요령)이 실사건과 독립적이고 시즌 내내
      * 반복돼 사건 버킷을 늘리는 유형만. 현재 산불뿐 — 산사태·홍수는 안내(조기경보)가 같은 호우
@@ -582,11 +590,37 @@ public class EventClusteringService {
             mergeIntoExisting(target.get(), alert, null, MergeMethod.REGIONAL_TYPE);
             log.info("clusterNewAlert(지역 한정): alertId={} → event={} 유형+시군구 머지({}, window={}h)",
                     alert.getId(), target.get(), alert.getDisasterType(), windowHours);
+        } else if (mergeIntoAdjacentRegionalEvent(alert, sigungu)) {
+            return true;
         } else {
             createNewEvent(alert, regionCodes[0], extractFirstRegionName(alert), false);
             log.info("clusterNewAlert(지역 한정): alertId={} → 신규 이벤트({}, window={}h)",
                     alert.getId(), alert.getDisasterType(), windowHours);
         }
+        return true;
+    }
+
+    /**
+     * 같은 시군구에 이벤트가 없을 때, 인접 시군구의 진행 중인 사건 이벤트(마지막 알림 24h 이내)에 병합한다.
+     * 2025-03 경북 대형 산불이 의성→안동→청송→영양→영덕 시군구별 5개 이벤트로 쪼개진 사례 때문이며,
+     * 대상 유형은 {@code regional-adjacent-types}(현재 산불)뿐이다. 안내 알림·span 초과는 이 메서드에
+     * 오기 전에 이미 분기되어 인접 조회를 하지 않는다. 병합 방식은 새 enum 값 없이 REGIONAL_TYPE 을 재사용.
+     *
+     * @return 병합했으면 true, 대상 유형이 아니거나 인접 이벤트가 없으면 false(호출 측이 신규 생성)
+     */
+    private boolean mergeIntoAdjacentRegionalEvent(DisasterAlert alert, String[] sigungu) {
+        String type = alert.getDisasterType();
+        if (type == null || !parseCsvSet(regionalAdjacentTypesCsv).contains(type.trim())) {
+            return false;
+        }
+        LocalDateTime since = alert.getCreatedAt().minusHours(regionalAdjacentWindowHours);
+        Optional<Long> target = disasterEventRepository.findRegionalTypeAdjacentMergeTarget(type, sigungu, since);
+        if (target.isEmpty()) {
+            return false;
+        }
+        mergeIntoExisting(target.get(), alert, null, MergeMethod.REGIONAL_TYPE);
+        log.info("clusterNewAlert(지역 한정·인접): alertId={} → event={} 인접 시군구 병합({}, window={}h)",
+                alert.getId(), target.get(), type, regionalAdjacentWindowHours);
         return true;
     }
 
