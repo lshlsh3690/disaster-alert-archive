@@ -14,15 +14,7 @@
 | 생성 (Generation) | 후보와 **묶을지 말지를 결정**. 묶으면 병합, 아니면 신규 이벤트 | 새 문자 + 후보 → 병합 / 신규 |
 | 엔드투엔드 | 최종 결과로 **여러 재난문자가 묶인 이벤트**가 나오는 것 | 문자 스트림 → 이벤트 집합 |
 
-```mermaid
-flowchart LR
-    A["새 재난문자"] --> R["검색<br/>후보 이벤트 선정"]
-    R --> D["판정<br/>묶을지 말지 결정"]
-    D --> E["엔드투엔드<br/>최종 이벤트"]
-    R -.->|"실패"| R1["검색 실패<br/>정답 이벤트가 후보에 없음"]
-    D -.->|"실패"| D1["판정 실패 또는 과병합<br/>후보에 있는데 안 묶음 / 다른 사건을 묶음"]
-    E -.->|"실패"| E1["이벤트 구조 문제<br/>연쇄 병합·쪼개짐<br/>(쌍 지표로는 안 잡힘)"]
-```
+![단계 대응: 검색, 판정, 엔드투엔드와 실패 유형](images/clustering-eval/stage-mapping.png)
 
 ### 검토 의견: 이 대응은 맞고, 세 가지를 보정해서 기록한다
 
@@ -34,34 +26,15 @@ flowchart LR
 
 ## 2. 구현 파이프라인 (새 재난문자 1건이 들어올 때)
 
-`EventClusteringService.doCluster`가 위에서부터 판단하고, 앞 단계에서 처리되면 뒤 단계는 건너뛴다.
+`EventClusteringService.doCluster`가 위에서부터 판단하고, 앞 단계에서 처리되면 뒤 단계는 건너뛴다. 아래 두 그림은 한 흐름을 둘로 나눈 것이다.
 
-```mermaid
-flowchart TD
-    A["새 재난문자"] --> B{"실종 인물?<br/>이름·나이 인식"}
-    B -->|"예"| B1["키 병합: 신원(이름+나이+키)<br/>IDENTITY"]
-    B -->|"아니오"| C{"태풍 등<br/>전국 통합 유형?"}
-    C -->|"예"| C1["키 병합: 유형만<br/>GLOBAL_TYPE"]
-    C -->|"아니오"| D{"지역 한정 유형?<br/>산불·산사태·홍수"}
-    D -->|"예"| D1["키 병합: 유형+시군구, 윈도우 7일<br/>REGIONAL_TYPE<br/>산불 안내문은 안내 이벤트로<br/>(다지역이면 안내 광역)"]
-    D -->|"아니오"| E{"에피소드형?<br/>폭염·한파·대설·강풍·가축질병"}
-    E -->|"예"| E1["시군구 1개: 키 병합 유형+시군구 (끊김 168h)<br/>2개 이상: 광역 경로"]
-    E -->|"아니오"| F{"기타 중 물놀이·수상안전<br/>예방 안내문?"}
-    F -->|"예"| F1["시군구 1개: 안내 이벤트 (168h)<br/>2개 이상: 안내 광역<br/>ADVISORY / BROADCAST"]
-    F -->|"아니오"| G["임베딩 확보<br/>저장값 재사용, 없으면 EmbeddingModel로 계산"]
-    G --> H{"지역 코드가 있나?"}
-    H -->|"아니오"| N["신규 이벤트"]
-    H -->|"예"| H2{"시군구 10개 초과?"}
-    H2 -->|"예"| H3["광역 경로: 시도 또는 전국 + 유형<br/>BROADCAST"]
-    H2 -->|"아니오"| I["검색: 같은 시군구 이벤트 중<br/>이벤트별 최소 코사인 거리 상위 3개<br/>윈도우 168h, 광역·안내 제외"]
-    I --> J{"거리가 임계값 이하?<br/>0.15, 완화 유형 0.35"}
-    J -->|"예"| J1["유사도 병합<br/>EMBEDDING"]
-    J -->|"아니오"| K{"사고성 유형 + 인접 시군구 후보가<br/>임계값 이하?"}
-    K -->|"예"| K1["유사도 병합 EMBEDDING<br/>가드: 후보도 사고성, 화재는 마지막 알림 72h,<br/>이벤트 첫 알림 72h 이내"]
-    K -->|"아니오"| L{"사고성 borderline이고<br/>LLM이 같은 사고라고 답함?"}
-    L -->|"예"| L1["LLM 폴백 병합<br/>LLM_FALLBACK"]
-    L -->|"아니오"| N
-```
+**① 키 병합 경로** — 본문을 보지 않고 키가 같으면 병합하는 분기(위에서부터 판단, 앞에서 처리되면 건너뜀)
+
+![구현 파이프라인 1: 키 병합 경로](images/clustering-eval/implementation-keys.png)
+
+**② 임베딩 경로** — 위 분기에 걸리지 않은 알림이 도달하는 기본 경로(유사도 병합)
+
+![구현 파이프라인 2: 임베딩 경로](images/clustering-eval/implementation-embedding.png)
 
 이 그림에는 실종자·탈출 동물을 다루는 cross-region 보조 패스(`EventCrossRegionService`)를 넣지 않았다(별도 패스).
 
@@ -79,18 +52,7 @@ flowchart TD
 
 ## 3. 검증 파이프라인
 
-```mermaid
-flowchart LR
-    S1["1 평가 셋 구축<br/>사람이 라벨한 250쌍<br/>개발용 150 + 최종용 100"] --> S2["2 라벨 적재<br/>evaluation_label (V130)<br/>지우고 다시 넣기"]
-    S2 --> S3["3 추론 실행<br/>평가 DB 사본 재클러스터링<br/>저장 임베딩 재사용, LLM 끔 또는 켬"]
-    S3 --> S4["4 평가 실행<br/>EvaluationRunTool"]
-    S4 --> S5["5 지표와 오류 분해<br/>정밀도·재현율·F1<br/>검색 실패 / 판정 실패 / 과병합"]
-    S3 --> S6["6 이벤트 구조 점검 (SQL)<br/>시군구 수·기간·광역·안내 규모"]
-    S5 --> S7["7 병목 진단과 튜닝<br/>Red → Green → 리뷰"]
-    S6 --> S7
-    S7 -->|"버전마다 반복"| S3
-    S7 --> S8["8 보고서"]
-```
+![검증 파이프라인](images/clustering-eval/verification-pipeline.png)
 
 | 단계 | 내용 | 도구·산출물 |
 |---|---|---|
@@ -201,3 +163,14 @@ flowchart LR
 | #297 | 최종 보고서 `docs/CLUSTERING_QUALITY_REPORT.md` |
 | #298 | 산불 지역 한정 윈도우 14일 → 7일 |
 | #299, #300 | 용어 정리: "지역앵커" → "지역 한정", "앵커링" → "키 병합" |
+
+---
+
+## 11. 도식 원본과 다시 그리는 법
+
+그림(`docs/images/clustering-eval/*.png`)은 mermaid 소스(`docs/images/clustering-eval/src/*.mmd`)에서 만들었다. 흐름이 바뀌면 소스를 고치고 아래처럼 다시 변환한다(Node.js와 Chrome 필요).
+
+```
+npx @mermaid-js/mermaid-cli -i docs/images/clustering-eval/src/<이름>.mmd -o docs/images/clustering-eval/<이름>.png -c docs/images/clustering-eval/src/mermaid.json -b white -s 2
+```
+
