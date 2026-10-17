@@ -52,6 +52,14 @@ public class DisasterAlert {
     @Column(name = "original_region", length = 1000)
     private String originalRegion; // 수신지역명 (RCPTN_RGN_NM) - 원본 지역명
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "alert_kind", length = 16)
+    private AlertKind alertKind;    // LLM 분류 결과(사건/비사건), 미분류면 null
+
+    public void classifyAs(AlertKind kind) {
+        this.alertKind = kind;
+    }
+
     public void addRegion(LegalDistrict region) {
         DisasterAlertRegion link = new DisasterAlertRegion(this, region);
         this.disasterAlertRegions.add(link);
