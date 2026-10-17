@@ -47,8 +47,7 @@ import static org.mockito.Mockito.when;
  * broadcast 경로로 보낸다(시군구 간 다리로 이벤트가 도 단위 blob 이 되는 것 방지). 사고성 유형의 다지역은
  * 전파 허용을 위해 기존 임베딩 경로를 유지한다.
  *
- * <p>순수 Mockito 단위 테스트(DB·Spring 컨텍스트 없음). 폭염·한파의 안내성 분리는 이 규칙으로 대체되므로
- * {@code advisorySplitTypesCsv} 는 새 기본값 "산불" 로 둔다.
+ * <p>순수 Mockito 단위 테스트(DB·Spring 컨텍스트 없음).
  */
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
@@ -87,7 +86,6 @@ class EventClusteringServiceEpisodicTypeTest {
         ReflectionTestUtils.setField(service, "globalTypesCsv", "태풍");
         ReflectionTestUtils.setField(service, "globalWindowHours", 168);
         ReflectionTestUtils.setField(service, "regionalTypesCsv", "산불:336,산사태:168,홍수:168");
-        ReflectionTestUtils.setField(service, "advisorySplitTypesCsv", "산불");
         ReflectionTestUtils.setField(service, "relaxedThresholdTypesCsv", "폭염,한파,대설,강풍,가축질병");
         ReflectionTestUtils.setField(service, "relaxedSimilarityThreshold", 0.65);
         ReflectionTestUtils.setField(service, "episodicTypesCsv", "폭염,한파,대설,강풍,가축질병");
@@ -131,8 +129,6 @@ class EventClusteringServiceEpisodicTypeTest {
         verify(alertEmbeddingRepository, never()).findEmbeddingText(any());
         verify(disasterEventRepository, never())
                 .findTopCandidates(anyString(), any(String[].class), any(LocalDateTime.class));
-        verify(disasterEventRepository, never())
-                .findAdvisoryMergeTarget(anyString(), any(String[].class), any(LocalDateTime.class));
     }
 
     private void verifyEmbeddingPathTaken() {
@@ -512,7 +508,7 @@ class EventClusteringServiceEpisodicTypeTest {
         verifyEmbeddingPathTaken();
     }
 
-    @ParameterizedTest(name = "9) 폭염 \"{0}\": 안내성 분리로 가지 않는다 - findAdvisoryMergeTarget 미호출, 비안내 이벤트, 키 병합 대상 조회 1회")
+    @ParameterizedTest(name = "9) 폭염 \"{0}\": 안내/특보 구분 없이 비안내 이벤트로 키 병합 대상 조회 1회")
     @ValueSource(strings = {HEAT_GUIDE, HEAT_WARNING})
     void heat_noLongerSplitAsAdvisory(String message) {
         alert("폭염", message, REGION);
@@ -520,31 +516,8 @@ class EventClusteringServiceEpisodicTypeTest {
 
         service.clusterNewAlert(1L);
 
-        verify(disasterEventRepository, never())
-                .findAdvisoryMergeTarget(anyString(), any(String[].class), any(LocalDateTime.class));
         verify(disasterEventRepository).findRegionalTypeMergeTarget(
                 eq("폭염"), any(String[].class), any(LocalDateTime.class));
-        ArgumentCaptor<DisasterEvent> event = ArgumentCaptor.forClass(DisasterEvent.class);
-        verify(disasterEventRepository).save(event.capture());
-        assertThat(event.getValue().isAdvisory()).isFalse();
-    }
-
-    @ParameterizedTest(name = "9b) 옛 설정(advisory-split-types=산불,폭염,한파)이 남아 있어도 {0} 은 안내성 분리로 가지 않는다")
-    @CsvSource(delimiter = '|', value = {
-            "폭염|무더위가 지속되고 있습니다. ▲야외 활동 자제 ▲무더위쉼터 이용[홍성군]",
-            "한파|강한 한파 지속 ▲방한용품 착용 ▲한랭질환 주의 ... 안전에 유의 [홍성군]"
-    })
-    void legacyAdvisorySplitConfig_isIgnoredForHeatAndCold(String type, String message) {
-        ReflectionTestUtils.setField(service, "advisorySplitTypesCsv", "산불,폭염,한파");
-        alert(type, message, REGION);
-        givenNoMergeTarget();
-
-        service.clusterNewAlert(1L);
-
-        verify(disasterEventRepository, never())
-                .findAdvisoryMergeTarget(anyString(), any(String[].class), any(LocalDateTime.class));
-        verify(disasterEventRepository).findRegionalTypeMergeTarget(
-                eq(type), any(String[].class), any(LocalDateTime.class));
         ArgumentCaptor<DisasterEvent> event = ArgumentCaptor.forClass(DisasterEvent.class);
         verify(disasterEventRepository).save(event.capture());
         assertThat(event.getValue().isAdvisory()).isFalse();

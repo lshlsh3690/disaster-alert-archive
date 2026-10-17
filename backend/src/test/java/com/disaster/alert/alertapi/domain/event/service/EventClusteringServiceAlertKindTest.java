@@ -60,7 +60,6 @@ class EventClusteringServiceAlertKindTest {
         ReflectionTestUtils.setField(service, "globalTypesCsv", "태풍");
         ReflectionTestUtils.setField(service, "globalWindowHours", 168);
         ReflectionTestUtils.setField(service, "regionalTypesCsv", "산불:336,산사태:168,홍수:168");
-        ReflectionTestUtils.setField(service, "advisorySplitTypesCsv", "산불");
     }
 
     /** 지역 코드가 없는 평범한 호우 알림 - 기존 경로에서는 임베딩 후 곧바로 신규 이벤트가 만들어진다. */

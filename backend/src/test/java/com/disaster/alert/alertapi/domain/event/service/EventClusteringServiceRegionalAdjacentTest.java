@@ -39,7 +39,7 @@ import static org.mockito.Mockito.when;
  * 지역 한정 유형(산불)의 인접 시군구 병합 검증.
  *
  * <p>대형 산불은 인접 시군구로 번지며 시군구별 이벤트로 쪼개진다(2025-03 경북: 의성·안동·청송·영양·영덕 5개).
- * 산불 사건(안내 아님)이 같은 시군구에 이벤트가 없으면, 인접 시군구의 마지막 알림이 24시간 이내인 진행 중
+ * 산불 알림이 같은 시군구에 이벤트가 없으면, 인접 시군구의 마지막 알림이 24시간 이내인 진행 중
  * 산불 이벤트에 병합한다. 순수 Mockito 단위 테스트(DB·Spring 컨텍스트 없음).
  */
 @ExtendWith(MockitoExtension.class)
@@ -52,8 +52,6 @@ class EventClusteringServiceRegionalAdjacentTest {
 
     private static final String FIRE_INCIDENT =
             "오늘 18:24 군북면 수곡리 320-4 산불 확산. 인근 주민은 대피바랍니다.";
-    private static final String FIRE_ADVISORY =
-            "작은 불씨도 산불로 번질 수 있습니다. 입산시 화기소지 금지, 영농부산물·쓰레기 소각금지 등 각별히 주의 바랍니다.";
 
     @Mock EmbeddingModel embeddingModel;
     @Mock DisasterAlertRepository disasterAlertRepository;
@@ -81,12 +79,10 @@ class EventClusteringServiceRegionalAdjacentTest {
         ReflectionTestUtils.setField(service, "globalTypesCsv", "태풍");
         ReflectionTestUtils.setField(service, "globalWindowHours", 168);
         ReflectionTestUtils.setField(service, "regionalTypesCsv", "산불:168,산사태:168,홍수:168");
-        ReflectionTestUtils.setField(service, "advisorySplitTypesCsv", "산불,기타");
         ReflectionTestUtils.setField(service, "relaxedThresholdTypesCsv", "폭염,한파,대설,강풍,가축질병");
         ReflectionTestUtils.setField(service, "relaxedSimilarityThreshold", 0.65);
         ReflectionTestUtils.setField(service, "episodicTypesCsv", "폭염,한파,대설,강풍,가축질병");
         ReflectionTestUtils.setField(service, "episodicWindowHours", 168);
-        ReflectionTestUtils.setField(service, "advisoryWindowHours", 168);
         ReflectionTestUtils.setField(service, "regionalAdjacentTypesCsv", "산불");
         ReflectionTestUtils.setField(service, "regionalAdjacentWindowHours", 24);
 
@@ -182,17 +178,6 @@ class EventClusteringServiceRegionalAdjacentTest {
         verify(disasterEventRepository).save(event.capture());
         assertThat(event.getValue().isAdvisory()).isFalse();
         assertThat(event.getValue().isBroadcast()).isFalse();
-    }
-
-    @Test
-    @DisplayName("d) 산불 안내 문구: 인접 조회 없음 [회귀 보호]")
-    void fireAdvisory_neverQueriesAdjacent() {
-        alert("산불", FIRE_ADVISORY, SIGUNGU_CODE);
-        stubAdjacentTarget();
-
-        service.clusterNewAlert(1L);
-
-        verifyAdjacentNeverQueried();
     }
 
     @Test

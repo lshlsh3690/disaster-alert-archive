@@ -63,7 +63,6 @@ class EventClusteringServiceAlwaysOnTest {
         ReflectionTestUtils.setField(service, "globalTypesCsv", "태풍");
         ReflectionTestUtils.setField(service, "globalWindowHours", 168);
         ReflectionTestUtils.setField(service, "regionalTypesCsv", "산불:336,산사태:168,홍수:168");
-        ReflectionTestUtils.setField(service, "advisorySplitTypesCsv", "산불");
     }
 
     @Test
