@@ -4,6 +4,8 @@
 
 **입력**: `specs/001-event-clustering-pipeline/spec.md`의 기능 명세
 
+**기준 문서**: 유형별 병합·분리 기준은 [`docs/CLUSTERING_CRITERIA.md`](../../docs/CLUSTERING_CRITERIA.md)를 따른다.
+
 **참고**: 이 계획 역시 spec.md와 마찬가지로 **사후 문서화(as-built)** 다. "Phase 0/1 설계 산출물을 만든다"는 원래 워크플로우 대신, 이미 구현된 코드를 근거로 실제 아키텍처 결정과 그 근거를 역기술한다. research.md/data-model.md/contracts/quickstart.md 같은 Phase 산출물은 이번 문서화 범위에서 별도로 생성하지 않았다(아래 "프로젝트 구조" 참고).
 
 ## 요약
