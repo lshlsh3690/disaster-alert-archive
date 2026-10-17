@@ -1,5 +1,6 @@
 package com.disaster.alert.alertapi.domain.event.service;
 
+import com.disaster.alert.alertapi.domain.disasteralert.model.AlertKind;
 import com.disaster.alert.alertapi.domain.disasteralert.model.DisasterAlert;
 import com.disaster.alert.alertapi.domain.disasteralert.model.DisasterAlertRegion;
 import com.disaster.alert.alertapi.domain.disasteralert.repository.DisasterAlertRepository;
@@ -172,6 +173,12 @@ public class EventClusteringService {
             return;
         }
         DisasterAlert alert = opt.get();
+        // 비사건(ADVISORY)은 이벤트로 묶지 않기로 한 결정이라 임베딩·후보 검색·LLM 폴백보다 앞에서 끊는다.
+        // null(분류 실패·분류 도입 전 기존 알림)은 통과시킨다 — 분류 실패가 사건을 이벤트에서 빼면 안 된다.
+        if (alert.getAlertKind() == AlertKind.ADVISORY) {
+            log.info("clusterNewAlert: alertId={} 비사건(ADVISORY, type={}) — 클러스터링 제외", alertId, alert.getDisasterType());
+            return;
+        }
         if (alert.getMessage() == null || alert.getMessage().isBlank()) {
             log.warn("clusterNewAlert: alertId={} message 가 비어있음 — skip", alertId);
             return;
