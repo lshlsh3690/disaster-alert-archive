@@ -65,12 +65,12 @@ docker compose -f docker-compose.dev.yml up postgres redis   # Postgres(pgvector
 ### 이벤트 클러스터링 파이프라인 (가장 복잡한 서브시스템)
 
 원본 알림(`disasteralert`)은 임베딩 기반 클러스터링을 통해 `DisasterEvent`로 그룹핑됩니다. 관련 로직은 `domain/event/service/`에 모여 있습니다.
-- `EventClusteringService` — 메인 클러스터링 진입점. 알림의 `alert_kind`가 비사건(`ADVISORY`)이면 클러스터링하지 않고, 그 외(`INCIDENT`·`null`)는 유형별 경로(실종 신원 키 → 태풍 → 지역 한정 → 에피소드형 → 안내성 → 임베딩)로 분기합니다. **유형별 병합·분리 기준과 값은 `docs/CLUSTERING_CRITERIA.md`가 기준 문서입니다** — 기준을 바꾸면 그 문서를 먼저 고치고, 이 파일에는 기준을 다시 쓰지 마세요.
+- `EventClusteringService` — 메인 클러스터링 진입점. 알림의 `alert_kind`가 비사건(`ADVISORY`)이면 클러스터링하지 않고, 그 외(`INCIDENT`·`null`)는 유형별 경로(실종 신원 키 → 태풍 → 지역 한정 → 에피소드형 → 임베딩)로 분기합니다. **유형별 병합·분리 기준과 값은 `docs/CLUSTERING_CRITERIA.md`가 기준 문서입니다** — 기준을 바꾸면 그 문서를 먼저 고치고, 이 파일에는 기준을 다시 쓰지 마세요.
 - `EventCrossRegionService` — 탈출 동물처럼 지역을 넘나드는 알림을 위한 별도 패스. `기타` + 인물이 아님(실종자는 신원 키 경로) + 동물 종 식별(`AnimalIdentity`)로 게이트하며 LLM이 판정합니다.
 - `EventLLMDecisionService` — 위 서비스들이 borderline 병합 판정에 공용으로 사용하는 LLM 판정 호출부 (Spring AI + `gpt-4o-mini`). 호출당 비용이 들지만 on/off 플래그 없이 항상 동작하며, 사고성 유형 화이트리스트(`llm-fallback.accident-types`)·borderline 거리 구간(`llm-fallback.distance-ceil`)·동물 게이트(`animal-keywords`)로 호출 대상을 좁힙니다.
 - `application.yml`의 `clustering.*` 블록 값들은 별도 `@ConfigurationProperties` 클래스 없이 `EventClusteringService`/`EventCrossRegionService`에 개별 `@Value` 필드로 흩어져 바인딩됩니다. 각 임계값/키워드 목록이 존재하는 이유(blob 방지, 유형별 머지 윈도우 등)가 한국어 주석으로 설명되어 있습니다. **클러스터링 임계값을 변경하기 전에 반드시 그 주석들을 먼저 읽으세요** — 대부분의 값은 임의가 아니라 실제 사건 데이터로 튜닝된 값입니다. (유형별 경로·임계값·윈도우의 기준은 `docs/CLUSTERING_CRITERIA.md` 참고.) (인접 시군구 BFS 확산 전파는 클러스터링이 아니라 `domain/risk`의 `RiskCalculationService.propagateEffective()`에 있습니다 — 아래 위험도 계산 절 참고.)
 - `EventClusteringBackfillTool` — 현재 클러스터링 설정으로 과거 알림을 재처리하는 도구. 임계값 튜닝 시 사용.
-- `DisasterCooldown` — 지역/유형별 쿨다운으로, 진행 중인 이벤트에 대한 반복 알림이 중복 알림을 만들지 않도록 함. 병합 기준과는 별개 개념입니다. 안내성 분리(`advisory-split-types`)·에피소드형·지역 한정·인접 병합 등 유형별 병합 기준은 `docs/CLUSTERING_CRITERIA.md`를 참고하세요.
+- `DisasterCooldown` — 지역/유형별 쿨다운으로, 진행 중인 이벤트에 대한 반복 알림이 중복 알림을 만들지 않도록 함. 병합 기준과는 별개 개념입니다. 에피소드형·지역 한정·인접 병합 등 유형별 병합 기준은 `docs/CLUSTERING_CRITERIA.md`를 참고하세요.
 - `AlertKindClassifier`/`AlertKindService` (`domain/disasteralert/service`) — 수집 루프에서 새 알림을 LLM(few-shot, `alert-kind/` 리소스)으로 사건/비사건 분류해 `disaster_alert.alert_kind`에 저장합니다. 실패는 null(미분류)이고 수집·클러스터링을 막지 않습니다. 비사건 제외 기준은 `docs/CLUSTERING_CRITERIA.md` 2절.
 
 클러스터링·LLM 폴백·cross-region 은 **항상 켜져 있습니다** — 2026-10-10 에 on/off 환경변수(`CLUSTERING_ENABLED`, `LLM_FALLBACK_ENABLED`, `CROSS_REGION_ENABLED`)를 삭제했습니다. 클러스터링이 꺼지면 이벤트가 생기지 않고, 위험도 계산은 이벤트(`AlertClusteredEvent`) 단위라 새 알림이 위험도에 반영되지 않기 때문입니다. 대신 새 알림마다 임베딩 호출이 들고 수집 루프(`DisasterFetchScheduler`) 안에서 동기로 실행되며, 백필 recluster 모드도 borderline 사고성 건은 LLM 을 호출합니다(완전히 공짜인 튜닝 루프가 아님).
