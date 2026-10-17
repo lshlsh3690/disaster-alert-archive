@@ -101,7 +101,7 @@ UNIQUE(`provider`, `provider_user_id`)
 | translated_title | TEXT | NOT NULL |
 | translated_at | TIMESTAMP | |
 
-> `AnimalIdentity`, `DisasterCooldown`, `FireAlertClassifier`, `MissingPersonIdentity`(event 패키지)는 테이블이 없는 순수 로직 클래스(정규식/판별 유틸)다.
+> `AnimalIdentity`, `DisasterCooldown`, `MissingPersonIdentity`(event 패키지)는 테이블이 없는 순수 로직 클래스(정규식/판별 유틸)다.
 
 ### 1.4 법정동 (legaldistrict)
 
