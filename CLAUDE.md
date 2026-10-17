@@ -22,7 +22,7 @@ Disaster Alert Archive(재난 안전 문자 아카이브) — 한국 정부의 �
 
 `@Tag("realApi")` 가 붙은 테스트(현재 `OpenAiTranslationClientRealApiTest`)는 실제 OpenAI API 를 호출하므로 `OPENAI_API_KEY` 가 필요하고 실행마다 요금이 발생하며 응답이 완전히 결정적이지 않습니다. `build.gradle`에서 기본 `test` 태스크는 이 태그를 제외하고, 별도 `realApiTest` 태스크로만 실행하도록 분리되어 있습니다 — 프롬프트 규칙을 바꿨을 때 수동으로 돌려 확인하는 용도입니다.
 
-DB/Spring 컨텍스트에 의존하는 통합 테스트는 `@SpringBootTest` + `@ActiveProfiles("test")` + `backend/.env.test` 로딩을 한 번에 묶은 `@IntegrationTest`(`global/testsupport/IntegrationTest.java`, `DotenvExtension` 포함)를 붙여 작성합니다 — 슬라이스/목킹된 단위 테스트가 아니므로, dev docker-compose와 동일한 구성의 DB에 접속 가능해야 합니다. 반면 외부 의존성이 없는 순수 로직 클래스(`domain/event/model`의 `FireAlertClassifier`·`DisasterCooldown`·`MissingPersonIdentity`·`AnimalIdentity`, `domain/risk/service`의 `IntensityExtractor` 같은 정적 유틸/판정 클래스)는 `@SpringBootTest` 없이 순수 JUnit 단위 테스트로 작성합니다 — DB 연결이나 Spring 컨텍스트 부트스트랩이 필요 없어 훨씬 빠릅니다.
+DB/Spring 컨텍스트에 의존하는 통합 테스트는 `@SpringBootTest` + `@ActiveProfiles("test")` + `backend/.env.test` 로딩을 한 번에 묶은 `@IntegrationTest`(`global/testsupport/IntegrationTest.java`, `DotenvExtension` 포함)를 붙여 작성합니다 — 슬라이스/목킹된 단위 테스트가 아니므로, dev docker-compose와 동일한 구성의 DB에 접속 가능해야 합니다. 반면 외부 의존성이 없는 순수 로직 클래스(`domain/event/model`의 `DisasterCooldown`·`MissingPersonIdentity`·`AnimalIdentity`, `domain/risk/service`의 `IntensityExtractor` 같은 정적 유틸/판정 클래스)는 `@SpringBootTest` 없이 순수 JUnit 단위 테스트로 작성합니다 — DB 연결이나 Spring 컨텍스트 부트스트랩이 필요 없어 훨씬 빠릅니다.
 
 QueryDSL Q-클래스는 컴파일 시 `backend/src/main/generated`에 생성됩니다 — 리포지토리 쿼리 메서드가 인식되지 않으면 `./gradlew compileJava`로 재생성하세요.
 
