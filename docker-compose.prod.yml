@@ -3,12 +3,33 @@ services:
     image: cloudflare/cloudflared:latest
     container_name: disaster-cloudflared
     restart: unless-stopped
-    command: tunnel run
+    command: tunnel --metrics 0.0.0.0:20241 run
     environment:
       TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN}
+    # 컨테이너 프로세스는 떠 있어도 엣지와의 QUIC 연결만 끊겨 재시도를 반복하는 경우가 있다
+    # (2026-10-18 실측 — UDP 연결이 끊긴 채 8일간 재시도만 하며 터널 불통). 컨테이너 자체는
+    # 죽지 않으므로 `restart: unless-stopped`만으로는 복구가 안 되고, 터널 연결 상태를 직접
+    # 확인하는 healthcheck + 아래 autoheal이 있어야 자동 재시작된다.
+    healthcheck:
+      test: ["CMD", "cloudflared", "tunnel", "--metrics", "0.0.0.0:20241", "ready"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+    labels:
+      - "autoheal=true"
     depends_on:
       - backend
       - frontend
+
+  autoheal:
+    image: willfarrell/autoheal:latest
+    container_name: disaster-autoheal
+    restart: unless-stopped
+    environment:
+      AUTOHEAL_CONTAINER_LABEL: autoheal
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
 
   frontend:
     build:
