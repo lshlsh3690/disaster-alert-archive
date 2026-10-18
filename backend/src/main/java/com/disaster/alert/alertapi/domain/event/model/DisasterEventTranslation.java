@@ -29,12 +29,4 @@ public class DisasterEventTranslation {
 
     @Column(name = "translated_at", nullable = false)
     private LocalDateTime translatedAt;
-
-    public static DisasterEventTranslation of(Long eventId, String languageCode, String translatedTitle) {
-        return DisasterEventTranslation.builder()
-                .id(new DisasterEventTranslationId(eventId, languageCode))
-                .translatedTitle(translatedTitle)
-                .translatedAt(LocalDateTime.now())
-                .build();
-    }
 }

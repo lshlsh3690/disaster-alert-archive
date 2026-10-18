@@ -24,11 +24,6 @@ export const useForegroundMessage = () => {
         icon: "/icons/icon-192x192.png",
         badge: "/icons/icon-72x72.png",
         data: { url: alertId ? `/alerts/${alertId}` : "/" },
-        ...(notificationType === "ALARM" && {
-          vibrate: [200, 100, 200, 100, 200],
-          requireInteraction: true,
-          silent: false,
-        }),
       };
 
       //SW 있을 때는 registration.showNotification() 사용

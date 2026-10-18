@@ -72,7 +72,9 @@
   border-radius: 14px;
   padding: 10px 16px;
   box-shadow: 0 10px 26px rgba(15, 23, 42, 0.16);
-  white-space: nowrap;
+  /* 지도 영역보다 넓어지면 줄바꿈한다(좁은 사이드 패널에서 긴 지역명이 잘리지 않게) */
+  width: max-content;
+  max-width: calc(100% - 16px);
   z-index: 5;
   opacity: 0;
 }
@@ -117,6 +119,45 @@
   font-size: 15px;
 }
 
+/* 알림 목록처럼 좁은 패널(compact)에서는 말풍선이 지도를 덜 가리도록 작게 그린다. 메인 페이지 값은 위 기본값 그대로다 */
+.tip.tipCompact {
+  border-radius: 10px;
+  padding: 6px 10px;
+}
+.tip.tipCompact .tipRegion {
+  gap: 5px;
+  font-size: 12px;
+}
+.tip.tipCompact .tipCount {
+  margin-top: 3px;
+  font-size: 11px;
+}
+.tip.tipCompact .tipCount b {
+  font-size: 12px;
+}
+.tip.tipCompact .tipWide {
+  margin-top: 2px;
+  font-size: 10px;
+}
+
+/* 상위 단위 전체로 발송돼 이 구역에 귀속시킬 수 없는 알림 */
+.tipWide {
+  margin-top: 4px;
+  font-size: 12px;
+  color: #6b7280;
+}
+.wideNote {
+  max-width: 320px;
+  padding: 6px 10px;
+  border: 1px solid #fcd9d4;
+  border-radius: 8px;
+  background: #fff5f3;
+  color: #b42318;
+  font-size: 12px;
+  line-height: 1.4;
+  text-align: right;
+}
+
 /* 범례 */
 .legend {
   display: flex;
@@ -137,4 +178,130 @@
   height: 14px;
   border-radius: 4px;
   border: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+/* 지도 오른쪽 위 컨트롤: 보기 단위 버튼 + (확대하면) 돌아가기 막대를 세로로 쌓는다.
+   제목 카드(.map-heading, dashboard.css: top 22px, right 28px, 높이는 제목 + 상태 줄이라 약 90px) 바로 아래에 둔다 — 카드 뒤에 가려지지 않게. */
+.controls {
+  position: absolute;
+  top: 124px;
+  right: 28px;
+  z-index: 4;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+  max-width: calc(100% - 40px);
+}
+@media (max-width: 760px) {
+  .controls {
+    right: 12px;
+  }
+}
+/* 위쪽에 제목 카드가 없는 곳(알림 목록 페이지)에서는 카드 높이만큼 내릴 필요가 없다 */
+.controlsCompact {
+  top: 14px;
+}
+
+/* 보기 단위 선택 (항상 펼쳐진 두 버튼) */
+.segmented {
+  display: inline-flex;
+  padding: 3px;
+  gap: 2px;
+  border: 1px solid #d9dee6;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 4px 14px rgba(37, 52, 78, 0.06);
+}
+.segment {
+  font-size: 13px;
+  font-weight: 600;
+  padding: 6px 12px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: #6b7280;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.segment:hover {
+  background: #f3f4f6;
+}
+.segmentActive,
+.segmentActive:hover {
+  background: #4f46e5;
+  color: #ffffff;
+}
+.segment:focus-visible {
+  outline: 2px solid #6366f1;
+  outline-offset: 1px;
+}
+
+/* 경계 데이터 로딩/오류 안내 */
+.status {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  z-index: 2;
+  transform: translate(-50%, -50%);
+  padding: 6px 12px;
+  font-size: 13px;
+  color: #6b7280;
+  background: rgba(255, 255, 255, 0.85);
+  border-radius: 8px;
+  pointer-events: none;
+}
+
+/* 확대(드릴다운) 상태 */
+/* 확대하면 viewBox 가 줄어 사용자 단위 선이 굵어지므로 경계선은 화면 픽셀 기준으로 고정한다 */
+.regionSigungu {
+  vector-effect: non-scaling-stroke;
+  stroke-width: 0.8;
+}
+.regionEmd {
+  vector-effect: non-scaling-stroke;
+  stroke-width: 1;
+}
+/* 확대 상태의 상단 막대: 돌아가기 · 선택한 시군구 이름 · 알림 목록 보기 */
+.drillBar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.drillBack,
+.drillGo {
+  font-size: 13px;
+  padding: 6px 10px;
+  border: 1px solid #d9dee6;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #1f2937;
+  cursor: pointer;
+}
+.drillBack:hover,
+.drillGo:hover {
+  background: #f3f4f6;
+}
+.drillGo {
+  border-color: #c7d2fe;
+  color: #4338ca;
+}
+.drillBack:focus-visible,
+.drillGo:focus-visible {
+  outline: 2px solid #6366f1;
+  outline-offset: 1px;
+}
+.drillName {
+  font-size: 14px;
+  font-weight: 600;
+  color: #1f2937;
+}
+
+/* 선택한 시군구의 바닥 채움(읍면동 경계 아래) */
+.drilledBase {
+  fill: #f7f9fb;
+  stroke: none;
+  pointer-events: none;
 }

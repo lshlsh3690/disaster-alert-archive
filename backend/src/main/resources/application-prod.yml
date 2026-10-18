@@ -5,3 +5,12 @@
 logging:
   level:
     org.springframework.web: info
+
+# base application.yml의 캐시 성능 측정용 actuator 노출(prometheus/metrics/caches)은 로컬 전용
+# 의도였다 — 로그인만 하면(ADMIN 권한 없이도) SecurityConfig의 anyRequest().authenticated()를
+# 통과해 접근 가능해지므로, 운영에서는 health만 남기고 되돌린다.
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health

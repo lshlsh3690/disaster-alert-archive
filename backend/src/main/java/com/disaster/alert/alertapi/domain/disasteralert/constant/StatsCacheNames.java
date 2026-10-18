@@ -16,6 +16,7 @@ public final class StatsCacheNames {
     public static final String SIDO = "stats-sido";
     public static final String SIGUNGU = "stats-sigungu";
     public static final String SIGUNGU_BREAKDOWN = "stats-sigungu-breakdown";
+    public static final String REGION_CODE = "stats-region-code";
     public static final String DAILY = "stats-daily";
     public static final String HOURLY = "stats-hourly";
     public static final String MONTHLY_TYPE = "stats-monthly-type";

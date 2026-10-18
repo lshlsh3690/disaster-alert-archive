@@ -1,4 +1,4 @@
-import { Alert, LatestAlert, Stats, ZAlert, ZLatestAlert, ZPageMeta, ZPageMetaCombined, ZRegionStat, ZRegionLevelStat, ZStats, ZDashboardSummary, ZDailyStat, ZHourlyStat, ZMonthlyTypeStat, ZWeatherCorrelationStat, ZAlertWeatherSnapshot, ZWeatherTypeStat, ZWeatherRegionStat, type DashboardSummary, type DailyStat, type HourlyStat, type MonthlyTypeStat, type WeatherCorrelationStat, type AlertWeatherSnapshot, type WeatherTypeStat, type WeatherRegionStat, type RegionLevelStat } from "@/types/alerts";
+import { Alert, LatestAlert, Stats, ZAlert, ZLatestAlert, ZPageMeta, ZPageMetaCombined, ZRegionStat, ZRegionCodeStat, ZRegionLevelStat, ZStats, ZDashboardSummary, ZDailyStat, ZHourlyStat, ZMonthlyTypeStat, ZWeatherCorrelationStat, ZAlertWeatherSnapshot, ZWeatherTypeStat, ZWeatherRegionStat, type DashboardSummary, type DailyStat, type HourlyStat, type MonthlyTypeStat, type WeatherCorrelationStat, type AlertWeatherSnapshot, type WeatherTypeStat, type WeatherRegionStat, type RegionLevelStat } from "@/types/alerts";
 import instance from "./axios";
 import { z } from "zod";
 
@@ -59,6 +59,17 @@ export async function fetchSigunguStats(
 ): Promise<Array<{ region: string; count: number }>> {
   const res = await instance.get("/api/v1/alerts/stats/sigungu", { params });
   return z.array(ZRegionStat).parse(res.data);
+}
+
+export type RegionCodeUnit = "SIGUNGU" | "EMD";
+
+// 법정동 코드 기준 건수. 구가 있는 시(수원시 장안구 등)를 구 단위로 나누는 점이 이름 기준 fetchSigunguStats 와 다르다.
+export async function fetchRegionCodeStats(
+  params: AlertSearchRequest,
+  unit: RegionCodeUnit
+): Promise<Array<{ code: string; count: number }>> {
+  const res = await instance.get("/api/v1/alerts/stats/region-code", { params: { ...params, unit } });
+  return z.array(ZRegionCodeStat).parse(res.data);
 }
 
 // 항상 전체 레벨(LEVEL_1/2/3) breakdown을 반환하는 엔드포인트 — level 파라미터는 서버에서 무시됨

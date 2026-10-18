@@ -213,7 +213,7 @@ UNIQUE(`provider`, `provider_user_id`)
 **`user_notification_log`** — 발송 성공/실패 로그
 | 컬럼 | 타입 | 비고 |
 |---|---|---|
-| id (PK) | BIGINT | IDENTITY |
+| id (PK) | BIGINT | SEQUENCE (시퀀스 `user_notification_log_id_seq`, allocationSize 500 — JDBC 배치 INSERT용) |
 | member_id | BIGINT | NOT NULL(FK 매핑 없음) |
 | alert_id (FK) | BIGINT | NOT NULL |
 | status | VARCHAR | `SENT` / `FAILED` |
@@ -226,7 +226,7 @@ UNIQUE(`provider`, `provider_user_id`)
 |---|---|---|
 | id (PK) | BIGINT | IDENTITY |
 | member_id (FK) | BIGINT | UNIQUE, NOT NULL — 회원당 1행 |
-| notification_type | VARCHAR | ENUM(`NONE`,`PUSH`,`ALARM`), 기본 `PUSH` |
+| notification_type | VARCHAR | ENUM(`NONE`,`PUSH`), 기본 `PUSH` |
 | min_risk_score | INT | 기본 0 |
 | created_at / updated_at | TIMESTAMP | |
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import LatestAlertsSection from "./LatestAlertsSection";
@@ -25,6 +25,8 @@ const clean = (value: string) => value.replace(/[\p{Extended_Pictographic}️]/g
 
 export default function HomeClient() {
   const { t } = useTranslation();
+  // 지도가 알려 주는 현재 보기 상태(제목 카드에 표시)
+  const [mapStatus, setMapStatus] = useState("");
   const { data } = useDashboardSummary();
   const latestComments = useLatestComments(5);
 
@@ -152,16 +154,17 @@ export default function HomeClient() {
               <div>
                 <p>{t("nav.dashboard")}</p>
                 <h2>{clean(t("dashboard.alertMap"))}</h2>
-              </div>
-              <div className="map-heading__actions">
-                <span className="live-status">
-                  <i></i>LIVE
-                </span>
+                {/* 지금 지도가 무엇을 보여 주는지(보기 단위와 확대한 지역). 제목 옆이 아니라 아래 한 줄에 둬서 제목이 접히지 않게 한다 */}
+                {mapStatus && (
+                  <span className="map-state" title={mapStatus}>
+                    {mapStatus}
+                  </span>
+                )}
               </div>
             </header>
             <div className="map-surface">
               <div className="map-decoration" aria-hidden="true"></div>
-              <KoreaMap25D height="clamp(650px, calc(100vh - 96px), 920px)" />
+              <KoreaMap25D height="clamp(650px, calc(100vh - 96px), 920px)" onStatusChange={setMapStatus} />
             </div>
           </section>
         </div>

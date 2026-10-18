@@ -46,6 +46,9 @@ export const ZPageMetaCombined = z.object({
 
 
 export const ZRegionStat = z.object({ region: z.string(), count: z.number() });
+// 법정동 코드 기준 건수(시군구 5자리 / 읍면동 8자리) — 대시보드 지도 폴리곤 코드와 직접 매칭
+export const ZRegionCodeStat = z.object({ code: z.string(), count: z.number() });
+export type RegionCodeStat = z.infer<typeof ZRegionCodeStat>;
 export const ZRegionLevelStat = z.object({
   region: z.string(),
   total: z.number(),

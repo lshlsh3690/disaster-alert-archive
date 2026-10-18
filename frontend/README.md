@@ -37,7 +37,6 @@ npm test         # jest (testEnvironment: node)
 |------|------|
 | `BASE_API_URL` | 서버 런타임(SSR/`generateMetadata`) 전용 API 주소. 브라우저에 노출되지 않음 |
 | `NEXT_PUBLIC_API_URL` / `NEXT_PUBLIC_API_BASE_URL` | 브라우저(axios·OAuth 리다이렉트)에서 쓰는 API 주소 |
-| `NEXT_PUBLIC_KAKAO_MAP_APP_KEY` | Kakao Map JS 키 |
 | `NEXT_PUBLIC_FIREBASE_*` | Firebase 설정 6종 + `VAPID_KEY` (FCM 웹 푸시) |
 
 ---
@@ -54,7 +53,6 @@ lib/
   mutations/        # React Query 변경 훅 (useLogin, useSignup, useCreateUserAlert, ...)
   i18n.ts           # i18next 초기화 (리소스는 constants/i18n)
   firebase.ts       # FCM 클라이언트 초기화
-  kakaoMapLoader.ts kakaoGeo.ts geojsonCache.ts   # 지도·법정동 폴리곤
   serverApi.ts queryClient.ts reactQueryProvider.tsx riskScore.ts
   alertsSearchParams.ts eventsSearchParams.ts     # URL 쿼리 ↔ 필터 상태 변환
 store/              # Zustand — authStore, guestFavoriteRegionsStore, languageStore, signupStore

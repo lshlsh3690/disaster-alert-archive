@@ -1,12 +1,10 @@
 package com.disaster.alert.alertapi.domain.event.service;
 
 import com.disaster.alert.alertapi.domain.event.model.DisasterEvent;
-import com.disaster.alert.alertapi.domain.event.model.DisasterEventTranslation;
 import com.disaster.alert.alertapi.domain.event.repository.DisasterEventRepository;
 import com.disaster.alert.alertapi.domain.event.repository.DisasterEventTranslationRepository;
 import com.disaster.alert.alertapi.global.translation.OpenAiTranslationClient;
 import com.disaster.alert.alertapi.global.translation.SupportedLanguage;
-import com.disaster.alert.alertapi.global.translation.TranslationProperties;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -30,7 +28,6 @@ public class EventTranslationService {
     private final DisasterEventRepository disasterEventRepository;
     private final DisasterEventTranslationRepository translationRepository;
     private final OpenAiTranslationClient translationClient;
-    private final TranslationProperties properties;
 
     /**
      * 상세 조회 lazy 번역 — 단건.
@@ -40,9 +37,6 @@ public class EventTranslationService {
      */
     @Transactional
     public void ensureTranslated(Long eventId, SupportedLanguage language) {
-        if (!properties.isEnabled()) {
-            return;
-        }
         if (translationRepository.findByIdEventIdAndIdLanguageCode(eventId, language.getDbCode()).isPresent()) {
             return;
         }
@@ -57,7 +51,7 @@ public class EventTranslationService {
     /** 목록 조회 lazy 번역 — 페이지 내 미번역분만 일괄 번역. */
     @Transactional
     public void ensureTranslatedBatch(List<Long> eventIds, SupportedLanguage language) {
-        if (!properties.isEnabled() || eventIds == null || eventIds.isEmpty()) {
+        if (eventIds == null || eventIds.isEmpty()) {
             return;
         }
         Set<Long> existing = translationRepository
@@ -88,7 +82,9 @@ public class EventTranslationService {
         }
         String targetLang = language.getDbCode();
         String translatedTitle = translationClient.translate(event.getEventTitle(), targetLang);
-        translationRepository.save(DisasterEventTranslation.of(eventId, targetLang, translatedTitle));
+        // save() 대신 upsert() — alert 번역 캐시와 동일한 동시성 문제(check-then-act +
+        // 복합키 write-behind)라 같은 해법을 적용한다. TranslationService.translateAndSaveInternal 참고.
+        translationRepository.upsert(eventId, targetLang, translatedTitle);
         log.info("이벤트 제목 번역 완료: eventId={}, lang={}", eventId, targetLang);
     }
 }

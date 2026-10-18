@@ -2,9 +2,9 @@
 
 ## 배경 / 목적
 
-EC2 서버 비용을 없애기 위해 백엔드(+Postgres+Redis)와 프론트엔드(현재 Vercel)를 모두 사용자의 맥북 위 `docker-compose.prod.yml` 하나로 합치고, 외부 접속은 Cloudflare Tunnel로 연다. `docs/runbooks/rds-to-ec2-postgres-migration.md`와 같은 이유로 **이관 자체(터널/DNS 설정, self-hosted 러너 설치, pg_dump/pg_restore, EC2/Vercel 해지)는 사용자가 직접 실행**한다 — Claude Code 세션은 저장소 파일만 다루고 운영 인프라에 접근할 수 없다.
+EC2 서버 비용을 없애기 위해 백엔드(+Postgres+Redis)와 프론트엔드(현재 Vercel)를 모두 사용자의 맥북 위 `docker-compose.prod.yml` 하나로 합치고, 외부 접속은 Cloudflare Tunnel로 연다. **이관 자체(터널/DNS 설정, self-hosted 러너 설치, pg_dump/pg_restore, EC2/Vercel 해지)는 사용자가 직접 실행**한다 — Claude Code 세션은 저장소 파일만 다루고 운영 인프라에 접근할 수 없다.
 
-진행 순서는 RDS 이관 런북과 동일하게 **① 사전 준비 → ② 예비 검증(다운타임 없음) → ③ 컷오버(짧은 다운타임) → ④ 사후 검증 → ⑤ 구자원 제거**다. ①~④를 이 문서가 다루고, ⑤는 검증 기간이 끝난 뒤 별도로 진행한다.
+진행 순서는 **① 사전 준비 → ② 예비 검증(다운타임 없음) → ③ 컷오버(짧은 다운타임) → ④ 사후 검증 → ⑤ 구자원 제거**다. ①~④를 이 문서가 다루고, ⑤는 검증 기간이 끝난 뒤 별도로 진행한다.
 
 ## 사전 준비
 
@@ -76,7 +76,7 @@ EC2는 계속 운영 중인 상태로 데이터만 스냅샷 떠서 맥북에서
 docker compose -f docker-compose.prod.yml up -d postgres redis cloudflared
 docker compose -f docker-compose.prod.yml logs -f postgres   # "database system is ready to accept connections" 확인
 
-# EC2에서 실행 — 운영 DB 덤프 (RDS 이관 런북과 동일한 패턴, 소스가 EC2의 disaster-postgres 컨테이너)
+# EC2에서 실행 — 운영 DB 덤프 (소스가 EC2의 disaster-postgres 컨테이너)
 docker exec disaster-postgres pg_dump -U <POSTGRES_USER> -d <POSTGRES_DB> \
   -Fc --no-owner --no-acl -f /tmp/disaster_alert_$(date +%Y%m%d_%H%M).dump
 docker cp disaster-postgres:/tmp/disaster_alert_<타임스탬프>.dump ~/disaster_alert.dump
@@ -88,7 +88,17 @@ docker cp ./disaster_alert.dump disaster-postgres:/tmp/restore.dump
 docker exec disaster-postgres pg_restore -U <POSTGRES_USER> -d <POSTGRES_DB> --no-owner --no-acl /tmp/restore.dump
 ```
 
-`flyway_schema_history` 테이블이 함께 복원됐는지 반드시 확인한다(없으면 `ddl-auto: validate`인 backend가 기동 실패한다). 확인 쿼리는 RDS 이관 런북의 "검증" 절과 동일하다.
+`flyway_schema_history` 테이블이 함께 복원됐는지 반드시 확인한다(없으면 `ddl-auto: validate`인 backend가 기동 실패한다). 복원 후 주요 테이블 행 수를 EC2(원본)와 맥북(복원본)에서 각각 조회해 서로 같은지 비교한다:
+
+```bash
+docker exec disaster-postgres psql -U <POSTGRES_USER> -d <POSTGRES_DB> -c "
+  SELECT 'disaster_alert', count(*) FROM disaster_alert
+  UNION ALL SELECT 'disaster_events', count(*) FROM disaster_events
+  UNION ALL SELECT 'region_risk_daily', count(*) FROM region_risk_daily
+  UNION ALL SELECT 'member', count(*) FROM member
+  UNION ALL SELECT 'flyway_schema_history', count(*) FROM flyway_schema_history;
+"
+```
 
 이제 self-hosted 러너가 떠 있는 상태에서 `develop`에 아무 변경이나 push 하면(혹은 수동으로 `docker compose -f docker-compose.prod.yml build backend frontend && up -d --no-deps backend frontend`) backend/frontend가 뜬다. `https://<터널 서브도메인 또는 맥북 로컬>`이 아니라, 이 시점에는 Cloudflare Public Hostname이 아직 EC2/Vercel을 가리키고 있으므로 맥북에서 `curl -H "Host: api.disaster-alert-archive.co.kr" http://localhost:8080/...` 식으로 로컬 검증만 한다.
 

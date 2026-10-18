@@ -36,6 +36,14 @@ const nextConfig: NextConfig = {
         source: "/manifest.json",
         headers: [{ key: "Cache-Control", value: "public, max-age=0, must-revalidate" }],
       },
+      // 대시보드 지도의 시군구/읍면동 경계(public/map/**.json: 시군구 약 1MB, 읍면동은 시도별 최대 약 0.5MB). 행정구역 개편 때만 바뀌는
+      // 정적 데이터인데 헤더 규칙이 없으면 매 방문마다 재검증 요청이 나간다. 파일명에 해시가 없어
+      // immutable 은 쓸 수 없으므로 하루 캐시 + 재검증 중 구버전 허용(stale-while-revalidate)으로 둔다. 개편으로 데이터를 다시 만들면
+      // useMapRegions.ts 의 MAP_DATA_VERSION 을 올려 요청 URL 을 바꾸면 옛 캐시를 건너뛴다.
+      {
+        source: "/map/:path*",
+        headers: [{ key: "Cache-Control", value: "public, max-age=86400, stale-while-revalidate=604800" }],
+      },
     ];
   },
   // 개발 모드에서만 렌더링되는 Next.js Dev Tools 인디케이터(좌하단 고정 배지).

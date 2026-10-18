@@ -3,12 +3,16 @@ package com.disaster.alert.alertapi.domain.notification.service;
 import com.disaster.alert.alertapi.domain.disasteralert.model.DisasterAlert;
 import com.disaster.alert.alertapi.domain.disasteralert.repository.DisasterAlertRepository;
 import com.disaster.alert.alertapi.domain.member.repository.MemberFavoriteRegionRepository;
+import com.disaster.alert.alertapi.domain.notification.dto.MemberNotificationType;
+import com.disaster.alert.alertapi.domain.notification.dto.MemberToken;
 import com.disaster.alert.alertapi.domain.notification.model.NotificationType;
 import com.disaster.alert.alertapi.domain.notification.model.UserNotificationLog;
 import com.disaster.alert.alertapi.domain.notification.repository.FcmTokenRepository;
 import com.disaster.alert.alertapi.domain.notification.repository.GuestFcmRegionRepository;
 import com.disaster.alert.alertapi.domain.notification.repository.NotificationPreferenceRepository;
 import com.disaster.alert.alertapi.domain.notification.repository.UserNotificationLogRepository;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Async;
@@ -16,12 +20,21 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class AlertNotificationService {
+
+    // UserNotificationLog 가 SEQUENCE 전략이라 INSERT 가 영속성 컨텍스트에 쌓였다가 flush 때 JDBC 배치로
+    // 나간다 — 이 flush 가 곧 배치 경계이며, hibernate.jdbc.batch_size(500, application.yml)와 같은 값이다.
+    // flush 후 영속성 컨텍스트를 비우는 기존 목적도 유지된다: 회원 1만 명 팬아웃 내내 managed 엔티티가
+    // 쌓이는 걸 막는다(실측: 루프 진행에 따라 건당 31ms→93ms로 3배 증가). 500은 튜닝된 값이 아니라
+    // "너무 자주도, 너무 뜸하지도 않은" 보수적인 출발점이다. flush 실패 처리는 flushAndClearSafely 참고.
+    private static final int FLUSH_INTERVAL = 500;
 
     private final MemberFavoriteRegionRepository favoriteRegionRepository;
     private final NotificationPreferenceRepository preferenceRepository;
@@ -31,9 +44,16 @@ public class AlertNotificationService {
     private final FcmSendService fcmSendService;
     private final DisasterAlertRepository disasterAlertRepository;
 
+    @PersistenceContext
+    private EntityManager entityManager;
+
     @Async
     @Transactional
     public void triggerNotification(Long alertId) {
+        // @Async라 HTTP 응답시간으로 못 재고, ThreadLocalLogTrace AOP도 @Async 어드바이저와의
+        // 순서가 둘 다 @Order 미지정이라 정적으로 불확실해 못 믿는다 — 직접 재서 로그로 남긴다
+        // (backend/loadtest/가 이 time=Xms를 파싱).
+        long startNanos = System.nanoTime();
         try {
             // 1. 재난문자 조회
             DisasterAlert alert = disasterAlertRepository.findById(alertId)
@@ -54,15 +74,7 @@ public class AlertNotificationService {
             String body = alert.getMessage();
 
             // 3. 해당 지역들을 관심지역으로 등록한 사용자 조회
-            // 시도 전체 등록 사용자를 위해 시도 레벨 코드도 포함 (예: "2900300000" → "2900000000")
-            List<String> sidoCodes = regionCodes.stream()
-                    .filter(code -> code.length() == 10)
-                    .map(code -> code.substring(0, 2) + "00000000")
-                    .distinct()
-                    .toList();
-            List<String> allCodesToSearch = Stream.concat(regionCodes.stream(), sidoCodes.stream())
-                    .distinct()
-                    .toList();
+            List<String> allCodesToSearch = withSidoCodes(regionCodes);
 
             List<Long> memberIds = favoriteRegionRepository
                     .findByIdLegalDistrictCodeIn(allCodesToSearch)
@@ -71,30 +83,136 @@ public class AlertNotificationService {
                     .distinct()
                     .toList();
 
+            // 게스트 토큰은 회원 팬아웃 전에 조회만 해 둔다(이유는 findGuestTokens 주석). 발송은 회원 뒤.
+            List<String> guestTokens = findGuestTokens(allCodesToSearch, alertId);
+
             if (!memberIds.isEmpty()) {
-                log.info("회원 알림 발송 대상: {}명, alertId: {}", memberIds.size(), alertId);
-                for (Long memberId : memberIds) {
-                    sendToMember(memberId, alertId, title, body);
-                }
+                sendToMembers(memberIds, alertId, title, body);
             }
 
             // 게스트 토큰 발송
-            sendToGuestTokens(allCodesToSearch, alertId, title, body);
+            sendToGuestTokens(guestTokens, alertId, title, body);
+
+            long totalMs = (System.nanoTime() - startNanos) / 1_000_000;
+            log.info("알림 트리거 완료 - alertId: {}, time={}ms", alertId, totalMs);
 
         } catch (Exception e) {
             log.error("알림 트리거 실패 - alertId: {}, error: {}", alertId, e.getMessage());
         }
     }
 
-    private void sendToGuestTokens(List<String> regionCodes, Long alertId, String title, String body) {
+    // 시도 전체 등록 사용자를 위해 시도 레벨 코드도 포함 (예: "2900300000" → "2900000000")
+    private List<String> withSidoCodes(List<String> regionCodes) {
+        List<String> sidoCodes = regionCodes.stream()
+                .filter(code -> code.length() == 10)
+                .map(code -> code.substring(0, 2) + "00000000")
+                .distinct()
+                .toList();
+        return Stream.concat(regionCodes.stream(), sidoCodes.stream())
+                .distinct()
+                .toList();
+    }
+
+    private void sendToMembers(List<Long> memberIds, Long alertId, String title, String body) {
+        log.info("회원 알림 발송 대상: {}명, alertId: {}", memberIds.size(), alertId);
+        long fanoutStartNanos = System.nanoTime();
+
+        // N+1 방지: 루프 진입 전에 회원 전체의 알림설정/토큰을 각각 1번의 IN 쿼리로 미리 조회한다.
+        // 이 두 조회는 sendToMember()의 try/catch 밖이라, 실패하면 회원 1명이 아니라 대상
+        // 전원의 발송이 스킵되고 triggerNotification()의 바깥 catch로 떨어진다 — 예전
+        // N+1 구조(회원별 조회, 회원 1명 실패가 나머지에 안 번짐)와 실패 모드가 다르다.
+        // 의도적으로 받아들인 트레이드오프다: 두 쿼리가 실패하는 상황은 거의 항상 DB 자체
+        // 장애라 어차피 회원별로 쪼개 불러도 전원 실패할 가능성이 높고, 그럴 땐 에러 로그
+        // 1만 줄보다 한 줄로 명확히 실패를 알리는 쪽이 낫다고 판단했다.
+        Map<Long, String> typeByMember = preferenceRepository.findNotificationTypesByMemberIdIn(memberIds)
+                .stream()
+                .collect(Collectors.toMap(
+                        MemberNotificationType::memberId,
+                        r -> r.notificationType().name()));
+        Map<Long, List<String>> tokensByMember = fcmTokenRepository.findTokensByMemberIdIn(memberIds)
+                .stream()
+                .collect(Collectors.groupingBy(
+                        MemberToken::memberId,
+                        Collectors.mapping(MemberToken::token, Collectors.toList())));
+
+        int processed = 0;
+        boolean flushErrorLogged = false;
+        for (Long memberId : memberIds) {
+            String notificationType = typeByMember.getOrDefault(memberId, NotificationType.PUSH.name());
+            List<String> tokens = tokensByMember.getOrDefault(memberId, List.of());
+            sendToMember(memberId, alertId, title, body, notificationType, tokens);
+
+            processed++;
+            if (processed % FLUSH_INTERVAL == 0) {
+                flushErrorLogged = flushAndClearSafely(
+                        flushContext(alertId, memberIds.size(), processed), flushErrorLogged);
+            }
+        }
+
+        // 마지막 잔여분(500 미만)은 주기 flush 에 안 걸리므로 여기서 명시적으로 내보낸다. 완료 로그 앞에
+        // 둬야 측정 시간에 마지막 INSERT 비용이 포함된다. 정확히 500의 배수면 직전 flush 로 이미 빈 상태다.
+        if (processed % FLUSH_INTERVAL != 0) {
+            flushAndClearSafely(flushContext(alertId, memberIds.size(), processed), flushErrorLogged);
+        }
+
+        long fanoutNanos = System.nanoTime() - fanoutStartNanos;
+        log.info("회원 팬아웃 완료 - alertId: {}, 대상: {}명, time={}ms, avg={}ms/명",
+                alertId, memberIds.size(), fanoutNanos / 1_000_000,
+                fanoutNanos / 1_000_000.0 / memberIds.size());
+    }
+
+    private String flushContext(Long alertId, int memberCount, int processed) {
+        return "alertId: " + alertId + ", 대상: " + memberCount + "명, 처리: " + processed + "건";
+    }
+
+    // flush 실패(예: FK 위반(팬아웃 중 회원 삭제), DB 장애)가 루프 밖으로 번져 남은 회원·게스트 FCM
+    // 발송을 막지 않게 삼킨다. clear 는 실패해도 항상 호출해 managed 엔티티가 쌓이지 않게 한다.
+    // 오류 처리 트레이드오프: INSERT 가 flush 시점으로 미뤄져 이력 저장 실패가 sendToMember 의 try/catch
+    // 밖에서 드러난다. flush 가 실패하면 Postgres 트랜잭션이 aborted 되어 같은
+    // @Transactional(triggerNotification) 안의 이후 flush 도 실패하고 커밋 시 롤백되므로, 이미 FCM 이
+    // 나간 회원의 이력이 일부 또는 전부 사라질 수 있다 — 발송 지속을 우선한 의도적 선택이다.
+    // 로그 레벨: 첫 실패만 error(스택트레이스 포함), 이후는 warn. aborted 이후 flush 는 연쇄 실패라 전부
+    // error 로 남기면 같은 error 가 500건마다 반복된다(CLAUDE.md: error 는 사람이 조치할 것만).
+    // 한계: aborted 상태에서는 시퀀스 블록(allocationSize 500)이 소진돼 nextval 이 필요해지는 시점부터
+    // sendToMember 의 save() 도 실패할 수 있고, 그때는 회원별 "개별 알림 발송 실패" error 가 남는다
+    // (FCM 은 이미 나간 뒤). 이 경로의 error 폭증까지 막지는 못한다.
+    // @return flush 실패 로그 중 error 를 이미 남겼는지(호출자가 다음 호출에 넘긴다)
+    private boolean flushAndClearSafely(String context, boolean errorAlreadyLogged) {
         try {
-            List<String> tokens = guestFcmRegionRepository
+            entityManager.flush();
+            return errorAlreadyLogged;
+        } catch (Exception e) {
+            if (errorAlreadyLogged) {
+                log.warn("알림 이력 flush 실패(이미 첫 실패를 error 로 기록함), 발송은 계속 - {}, error: {}",
+                        context, e.getMessage());
+            } else {
+                log.error("알림 이력 flush 실패, 발송은 계속 - {}, error: {}", context, e.getMessage(), e);
+            }
+            return true;
+        } finally {
+            entityManager.clear();
+        }
+    }
+
+    // 회원 팬아웃 앞에서 호출한다: 팬아웃 중 flush 가 실패하면 트랜잭션이 aborted 되어 이후 DB 조회가
+    // 모두 실패하므로, 뒤에서 조회하면 게스트 FCM 이 누락될 수 있다. 조회 실패는 error 로그만 남기고
+    // 게스트 발송만 생략한다(회원 팬아웃은 계속). 발송 실패 로그와 구분되게 문구를 따로 둔다.
+    private List<String> findGuestTokens(List<String> regionCodes, Long alertId) {
+        try {
+            return guestFcmRegionRepository
                     .findAllByLegalDistrictCodeIn(regionCodes)
                     .stream()
                     .map(r -> r.getFcmToken())
                     .distinct()
                     .toList();
+        } catch (Exception e) {
+            log.error("게스트 토큰 조회 실패 - 게스트 발송 생략, alertId: {}, error: {}", alertId, e.getMessage());
+            return List.of();
+        }
+    }
 
+    private void sendToGuestTokens(List<String> tokens, Long alertId, String title, String body) {
+        try {
             if (tokens.isEmpty()) return;
 
             log.info("게스트 알림 발송 대상: {}개 토큰", tokens.size());
@@ -113,23 +231,11 @@ public class AlertNotificationService {
         }
     }
 
-    private void sendToMember(Long memberId, Long alertId, String title, String body) {
+    private void sendToMember(Long memberId, Long alertId, String title, String body,
+                               String notificationType, List<String> tokens) {
         try {
-            // 알림 타입 조회
-            String notificationType = preferenceRepository
-                    .findByMemberId(memberId)
-                    .map(p -> p.getNotificationType().name())
-                    .orElse(NotificationType.PUSH.name());
-
             // NONE이면 발송 안 함
             if (NotificationType.NONE.name().equals(notificationType)) return;
-
-            // FCM 토큰 조회
-            List<String> tokens = fcmTokenRepository
-                    .findAllByMemberId(memberId)
-                    .stream()
-                    .map(t -> t.getToken())
-                    .toList();
 
             if (tokens.isEmpty()) return;
 

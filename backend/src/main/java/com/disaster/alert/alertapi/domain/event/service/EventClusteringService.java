@@ -3,9 +3,10 @@ package com.disaster.alert.alertapi.domain.event.service;
 import com.disaster.alert.alertapi.domain.disasteralert.model.DisasterAlert;
 import com.disaster.alert.alertapi.domain.disasteralert.model.DisasterAlertRegion;
 import com.disaster.alert.alertapi.domain.disasteralert.repository.DisasterAlertRepository;
+import com.disaster.alert.alertapi.domain.event.model.AdvisoryClassifier;
+import com.disaster.alert.alertapi.domain.event.model.DisasterCooldown;
 import com.disaster.alert.alertapi.domain.event.model.DisasterEvent;
 import com.disaster.alert.alertapi.domain.event.model.EventAlertMapping;
-import com.disaster.alert.alertapi.domain.event.model.FireAlertClassifier;
 import com.disaster.alert.alertapi.domain.event.model.MergeMethod;
 import com.disaster.alert.alertapi.domain.event.model.MissingPersonIdentity;
 import com.disaster.alert.alertapi.domain.event.repository.AlertEmbeddingRepository;
@@ -43,8 +44,6 @@ import java.util.stream.Collectors;
  *   <li>후보 이벤트 검색 (7일 윈도우 + 지역 교집합 + 코사인 최소)</li>
  *   <li>최소 거리 &le; (1 - threshold) → 기존 이벤트 머지. 아니면 신규 이벤트.</li>
  * </ol>
- *
- * <p>{@code clustering.enabled=false} 인 경우 no-op (코드만 머지된 상태에서 안전 가드).
  */
 @Service
 @RequiredArgsConstructor
@@ -58,9 +57,6 @@ public class EventClusteringService {
     private final AlertEmbeddingRepository alertEmbeddingRepository;
     private final ApplicationEventPublisher eventPublisher;
     private final EventLLMDecisionService llmDecisionService;
-
-    @Value("${clustering.enabled:false}")
-    private boolean enabled;
 
     @Value("${clustering.similarity-threshold:0.85}")
     private double similarityThreshold;
@@ -79,10 +75,6 @@ public class EventClusteringService {
     /** 실종 인물 신원 클러스터링 윈도우(시간). 같은 사람 재신고를 한 이벤트로 보는 간격. 기본 14일. */
     @Value("${clustering.person-window-hours:336}")
     private int personWindowHours;
-
-    /** local borderline LLM 폴백 스위치 — 임베딩 임계 미만이지만 같은 사건일 수 있는 사고성 알림을 LLM 으로 판정. */
-    @Value("${clustering.llm-fallback.enabled:false}")
-    private boolean llmFallbackEnabled;
 
     /** LLM 폴백 후보 거리 상한(코사인). (mergeMaxDistance, ceil] 구간 후보만 LLM 에 묻는다. */
     @Value("${clustering.llm-fallback.distance-ceil:0.40}")
@@ -105,40 +97,75 @@ public class EventClusteringService {
     private int globalWindowHours;
 
     /**
-     * 지역앵커 유형(유형:윈도우시간 CSV) — 산불·산사태·홍수처럼 유형+시군구가 곧 사건인 이산 재난.
-     * 태풍(global-types, 전국)과 달리 시군구 스코프. 윈도우는 유형별로 다르다 — 산불은 재발화 주기가
-     * 길어 14일(336h), 호우성(산사태·홍수)은 같은 날 burst 라 7일(168h). 계절 연속형(폭염·호우특보 등)은
+     * 지역 한정 유형(유형:윈도우시간 CSV) — 산불·산사태·홍수처럼 유형+시군구가 곧 사건인 이산 재난.
+     * 태풍(global-types, 전국)과 달리 시군구 스코프. 윈도우는 유형별로 지정한다 — 현재 산불·산사태·홍수
+     * 모두 7일(168h)(산불은 14일(336h)에서 줄임). 계절 연속형(폭염·호우특보 등)은
      * 절대 넣지 말 것(같은 시군구 매일 발령 → span blob).
      */
-    @Value("${clustering.regional-types:산불:336,산사태:168,홍수:168}")
+    @Value("${clustering.regional-types:산불:168,산사태:168,홍수:168}")
     private String regionalTypesCsv;
 
+    /** 인접 시군구 병합을 허용하는 지역 한정 유형(쉼표 구분) — Red 뼈대, 사용 로직은 Green 에서. */
+    @Value("${clustering.regional-adjacent-types:산불}")
+    private String regionalAdjacentTypesCsv;
+
+    /** 인접 시군구 이벤트의 마지막 알림이 이 시간 이내여야 병합 — Red 뼈대, 사용 로직은 Green 에서. */
+    @Value("${clustering.regional-adjacent-window-hours:24}")
+    private int regionalAdjacentWindowHours;
+
     /**
-     * 안내성 분리 적용 유형(쉼표 구분) — 안내성(예방·캠페인)이 실사건과 독립적이고 시즌 내내 반복돼
-     * 사건 버킷을 blob 으로 만드는 유형만. 산불만 해당 — 산사태·홍수는 안내(조기경보)가 같은 호우
-     * episode 에 강결합이라 분리하면 타임라인이 깨진다(실데이터). regional-types 의 부분집합이어야 한다.
+     * 안내성 분리 적용 유형(쉼표 구분) — 안내성(예방·캠페인·일반 행동요령)이 실사건과 독립적이고 시즌 내내
+     * 반복돼 사건 버킷을 늘리는 유형만. 현재 산불뿐 — 산사태·홍수는 안내(조기경보)가 같은 호우
+     * episode 에 강결합이라 분리하면 타임라인이 깨진다(실데이터). 머지 윈도우는 regional-types 를 쓴다.
+     * 폭염·한파는 안내를 분리하지 않고 episodic-types 로 특보와 한 이벤트에 합친다.
      */
     @Value("${clustering.advisory-split-types:산불}")
     private String advisorySplitTypesCsv;
+
+    /** 임베딩 병합 임계값을 완화할 에피소드형 유형(쉼표 구분). 폭염·한파·대설·강풍·가축질병. */
+    @Value("${clustering.relaxed-threshold-types:폭염,한파,대설,강풍,가축질병}")
+    private String relaxedThresholdTypesCsv;
+
+    /** 완화 대상 유형에 적용할 병합 유사도 하한(거리 상한 = 1 - 값). 기본 0.65 → 거리 0.35. */
+    @Value("${clustering.relaxed-similarity-threshold:0.65}")
+    private double relaxedSimilarityThreshold;
+
+    /** 에피소드형 유형(쉼표 구분) — "유형 + 시군구" 단위 하나의 이벤트로 이어 가는 유형. */
+    @Value("${clustering.episodic-types:폭염,한파,대설,강풍,가축질병}")
+    private String episodicTypesCsv;
+
+    /** 에피소드형 유형의 끊김 기준(시간) — 같은 유형+시군구의 마지막 알림 이후 이 시간이 지나면 새 이벤트. */
+    @Value("${clustering.episodic-window-hours:168}")
+    private int episodicWindowHours;
+
+    /** 사고성 유형의 인접 시군구 후보 조회 윈도우(시간) — 같은 시군구 윈도우보다 짧게. */
+    @Value("${clustering.adjacent-window-hours:48}")
+    private int adjacentWindowHours;
+
+    /** 인접 시군구 병합 허용 이벤트 나이 상한(시간) — 후보 이벤트 첫 알림부터 새 알림까지. 인접 경로 전용. */
+    @Value("${clustering.adjacent-max-event-age-hours:72}")
+    private int adjacentMaxEventAgeHours;
+
+    /** 안내 이벤트 병합 윈도우(시간) — 안내성 유형(기타 등) 전용. 산불은 regional-types 윈도우를 쓴다. */
+    @Value("${clustering.advisory-window-hours:168}")
+    private int advisoryWindowHours;
 
     private Set<String> accidentTypes;
     private Pattern animalPattern;
     private Set<String> globalTypes;
     private Map<String, Integer> regionalTypeWindows;
     private Set<String> advisorySplitTypes;
+    private Set<String> relaxedThresholdTypes;
+    private Set<String> episodicTypes;
 
     /**
      * 신규 알림에 대해 임베딩 생성 + 클러스터링 수행.
      *
-     * <p>{@code clustering.enabled=false} 또는 alert/message 가 비어있으면 조용히 skip.
+     * <p>alert/message 가 비어있으면 조용히 skip.
      * 외부 API 실패 시 예외 던지지 않음 — 수집 스케줄러의 다음 사이클이나 백필 도구로 복구.
      */
     @Transactional
     public void clusterNewAlert(Long alertId) {
-        if (!enabled) {
-            return;
-        }
-
         Optional<DisasterAlert> opt = disasterAlertRepository.findById(alertId);
         if (opt.isEmpty()) {
             log.warn("clusterNewAlert: alertId={} 조회 실패", alertId);
@@ -190,11 +217,24 @@ public class EventClusteringService {
             return;
         }
 
-        // 0.7 지역앵커 유형(산불·산사태·홍수) — 유형+시군구가 곧 사건. 같은 시군구·같은 유형·유형별
+        // 0.7 지역 한정 유형(산불·산사태·홍수) — 유형+시군구가 곧 사건. 같은 시군구·같은 유형·유형별
         //     윈도우 안이면 임베딩 무관하게 단일 이벤트로 묶는다. 한 산불/호우 episode 가 같은 시군구에서
         //     며칠 burst 로 쏟아질 때 본문 텍스트가 갈려(코사인<0.85) 임베딩 경로가 한 사건을 수십 개로
         //     파편화하던 것을 차단. 태풍(GLOBAL_TYPE)과 같은 철학이되 전국이 아니라 시군구 스코프(blob 방지).
         if (clusterRegionalType(alert)) {
+            return;
+        }
+
+        // 0.8 에피소드형 유형(폭염·한파·대설·강풍·가축질병) — 같은 시군구·같은 유형의 발령이 끊김 없이
+        //     이어지는 동안은 안내/특보·문장 유사도와 무관하게 하나의 이벤트. 임베딩·LLM 호출 전에 분기해
+        //     비용도 들지 않는다. 시군구 1개는 키 병합, 2개 이상(다지역)은 지역 이벤트와 섞이지 않게
+        //     곧바로 광역(broadcast) 경로로 보낸다(시군구 간 다리 방지). 사고성은 전파 허용이라 대상 아님.
+        if (clusterEpisodicType(alert)) {
+            return;
+        }
+
+        // 0.9 안내성 알림(물놀이·수상안전 예방 안내 등) — 시군구별 안내 이벤트로 모으고 이웃 병합은 안 한다.
+        if (clusterAdvisoryType(alert)) {
             return;
         }
 
@@ -234,7 +274,7 @@ public class EventClusteringService {
         logCandidates(alert.getId(), candidates);
 
         // 5. 임계값 판정 — 같은 지역 후보 중 코사인 유사도 >= threshold 면 머지
-        double mergeMaxDistance = 1.0 - similarityThreshold;
+        double mergeMaxDistance = mergeMaxDistanceFor(alert.getDisasterType());
         for (Object[] row : candidates) {
             Long eventId = ((Number) row[0]).longValue();
             double dist = ((Number) row[1]).doubleValue();
@@ -242,6 +282,11 @@ public class EventClusteringService {
                 mergeIntoExisting(eventId, alert, 1.0 - dist, MergeMethod.EMBEDDING);
                 return;
             }
+        }
+
+        // 5.2 인접 시군구 후보 — 사고성 유형만, 임계값 병합만(LLM 폴백 없음).
+        if (tryMergeAdjacent(alert, embeddingText, regionCodes, mergeMaxDistance)) {
+            return;
         }
 
         // 5.5 LLM 폴백 — 임베딩은 임계 미만이지만 같은 사건일 수 있는 사고성 알림을 LLM 으로 판정.
@@ -255,16 +300,68 @@ public class EventClusteringService {
     }
 
     /**
+     * 사고성 유형의 인접 시군구 후보 병합 — 같은 사고가 시군구 경계를 넘어 인접 시군구로 번지면 시군구가
+     * 달라 같은 시군구 hard 필터에서 갈라지던 것을 잡는다.
+     *
+     * <p>임계값(mergeMaxDistance)만 쓰고 LLM 폴백은 태우지 않는다 — 지역 제약이 느슨해진 만큼 borderline 까지
+     * 넓히면 별개 사고를 합칠 위험이 커서다. 윈도우도 같은 시군구보다 짧은 adjacent-window-hours 를 쓴다.
+     * 비사고성(폭염·호우 등 템플릿형)은 시군구 간 다리(blob)가 생기므로 대상이 아니다.
+     * 후보 이벤트에도 LLM 폴백과 같은 두 가드(사고성 유형, 화재 72h)를 적용한다 — 별개 화재 오병합 방지와 같은 이유.
+     *
+     * @return 인접 이벤트에 병합했으면 true
+     */
+    private boolean tryMergeAdjacent(DisasterAlert alert, String embeddingText, String[] regionCodes,
+                                     double mergeMaxDistance) {
+        if (!isAccidentType(alert.getDisasterType())) {
+            return false;
+        }
+        LocalDateTime adjacentSince = alert.getCreatedAt().minusHours(adjacentWindowHours);
+        List<Object[]> adjacent = disasterEventRepository.findTopAdjacentCandidates(
+                embeddingText, sigunguPrefixes(regionCodes), adjacentSince);
+        log.info("clusterNewAlert: alertId={} 인접 시군구 후보 {}건 (윈도우 {}h)",
+                alert.getId(), adjacent.size(), adjacentWindowHours);
+        logCandidates(alert.getId(), adjacent);
+
+        // 거리 오름차순이므로 임계 이내의 첫 후보가 가장 가까운 이벤트.
+        for (Object[] row : adjacent) {
+            Long eventId = ((Number) row[0]).longValue();
+            double dist = ((Number) row[1]).doubleValue();
+            if (dist > mergeMaxDistance) {
+                continue;
+            }
+            // 가드 실패 후보는 건너뛰고 다음(더 먼) 후보를 본다.
+            DisasterEvent ev = disasterEventRepository.findById(eventId).orElse(null);
+            if (allowsAccidentMerge(alert, ev) && withinAdjacentEventAge(alert, ev)) {
+                mergeIntoExisting(eventId, alert, 1.0 - dist, MergeMethod.EMBEDDING);
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * 인접 병합 전용 이벤트 나이 상한 — 후보 이벤트 첫 알림부터 새 알림까지 adjacent-max-event-age-hours 이내(경계 포함).
+     * 인접 병합이 last_alert_at 윈도우를 계속 밀어 안내문이 44일·7개 시군구로 연쇄 병합되던 문제(평가 DB 실측) 차단.
+     * 첫 알림 시각을 모르면 나이를 증명할 수 없으므로 거부한다. 같은 시군구 경로(tryLlmFallback)에는 적용하지 않는다.
+     */
+    private boolean withinAdjacentEventAge(DisasterAlert alert, DisasterEvent ev) {
+        if (ev == null || ev.getFirstAlertAt() == null) {
+            return false;
+        }
+        return !alert.getCreatedAt().isAfter(ev.getFirstAlertAt().plusHours(adjacentMaxEventAgeHours));
+    }
+
+    /**
      * borderline 후보(임베딩 임계 미만, ceil 이내)를 LLM 으로 동일 사건 판정해 머지 시도.
      *
-     * <p>게이트: {@code llm-fallback.enabled} + 사고성 유형(화이트리스트) + 동물·비정형 아님
+     * <p>게이트: 사고성 유형(화이트리스트) + 동물·비정형 아님
      * (동물은 cross-region 단계, 인물은 {@link #clusterPerson} 앞단에서 이미 분기). 후보가 없거나
      * LLM 이 NONE(보수적)이면 false → 신규 이벤트로 진행.
      *
      * @return LLM 이 같은 사건으로 판정해 머지하면 true
      */
     private boolean tryLlmFallback(DisasterAlert alert, List<Object[]> candidates, double mergeMaxDistance) {
-        if (!llmFallbackEnabled || !isAccidentType(alert.getDisasterType()) || isAnimalCase(alert.getMessage())) {
+        if (!isAccidentType(alert.getDisasterType()) || isAnimalCase(alert.getMessage())) {
             return false;
         }
 
@@ -286,8 +383,7 @@ public class EventClusteringService {
         Map<Long, String> repMessages = representativeMessages(borderlineIds);
         List<EventLLMDecisionService.Candidate> cands = new ArrayList<>(borderlineIds.size());
         for (Long id : borderlineIds) {
-            DisasterEvent ev = disasterEventRepository.findById(id).orElse(null);
-            if (ev == null || !isAccidentType(ev.getPrimaryDisasterType())) {
+            if (!allowsAccidentMerge(alert, disasterEventRepository.findById(id).orElse(null))) {
                 continue;
             }
             cands.add(new EventLLMDecisionService.Candidate(id, repMessages.getOrDefault(id, "")));
@@ -305,6 +401,18 @@ public class EventClusteringService {
                 alert.getId(), targetEventId, alert.getDisasterType(), cands.size());
         mergeIntoExisting(targetEventId, alert, null, MergeMethod.LLM_FALLBACK);
         return true;
+    }
+
+    /**
+     * 후보 이벤트가 사고성 유형 병합 대상인지 — LLM 폴백과 인접 병합이 공유하는 두 가드.
+     * (1) 후보 이벤트도 사고성 유형이어야 한다(기상특보 이벤트에 화재 알림이 흡수되는 과병합 차단).
+     * (2) 화재는 별개 화재를 합치는 오병합이 많아 이벤트 마지막 알림 72h 초과 시 제외(운영 데이터 분석 2026-10).
+     */
+    private boolean allowsAccidentMerge(DisasterAlert alert, DisasterEvent ev) {
+        return ev != null
+                && isAccidentType(ev.getPrimaryDisasterType())
+                && DisasterCooldown.allowsLlmFallbackMerge(alert.getDisasterType(),
+                        ev.getFirstAlertAt(), ev.getLastAlertAt(), alert.getCreatedAt());
     }
 
     /** 사고성 유형 화이트리스트 매칭 (LLM 폴백 적용 대상). */
@@ -393,7 +501,7 @@ public class EventClusteringService {
         LocalDateTime since = alert.getCreatedAt().minusHours(globalWindowHours);
         // 전국 broadcast(region_code=null) 이벤트만 키로 — broadcast 격리 규칙과 일관(local 과 안 섞임).
         Optional<DisasterEvent> target = disasterEventRepository
-                .findFirstByBroadcastTrueAndPrimaryDisasterTypeAndPrimaryRegionCodeIsNullAndLastAlertAtAfterOrderByLastAlertAtDesc(
+                .findLatestGeneralBroadcastNationwide(
                         type, since);
         if (target.isPresent()) {
             mergeIntoExisting(target.get().getId(), alert, null, MergeMethod.GLOBAL_TYPE);
@@ -434,7 +542,7 @@ public class EventClusteringService {
     }
 
     /**
-     * 지역앵커 유형 클러스터링 — 산불·산사태·홍수처럼 "유형+지역이 곧 사건"인 이산 재난을, 같은 시군구·
+     * 지역 한정 유형 클러스터링 — 산불·산사태·홍수처럼 "유형+지역이 곧 사건"인 이산 재난을, 같은 시군구·
      * 같은 유형·유형별 윈도우 안의 기존 이벤트에 머지(없으면 신규). 지역·유형은 보되 임베딩·LLM 은 안 본다.
      *
      * <p>이 유형들은 한 사건(산불/호우 episode)이 같은 시군구에서 며칠 burst 로 쏟아지며 본문 텍스트가
@@ -443,11 +551,11 @@ public class EventClusteringService {
      * 것과 달리 <b>시군구 스코프</b>라 전국 blob 이 안 생긴다. episode 간 갭이 윈도우보다 커서(실측: 산불
      * 재발화 7~30일, 호우성 같은 날 burst 후 9~25일) 서로 다른 episode 는 자연 분리된다.
      *
-     * <p>윈도우는 유형별 — 산불 14일(재발화 길다), 산사태·홍수 7일(같은 날 burst). 광역 broadcast
+     * <p>윈도우는 유형별 — 현재 산불·산사태·홍수 모두 7일. 광역 broadcast
      * (span&gt;{@code maxRegionSpan})·지역 없음은 여기서 처리하지 않고 false → 기존 broadcast/임베딩
      * 경로로 넘긴다(전국 산불이 시군구로 안 쪼개지게 격리 유지).
      *
-     * @return 지역앵커 유형으로 처리하면 true, 아니면(일반 유형·광역·지역없음) false → 임베딩 경로로.
+     * @return 지역 한정 유형으로 처리하면 true, 아니면(일반 유형·광역·지역없음) false → 임베딩 경로로.
      */
     private boolean clusterRegionalType(DisasterAlert alert) {
         Integer windowHours = regionalTypeWindowHours(alert.getDisasterType());
@@ -458,19 +566,20 @@ public class EventClusteringService {
         if (regionCodes.length == 0) {
             return false;  // 지역 없으면 시군구 키 못 만듦 → 임베딩 경로(신규 생성)로
         }
+        // 안내성 분리(산불): 건조특보·소각금지·예방캠페인 등 실제 화재가 아닌 안내 알림은 사건 머지에
+        //   태우지 않고 안내 이벤트로 모은다. 안내성이 14일 윈도우로 시즌 내내 체이닝돼
+        //   사건 버킷을 blob(span 130일+)으로 만들고 소수 실사건을 오염시키던 것을 발생 지점에서 차단.
+        // span 게이트보다 먼저 판정한다 — 안내가 게이트에서 return false 로 일반 광역 경로에 새면 안내가 섞인다.
+        if (isAdvisorySplitType(alert.getDisasterType())
+                && AdvisoryClassifier.isAdvisory(alert.getDisasterType(), alert.getMessage(), alert.getEmergencyLevel())) {
+            clusterRegionalAdvisory(alert, regionCodes, windowHours);
+            return true;
+        }
+
         // 광역 broadcast(다수 시군구)는 여기서 안 잡고 기존 broadcast 경로가 (시도+유형/전국) 키로 격리.
         // 전국 산불이 시군구마다 쪼개지지 않게 — span 게이트는 local 경로와 동일 기준.
         if (distinctSigunguCount(regionCodes) > maxRegionSpan) {
             return false;
-        }
-
-        // 안내성 분리(산불): 건조특보·소각금지·예방캠페인 등 실제 화재가 아닌 안내 알림은 사건 머지에
-        //   태우지 않고 시군구별 롤링 안내 이벤트로 모은다. 안내성이 14일 윈도우로 시즌 내내 체이닝돼
-        //   사건 버킷을 blob(span 130일+)으로 만들고 소수 실사건을 오염시키던 것을 발생 지점에서 차단.
-        if (isAdvisorySplitType(alert.getDisasterType())
-                && FireAlertClassifier.isAdvisory(alert.getMessage(), alert.getEmergencyLevel())) {
-            clusterFireAdvisory(alert, regionCodes, windowHours);
-            return true;
         }
 
         String[] sigungu = sigunguPrefixes(regionCodes);
@@ -479,24 +588,181 @@ public class EventClusteringService {
                 alert.getDisasterType(), sigungu, since);
         if (target.isPresent()) {
             mergeIntoExisting(target.get(), alert, null, MergeMethod.REGIONAL_TYPE);
-            log.info("clusterNewAlert(지역앵커): alertId={} → event={} 유형+시군구 머지({}, window={}h)",
+            log.info("clusterNewAlert(지역 한정): alertId={} → event={} 유형+시군구 머지({}, window={}h)",
                     alert.getId(), target.get(), alert.getDisasterType(), windowHours);
+        } else if (mergeIntoAdjacentRegionalEvent(alert, sigungu)) {
+            return true;
         } else {
             createNewEvent(alert, regionCodes[0], extractFirstRegionName(alert), false);
-            log.info("clusterNewAlert(지역앵커): alertId={} → 신규 이벤트({}, window={}h)",
+            log.info("clusterNewAlert(지역 한정): alertId={} → 신규 이벤트({}, window={}h)",
                     alert.getId(), alert.getDisasterType(), windowHours);
         }
         return true;
     }
 
     /**
+     * 같은 시군구에 이벤트가 없을 때, 인접 시군구의 진행 중인 사건 이벤트(마지막 알림 24h 이내)에 병합한다.
+     * 2025-03 경북 대형 산불이 의성→안동→청송→영양→영덕 시군구별 5개 이벤트로 쪼개진 사례 때문이며,
+     * 대상 유형은 {@code regional-adjacent-types}(현재 산불)뿐이다. 안내 알림·span 초과는 이 메서드에
+     * 오기 전에 이미 분기되어 인접 조회를 하지 않는다. 병합 방식은 새 enum 값 없이 REGIONAL_TYPE 을 재사용.
+     *
+     * @return 병합했으면 true, 대상 유형이 아니거나 인접 이벤트가 없으면 false(호출 측이 신규 생성)
+     */
+    private boolean mergeIntoAdjacentRegionalEvent(DisasterAlert alert, String[] sigungu) {
+        String type = alert.getDisasterType();
+        if (type == null || !parseCsvSet(regionalAdjacentTypesCsv).contains(type.trim())) {
+            return false;
+        }
+        LocalDateTime since = alert.getCreatedAt().minusHours(regionalAdjacentWindowHours);
+        Optional<Long> target = disasterEventRepository.findRegionalTypeAdjacentMergeTarget(type, sigungu, since);
+        if (target.isEmpty()) {
+            return false;
+        }
+        mergeIntoExisting(target.get(), alert, null, MergeMethod.REGIONAL_TYPE);
+        log.info("clusterNewAlert(지역 한정·인접): alertId={} → event={} 인접 시군구 병합({}, window={}h)",
+                alert.getId(), target.get(), type, regionalAdjacentWindowHours);
+        return true;
+    }
+
+    /**
+     * 지역 한정 유형(산불)의 안내 알림 라우팅 — 시군구 1개면 시군구 안내 이벤트, 2개 이상이면 안내 광역 이벤트.
+     * 다지역 안내를 시군구 footprint 교집합({@link #clusterAdvisory})으로 모으면 이웃 시군구 안내 이벤트를
+     * 이어 붙이는 다리가 생겨, 실측 이벤트 698(360건·148일·29개 시군구)이 만들어졌다. 그래서 다지역은
+     * 시도/전국+유형 키의 안내 광역으로 보낸다(span 이 maxRegionSpan 을 넘어도 동일).
+     */
+    private void clusterRegionalAdvisory(DisasterAlert alert, String[] regionCodes, int windowHours) {
+        if (distinctSigunguCount(regionCodes) > 1) {
+            clusterAdvisoryBroadcast(alert, regionCodes, windowHours);
+        } else {
+            clusterAdvisory(alert, regionCodes, windowHours);
+        }
+    }
+
+    /**
+     * 에피소드형 유형(폭염·한파·대설·강풍·가축질병) 클러스터링 — "유형 + 시군구"가 곧 하나의 이벤트.
+     * 같은 시군구에서 같은 유형의 발령이 끊김 없이 이어지는 동안은 문장 유사도와 무관하게 합친다
+     * (연쇄 병합은 의도). 끊김 기준은 마지막 알림 이후 {@code episodic-window-hours}. 본문은 보지 않는다.
+     *
+     * <p>시군구가 정확히 1개면 위 키 병합, 2개 이상(다지역)이면 지역 이벤트 후보에서 빼고 곧바로 광역
+     * (broadcast) 경로로 보낸다(span 이 maxRegionSpan 이하든 초과든 동일). 다지역 알림을 임베딩 경로에 두면
+     * footprint 교집합 머지가 서로 다른 시군구의 지역 이벤트를 이어 붙여(시군구 간 다리) 폭염 이벤트 하나가
+     * 43개 시군구·7개 시도·612건까지 커졌기 때문이다. 사고성·비대상 유형은 사고 전파를 허용해야 하므로
+     * 이 분기를 타지 않는다.
+     *
+     * @return 에피소드형으로 처리하면 true (지역코드가 없으면 false)
+     */
+    private boolean clusterEpisodicType(DisasterAlert alert) {
+        String type = alert.getDisasterType();
+        if (!isEpisodicType(type)) {
+            return false;
+        }
+        String[] regionCodes = extractRegionCodes(alert);
+        if (regionCodes.length == 0) {
+            return false;
+        }
+        int sigunguSpan = distinctSigunguCount(regionCodes);
+        if (sigunguSpan > 1) {
+            clusterBroadcast(alert, regionCodes, sigunguSpan);
+            return true;
+        }
+        LocalDateTime since = alert.getCreatedAt().minusHours(episodicWindowHours);
+        Optional<Long> target = disasterEventRepository.findRegionalTypeMergeTarget(
+                type, sigunguPrefixes(regionCodes), since);
+        if (target.isPresent()) {
+            mergeIntoExisting(target.get(), alert, null, MergeMethod.REGIONAL_TYPE);
+            log.info("clusterNewAlert(에피소드형): alertId={} → event={} 유형+시군구 머지({}, window={}h)",
+                    alert.getId(), target.get(), type, episodicWindowHours);
+        } else {
+            createNewEvent(alert, regionCodes[0], extractFirstRegionName(alert), false);
+            log.info("clusterNewAlert(에피소드형): alertId={} → 신규 이벤트({}, window={}h)",
+                    alert.getId(), type, episodicWindowHours);
+        }
+        return true;
+    }
+
+    /**
+     * 안내성 유형(advisory-split-types, 산불 제외 — 산불은 clusterRegionalType 에서 처리)의 안내 알림을
+     * 시군구별 안내 이벤트로 모은다. 평가 DB 에서 "기타" 물놀이 안내문이 인접 시군구 병합으로 이어 붙어
+     * 7개 시군구·44일짜리 이벤트가 된 것이 실측됐다. 안내문은 사건이 아니므로 임베딩·후보 조회·LLM 을 거치지
+     * 않고 시군구별 안내 이벤트(is_advisory=true)로 직접 모은다. 이웃 시군구 병합은 후보 검색이
+     * is_advisory=false 만 보기 때문에 안내 이벤트가 사건 후보가 되지 않아 차단된다.
+     *
+     * <p>산불은 지역 한정 유형이라 clusterRegionalType 이 유형별 윈도우로 처리하므로 여기서 제외한다.
+     * 다지역(시군구 2개 이상) 안내문은 시군구 사이 다리를 만들지 않도록 광역 경로로 보낸다.
+     *
+     * @return 안내성으로 처리하면 true (대상 아님/지역코드 없음이면 false)
+     */
+    private boolean clusterAdvisoryType(DisasterAlert alert) {
+        String type = alert.getDisasterType();
+        if (!isAdvisorySplitType(type) || regionalTypeWindowHours(type) != null
+                || !AdvisoryClassifier.isAdvisory(type, alert.getMessage(), alert.getEmergencyLevel())) {
+            return false;
+        }
+        String[] regionCodes = extractRegionCodes(alert);
+        if (regionCodes.length == 0) {
+            return false;
+        }
+        int sigunguSpan = distinctSigunguCount(regionCodes);
+        if (sigunguSpan > 1) {
+            clusterAdvisoryBroadcast(alert, regionCodes, advisoryWindowHours);
+        } else {
+            clusterAdvisory(alert, regionCodes, advisoryWindowHours);
+        }
+        return true;
+    }
+
+    /**
+     * 다지역(시군구 2개 이상) 안내문을 시도(또는 전국) + 유형 키의 안내 광역 이벤트로 모은다.
+     * 유형 '기타' 는 V7 에서 uninformative 라 {@link #clusterBroadcast} 가 병합 없이 매번 단발 광역 이벤트를
+     * 만들어, 다지역 물놀이 안내마다 이벤트가 늘었다(평가 DB 51개). 안내는 본문이 달라도 같은 묶음이므로
+     * 안내 윈도우 안에서 병합하되, 일반 '기타' 광역 이벤트와 섞이지 않게 is_advisory=true 인 것만 대상으로 삼는다.
+     *
+     * @param windowHours 병합 윈도우 — '기타' 는 advisoryWindowHours(168h), 산불은 regional-types 의 유형별 윈도우(168h)
+     */
+    private void clusterAdvisoryBroadcast(DisasterAlert alert, String[] regionCodes, int windowHours) {
+        String type = alert.getDisasterType();
+        LocalDateTime since = alert.getCreatedAt().minusHours(windowHours);
+        boolean nationwide = distinctSidoCount(regionCodes) >= nationwideSidoSpan;
+        String sido = nationwide ? null : dominantSidoPrefix(regionCodes);
+        Optional<DisasterEvent> target = nationwide
+                ? disasterEventRepository.findAdvisoryBroadcastNationwide(type, since)
+                : disasterEventRepository.findAdvisoryBroadcastBySido(type, sido, since);
+        if (target.isPresent()) {
+            mergeIntoExisting(target.get().getId(), alert, null, MergeMethod.BROADCAST);
+            log.info("clusterNewAlert(안내 광역): alertId={} → event={} 머지({} {})",
+                    alert.getId(), target.get().getId(), nationwide ? "전국" : sido, type);
+            return;
+        }
+        DisasterEvent event = DisasterEvent.createAdvisory(type,
+                nationwide ? null : firstCodeOfSido(regionCodes, sido),
+                nationwide ? "전국" : sidoNameForPrefix(alert, sido),
+                alert.getCreatedAt(), true);
+        DisasterEvent saved = disasterEventRepository.save(event);
+        eventAlertMappingRepository.save(EventAlertMapping.of(saved.getId(), alert.getId(), 1, null, MergeMethod.SEED));
+        eventPublisher.publishEvent(new AlertClusteredEvent(saved.getId(), alert.getId()));
+        log.info("clusterNewAlert(안내 광역): alertId={} → 신규 안내 광역 event={} (title='{}')",
+                alert.getId(), saved.getId(), saved.getEventTitle());
+    }
+
+    /** 에피소드형 유형 매칭. 유형 null 이거나 목록이 비어 있으면 적용하지 않는다. */
+    private boolean isEpisodicType(String type) {
+        if (type == null) {
+            return false;
+        }
+        if (episodicTypes == null) {
+            episodicTypes = parseCsvSet(episodicTypesCsv);
+        }
+        return episodicTypes.contains(type.trim());
+    }
+
+    /**
      * 안내성 알림을 시군구별 롤링 안내 이벤트에 머지(없으면 신규). 같은 유형·같은 시군구·윈도우 안의
      * {@code is_advisory=true} 이벤트만 대상이라 사건 버킷과 섞이지 않는다. 임베딩·LLM 안 봄.
      */
-    private void clusterFireAdvisory(DisasterAlert alert, String[] regionCodes, int windowHours) {
+    private void clusterAdvisory(DisasterAlert alert, String[] regionCodes, int windowHours) {
         String[] sigungu = sigunguPrefixes(regionCodes);
         LocalDateTime since = alert.getCreatedAt().minusHours(windowHours);
-        Optional<Long> target = disasterEventRepository.findFireAdvisoryMergeTarget(
+        Optional<Long> target = disasterEventRepository.findAdvisoryMergeTarget(
                 alert.getDisasterType(), sigungu, since);
         if (target.isPresent()) {
             mergeIntoExisting(target.get(), alert, null, MergeMethod.ADVISORY);
@@ -519,15 +785,46 @@ public class EventClusteringService {
             return false;
         }
         if (advisorySplitTypes == null) {
-            advisorySplitTypes = Arrays.stream(advisorySplitTypesCsv.split(","))
-                    .map(String::trim).filter(s -> !s.isEmpty())
-                    .collect(Collectors.toSet());
+            advisorySplitTypes = parseCsvSet(advisorySplitTypesCsv);
         }
         return advisorySplitTypes.contains(type.trim());
     }
 
     /**
-     * 지역앵커 유형이면 유형별 머지 윈도우(시간), 아니면 null. CSV {@code "유형:시간,유형:시간"} 1회 파싱.
+     * 임베딩 병합 거리 상한. 에피소드형 유형(폭염·한파 등)은 같은 행동요령을 표현만 바꿔 되풀이해 거리가
+     * 0.15 를 넘기 쉬우므로 완화 상한을, 그 외는 기본 상한을 쓴다. LLM 폴백(borderline 구간 시작점)에도
+     * 같은 값을 넘겨 "머지 불가 구간"의 기준을 알림 단위로 일관되게 유지한다.
+     */
+    private double mergeMaxDistanceFor(String type) {
+        if (isRelaxedThresholdType(type)) {
+            return 1.0 - relaxedSimilarityThreshold;
+        }
+        return 1.0 - similarityThreshold;
+    }
+
+    /** 병합 임계값 완화 대상 유형 매칭. 유형 null 이거나 목록이 비어 있으면 완화하지 않는다. */
+    private boolean isRelaxedThresholdType(String type) {
+        if (type == null) {
+            return false;
+        }
+        if (relaxedThresholdTypes == null) {
+            relaxedThresholdTypes = parseCsvSet(relaxedThresholdTypesCsv);
+        }
+        return relaxedThresholdTypes.contains(type.trim());
+    }
+
+    /** 쉼표 구분 목록 → 집합. null/빈 값은 빈 집합(설정이 없으면 해당 기능을 적용하지 않는다). */
+    private static Set<String> parseCsvSet(String csv) {
+        if (csv == null) {
+            return Set.of();
+        }
+        return Arrays.stream(csv.split(","))
+                .map(String::trim).filter(s -> !s.isEmpty())
+                .collect(Collectors.toSet());
+    }
+
+    /**
+     * 지역 한정 유형이면 유형별 머지 윈도우(시간), 아니면 null. CSV {@code "유형:시간,유형:시간"} 1회 파싱.
      * 잘못된 토큰은 건너뛴다(부분 실패가 전체를 막지 않게).
      */
     private Integer regionalTypeWindowHours(String type) {
@@ -645,7 +942,7 @@ public class EventClusteringService {
         if (sidoSpan >= nationwideSidoSpan) {
             if (informative) {
                 Optional<DisasterEvent> target = disasterEventRepository
-                        .findFirstByBroadcastTrueAndPrimaryDisasterTypeAndPrimaryRegionCodeIsNullAndLastAlertAtAfterOrderByLastAlertAtDesc(
+                        .findLatestGeneralBroadcastNationwide(
                                 type, since);
                 if (target.isPresent()) {
                     log.info("clusterNewAlert: alertId={} 전국({}시도) → broadcast event={} 유형 머지({})",
@@ -663,7 +960,7 @@ public class EventClusteringService {
         String sido = dominantSidoPrefix(regionCodes);
         if (informative) {
             Optional<DisasterEvent> target = disasterEventRepository
-                    .findFirstByBroadcastTrueAndPrimaryDisasterTypeAndPrimaryRegionCodeStartingWithAndLastAlertAtAfterOrderByLastAlertAtDesc(
+                    .findLatestGeneralBroadcastBySido(
                             type, sido, since);
             if (target.isPresent()) {
                 log.info("clusterNewAlert: alertId={} 광역({}시군구) → broadcast event={} 시도+유형 머지({} {})",

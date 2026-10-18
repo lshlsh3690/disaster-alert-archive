@@ -1,0 +1,100 @@
+{
+  "info": {
+    "name": "Disaster Alert - Stats Cache Perf (Step 4 웜업/탐색용)",
+    "description": "동시 부하가 필요한 p95 비교는 Postman이 아니라 k6(stats-endpoint.js)가 담당한다. 이 컬렉션은 워밍업(JVM/커넥션풀 정상화)과 응답 형태 확인 용도다. Collection Runner로 Warmup 폴더를 3회 정도 반복 실행하면 된다.\n\n⚠️ 변수명을 perfLocalBaseUrl로 지었다 — Postman은 활성화된 Environment 변수가 Collection 변수보다 우선한다. 흔한 이름(baseUrl)을 쓰면 기존에 갖고 있던 Environment의 프로덕션 baseUrl이 이 컬렉션의 값을 덮어써 실수로 운영 서버를 칠 수 있다(실제로 발생했던 문제). 실행 전 우측 상단에서 Environment가 'No Environment'인지, 또는 활성 Environment에 perfLocalBaseUrl이 없는지 확인할 것.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:8080" }
+  ],
+  "item": [
+    {
+      "name": "Warmup (5개 후보, Runner로 2~3회 반복)",
+      "item": [
+        {
+          "name": "GET /stats",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/api/v1/alerts/stats", "host": ["{{baseUrl}}"], "path": ["api", "v1", "alerts", "stats"] }
+          }
+        },
+        {
+          "name": "GET /stats/sigungu/breakdown",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/api/v1/alerts/stats/sigungu/breakdown", "host": ["{{baseUrl}}"], "path": ["api", "v1", "alerts", "stats", "sigungu", "breakdown"] }
+          }
+        },
+        {
+          "name": "GET /stats/daily-type",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/api/v1/alerts/stats/daily-type", "host": ["{{baseUrl}}"], "path": ["api", "v1", "alerts", "stats", "daily-type"] }
+          }
+        },
+        {
+          "name": "GET /stats/weather-correlation",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/api/v1/alerts/stats/weather-correlation", "host": ["{{baseUrl}}"], "path": ["api", "v1", "alerts", "stats", "weather-correlation"] }
+          }
+        },
+        {
+          "name": "GET /stats/weather-by-region?groupBy=sigungu",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/alerts/stats/weather-by-region?groupBy=sigungu",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "alerts", "stats", "weather-by-region"],
+              "query": [{ "key": "groupBy", "value": "sigungu" }]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Auth (actuator 확인용 로컬 테스트 계정)",
+      "item": [
+        {
+          "name": "POST /auth/signup",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"email\":\"perftest@local.test\",\"password\":\"perftest1234\",\"confirmPassword\":\"perftest1234\",\"nickname\":\"perftest\"}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/v1/auth/signup", "host": ["{{baseUrl}}"], "path": ["api", "v1", "auth", "signup"] }
+          }
+        },
+        {
+          "name": "POST /auth/login",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"email\":\"perftest@local.test\",\"password\":\"perftest1234\"}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/v1/auth/login", "host": ["{{baseUrl}}"], "path": ["api", "v1", "auth", "login"] }
+          }
+        },
+        {
+          "name": "GET /actuator/caches",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/actuator/caches", "host": ["{{baseUrl}}"], "path": ["actuator", "caches"] }
+          }
+        },
+        {
+          "name": "GET /actuator/metrics/cache.gets",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/actuator/metrics/cache.gets", "host": ["{{baseUrl}}"], "path": ["actuator", "metrics", "cache.gets"] }
+          }
+        }
+      ]
+    }
+  ]
+}

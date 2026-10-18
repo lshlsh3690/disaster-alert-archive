@@ -51,6 +51,19 @@ public interface DisasterAlertRepository extends JpaRepository<DisasterAlert, Lo
     List<Object[]> findAlertIdAndRegionNamePairs(@Param("ids") List<Long> ids);
 
 
+    /**
+     * 최신 알림 N건. 지역 조인 + GROUP BY 를 전체 테이블에 먼저 돌리면 LIMIT 5 여도 6만 건을
+     * 전부 집계한 뒤 자르게 되므로(EXPLAIN ANALYZE 201.8ms), 최신 ID N개를 먼저 뽑고
+     * 그 ID 에 대해서만 지역을 조인한다 (7.8ms, created_at 인덱스 적용 시 0.1ms).
+     */
+    default List<LatestAlertResponse> latestAlerts(Pageable pageable) {
+        List<Long> ids = latestAlertIds(pageable);
+        return ids.isEmpty() ? List.of() : latestAlertsByIds(ids);
+    }
+
+    @Query("select d.id from DisasterAlert d order by d.createdAt desc")
+    List<Long> latestAlertIds(Pageable pageable);
+
     @Query("""
               select new com.disaster.alert.alertapi.domain.disasteralert.dto.LatestAlertResponse(
                 d.id,
@@ -62,10 +75,11 @@ public interface DisasterAlertRepository extends JpaRepository<DisasterAlert, Lo
               from DisasterAlert d
               left join d.disasterAlertRegions r
               left join r.legalDistrict ld
+              where d.id in :ids
               group by d.id, d.message, d.createdAt, d.disasterType, d.originalRegion
               order by d.createdAt desc
             """)
-    List<LatestAlertResponse> latestAlerts(Pageable pageable);
+    List<LatestAlertResponse> latestAlertsByIds(@Param("ids") List<Long> ids);
 
     /**
      * {@code createdAt}은 타임존 정보 없는 TIMESTAMP에 KST 벽시계 값으로 저장되므로,

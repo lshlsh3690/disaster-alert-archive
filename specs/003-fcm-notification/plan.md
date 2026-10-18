@@ -12,10 +12,10 @@
 
 ## 요약
 
-재난문자가 수집될 때마다(10분 주기 스케줄러 또는 관리자 수동 트리거), 해당 재난문자의
+재난문자가 수집될 때마다(1분 주기 스케줄러 또는 관리자 수동 트리거), 해당 재난문자의
 법정동 코드(및 시도 전체 파생 코드)와 일치하는 관심지역을 등록한 회원과, 동일 지역을
 등록한 비로그인(게스트) FCM 토큰에게 Firebase Admin SDK로 **data-only** 푸시 메시지를
-비동기 발송한다. 회원 경로는 알림 설정(`NONE`/`PUSH`/`ALARM`)과 발송 이력
+비동기 발송한다. 회원 경로는 알림 설정(`NONE`/`PUSH`)과 발송 이력
 (`UserNotificationLog`)을 거치는 반면, 게스트 경로는 이 두 가지가 없는 더 단순한 구조다.
 (memberId, alertId) 단위 중복 발송 방지는 2026-08-03 `V115` 마이그레이션으로 회원 경로에서도
 제거되어, 현재는 두 경로 모두 dedup이 없다. 프론트엔드 포그라운드(`onMessage`, Firebase JS
@@ -66,7 +66,7 @@ Firebase Cloud Messaging. 코드 내 `deviceType` 값으로 `WEB`/`ANDROID`/`IOS
 `backend/`, `frontend/` 분리)
 
 **성능 목표**: 코드에 명시된 성능 목표나 SLA는 없다. 발송은 `@Async`로 스케줄러 스레드를
-블로킹하지 않도록 되어 있고(`AlertNotificationService.java:34`), 멀티캐스트 발송은 Firebase
+블로킹하지 않도록 되어 있고(`AlertNotificationService.java:50`), 멀티캐스트 발송은 Firebase
 제약상 최대 500 토큰/요청으로 제한된다(`FcmSendService.java:48` 주석).
 
 **제약사항**: FCM 메시지는 반드시 data-only여야 함(webpush `notification` 필드 금지),
@@ -162,7 +162,7 @@ backend/src/main/java/com/disaster/alert/alertapi/
 │   ├── repository/MemberFavoriteRegionRepository.java
 │   └── service/MemberFavoriteRegionService.java
 ├── domain/disasteralert/model/DisasterAlert*.java # 알림 트리거의 소스(법정동 코드 목록)
-├── scheduler/DisasterFetchScheduler.java          # 10분 주기 수집→번역→알림트리거→클러스터링
+├── scheduler/DisasterFetchScheduler.java          # 1분 주기 수집→번역→알림트리거→클러스터링
 └── global/
     ├── config/SecurityConfig.java                 # 게스트 엔드포인트 permitAll 규칙
     └── controller/AdminController.java            # 수동 발송 트리거(permitAll)

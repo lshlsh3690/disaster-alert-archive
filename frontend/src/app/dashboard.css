@@ -233,8 +233,8 @@
   backdrop-filter: blur(12px);
 }
 .map-heading__actions { display: flex; align-items: center; gap: 18px; }
-.live-status { display: inline-flex; align-items: center; gap: 6px; color: #697486; font-size: 11px; font-weight: 800; letter-spacing: 0.06em; }
-.live-status i { width: 6px; height: 6px; border-radius: 50%; background: #31a866; box-shadow: 0 0 0 4px rgba(49, 168, 102, 0.1); }
+/* 현재 지도 보기 상태(보기 단위 › 확대한 지역). 길면 말줄임, 전체 문구는 title 로 보인다 */
+.map-state { display: block; max-width: 100%; margin-top: 5px; overflow: hidden; color: #4f46e5; font-size: 12px; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
 .map-surface {
   position: relative;
   display: flex;

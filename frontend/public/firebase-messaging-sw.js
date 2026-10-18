@@ -35,11 +35,6 @@ async function handlePush(event) {
       icon: "/icons/icon-192x192.png",
       badge: "/icons/icon-72x72.png",
       data: { alertId, url: alertId ? `/alerts/${alertId}` : "/" },
-      ...(notificationType === "ALARM" && {
-        vibrate: [200, 100, 200, 100, 200],
-        requireInteraction: true,
-        silent: false,
-      }),
       ...(notificationType === "PUSH" && {
         vibrate: [100],
         silent: false,

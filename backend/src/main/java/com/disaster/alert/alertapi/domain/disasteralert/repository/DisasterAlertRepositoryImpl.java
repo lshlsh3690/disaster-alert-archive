@@ -7,6 +7,7 @@ import com.disaster.alert.alertapi.domain.weather.model.QWeatherObservation;
 import com.disaster.alert.alertapi.domain.disasteralert.model.DisasterAlert;
 import com.disaster.alert.alertapi.domain.disasteralert.model.DisasterLevel;
 import com.disaster.alert.alertapi.domain.disasteralert.model.QDisasterAlertRegion;
+import com.disaster.alert.alertapi.domain.disasteralert.model.RegionCodeUnit;
 import com.disaster.alert.alertapi.domain.legaldistrict.model.QLegalDistrict;
 import com.disaster.alert.alertapi.domain.useralert.model.QUserDisasterAlert;
 import com.disaster.alert.alertapi.domain.useralert.model.QUserDisasterAlertRegion;
@@ -22,6 +23,8 @@ import com.querydsl.core.types.dsl.DateTimeTemplate;
 import com.querydsl.core.types.dsl.Expressions;
 import com.querydsl.core.types.dsl.NumberExpression;
 import com.querydsl.core.types.dsl.NumberPath;
+import com.querydsl.core.types.dsl.StringExpression;
+import com.querydsl.core.types.dsl.StringPath;
 import com.querydsl.core.types.dsl.StringTemplate;
 import com.querydsl.jpa.JPAExpressions;
 import com.querydsl.jpa.impl.JPAQueryFactory;
@@ -112,9 +115,19 @@ public class DisasterAlertRepositoryImpl implements DisasterAlertRepositoryCusto
 
     @Override
     public List<DisasterAlertStatResponse.RegionStat> countByRegion(AlertSearchRequest request) {
+        // legal_district.name 대신 name_collate_c(V118)로 그룹핑/정렬한다 — 값은 name과
+        // 동일하지만 컬럼 타입에 COLLATE "C"(바이트 비교)가 박혀있다. name 그대로 쓰면 DB 기본
+        // collation(en_US.utf8, 로케일 인식 비교) 때문에 69,027행 조인 기준 EXPLAIN ANALYZE
+        // 실측 4,921ms인데, 이 컬럼으로는 108.6ms(약 45배) — 컬럼 자체가 이미 그 collation을
+        // 가지므로 쿼리에 별도 표현식이 필요 없다(HQL의 `collate` 구문 미지원, 커스텀 도메인
+        // CAST 미인식, SQL 함수는 collation을 잃는 문제를 각각 실측으로 확인하고 이 방식으로
+        // 정착 — V118 마이그레이션 주석 참고). 이 쿼리는 1차 정렬키가 count DESC라 이름 비교는
+        // 동점자 타이브레이커로만 쓰여 정렬 순서 체감 영향이 작다.
+        StringPath nameCollateC = legalDistrict.nameCollateC;
+
         return queryFactory
                 .select(Projections.constructor(DisasterAlertStatResponse.RegionStat.class,
-                        disasterAlertRegion.legalDistrict.name,
+                        nameCollateC,
                         disasterAlert.id.countDistinct()
                 ))
                 .from(disasterAlert)
@@ -124,8 +137,8 @@ public class DisasterAlertRepositoryImpl implements DisasterAlertRepositoryCusto
                         byAlertCondition(request),
                         regionFilterOnJoin(request)
                 )
-                .groupBy(disasterAlertRegion.legalDistrict.name)
-                .orderBy(disasterAlert.id.countDistinct().desc(), disasterAlertRegion.legalDistrict.name.asc())
+                .groupBy(nameCollateC)
+                .orderBy(disasterAlert.id.countDistinct().desc(), nameCollateC.asc())
                 .fetch();
     }
 
@@ -189,19 +202,7 @@ public class DisasterAlertRepositoryImpl implements DisasterAlertRepositoryCusto
 
     @Override
     public List<DisasterAlertStatResponse.RegionStat> getStatsSigungu(AlertSearchRequest request) {
-        StringTemplate norm =
-                Expressions.stringTemplate(
-                        "function('btrim', function('regexp_replace', {0}, '\\\\s+', ' ', 'g'))",
-                        legalDistrict.name
-                );
-
-        // 시/도 + 시/군/구 = 첫 두 토큰 (두 번째 토큰이 없으면 첫 토큰만)
-        StringTemplate sigungu = Expressions.stringTemplate(
-                "CASE WHEN function('split_part', {0}, ' ', 2) = '' " +
-                "THEN function('split_part', {0}, ' ', 1) " +
-                "ELSE function('split_part', {0}, ' ', 1) || ' ' || function('split_part', {0}, ' ', 2) END",
-                norm
-        );
+        StringExpression sigungu = sigunguExpr();
 
         return queryFactory
                 .select(Projections.constructor(DisasterAlertStatResponse.RegionStat.class,
@@ -220,6 +221,35 @@ public class DisasterAlertRepositoryImpl implements DisasterAlertRepositoryCusto
                 .fetch();
     }
 
+    @Override
+    public List<DisasterAlertStatResponse.RegionCodeStat> getStatsByRegionCode(AlertSearchRequest request, RegionCodeUnit unit) {
+        // 법정동 코드 앞 N자리로 그룹핑 — sidoCodeExpr() 와 같은 이유(이름 파싱보다 저렴, 지도 폴리곤 코드와 직접 매칭).
+        // prefixLength 는 enum 상수라 템플릿 문자열에 바로 넣어도 안전하다.
+        StringTemplate regionCode = Expressions.stringTemplate(
+                "function('left', {0}, " + unit.prefixLength() + ")", legalDistrict.code);
+
+        // 시도 전체 코드(xx00000000, 3~5번째 자리가 000)는 시군구/읍면동 어디에도 귀속시킬 수 없어 제외한다.
+        // 읍면동 단위에서 시군구 전체 코드(6~8번째 자리가 000)는 "시군구코드+000"(예: 46880000) 항목으로 그대로 내려준다 —
+        // 읍면동까지 특정되지 않은 알림이라 어느 읍면동에도 속하지 않지만, 제외하면 화면이 그 알림을 0건으로 보여 주게 된다.
+        BooleanExpression belongsToUnit = legalDistrict.code.substring(2, 5).ne("000");
+
+        return queryFactory
+                .select(Projections.constructor(DisasterAlertStatResponse.RegionCodeStat.class,
+                        regionCode,
+                        disasterAlert.id.countDistinct()))
+                .from(disasterAlert)
+                .join(disasterAlert.disasterAlertRegions, disasterAlertRegion)
+                .join(disasterAlertRegion.legalDistrict, legalDistrict)
+                .where(
+                        byAlertCondition(request),
+                        regionFilterOnJoin(request),
+                        belongsToUnit
+                )
+                .groupBy(regionCode)
+                .orderBy(disasterAlert.id.countDistinct().desc(), regionCode.asc())
+                .fetch();
+    }
+
     /**
      * {@link #getStatsSigungu}를 level별로 4번(전체+LEVEL_1/2/3) 호출하던 프론트 패턴을
      * 한 쿼리로 대체하기 위한 breakdown 버전. WHERE절 대신 SELECT의 조건부 countDistinct로
@@ -231,18 +261,7 @@ public class DisasterAlertRepositoryImpl implements DisasterAlertRepositoryCusto
         // breakdown은 항상 전체 레벨을 함께 반환해야 하므로, 호출자가 level을 실어 보내더라도 무시한다.
         request.setLevel(null);
 
-        StringTemplate norm =
-                Expressions.stringTemplate(
-                        "function('btrim', function('regexp_replace', {0}, '\\\\s+', ' ', 'g'))",
-                        legalDistrict.name
-                );
-
-        StringTemplate sigungu = Expressions.stringTemplate(
-                "CASE WHEN function('split_part', {0}, ' ', 2) = '' " +
-                "THEN function('split_part', {0}, ' ', 1) " +
-                "ELSE function('split_part', {0}, ' ', 1) || ' ' || function('split_part', {0}, ' ', 2) END",
-                norm
-        );
+        StringExpression sigungu = sigunguExpr();
 
         NumberExpression<Long> level1Count = new CaseBuilder()
                 .when(disasterAlert.emergencyLevel.eq(DisasterLevel.LEVEL_1)).then(disasterAlert.id)
@@ -772,6 +791,14 @@ public class DisasterAlertRepositoryImpl implements DisasterAlertRepositoryCusto
                 .collect(Collectors.toList());
     }
 
+    // frontend/src/app/stats/charts/WeatherByRegionChart.tsx가 총 건수 기준 상위 10개
+    // 지역만 차트에 그리고 나머지는 버린다 — 264개 후보 시군구×날짜 전체를 응답에 실어
+    // 보내봐야 프론트가 90% 이상을 버리므로, 서버에서 미리 상위 10개로 좁혀서 응답
+    // 크기 자체를 줄인다(응답 계약은 동일, 포함되는 지역 집합만 서버가 선(先) 결정).
+    // 이 숫자를 바꾸면 프론트의 slice(0, 10)도 함께 맞춰야 한다 — 서버가 더 적게 주면
+    // 프론트가 부족한 채로 그리고, 더 많이 줘도 프론트가 나머지를 조용히 버린다.
+    private static final int WEATHER_REGION_TOP_N = 10;
+
     @Override
     public List<WeatherRegionStatDto> getWeatherBySigungu(AlertSearchRequest request) {
         QWeatherDailySummary wds = QWeatherDailySummary.weatherDailySummary;
@@ -779,13 +806,23 @@ public class DisasterAlertRepositoryImpl implements DisasterAlertRepositoryCusto
         NumberExpression<Integer> month = disasterAlert.createdAt.month();
         NumberExpression<Integer> day   = disasterAlert.createdAt.dayOfMonth();
 
-        StringTemplate norm = Expressions.stringTemplate(
-                "function('btrim', function('regexp_replace', {0}, '\\\\s+', ' ', 'g'))", legalDistrict.name);
-        StringTemplate sigungu = Expressions.stringTemplate(
-                "CASE WHEN function('split_part', {0}, ' ', 2) = '' " +
-                "THEN function('split_part', {0}, ' ', 1) " +
-                "ELSE function('split_part', {0}, ' ', 1) || ' ' || function('split_part', {0}, ' ', 2) END",
-                norm);
+        StringExpression sigungu = sigunguExpr();
+
+        List<String> topSigungu = queryFactory
+                .select(sigungu)
+                .from(disasterAlert)
+                .join(disasterAlert.disasterAlertRegions, disasterAlertRegion)
+                .join(disasterAlertRegion.legalDistrict, legalDistrict)
+                .where(byAlertCondition(request), regionFilterOnJoin(request))
+                .groupBy(sigungu)
+                // count.desc()만 쓰면 동률(10위/11위 등)일 때 순서가 결정되지 않아 LIMIT
+                // 결과가 실행마다(캐시 갱신 시) 달라질 수 있다 — getStatsSigungu/
+                // getStatsSigunguBreakdown과 동일하게 이름 오름차순을 2차 키로 고정.
+                .orderBy(disasterAlert.id.countDistinct().desc(), sigungu.asc())
+                .limit(WEATHER_REGION_TOP_N)
+                .fetch();
+
+        if (topSigungu.isEmpty()) return List.of();
 
         List<Tuple> rows = queryFactory
                 .select(year, month, day, sigungu,
@@ -800,7 +837,7 @@ public class DisasterAlertRepositoryImpl implements DisasterAlertRepositoryCusto
                 .leftJoin(wds).on(
                         wds.legalDistrictCode.eq(legalDistrict.code)
                         .and(wds.date.eq(Expressions.dateTemplate(java.time.LocalDate.class, "cast({0} as date)", disasterAlert.createdAt))))
-                .where(byAlertCondition(request), regionFilterOnJoin(request))
+                .where(byAlertCondition(request), regionFilterOnJoin(request), legalDistrict.sigunguName.in(topSigungu))
                 .groupBy(year, month, day, sigungu)
                 .orderBy(year.asc(), month.asc(), day.asc())
                 .fetch();
@@ -1166,7 +1203,7 @@ public class DisasterAlertRepositoryImpl implements DisasterAlertRepositoryCusto
 
     private List<WeatherRegionStatDto> getWeatherHourlyBySigunguFromRollup(AlertSearchRequest request) {
         QWeatherHourlyCorrelationRollup r = QWeatherHourlyCorrelationRollup.weatherHourlyCorrelationRollup;
-        StringTemplate sigungu = sigunguExpr();
+        StringExpression sigungu = sigunguExpr();
 
         // 표시용 건수는 weather 조인 없는 alertCountByHourAndSigungu로 정확히 구한다 (사유는
         // getWeatherHourlyCorrelationFromRollup 주석 참고 — 수원시/성남시처럼 구가 나뉜 일반시는
@@ -1205,7 +1242,7 @@ public class DisasterAlertRepositoryImpl implements DisasterAlertRepositoryCusto
         NumberExpression<Integer> month = disasterAlert.createdAt.month();
         NumberExpression<Integer> day   = disasterAlert.createdAt.dayOfMonth();
         NumberExpression<Integer> hour  = disasterAlert.createdAt.hour();
-        StringTemplate sigungu = sigunguExpr();
+        StringExpression sigungu = sigunguExpr();
 
         List<Tuple> rows = queryFactory
                 .select(year, month, day, hour, sigungu, disasterAlert.id.countDistinct())
@@ -1236,7 +1273,7 @@ public class DisasterAlertRepositoryImpl implements DisasterAlertRepositoryCusto
         NumberExpression<Integer> day   = disasterAlert.createdAt.dayOfMonth();
         NumberExpression<Integer> hour  = disasterAlert.createdAt.hour();
 
-        StringTemplate sigungu = sigunguExpr();
+        StringExpression sigungu = sigunguExpr();
 
         List<Tuple> rows = queryFactory
                 .select(year, month, day, hour, sigungu,
@@ -1271,15 +1308,13 @@ public class DisasterAlertRepositoryImpl implements DisasterAlertRepositoryCusto
                 .collect(Collectors.toList());
     }
 
-    /** legalDistrict.name의 첫 두 토큰("시/도 + 시/군/구")을 시군구 표시명으로 파싱. */
-    private StringTemplate sigunguExpr() {
-        StringTemplate norm = Expressions.stringTemplate(
-                "function('btrim', function('regexp_replace', {0}, '\\\\s+', ' ', 'g'))", legalDistrict.name);
-        return Expressions.stringTemplate(
-                "CASE WHEN function('split_part', {0}, ' ', 2) = '' " +
-                "THEN function('split_part', {0}, ' ', 1) " +
-                "ELSE function('split_part', {0}, ' ', 1) || ' ' || function('split_part', {0}, ' ', 2) END",
-                norm);
+    /**
+     * legalDistrict.name의 첫 두 토큰("시/도 + 시/군/구")을 시군구 표시명으로 파싱한 값.
+     * V117부터 legal_district.sigungu_name(GENERATED STORED)을 그대로 반환한다 — 조회 시점마다
+     * regexp_replace/split_part를 다시 계산하지 않는다.
+     */
+    private StringExpression sigunguExpr() {
+        return legalDistrict.sigunguName;
     }
 
     @Override

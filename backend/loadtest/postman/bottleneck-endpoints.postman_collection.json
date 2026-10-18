@@ -1,0 +1,38 @@
+{
+  "info": {
+    "name": "Disaster Alert - Stats 병목 3종 (Step 4 확정 결과)",
+    "description": "웜업된 JVM 기준 실측(FLUSHDB 후 curl)으로 확정된 상위 3개 병목. 각 요청 실행 전에 캐시를 비우면 '미스', 비우지 않고 연속 실행하면 '히트'를 관찰할 수 있다.\n\n캐시 비우기(터미널에서):\n  docker exec redis redis-cli FLUSHDB\n\n실측 결과(2026-09-29, 60,000건 시드 기준):\n- weather-by-region?groupBy=sigungu: 미스 8.05s / 히트 1.3~1.5s (히트도 느림 — 캐시 페이로드 크기+JSON 역직렬화 비용으로 추정)\n- stats: 미스 5.11s / 히트 26~31ms\n- sigungu/breakdown: 미스 4.32s / 히트 24~28ms\n\nweather-correlation(0.70s)과 daily-type(0.44s)은 미스 자체가 가벼워 후보에서 제외.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:8080" }
+  ],
+  "item": [
+    {
+      "name": "1. GET /stats (미스 5.11s / 히트 ~30ms)",
+      "request": {
+        "method": "GET",
+        "url": { "raw": "{{baseUrl}}/api/v1/alerts/stats", "host": ["{{baseUrl}}"], "path": ["api", "v1", "alerts", "stats"] }
+      }
+    },
+    {
+      "name": "2. GET /stats/sigungu/breakdown (미스 4.32s / 히트 ~25ms)",
+      "request": {
+        "method": "GET",
+        "url": { "raw": "{{baseUrl}}/api/v1/alerts/stats/sigungu/breakdown", "host": ["{{baseUrl}}"], "path": ["api", "v1", "alerts", "stats", "sigungu", "breakdown"] }
+      }
+    },
+    {
+      "name": "3. GET /stats/weather-by-region?groupBy=sigungu (미스 8.05s / 히트도 1.3~1.5s)",
+      "request": {
+        "method": "GET",
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/alerts/stats/weather-by-region?groupBy=sigungu",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "alerts", "stats", "weather-by-region"],
+          "query": [{ "key": "groupBy", "value": "sigungu" }]
+        }
+      }
+    }
+  ]
+}

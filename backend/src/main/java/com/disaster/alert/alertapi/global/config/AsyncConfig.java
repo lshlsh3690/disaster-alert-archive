@@ -1,18 +1,15 @@
 package com.disaster.alert.alertapi.global.config;
 
-import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Primary;
 import org.springframework.scheduling.annotation.EnableAsync;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
-import com.disaster.alert.alertapi.global.translation.TranslationProperties;
 
 import java.util.concurrent.Executor;
 
 @Configuration
 @EnableAsync
-@EnableConfigurationProperties(TranslationProperties.class)
 public class AsyncConfig {
 
     // riskTaskExecutor가 추가되어 Executor 빈이 2개가 됨.

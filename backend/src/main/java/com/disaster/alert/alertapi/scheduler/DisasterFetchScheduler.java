@@ -25,8 +25,9 @@ public class DisasterFetchScheduler {
     private final EventClusteringService eventClusteringService;
     private final EventCrossRegionService eventCrossRegionService;
 
-    // 매 10분마다 실행
-    @Scheduled(cron = "0 0/10 * * * *")
+    // 매 1분마다 실행 (2026-10-10 10분 → 1분). 한 사이클이 1분을 넘기면 cron 특성상 겹쳐 돌지 않고
+    // 그 사이 지나간 실행 시점은 건너뛴다 — 스케줄러 스레드가 1개라 다른 @Scheduled 도 그동안 밀린다.
+    @Scheduled(cron = "0 * * * * *")
     public void fetchAndSaveDisasterAlerts() {
         log.info("재난문자 수집 시작");
 
@@ -43,9 +44,9 @@ public class DisasterFetchScheduler {
             translationService.translateAndSaveAsync(alertId);
             // FCM 알림 트리거
             alertNotificationService.triggerNotification(alertId);
-            // 이벤트 클러스터링 (clustering.enabled=false 시 no-op)
+            // 이벤트 클러스터링
             eventClusteringService.clusterNewAlert(alertId);
-            // 기타(지역 이동 유형) cross-region LLM 병합 (clustering.cross-region.enabled=false 시 no-op)
+            // 기타(지역 이동 유형) cross-region LLM 병합
             eventCrossRegionService.linkCrossRegion(alertId);
         });
     }

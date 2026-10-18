@@ -94,20 +94,6 @@ oauth:
     clientSecret: ${NAVER_OAUTH_CLIENT_SECRET}
     redirectUri: ${NAVER_OAUTH_REDIRECT_URI:http://localhost:8080/api/v1/auth/oauth/naver/callback}
 
-
-# 재난문자 본문/유형·이벤트 제목 번역. 엔진은 OpenAI 이며 spring.ai.openai 자격증명을
-# 임베딩·LLM 판정과 공유하므로 별도 API 키 설정이 없다. 대상 언어는 EN/JA/ZH 세 개다
-# (VI/TH 는 2026-08-11 제거 — 법정동 명칭 시드가 없어 지역명이 영어로 나오는 반쪽 상태였고
-# 오역을 검증할 수단도 없었다. SupportedLanguage javadoc 참고).
-# 모델은 아래 spring.ai.openai.chat 기본값(gpt-4o-mini)이 아니라 OpenAiTranslationClient.MODEL
-# 이 per-call 로 gpt-4o 를 오버라이드한다. 최초 상향 사유는 태국어 음차였고 TH 제거로 그 사유는
-# 소멸했지만, mini 복귀를 실측해 보니 JA 에서 지명 표기(7/10→5/10)와 폭염→猛暑(6/6→2/6)가
-# 후퇴해 gpt-4o 로 유지한다 (수치·조건은 OpenAiTranslationClient.MODEL javadoc 참고).
-# DeepL(Free)에서 옮겨왔다: 계정당 평생 누적 한도라 소진 후 리셋되지 않아 예비 키까지 막히면
-# 번역이 영구 정지되고(운영에서 실제 발생), 재난문자 특유 표기에 번역 지시를 줄 수 없었다.
-translation:
-  enabled: ${TRANSLATION_ENABLED:true}
-
 # Spring AI — OpenAI Embedding + Chat
 # 컨테이너 추가 없음. 기존 backend Spring Boot 프로세스 안에서 라이브러리로 동작.
 # base-url 은 embedding/chat 공용 — 팀 risk 모듈과 동일한 OpenAI 계정/키 공유.
@@ -122,13 +108,15 @@ spring.ai:
     chat:
       options:
         model: gpt-4o-mini
-        temperature: 0.2
+        # 0: LLM 폴백(같은 사건 판정)·cross-region·위험도 프로파일러의 응답 흔들림을 줄이기 위함.
+        # 같은 입력으로 재클러스터링해도 판정이 달라져 평가 수치가 재현되지 않던 문제(2026-10) 대응.
+        # 번역은 OpenAiTranslationClient 가 호출마다 temperature 0 을 따로 지정한다.
+        temperature: 0.0
 
 # 이벤트 클러스터링 (임베딩 기반)
 # 지역 hard 필터: 같은 시군구 후보만, 코사인 유사도 >= similarity-threshold 면 머지.
 # (cross-region 자동병합은 폭염 등 템플릿형 메시지에서 다지역 blob 을 만들어 제거 — 실데이터 검증)
 clustering:
-  enabled: ${CLUSTERING_ENABLED:false}
   similarity-threshold: 0.85
   candidate-time-window-hours: 168
   # 한 알림이 이 수 초과 시군구에 발송되면 광역 브로드캐스트로 보고 단독 이벤트 처리 (blob 다리 차단)
@@ -140,27 +128,69 @@ clustering:
   # 실종 인물 신원 클러스터링 윈도우 — 같은 이름+나이+키를 한 사람으로 보는 재신고 간격 (14일).
   # 인물은 임베딩/지역이 아니라 신원으로만 묶음(같은 사람=한 이벤트, 다른 사람=다른 이벤트).
   person-window-hours: 336
-  # 지역앵커 유형(유형:윈도우시간 CSV) — 산불·산사태·홍수처럼 "유형+시군구가 곧 사건"인 이산 재난을
+  # 지역 한정 유형(구 명칭 "지역앵커", 유형:윈도우시간 CSV) — 산불·산사태·홍수처럼 "유형+시군구가 곧 사건"인 이산 재난을
   # 같은 시군구·같은 유형·윈도우 안에서 임베딩/LLM 무관하게 하나로 묶음(태풍 global-types 와 같은 철학,
   # 단 전국이 아니라 시군구 스코프 → 전국 blob 방지). 한 산불/호우 episode 가 본문 텍스트 차이(코사인<0.85)로
-  # 수십 개로 파편화되던 것을 차단(산청 산불 16조각 등). 윈도우는 유형별: 산불은 재발화 주기가 길어 14일(336h),
-  # 호우성(산사태·홍수)은 같은 날 burst 라 7일(168h). ⚠️ 계절 연속형(폭염·호우특보·한파·대설)은 절대 넣지 말 것
+  # 수십 개로 파편화되던 것을 차단(산청 산불 16조각 등). 윈도우는 유형별: 현재 산불·산사태·홍수 모두 7일(168h).
+  # (산불은 재발화 주기를 보아 14일(336h)이었으나 2026-10-14 에 7일로 줄였다 — 같은 시군구에서 7일 넘게 비었다가
+  # 다시 난 산불은 별개 이벤트로 본다). ⚠️ 계절 연속형(폭염·호우특보·한파·대설)은 절대 넣지 말 것
   # — 같은 시군구 매일 발령이라 윈도우로 체인돼 span>180 blob 부활.
-  regional-types: "산불:336,산사태:168,홍수:168"
+  # (폭염·한파·대설·강풍·가축질병은 아래 episodic-types 로 별도 처리 — 지역 한정 경로가 아니라 시군구 1개는 키 병합, 다지역은 광역 경로)
+  regional-types: "산불:168,산사태:168,홍수:168"
+  # 인접 시군구 병합 유형 — 2025-03 경북 대형 산불(의성→안동→청송→영양→영덕)이 시군구별 5개 이벤트로 쪼개진 사례 때문에,
+  # 산불 "사건"(안내 제외) 알림이 같은 시군구에 이벤트가 없으면 인접 시군구의 진행 중 이벤트에 병합한다.
+  # 시군구 개수 상한은 두지 않는다(확산이 며칠간 여러 시군구를 건너므로). 대신 인접 이벤트의 마지막 알림이
+  # regional-adjacent-window-hours(24h) 이내여야 해서, 시간이 안 겹치는 별개 산불은 걸러진다.
+  regional-adjacent-types: "산불"
+  regional-adjacent-window-hours: 24
+  # 안내성 분리 유형 — 산불의 예방·캠페인·건조특보 등 일반 안내와 "기타"의 물놀이·수상안전 예방 안내는
+  # 실사건과 독립적이고 시즌 내내 반복돼 사건 버킷을 blob 으로 만들므로 시군구+유형 안내 이벤트로 모은다.
+  # 산불의 머지 윈도우는 regional-types(168h), "기타"는 아래 advisory-window-hours.
+  # 다지역(시군구 2개 이상) 안내는 시군구 간 다리를 막으려 시도/전국+유형 안내 광역 이벤트로 모은다(산불 안내
+  # 이벤트 698: 360건·148일·29개 시군구 실측). 일반 광역 조회는 is_advisory=false 만 보므로 안내와 섞이지 않는다.
+  # 폭염·한파는 안내를 분리하지 않는다 — 아래 episodic-types 로 안내와 특보를 한 이벤트에 합친다.
+  advisory-split-types: "산불,기타"
+  # 산불은 regional-types 의 유형별 윈도우를 그대로 쓰고, 이 값은 그 외 안내성 유형(기타 등)용이다.
+  # 안내 이벤트 병합 윈도우 = cooldown 기본값(168h).
+  advisory-window-hours: 168
+  # 에피소드형 유형 — 같은 시군구에서 같은 유형의 발령이 끊김 없이 이어지는 동안은 문장 유사도와 무관하게
+  # 하나의 이벤트로 묶는다(연쇄 병합은 의도, 끊김 기준은 마지막 알림 이후 episodic-window-hours).
+  # 안내와 특보를 한 이벤트로 합친다. 시군구가 정확히 1개인 알림은 이 키 병합(구 명칭 "앵커링")으로, 2개 이상(다지역)은
+  # 지역 이벤트와 섞이지 않게 광역(broadcast) 경로로 보낸다 — 임베딩 경로의 footprint 교집합 머지가 서로 다른
+  # 시군구 이벤트를 이어 붙여(시군구 간 다리) 폭염 하나가 43개 시군구·612건으로 커졌기 때문이다.
+  # 사고성 유형·호우·홍수·산사태는 대상이 아니다(지점형 사건 혼입, 사고성은 전파 허용). 150문항 평가에서 같은 사건 62쌍 중
+  # 55쌍을 합치고 다른 사건 23쌍은 잘못 합치지 않았다. 빈 문자열이면 적용하지 않는다.
+  episodic-types: "폭염,한파,대설,강풍,가축질병"
+  episodic-window-hours: 168
+  # 병합 임계값 완화 유형 — 에피소드형 유형은 같은 행동요령을 표현만 바꿔 되풀이해 코사인 거리가 0.15 를
+  # 넘기 쉬워 같은 사건이 갈라졌다. 150문항 평가에서 이 유형군은 거리 0.35 까지 올려도 오탐이 없었다.
+  # 이 완화는 임베딩 경로에서만 적용된다. 기본 설정에서는 에피소드형 유형이 이 경로에 오지 않으므로(1개는 키 병합,
+  # 다지역은 광역 경로) 다른 유형에 적용하거나 episodic-types 를 바꿀 때만 의미가 있다. 끊김 기준은 후보 윈도우(168h).
+  # 사고성 유형·호우·홍수·산사태는 대상이 아니다(지점형 사건 혼입 위험). 정형 필드 disaster_type 에만 의존.
+  # 빈 문자열이면 어떤 유형도 완화하지 않는다. 완화 유형의 병합 유사도 하한은 relaxed-similarity-threshold(거리 0.35).
+  relaxed-threshold-types: "폭염,한파,대설,강풍,가축질병"
+  relaxed-similarity-threshold: 0.65
+  # 사고성 유형의 인접 시군구 후보 조회 윈도우(시간) — 같은 시군구 후보에서 병합에 실패하면 region_adjacency 이웃
+  # 시군구의 이벤트도 임계값(LLM 폴백 없이)으로만 검사한다. 같은 사건이 옆 시군구로 번지는 경우만 잡도록
+  # 같은 시군구 윈도우(candidate-time-window-hours 168h)보다 짧게 둔다. 사고성 유형 한정, 평가 도구로 튜닝.
+  adjacent-window-hours: 48
+  # 인접 시군구 병합을 허용하는 후보 이벤트 나이 상한(시간) — 이벤트 '첫 알림' 기준. 인접 병합이 last_alert_at 을 밀어
+  # 윈도우가 계속 연장되며 안내문이 수십 일·여러 시군구로 연쇄 병합되던 것을 차단한다. 위 adjacent-window-hours(48h)는
+  # 마지막 알림 기준 조회 윈도우라 별개다. 인접 경로 전용(같은 시군구 경로엔 미적용).
+  adjacent-max-event-age-hours: 72
   # local borderline LLM 폴백 — 같은 시군구 후보지만 임베딩이 임계(0.85) 미만이라 못 묶은
   # '사고성' 사건을 LLM 으로 동일 사건 판정해 묶는다. "서소문 고가 붕괴"처럼 같은 사고를 여러
   # 기관이 다른 측면(도로통제/KTX/경의선)으로 보내 본문 임베딩이 갈리는 케이스 대응.
   # 폭염·호우 등 기상특보는 발효/해제 반복이 borderline 에 걸려 LLM 이 과병합하므로 화이트리스트로 제외.
-  # recluster 시에도 enabled=true 면 동작(임베딩 임계 튜닝만 할 땐 false 로 두면 LLM 호출 0=공짜).
+  # 실시간·백필(recluster 포함) 모두 항상 동작 — recluster 도 borderline 사고성 건은 LLM 을 호출한다.
   llm-fallback:
-    enabled: ${LLM_FALLBACK_ENABLED:false}   # 실시간/백필 공용 토글 (clustering.enabled 와 별개)
     distance-ceil: 0.40                        # (mergeMaxDistance=0.15, 0.40] 구간 후보만 LLM 에 질의
     # 특정 장소·시설의 일회성 사고만 (실데이터 borderline 분석 기반). 기타는 동물·실종 게이트로 추가 제외.
     accident-types: "기타,화재,산불,붕괴,교통사고,교통통제,교통,환경오염사고,정전,통신,테러,지진,지진해일,수도"
   # cross-region LLM 병합 — 지역 이동 사건(탈출 동물 등 비정형)을 LLM 으로 같은 사건 판정해 묶음.
-  # clusterNewAlert(local+broadcast)와 분리된 별도 단계라 recluster(공짜 튜닝)에 LLM 안 섞임.
+  # clusterNewAlert(local+broadcast)와 분리된 별도 단계라 백필 recluster 에는 cross-region 단계 자체가 없다
+  # (백필은 --backfill.cross-region 으로 따로 실행). recluster 의 LLM 호출은 위 llm-fallback 에서만 생긴다.
   cross-region:
-    enabled: ${CROSS_REGION_ENABLED:false}   # 실시간 토글 (clustering.enabled 와 별개)
     candidate-window-hours: 336               # 14일 (실종·이동은 며칠~몇 주)
     top-k: 5                                  # 임베딩 후보 상위 K (LLM 에 배치로 전달)
     similarity-floor: 0.6                     # 무관한 기타 거름용 (동일인 판정은 LLM 몫)
@@ -174,3 +204,13 @@ springdoc:
     path: /swagger-ui.html
   api-docs:
     path: /v3/api-docs
+
+# 캐시 도입 전/후 성능 측정(backend/loadtest/)용. 필요한 엔드포인트만 노출.
+# prod 프로필에서는 application-prod.yml이 health만 남기고 되돌린다 — 로그인만 하면(관리자
+# 권한 없이도) SecurityConfig의 anyRequest().authenticated()를 통과해 prometheus/metrics/caches에
+# 접근 가능해지므로, 운영에는 이 넓은 노출 범위를 그대로 두지 않는다.
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,prometheus,metrics,caches

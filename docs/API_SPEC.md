@@ -139,14 +139,15 @@
 | GET | `/tokens` | 발급 토큰 목록 조회 |
 | DELETE | `/tokens/{tokenId}` | 토큰 폐기 |
 
-### 2.12 관리자 (`/api/v1/admin`) — ⚠️ 인증 미적용
+### 2.12 관리자 (`/api/v1/admin`)
 | Method | Path | 설명 |
 |---|---|---|
 | POST | `/trigger-fetch` | 재난문자 수집 + 알림 수동 트리거 |
-| POST | `/trigger-notification/{alertId}` | 특정 알림 재발송 트리거 |
 | POST | `/weather/collect` | 기상 관측 수동 수집 (실제 경로: `/api/v1/admin/weather/collect`) |
 
-> **보안 이슈**: `SecurityConfig`에서 `/api/v1/admin/**` 전체가 `permitAll()`로 설정되어 있어 인증 없이 누구나 호출 가능한 상태다. 사용자 제재 기능(PRD 5.7)을 이 경로 아래에 추가할 경우 반드시 `ADMIN` 권한 검증을 먼저 적용해야 한다 (TRD 4 참고).
+`/api/v1/admin/**`은 인증(`anyRequest().authenticated()`) + `AdminController` 클래스 레벨
+`@PreAuthorize("hasRole('ADMIN')")`으로 보호된다(`SecurityConfig.java:57-58`) — 한때
+`permitAll()`로 열려있던 적이 있었으나 수정됨.
 
 ## 3. 참고
 - [PRD.md](./PRD.md), [TRD.md](./TRD.md), [REQUIREMENTS.md](./REQUIREMENTS.md)

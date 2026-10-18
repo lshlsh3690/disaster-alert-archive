@@ -5,14 +5,13 @@ import { useState, useEffect } from "react";
 import { useNotificationPermission } from "@/hooks/useNotificationPermission";
 import { useTranslation } from "react-i18next";
 
-type NotificationType = "NONE" | "PUSH" | "ALARM";
+type NotificationType = "NONE" | "PUSH";
 
 function useNotificationOptions(): { type: NotificationType; label: string; description: string }[] {
   const { t } = useTranslation();
   return [
     { type: "NONE", label: t("notificationSettings.none.label"), description: t("notificationSettings.none.description") },
     { type: "PUSH", label: t("notificationSettings.push.label"), description: t("notificationSettings.push.description") },
-    { type: "ALARM", label: t("notificationSettings.alarm.label"), description: t("notificationSettings.alarm.description") },
   ];
 }
 
@@ -24,16 +23,6 @@ function NotificationTypeIcon({ type }: { type: NotificationType }) {
         <path d="M17 17H4s3-2 3-9a4.7 4.7 0 0 1 .3-1.7" />
         <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" />
         <line x1="3" y1="3" x2="21" y2="21" />
-      </svg>
-    );
-  }
-  if (type === "ALARM") {
-    return (
-      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" />
-        <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" />
-        <path d="M3.5 3.5C2.6 4.9 2 6.4 2 8" />
-        <path d="M22 8c0-1.6-.6-3.1-1.5-4.5" />
       </svg>
     );
   }
@@ -74,7 +63,7 @@ export default function NotificationSettings() {
 
   // 알림 타입 변경 저장
   const handleSave = async (type: NotificationType) => {
-    // PUSH나 ALARM 선택 시 권한 확인
+    // PUSH 선택 시 권한 확인
     if (type !== "NONE" && permission !== "granted") {
       const granted = await requestPermission();
       if (!granted) {

@@ -3,11 +3,13 @@ package com.disaster.alert.alertapi.domain.notification.service;
 import com.google.firebase.messaging.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DataAccessException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.TransactionException;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 @Slf4j
@@ -34,9 +36,20 @@ public class FcmSendService {
 
     private final DeadTokenCleanupService deadTokenCleanupService;
 
+    // 로컬 부하테스트용 스위치. true면 실제 Firebase 호출을 전혀 하지 않고 즉시 성공으로 응답한다 —
+    // @RequiredArgsConstructor 생성자와 별개로 Spring이 필드 주입으로 채운다.
+    // 기본값 false라 운영 동작은 그대로 유지된다.
+    @Value("${fcm.dry-run:false}")
+    private boolean dryRun;
+
     // 단일 토큰에 FCM 발송
     public boolean sendToToken(String token, String title, String body,
                                String notificationType, String alertId) {
+        if (dryRun) {
+            log.info("FCM dry-run - 실제 발송 생략, token: {}", maskToken(token));
+            return true;
+        }
+
         try {
             Message message = Message.builder()
                     .setToken(token)
@@ -44,7 +57,7 @@ public class FcmSendService {
                     .putData("body", body != null ? body : "")
                     .putData("notificationType", notificationType)
                     .putData("alertId", alertId != null ? alertId : "")
-                    .setAndroidConfig(buildAndroidConfig(notificationType))
+                    .setAndroidConfig(buildAndroidConfig())
                     .setWebpushConfig(buildWebpushConfig())
                     .build();
 
@@ -81,6 +94,11 @@ public class FcmSendService {
                                       String notificationType, String alertId) {
         if (tokens.isEmpty()) return null;
 
+        if (dryRun) {
+            log.info("FCM dry-run - 실제 배치 발송 생략, 토큰 수: {}", tokens.size());
+            return new DryRunBatchResponse(tokens.size());
+        }
+
         try {
             MulticastMessage message = MulticastMessage.builder()
                     .addAllTokens(tokens)
@@ -88,7 +106,7 @@ public class FcmSendService {
                     .putData("body", body != null ? body : "")
                     .putData("notificationType", notificationType)
                     .putData("alertId", alertId != null ? alertId : "")
-                    .setAndroidConfig(buildAndroidConfig(notificationType))
+                    .setAndroidConfig(buildAndroidConfig())
                     .setWebpushConfig(buildWebpushConfig())
                     .build();
 
@@ -319,8 +337,8 @@ public class FcmSendService {
      * 절전은 별개 요인이고, 서비스워커가 멈춰 있다가 깨어나는 시간도 남는다. 이 헤더는 그중
      * 서버가 통제할 수 있는 유일한 부분이다.
      *
-     * <p>{@code AndroidConfig} 와 달리 유형별로 나누지 않는다. {@code PUSH}/{@code ALARM} 모두
-     * 재난 알림이라 지연되면 안 되는 것은 같다.
+     * <p>{@code AndroidConfig} 와 마찬가지로 알림 유형({@code NotificationType})에 따라
+     * 나누지 않는다. 재난 알림은 어느 유형이든 지연되면 안 된다.
      */
     private WebpushConfig buildWebpushConfig() {
         return WebpushConfig.builder()
@@ -328,28 +346,47 @@ public class FcmSendService {
                 .build();
     }
 
-    // Android 설정 (ALARM: 높은 우선순위)
-    private AndroidConfig buildAndroidConfig(String notificationType) {
-        AndroidConfig.Builder builder = AndroidConfig.builder()
-                .setPriority(AndroidConfig.Priority.HIGH);
+    /**
+     * dry-run 전용 {@link BatchResponse} 구현체.
+     *
+     * <p>실제 Firebase 호출을 하지 않으므로 개별 {@link SendResponse}를 만들 근거가 없다 —
+     * {@link #getResponses()}는 빈 리스트를 반환한다. 실패가 0건이라 호출부의
+     * {@code logBatchFailures}/{@code collectDeadTokens}는 dry-run 분기에서 아예 호출되지 않으므로
+     * 빈 리스트로도 문제가 없다.
+     */
+    private static final class DryRunBatchResponse implements BatchResponse {
+        private final int successCount;
 
-        if ("ALARM".equals(notificationType)) {
-            builder.setNotification(
-                    AndroidNotification.builder()
-                            .setChannelId("disaster_alarm")
-                            .setSound("default")
-                            .setVibrateTimingsInMillis(new long[]{0, 200, 100, 200})
-                            .setPriority(AndroidNotification.Priority.MAX)
-                            .build()
-            );
-        } else {
-            builder.setNotification(
-                    AndroidNotification.builder()
-                            .setChannelId("disaster_push")
-                            .setSound("default")
-                            .build()
-            );
+        private DryRunBatchResponse(int successCount) {
+            this.successCount = successCount;
         }
-        return builder.build();
+
+        @Override
+        public List<SendResponse> getResponses() {
+            return Collections.emptyList();
+        }
+
+        @Override
+        public int getSuccessCount() {
+            return successCount;
+        }
+
+        @Override
+        public int getFailureCount() {
+            return 0;
+        }
+    }
+
+    // Android 설정 (재난 알림이라 항상 높은 우선순위)
+    private AndroidConfig buildAndroidConfig() {
+        return AndroidConfig.builder()
+                .setPriority(AndroidConfig.Priority.HIGH)
+                .setNotification(
+                        AndroidNotification.builder()
+                                .setChannelId("disaster_push")
+                                .setSound("default")
+                                .build()
+                )
+                .build();
     }
 }

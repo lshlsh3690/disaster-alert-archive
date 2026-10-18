@@ -1,0 +1,301 @@
+# 통계 API 성능 측정 및 병목 제거
+
+측정일: 2026-09-29. 재현 스크립트: `backend/loadtest/`. 두 라운드로 진행:
+- **1라운드(1~6절)**: 기존 Redis 캐시(`@Cacheable`)의 효과를 k6로 정량 측정 — 과정에서
+  Postgres 버퍼 워밍업이 측정치를 교란한다는 걸 발견해 캐시 기반 수치는 이력서에서 폐기.
+- **2라운드(7절)**: 1라운드에서 EXPLAIN ANALYZE로 규명한 실제 병목 2가지(인덱스 부재,
+  정규식 재계산, 대용량 응답 페이로드)를 실제로 제거. 이쪽이 이력서에 쓸 수 있는 수치.
+
+## 1. 측정 환경
+
+| 항목 | 값 |
+|---|---|
+| 머신 | Intel Core i7-13700H (14코어/20스레드), RAM 31.6GB, Windows 11 Enterprise |
+| Docker 리소스 | Docker Desktop VM: 20 CPU, 15.4GB 할당 |
+| Postgres | `pgvector/pgvector:pg15`, `max_parallel_workers_per_gather=0` (운영 `docker-compose.prod.yml`과 동일 조건으로 `ALTER SYSTEM` 적용) |
+| Redis | `redis:latest`, 별도 설정 변경 없음 |
+| 애플리케이션 | `SPRING_PROFILES_ACTIVE` 미지정 (로컬 `./gradlew bootRun`) — `SchedulingConfig`가 `@Profile("prod")`라 스케줄러 비활성, 측정 중 캐시가 스케줄러로 임의 evict될 위험 없음 |
+| k6 | v2.2.0 (Windows, `winget install GrafanaLabs.k6`) |
+| 데이터 규모 | `disaster_alert` 60,000건(합성 시드) + `disaster_alert_region` 69,027건(합성 시드, alert당 1개 기본 + 15% 확률 2개) + `legal_district` 53,063건(Flyway 시드) + `weather_daily_summary` 250,488건(Flyway 자체 백필 — 2023-09-01~2026-05-21, 시군구 264개 후보 중 225개 커버, 실데이터 성격이라 별도 합성 불필요) |
+
+### 데이터 시딩 관련 참고
+- 운영 EC2 인스턴스가 측정 시점에 존재하지 않아(맥북 셀프호스팅 구조로 전환 중) 운영 데이터 덤프를 받을 수 없었음 → `backend/loadtest/seed/seed_stats_data.sql`로 합성 시드.
+- `disaster_alert_id`는 10,000,000 이상 전용 대역만 사용해 실 데이터 시퀀스(`disaster_alert_seq`)와 충돌하지 않음. 스크립트 재실행 시 기존 데이터 위에 이어서 증량되는 멱등 구조.
+
+## 2. 대상 엔드포인트 선정 (3개)
+
+`DisasterAlertService`의 `@Cacheable` 대상 16개 메서드 중, `AlertSearchRequest` 파라미터 없이 호출했을 때(WHERE절이 비어 전체 스캔) 캐시 미스 비용이 큰 순으로 상위 3개를 선정했다. 워밍업(JVM/커넥션풀 정상화) 후 `docker exec redis redis-cli FLUSHDB` 직후 단발 curl로 측정, 2회 재현성 확인:
+
+| 엔드포인트 | 미스 응답시간 | 선정 |
+|---|---|---|
+| `GET /stats/weather-by-region?groupBy=sigungu` | 7.67~8.05s | ✅ |
+| `GET /stats` | 5.11~5.13s | ✅ |
+| `GET /stats/sigungu/breakdown` | 4.32~4.37s | ✅ |
+| `GET /stats/weather-correlation` | 0.70s | 제외 (상대적으로 가벼움) |
+| `GET /stats/daily-type` | 0.44s | 제외 (조인 없음, 가장 가벼움) |
+
+참고: `GET /stats/weather-by-region`은 `groupBy` 기본값이 `sido`(코드 앞 2자리로 그룹핑, 저렴)라 파라미터 없이 호출하면 `stats-weather-by-sigungu`가 아니라 `stats-weather-by-sido` 캐시를 탄다. 위 측정은 `?groupBy=sigungu`를 명시한 값이며, 프론트엔드(`frontend/src/app/stats/page.tsx:517`)에서도 사용자가 특정 시도를 드릴다운할 때 정확히 이 `sigungu` 버전을 호출한다 — 죽은 코드가 아니라 실사용 경로다.
+
+## 3. 결과 — VU10, 40초(5s ramp-up / 30s hold / 5s ramp-down), 조건당 3회 반복
+
+미스 조건은 k6 실행과 동시에 `docker exec redis sh -c "redis-cli --scan --pattern 'stats-*' | xargs -r redis-cli DEL"`를 100ms 주기로 반복해 캐시를 지속적으로 비웠다. 히트 조건은 evict 없이, 워밍업 1회 GET 후 실행.
+
+### `GET /stats`
+
+| | rep1 | rep2 | rep3 |
+|---|---|---|---|
+| 미스 avg/med/p90/p95/max | 251.72/10.44/22.91/**50.82**/7.11s ms | 254.56/10.16/19.88/**37.77**/7.15s ms | 11.94/10.97/17.12/**20.07**/70.48 ms |
+| 히트 avg/med/p90/p95/max | 12.63/12/17.46/**19.48**/28.85 ms | 14.95/15/19.58/**20.81**/36.42 ms | 14.68/14.57/19.86/**21.58**/33 ms |
+| 미스 RPS / 히트 RPS | 7.02 / 8.76 | 6.98 / 8.74 | 8.76 / 8.74 |
+
+### `GET /stats/sigungu/breakdown`
+
+| | rep1 | rep2 | rep3 |
+|---|---|---|---|
+| 미스 avg/med/p90/p95/max | 217.85/12.06/26.58/**35.27**/6.25s ms | 203.28/10.45/21.03/**29.65**/5.94s ms | 12.67/11.83/19.45/**21.2**/36.57 ms |
+| 히트 avg/med/p90/p95/max | 13.76/13.42/20.11/**22.81**/43.19 ms | 15.95/16.1/21.86/**23.7**/38.4 ms | 12.49/12.67/18.09/**19.91**/26.68 ms |
+| 미스 RPS / 히트 RPS | 7.35 / 8.76 | 7.30 / 8.72 | 8.76 / 8.75 |
+
+### `GET /stats/weather-by-region?groupBy=sigungu`
+
+| | rep1 | rep2 | rep3 |
+|---|---|---|---|
+| 미스 avg/med/p90/p95/max | 2.12/1.2/4.11/**9.57s**/13.24s | 2.0/1.11/3.8/**8.65s**/12.77s | 417.15/417.24/447.64/**452.77**/473.46 ms |
+| 히트 avg/med/p90/p95/max | 1.22/1.28/1.46/**1.62s**/1.71s | 1.32/1.32/1.42/**1.46s**/1.58s | 411.32/413.51/441.23/**446.34**/475.16 ms |
+| 미스 RPS / 히트 RPS | 2.77 / 3.92 | 2.94 / 3.72 | 6.20 / 6.23 |
+| 40초간 수신 데이터 | 952MB(미스) / 1.3GB(히트) | — | 2.1GB(미스) / 2.1GB(히트) |
+
+## 4. 관찰 — 3회 중앙값이 아니라 추세를 그대로 보고함
+
+당초 계획은 "조건당 3회 반복해 중앙값 채택"이었으나, 실측 결과 **반복할수록 미스 조건이 뚜렷하게 빨라지는 추세**가 나타나 중앙값이 의미가 없었다. 노이즈가 아니라 방향성 있는 변화라 추세 자체를 결과로 남긴다.
+
+- **`stats`/`sigungu/breakdown`**: rep1→rep3에서 미스 p95가 50.82ms/35.27ms → 20.07ms/21.2ms로 좁혀지며 **히트 p95(19~24ms)와 거의 같아진다.** 다만 max는 rep1~2에서 6~7초짜리 outlier가 있다가 rep3엔 사라진다.
+- **`weather-by-region?groupBy=sigungu`**: 변화가 가장 극적이다. 미스 p95가 9.57s → 8.65s → **452.77ms**로 떨어지고, 결국 rep3에서는 **미스(452.77ms)와 히트(446.34ms)가 사실상 동일**해진다.
+
+**해석**: `disaster_alert`에는 `created_at`/`disaster_type`/`emergency_level` 인덱스가 전혀 없어 미스 시 항상 풀스캔이다. 반복 실행될수록 Postgres가 이 60,000행 테이블(및 조인 대상)을 버퍼 캐시(shared_buffers/OS 페이지 캐시)에 계속 들고 있게 되면서, "첫 계산" 비용 자체가 초 단위 → 밀리초 단위로 줄어든다. 즉 Redis 캐시의 순수 기여분은 **"애플리케이션이 오래 떠 있어 DB가 이미 웜업된 상태"에서는 생각보다 작고**, `weather-by-region`의 경우 DB가 완전히 웜업되면 병목이 DB 쿼리가 아니라 **거대한 응답 페이로드(40초에 2GB+ 전송)의 직렬화/네트워크 비용으로 옮겨가 캐시가 사실상 무력화**된다.
+
+이건 캐시 효과가 작게 나온 걸 감추는 게 아니라, "캐시를 넣었는데 왜 이만큼만 개선됐는가"에 대한 실측 기반 답이다 — Postgres 버퍼 캐시가 식어있는 배포 직후(콜드 스타트)에는 캐시 효과가 명확하지만(수 초 → 수십 ms), 오래 떠 있는 서버에서는 격차가 좁혀지고, 응답이 큰 엔드포인트는 캐시만으로 해결이 안 된다는 것을 확인했다.
+
+## 5. 재현 방법
+
+```bash
+# 0) 인프라
+docker compose -f docker-compose.dev.yml up -d postgres redis
+docker exec postgres psql -U $POSTGRES_USER -d postgres -c "ALTER SYSTEM SET max_parallel_workers_per_gather = 0;"
+docker restart postgres
+cd backend && set -a && source ../.env.dev && set +a && export DB_HOST=localhost
+./gradlew bootRun   # "Started BackendApplication" 확인 후 그대로 두거나 재기동
+
+# 1) 시드 (최초 1회, 증량하려면 재실행)
+docker exec -i postgres psql -U $POSTGRES_USER -d $POSTGRES_DB < backend/loadtest/seed/seed_stats_data.sql
+
+# 2) 측정 (엔드포인트별 미스/히트, backend/loadtest/README.md에 3개 엔드포인트 전체 커맨드)
+while true; do docker exec redis sh -c "redis-cli --scan --pattern 'stats-*' | xargs -r redis-cli DEL" >/dev/null 2>&1; sleep 0.1; done &
+EVICT_PID=$!
+k6 run --env PATH=/api/v1/alerts/stats --env VUS=10 --env DURATION=30s backend/loadtest/k6/stats-endpoint.js
+kill $EVICT_PID
+
+curl -s -o /dev/null http://localhost:8080/api/v1/alerts/stats
+k6 run --env PATH=/api/v1/alerts/stats --env VUS=10 --env DURATION=30s backend/loadtest/k6/stats-endpoint.js
+```
+전체 3개 엔드포인트 커맨드와 PowerShell 버전은 `backend/loadtest/README.md` 참고.
+
+## 6. 1라운드 수치의 이력서 채택 여부
+
+**캐시 미스/히트 관련 수치는 전부 이력서에서 제외한다.** 4절에서 확인했듯 반복 측정 중
+Postgres 버퍼 워밍업이 섞여 들어가(rep1→rep3에서 미스 자체가 50.82ms→20.07ms로 빨라짐)
+"캐시가 N배 개선했다"는 주장 자체가 방어 불가능해졌다. 이 라운드의 가치는 수치가 아니라
+**"왜 병목이 생기는지 EXPLAIN ANALYZE로 규명한 것"**이고, 그 규명 결과가 7절의 실제
+개선 작업으로 이어졌다. 1라운드 수치는 면접에서 "측정 방법론을 어떻게 검증했나"를 설명할
+때만 근거로 쓴다(9절 참고).
+
+## 7. 2라운드 — 실제 병목 제거
+
+1라운드에서 EXPLAIN ANALYZE로 확인한 두 가지 근본 원인을 실제로 제거했다.
+브랜치: `perf/disaster-alert-indexes` → `perf/district-name-precompute` →
+`perf/weather-payload` (순서대로 쌓임, 각각 develop 대상 PR 예정).
+
+### 7-1. `disaster_type` 인덱스 부재 (커밋만, 이력서 제외)
+
+`/stats`의 `countByType`(유형별 집계)이 `disaster_type`에 인덱스가 없어 매번 Seq Scan +
+디스크 정렬 스필을 했다. `CREATE INDEX idx_disaster_alert_disaster_type`(V116) 추가.
+
+| | Before | After |
+|---|---|---|
+| 실행계획 | Seq Scan(60,000건) → 외부 정렬(디스크 1.6MB) | Index Scan (정렬 불필요) |
+| 실행시간 (EXPLAIN ANALYZE) | 162.9ms | 27.4ms (**약 6배**) |
+
+이력서 제외 이유: 사용자 판단 — 인덱스 추가는 흔한 최적화라 차별화 요소로 약함(코드/커밋에는 남김).
+
+### 7-2. `legal_district.name` 런타임 정규식 파싱 (커밋만, 이력서 제외)
+
+`sigungu/breakdown`, `weather-by-region`이 조회 시점마다 `legal_district.name`을
+`regexp_replace`+`split_part`로 파싱해 "시군구명"을 계산했다(`DisasterAlertRepositoryImpl`
+6개 호출부, 그중 3개는 `sigunguExpr()` 공유 헬퍼). `legal_district.sigungu_name`을
+`GENERATED ALWAYS ... STORED` 컬럼(V117)으로 추가해 조회 시점 계산을 없앴다.
+
+- GENERATED를 택한 이유: `LegalDistrictService.saveAllLegalDistricts()`가 Flyway 밖에서
+  CSV로 `legal_district`에 신규 행을 계속 추가하는 애플리케이션 쓰기 경로가 있어, 일반
+  컬럼+수동 백필이면 드리프트 위험이 있음(실제 코드로 확인).
+- 검증: 마이그레이션 직후 신규 컬럼과 기존 표현식을 전건 대조해 0건 불일치 확인. 코드 변경
+  전/후 API 응답 JSON을 실제로 덤프해 `diff`로 바이트 단위 동일함을 확인(로직 변경 아님을 증명).
+
+| | Before(정규식) | After(컬럼) |
+|---|---|---|
+| `/sigungu/breakdown` 실행시간 (동일 세션 3회 중앙값) | 6,399ms | 6,101ms (약 4.7%) |
+| `/weather-by-region` 실행시간 (동일 세션 3회 중앙값) | 7,077.8ms | 6,758.4ms (약 4.5%) |
+
+이력서 제외 이유(2026-09-29 정정 전 원래 판단): 개선폭이 작음 — `work_mem`(Postgres 기본값
+4MB)이 69,027행 정렬을 디스크 스필로 떨어뜨리는 게 지배적 비용이라고 추정했었다. **이 원인
+추정은 아래 7-2-1에서 EXPLAIN (ANALYZE, BUFFERS)로 정밀 분해한 결과 틀린 것으로 확인됐다** —
+`work_mem` 자체는 이력서 제외 사유가 아니다(이력서 제외 결정 자체는 "개선폭이 작다"는 사실
+기준으로는 여전히 유효, 다만 왜 작은지의 설명이 틀렸었다).
+
+#### 7-2-1. Before 구간 정밀 분해 (2026-09-29 후속) — work_mem 결론 정정
+
+목적: `sigungu/breakdown`의 Before(정규식) 실행시간 6,399ms가 어느 노드에서 소요되는지
+`EXPLAIN (ANALYZE, BUFFERS)`로 정밀 분해. 위 표의 6,399ms는 당시 세션의 버퍼/시스템 상태에서
+잰 단발 값이라 재현 세션에서는 절대값이 다르게 나오지만(아래 4,412ms), 상대적 병목 비중을
+분해하는 게 목적이므로 재현 세션 내 비교로 충분하다.
+
+**방법**: `75e73f1`(regex→GENERATED 교체 커밋) diff에서 Before 버전 QueryDSL 식을 그대로
+raw SQL로 재구성하고, `legal_district` 전체 53,063건에 대해 재구성한 식과
+`sigungu_name`(GENERATED) 컬럼이 0건 불일치함을 먼저 검증했다(재구성이 정확함을 증명).
+이후 변수를 하나씩 고정해 `EXPLAIN (ANALYZE, BUFFERS)` 3회씩 반복 측정(동일 세션,
+`max_parallel_workers_per_gather=0`, 재현 방법 동일):
+
+| 변형 | 실행시간(3회 중앙값) |
+|---|---|
+| Before(정규식) + DB 기본 collation(`en_US.utf8`) | 4,412 ms |
+| After(GENERATED 컬럼) + DB 기본 collation | 4,255 ms |
+| Before(정규식) + `COLLATE "C"`(그룹/정렬 키에만 적용) | 238 ms |
+| After(GENERATED 컬럼) + `COLLATE "C"` | 81 ms |
+| After + `COLLATE "C"` + `work_mem=16MB`(디스크 스필 제거) | 79 ms |
+
+Before(정규식, 기본 collation) 4,412ms를 성분별로 분해하면:
+
+| 성분 | 기여분 | 비중 |
+|---|---|---|
+| **로케일 collation** (Korean 텍스트 `GROUP BY`/`ORDER BY` 정렬 시 `en_US.utf8` libc `strcoll` 비용) | ~4,174 ms | **94.6%** |
+| 정규식 계산 (`regexp_replace`+`split_part`, 행당 4회 평가 × 69,027행) | ~157 ms | 3.6% |
+| `work_mem` 4MB 디스크 스필(external merge) | ~2 ms | 0.05% |
+| 나머지(Hash Join, Index Scan+Memoize, GroupAggregate 등) | ~79 ms | 1.8% |
+
+**결론 — 원래 문서(위 7-2 표 작성 시점)의 "work_mem 4MB 디스크 스필이 지배적 비용" 설명은
+틀렸다.** `work_mem`을 16MB로 올려 external merge를 완전히 없애도(quicksort로 인메모리 처리)
+실행시간이 거의 그대로였다(Before 기준 약 4,456~4,472ms, 스필 있을 때와 동일 구간) — 즉
+디스크 스필은 애초에 유의미한 비용이 아니었다. 실제 지배 요인은 **DB가 `en_US.utf8`(libc)
+collation으로 생성돼 있어, `sigungu`(한글 텍스트) 컬럼을 `GROUP BY`/`ORDER BY`할 때마다
+Postgres 내부 Sort 노드가 로케일 인식 문자열 비교(`strcoll`)를 69,027행에 대해 수행**하기
+때문이다 — `COLLATE "C"`(바이트 단위 비교)로 바꾸면 동일 쿼리가 4,412ms → 238ms로
+약 18.5배 빨라진다. 정규식 계산 자체의 비용(157ms, 3.6%)은 원래 표의 4.5~4.7% 수치와
+같은 자릿수라 그 측정 자체는 유효했다 — 다만 "왜 개선폭이 작았는지"의 원인 설명(work_mem)이
+틀렸을 뿐이다. Join/집계 경로(Hash Join, Index Scan+Memoize)는 collation 영향을 받지 않는다
+— 등호 비교는 로케일 인식 비교가 필요 없기 때문.
+
+**후속 튜닝 제안 방향 정정**: `work_mem` 튜닝은 이 쿼리엔 사실상 의미가 없다(전체의 0.05%).
+의미 있는 레버가 있다면 `legal_district.sigungu_name`(또는 `name`) 컬럼의 collation을 `C`로
+바꾸는 것이지만, 이건 스키마/코드 변경(그리고 한글 사전식 정렬 순서가 바뀌어 다른 화면에
+쓰이는 정렬 UX에 영향을 줄 수 있는지 별도 검토가 필요)이라 이번 측정 작업(A) 범위 밖으로
+남겨둔다 — 구현하지 않음, 측정 결과만 기록.
+
+### 7-3. `weather-by-region` 응답 페이로드 — **이력서 채택**
+
+`GET /stats/weather-by-region?groupBy=sigungu`가 264개 후보 시군구×최근 3년 일별 전체를
+반환해 단건 응답이 **8.2MB(58,265행)** 였다. 코드 확인 결과 프론트(`WeatherByRegionChart.tsx`)가
+총 건수 기준 상위 10개 지역만 차트에 쓰고 나머지는 버리고 있어, 서버가 처음부터 그 10개만
+반환하도록 `getWeatherBySigungu()`에 **서버사이드 상위 10개 지역 필터**(2단계 쿼리: 랭킹→필터)를
+추가했다.
+
+검증: 서버가 뽑은 상위 10개가 DB 직접 집계 상위 10개와 정확히 일치(11/12위 경계 확인),
+포함된 지역 데이터가 기존 응답과 행 단위로 동일(부동소수점 평균의 최하위 자릿수 표현
+차이 3건 제외)함을 확인. 동률 처리용 2차 정렬 키 누락을 dev-reviewer가 지적해 수정.
+
+**결과** (동일 세션, 3회 반복 중앙값, VU10/30s k6 + curl 단건 교차검증):
+
+| | Before | After (상위 10개 필터) | 개선 |
+|---|---|---|---|
+| 응답 행수 | 58,265 | 6,734 | 약 88.4% 감소 |
+| 단건 전송량 | 8,201,008 bytes | 917,745 bytes | 약 88.8% 감소 |
+| p95 응답시간 (k6 VU10) | 1.33~1.36s | 131.87ms | **약 10.3배** |
+
+이 수치가 이력서에 채택된 이유: 응답 행수 감소(88.4%)는 DB 실측과 정확히 교차검증됐으며,
+그 결과로 나온 응답시간 개선(10.3배)까지 동일 세션·동일 조건에서 재현 가능하게 나왔다 —
+앞선 캐시 수치들과 달리 버퍼 워밍업·동시성 등 환경 변수에 흔들리지 않는 측정이다.
+
+## 8. 이력서 문장 (확정)
+
+> **단일 응답이 8.2MB(58,265행)에 달하던 지역별 날씨 통계 API에서, 프론트엔드가 실제로는 상위 10개 지역만 사용한다는 걸 코드로 확인하고 서버사이드 상위 N 필터링을 적용 — k6 부하 테스트(VU10) 기준 p95 응답시간을 10.3배(1.36s→131.87ms) 개선.**
+
+보조 문장(선택):
+> Redis 캐시가 이미 적용된 통계 API의 실효성을 k6로 검증하는 과정에서 Postgres 버퍼 워밍업이 측정치를 교란한다는 걸 발견 — EXPLAIN ANALYZE로 실제 병목(인덱스 부재, 런타임 정규식 재계산, 대용량 응답 페이로드)을 구분해 정말 효과적인 개선(응답 페이로드 축소)에 집중했다.
+
+## 9. 면접 대비 — 예상 질문
+
+- **"왜 캐시 효과 수치가 이력서에 없나요?"** → 반복 측정 중 DB 버퍼 워밍업이 섞여 캐시
+  기여분을 독립적으로 분리할 수 없었다고 설명. 이게 오히려 "측정을 의심할 줄 안다"는 근거.
+- **"인덱스나 컬럼 정규화는 왜 이력서에 없나요?"** → 인덱스(6배)는 있었지만 흔한 최적화라
+  차별화 요소로 약하다고 판단해 제외, 코드에는 남아있음(V116/V117). 정규식 제거는 실측상
+  개선폭이 4.5~4.7%로 작았다 — 후속으로 `EXPLAIN (ANALYZE, BUFFERS)` 정밀 분해(7-2-1)까지
+  해봤고, 처음 추정했던 `work_mem` 디스크 스필 원인설은 틀렸다는 것까지 확인했다(디스크 스필
+  기여분은 0.05%뿐). 실제 지배 요인은 DB가 `en_US.utf8` collation이라 한글 컬럼 정렬에
+  로케일 인식 문자열 비교가 매 쿼리마다 들어가는 것(94.6%)이었다 — 이 사실은 "1차 원인
+  추정이 틀렸을 때 어떻게 재검증하는가"를 보여주는 사례로 쓸 수 있다.
+
+## 10. 1·2라운드 수치 통합 비교 — 같은 엔드포인트인데 왜 결론이 달랐나
+
+3절/7절에서 각각 따로 보고한 1라운드(캐시)·2라운드(병목 제거) 수치를, 같은 엔드포인트 기준으로
+나란히 놓는다. **1라운드 수치는 이미 6절에서 폐기 처리됐다** — 여기서 다시 꺼내는 이유는
+"똑같은 엔드포인트를 재고 왜 상반된(또는 무관한) 결론이 나왔는지"를 대조하기 위함이지,
+1라운드 결론을 되살리려는 게 아니다.
+
+| 엔드포인트 | 1라운드(캐시) 측정 | 1라운드 결론 | 2라운드(코드 변경) 측정 | 2라운드 결론 |
+|---|---|---|---|---|
+| `GET /stats` | 미스 p95: 50.82→37.77→20.07ms (3회), 히트 p95: 19.48→20.81→21.58ms — 반복할수록 미스가 히트 수준으로 수렴 | 캐시 순수 기여분 분리 불가 → **폐기** | `disaster_type` 인덱스(V116): `countByType` 서브쿼리 EXPLAIN ANALYZE 162.9ms→27.4ms | **약 6배**, 실측이나 "흔한 최적화"라 이력서 제외(코드는 유지) |
+| `GET /stats/sigungu/breakdown` | 미스 p95: 35.27→29.65→21.2ms, 히트 p95: 22.81→23.7→19.91ms — 역시 미스↘히트 수렴 | 캐시 순수 기여분 분리 불가 → **폐기** | GENERATED 컬럼(V117, 정규식 제거): EXPLAIN ANALYZE 6,399ms→6,101ms(4.7%). 후속 정밀 분해(7-2-1): 실제 지배 요인은 정규식이 아니라 DB collation(94.6%) | 개선폭 작음(4.5~4.7%) → 이력서 제외, 원인 설명은 work_mem→collation으로 정정 |
+| `GET /stats/weather-by-region?groupBy=sigungu` | 미스 p95: 9.57s→8.65s→452.77ms, 히트 p95: 1.62s→1.46s→446.34ms — 미스가 3회차에 히트와 사실상 동일해짐 | 캐시 순수 기여분 분리 불가, 큰 응답에선 캐시 자체가 무력화 → **폐기** | 상위10지역필터: 응답행 58,265→6,734(88.4%↓), 전송량 8.2MB→918KB(88.8%↓), p95 1.36s→131.87ms(10.3배) | **이력서 채택** — 유일하게 재현 가능한 수치 |
+
+### 왜 결론이 갈렸는가
+
+- **1라운드는 "같은 코드, 다른 반복 횟수"를 쟀다.** 캐시 미스/히트 둘 다 동일한 DB 쿼리를
+  실행하는 동일 코드 경로였고, 유일한 변수는 Redis 캐시 적중 여부였어야 했다. 그런데 3회
+  반복 사이에 Postgres 버퍼 캐시(shared_buffers/OS 페이지 캐시)가 `disaster_alert`(60,000건)
+  테이블을 계속 들고 있게 되면서, "미스"조차 반복될수록 빨라졌다(4절 참고) — 측정 대상이던
+  "캐시 유무"와 측정에 섞여 들어간 "버퍼 워밍업"을 분리할 방법이 없어 결론 자체가 무효화됐다.
+- **2라운드는 "다른 코드, 같은 버퍼 상태"를 쟀다.** 인덱스 추가/GENERATED 컬럼/상위N필터는
+  전부 실제 코드·스키마를 바꾼 뒤 **동일 세션 내에서** Before/After를 번갈아 측정했다 — DB가
+  이미 웜업된 상태를 양쪽에 동일하게 적용했으므로 버퍼 워밍업이 결과를 왜곡할 여지가 없다.
+  거기에 EXPLAIN ANALYZE의 실행계획 차이(Seq Scan→Index Scan, 정규식 노드 유무)와 응답 JSON
+  바이트 단위 diff로 "로직은 그대로고 이 변경만의 효과"임을 추가로 증명했다(7-2/7-3 참고).
+- **요약**: 1라운드가 버려진 건 캐시가 효과 없어서가 아니라 **측정 설계가 캐시 효과와 버퍼
+  워밍업을 뒤섞어놔서 어느 쪽 기여인지 증명이 불가능**했기 때문이고, 2라운드가 채택된 건
+  **같은 교란 변수(버퍼 상태)를 양쪽에 고정한 채 코드 변경 전후만 비교**했기 때문이다. 이
+  차이 자체가 "측정을 어떻게 설계해야 신뢰 가능한가"에 대한 이번 작업의 핵심 교훈이다.
+
+## 재현 방법
+
+```bash
+# 0) 인프라
+docker compose -f docker-compose.dev.yml up -d postgres redis
+docker exec postgres psql -U $POSTGRES_USER -d postgres -c "ALTER SYSTEM SET max_parallel_workers_per_gather = 0;"
+docker restart postgres
+cd backend && set -a && source ../.env.dev && set +a && export DB_HOST=localhost
+./gradlew bootRun   # "Started BackendApplication" 확인 후 그대로 두거나 재기동
+
+# 1) 시드 (최초 1회, 증량하려면 재실행)
+docker exec -i postgres psql -U $POSTGRES_USER -d $POSTGRES_DB < backend/loadtest/seed/seed_stats_data.sql
+
+# 2) 측정 (엔드포인트별 미스/히트, backend/loadtest/README.md에 3개 엔드포인트 전체 커맨드)
+while true; do docker exec redis sh -c "redis-cli --scan --pattern 'stats-*' | xargs -r redis-cli DEL" >/dev/null 2>&1; sleep 0.1; done &
+EVICT_PID=$!
+k6 run --env PATH=/api/v1/alerts/stats --env VUS=10 --env DURATION=30s backend/loadtest/k6/stats-endpoint.js
+kill $EVICT_PID
+
+curl -s -o /dev/null http://localhost:8080/api/v1/alerts/stats
+k6 run --env PATH=/api/v1/alerts/stats --env VUS=10 --env DURATION=30s backend/loadtest/k6/stats-endpoint.js
+
+# 3) 2라운드(상위N필터) 재현
+k6 run --env PATH=/api/v1/alerts/stats/weather-by-region --env QUERY=groupBy=sigungu --env VUS=10 --env DURATION=30s backend/loadtest/k6/stats-endpoint.js
+curl -s -o /dev/null -w "wire bytes: %{size_download}\n" "http://localhost:8080/api/v1/alerts/stats/weather-by-region?groupBy=sigungu"
+```
+전체 커맨드와 PowerShell 버전은 `backend/loadtest/README.md` 참고.
