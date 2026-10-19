@@ -105,6 +105,23 @@ class EvaluationReportFormatterTest {
         assertThat(md).contains("0.0000").doesNotContain("NaN");
     }
 
+    /**
+     * 미배정으로 뺀 건수와 키 병합 경로 오류의 문구가 리포트에 나와야 전/후 비교에서 왜곡 여부를 알 수 있다.
+     * Red: 뼈대 포매터는 미배정 줄을 출력하지 않고 KEY_PATH_MISS 를 "알 수 없음"으로 찍어 두 단언 모두 실패한다.
+     */
+    @Test
+    void 미배정_건수와_키_병합_경로_문구가_나온다() {
+        var errors = List.of(new ErrorCase(1, 2, EvaluationStratum.GENERAL, ErrorCause.KEY_PATH_MISS));
+        var base = sample(errors, 0);
+        // 미배정 제외 3건 — 기존 report 값에 excludedUnassigned 만 더한다
+        var report = new PairwiseReport(base.overall(), base.byStratum(), base.errors(), 0, 3);
+
+        String md = EvaluationReportFormatter.toMarkdown("ds", report);
+
+        assertThat(md).containsPattern("미배정\\D*3");
+        assertThat(md).contains("키 병합 경로 — 검색·판정 해당 없음");
+    }
+
     @Test
     void dataset_이_null_이면_예외() {
         assertThatThrownBy(() -> EvaluationReportFormatter.toMarkdown(null, sample(List.of(), 0)))

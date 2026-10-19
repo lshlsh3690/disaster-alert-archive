@@ -173,6 +173,58 @@ class PairwiseEvaluatorTest {
                 new ErrorCase(13, 14, BOUNDARY, ErrorCause.UNKNOWN_MISS));
     }
 
+    private static EvaluatedPair pathPair(long id, EvaluationLabelType label, boolean predictedSame, Boolean gold,
+                                          EvaluationPath path, boolean sharesSigungu, boolean assigned) {
+        return new EvaluatedPair(id, id + 1, label, GENERAL, predictedSame, gold, path, sharesSigungu, assigned);
+    }
+
+    /**
+     * 놓친 SAME 쌍의 원인은 쌍이 탄 경로로 먼저 가른다. 키 병합 경로는 후보 검색·판정이 없으니 KEY_PATH_MISS,
+     * 광역 경로나 시군구를 공유하지 않는 인접 쌍은 임베딩 후보에 원래 없으므로 검색 실패로 단정하지 않고 UNKNOWN_MISS.
+     * Red: 현재는 경로를 무시하고 goldEventInCandidates 만 봐서 KEY/false -> RETRIEVAL_MISS,
+     * BROADCAST/true -> DECISION_MISS, 비공유/false -> RETRIEVAL_MISS 가 나와 세 기대 모두 다르다.
+     */
+    @Test
+    @DisplayName("놓친 SAME 쌍: KEY 는 KEY_PATH_MISS, BROADCAST·시군구 비공유는 UNKNOWN_MISS")
+    void missedPairCauseDependsOnPath() {
+        // 키 병합 경로: 후보 목록에 없었다(false)고 해도 검색 실패가 아니다
+        EvaluatedPair key = pathPair(10, SAME, false, Boolean.FALSE, EvaluationPath.KEY, true, true);
+        // 광역 경로: 후보에 있었다(true)고 나와도 판정 실패로 믿을 수 없다
+        EvaluatedPair broadcast = pathPair(20, SAME, false, Boolean.TRUE, EvaluationPath.BROADCAST, true, true);
+        // 임베딩 경로지만 시군구를 공유하지 않는 인접 쌍: 평가 쿼리가 같은 시군구만 찾으므로 항상 후보 밖
+        EvaluatedPair adjacent = pathPair(30, SAME, false, Boolean.FALSE, EvaluationPath.EMBEDDING, false, true);
+
+        PairwiseReport r = PairwiseEvaluator.evaluate(List.of(key, broadcast, adjacent));
+
+        assertThat(r.errors()).extracting(ErrorCase::cause).containsExactly(
+                ErrorCause.KEY_PATH_MISS, ErrorCause.UNKNOWN_MISS, ErrorCause.UNKNOWN_MISS);
+    }
+
+    /**
+     * 이벤트에 배정되지 않은 알림(예: 클러스터링에서 제외된 비사건)이 낀 쌍은 시스템이 아무것도 안 한 것이라
+     * tn/fn 으로 세면 지표가 왜곡된다. 지표·오류에서 빼고 excludedUnassigned 로만 센다. UNSURE 가 우선이다.
+     * Red: 뼈대는 assigned 를 무시해 SAME 미배정이 fn, DIFF 미배정이 tn 으로 잡히고 excludedUnassigned 는 0 이다.
+     */
+    @Test
+    @DisplayName("미배정 쌍은 지표·오류에서 빠지고 excludedUnassigned 로 센다 (UNSURE 가 우선)")
+    void unassignedPairsAreExcludedFromMetrics() {
+        EvaluatedPair tp = pathPair(10, SAME, true, null, EvaluationPath.EMBEDDING, true, true);
+        // 미배정 SAME: fn 이 아니라 제외 (예측 same=false 로 들어와도)
+        EvaluatedPair unassignedSame = pathPair(20, SAME, false, null, EvaluationPath.EMBEDDING, true, false);
+        // 미배정 DIFF: tn 이 아니라 제외
+        EvaluatedPair unassignedDiff = pathPair(30, DIFF, false, null, EvaluationPath.EMBEDDING, true, false);
+        // UNSURE 이면서 미배정: excludedUnsure 에만 세고 excludedUnassigned 에는 세지 않는다
+        EvaluatedPair unsureUnassigned = pathPair(40, UNSURE, false, null, EvaluationPath.EMBEDDING, true, false);
+
+        PairwiseReport r = PairwiseEvaluator.evaluate(List.of(tp, unassignedSame, unassignedDiff, unsureUnassigned));
+
+        assertThat(r.excludedUnassigned()).isEqualTo(2);
+        assertThat(r.excludedUnsure()).isEqualTo(1);
+        // 배정된 tp 1건만 남는다
+        assertThat(r.overall()).isEqualTo(new Confusion(1, 0, 0, 0, 1.0, 1.0, 1.0));
+        assertThat(r.errors()).isEmpty();
+    }
+
     @Test
     @DisplayName("빈 리스트는 예외 없이 모두 0 인 report")
     void emptyInput() {

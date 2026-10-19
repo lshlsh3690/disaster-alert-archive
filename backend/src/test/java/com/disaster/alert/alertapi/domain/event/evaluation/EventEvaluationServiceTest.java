@@ -124,17 +124,38 @@ class EventEvaluationServiceTest {
     }
 
     @Test
-    void 한쪽_알림이_매핑에_없으면_예측은_false이고_SAME이면_UNKNOWN_MISS다() {
+    void 한쪽_알림이_이벤트에_배정되지_않은_쌍은_지표에서_빠지고_excludedUnassigned로_센다() {
         long a = alert(T.minusHours(2), sigungu1, vec(1, 0));
         long b = alert(T, sigungu1, vec(0.9, 0.1));
         map(event(false, false), a, 1);
-        // b 는 event_alert_mapping 에 없다
+        // b 는 event_alert_mapping 에 없다 (클러스터링 제외된 비사건 등)
         label(a, b, EvaluationLabelType.SAME, EvaluationStratum.GENERAL);
 
         PairwiseReport report = service.evaluate(dataset);
 
-        assertConfusion(report.overall(), 0, 0, 1, 0);
-        assertSingleError(report, a, b, EvaluationStratum.GENERAL, ErrorCause.UNKNOWN_MISS);
+        // 시스템이 아무것도 안 한 쌍이라 fn 으로 세지 않고 제외 건수로만 센다
+        assertEquals(1, report.excludedUnassigned());
+        assertConfusion(report.overall(), 0, 0, 0, 0);
+        assertTrue(report.errors().isEmpty());
+    }
+
+    /**
+     * 산불은 지역 한정 유형이라 후보 검색 없이 키로 병합된다. 두 산불 알림이 서로 다른 이벤트에 있으면 원인은
+     * 검색/판정 실패가 아니라 KEY_PATH_MISS 여야 한다. 서비스가 알림 유형(DB 의 disaster_type)을 읽어 경로를 판별한다.
+     * Red: 서비스가 아직 알림 유형을 읽지 않아 임베딩 경로로 간주하고, 같은 시군구·가까운 벡터라 DECISION_MISS 가 나온다.
+     * (위 미배정 테스트도 Red: 서비스가 assigned 를 채우지 않아 fn 1건으로 집계되고 excludedUnassigned 는 0 이다.)
+     */
+    @Test
+    void 산불_두_알림이_다른_이벤트면_원인은_KEY_PATH_MISS다() {
+        long a = alertOfType("산불", T.minusHours(2), sigungu1, vec(1, 0));
+        long b = alertOfType("산불", T, sigungu1, vec(0.9, 0.1));
+        map(event(false, false), a, 1);
+        map(event(false, false), b, 1);
+        label(a, b, EvaluationLabelType.SAME, EvaluationStratum.GENERAL);
+
+        PairwiseReport report = service.evaluate(dataset);
+
+        assertSingleError(report, a, b, EvaluationStratum.GENERAL, ErrorCause.KEY_PATH_MISS);
     }
 
     @Test
@@ -319,7 +340,8 @@ class EventEvaluationServiceTest {
         map(event(false, false), t2, 1);
         long b1 = alert(T.minusHours(2), sigungu1, vec(1, 0));
         long b2 = alert(T, sigungu1, vec(0.9, 0.1));
-        map(event(false, false), b1, 1);   // b2 는 매핑 없음 -> fn
+        map(event(false, false), b1, 1);
+        map(event(false, false), b2, 1);   // b1, b2 가 서로 다른 이벤트 -> fn (미배정이면 제외되므로 배정해 둔다)
         label(g1, g2, EvaluationLabelType.SAME, EvaluationStratum.GENERAL);
         label(t1, t2, EvaluationLabelType.DIFF, EvaluationStratum.TRAP);
         label(b1, b2, EvaluationLabelType.SAME, EvaluationStratum.BOUNDARY);
@@ -369,13 +391,17 @@ class EventEvaluationServiceTest {
     }
 
     private long alert(LocalDateTime createdAt, String districtCode, String vector) {
+        return alertOfType("테스트", createdAt, districtCode, vector);
+    }
+
+    private long alertOfType(String disasterType, LocalDateTime createdAt, String districtCode, String vector) {
         long id = ID.incrementAndGet();
         alertIds.add(id);
         jdbc.update("""
                 insert into disaster_alert (disaster_alert_id, sn, message, created_at, emergency_level,
                                             disaster_type, modified_date, original_region, embedding)
-                values (?, ?, '평가 서비스 테스트', ?, 'LEVEL_1', '테스트', ?, '테스트', cast(? as vector))
-                """, id, id, Timestamp.valueOf(createdAt), Timestamp.valueOf(createdAt), vector);
+                values (?, ?, '평가 서비스 테스트', ?, 'LEVEL_1', ?, ?, '테스트', cast(? as vector))
+                """, id, id, Timestamp.valueOf(createdAt), disasterType, Timestamp.valueOf(createdAt), vector);
         if (districtCode != null) {
             jdbc.update("insert into disaster_alert_region (disaster_alert_id, legal_district_code) values (?, ?)",
                     id, districtCode);

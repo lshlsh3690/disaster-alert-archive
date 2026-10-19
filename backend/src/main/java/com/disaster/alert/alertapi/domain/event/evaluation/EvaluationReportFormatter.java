@@ -80,6 +80,7 @@ public final class EvaluationReportFormatter {
             case OVER_MERGE -> "과병합";
             case RETRIEVAL_MISS -> "검색 실패";
             case DECISION_MISS -> "판정 실패";
+            case KEY_PATH_MISS -> "알 수 없음"; // Red 단계 뼈대 — 문구는 Green 에서
             case UNKNOWN_MISS -> "알 수 없음";
         };
     }
