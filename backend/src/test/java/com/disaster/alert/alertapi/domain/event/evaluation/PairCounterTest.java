@@ -2,7 +2,6 @@ package com.disaster.alert.alertapi.domain.event.evaluation;
 
 import com.disaster.alert.alertapi.domain.event.evaluation.LabelCsv.Label;
 import com.disaster.alert.alertapi.domain.event.evaluation.PairCounter.Observation;
-import com.disaster.alert.alertapi.domain.event.evaluation.PairCountResult;
 import com.disaster.alert.alertapi.domain.event.evaluation.PairCountResult.WrongKind;
 import com.disaster.alert.alertapi.domain.event.evaluation.PairCountResult.WrongPair;
 import org.junit.jupiter.api.Test;
