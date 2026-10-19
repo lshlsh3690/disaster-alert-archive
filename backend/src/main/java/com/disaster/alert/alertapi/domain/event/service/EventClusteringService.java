@@ -57,6 +57,7 @@ public class EventClusteringService {
     private final AlertEmbeddingRepository alertEmbeddingRepository;
     private final ApplicationEventPublisher eventPublisher;
     private final EventLLMDecisionService llmDecisionService;
+    private final ClusteringTraceRecorder traceRecorder;
 
     @Value("${clustering.similarity-threshold:0.85}")
     private double similarityThreshold;

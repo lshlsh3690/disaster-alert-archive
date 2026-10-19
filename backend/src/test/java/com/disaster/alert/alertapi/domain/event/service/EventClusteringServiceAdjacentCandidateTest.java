@@ -64,6 +64,7 @@ class EventClusteringServiceAdjacentCandidateTest {
     @Mock AlertEmbeddingRepository alertEmbeddingRepository;
     @Mock ApplicationEventPublisher eventPublisher;
     @Mock EventLLMDecisionService llmDecisionService;
+    @Mock ClusteringTraceRecorder traceRecorder;
 
     EventClusteringService service;
     LocalDateTime now = LocalDateTime.of(2026, 7, 20, 12, 0);
@@ -71,7 +72,7 @@ class EventClusteringServiceAdjacentCandidateTest {
     @BeforeEach
     void setUp() {
         service = new EventClusteringService(embeddingModel, disasterAlertRepository, disasterEventRepository,
-                eventAlertMappingRepository, alertEmbeddingRepository, eventPublisher, llmDecisionService);
+                eventAlertMappingRepository, alertEmbeddingRepository, eventPublisher, llmDecisionService, traceRecorder);
         ReflectionTestUtils.setField(service, "similarityThreshold", 0.85);
         ReflectionTestUtils.setField(service, "candidateWindowHours", 168);
         ReflectionTestUtils.setField(service, "maxRegionSpan", 10);

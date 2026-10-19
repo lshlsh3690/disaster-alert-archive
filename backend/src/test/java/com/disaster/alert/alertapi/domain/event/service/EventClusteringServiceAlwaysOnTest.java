@@ -43,13 +43,14 @@ class EventClusteringServiceAlwaysOnTest {
     @Mock AlertEmbeddingRepository alertEmbeddingRepository;
     @Mock ApplicationEventPublisher eventPublisher;
     @Mock EventLLMDecisionService llmDecisionService;
+    @Mock ClusteringTraceRecorder traceRecorder;
 
     EventClusteringService service;
 
     @BeforeEach
     void setUp() {
         service = new EventClusteringService(embeddingModel, disasterAlertRepository, disasterEventRepository,
-                eventAlertMappingRepository, alertEmbeddingRepository, eventPublisher, llmDecisionService);
+                eventAlertMappingRepository, alertEmbeddingRepository, eventPublisher, llmDecisionService, traceRecorder);
         // application.yml 기본값
         ReflectionTestUtils.setField(service, "similarityThreshold", 0.85);
         ReflectionTestUtils.setField(service, "candidateWindowHours", 168);
