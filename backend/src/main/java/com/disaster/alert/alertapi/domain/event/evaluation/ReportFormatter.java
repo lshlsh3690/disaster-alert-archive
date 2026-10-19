@@ -19,7 +19,7 @@ public final class ReportFormatter {
     }
 
     public static String format(String datasetName, LocalDateTime runAt,
-                                PairCounter.Result result, List<Row> wrongRows) {
+                                PairCountResult result, List<Row> wrongRows) {
         return "";
     }
 }

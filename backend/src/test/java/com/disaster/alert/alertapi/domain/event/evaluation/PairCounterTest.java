@@ -2,9 +2,9 @@ package com.disaster.alert.alertapi.domain.event.evaluation;
 
 import com.disaster.alert.alertapi.domain.event.evaluation.LabelCsv.Label;
 import com.disaster.alert.alertapi.domain.event.evaluation.PairCounter.Observation;
-import com.disaster.alert.alertapi.domain.event.evaluation.PairCounter.Result;
-import com.disaster.alert.alertapi.domain.event.evaluation.PairCounter.WrongKind;
-import com.disaster.alert.alertapi.domain.event.evaluation.PairCounter.WrongPair;
+import com.disaster.alert.alertapi.domain.event.evaluation.PairCountResult;
+import com.disaster.alert.alertapi.domain.event.evaluation.PairCountResult.WrongKind;
+import com.disaster.alert.alertapi.domain.event.evaluation.PairCountResult.WrongPair;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -33,7 +33,7 @@ class PairCounterTest {
                 obs(6, Label.DIFF, true, false));
 
         // 실행
-        Result result = PairCounter.count(observations);
+        PairCountResult result = PairCounter.count(observations);
 
         // 검증: 개수, 비율, 그리고 틀린 쌍은 놓침 2 + 잘못 묶음 1 만 담긴다
         assertThat(result.correctlyMerged()).isEqualTo(2);
@@ -59,7 +59,7 @@ class PairCounterTest {
                 obs(2, Label.UNSURE, true, true));
 
         // 실행
-        Result result = PairCounter.count(observations);
+        PairCountResult result = PairCounter.count(observations);
 
         // 검증: 두 분모(맞게 묶음+놓침, 맞게 묶음+잘못 묶음)가 모두 0 → 비율 empty
         assertThat(result.underMergeRate()).isEmpty();
@@ -79,7 +79,7 @@ class PairCounterTest {
         List<Observation> observations = List.of(obs(1, Label.DIFF, true, true));
 
         // 실행
-        Result result = PairCounter.count(observations);
+        PairCountResult result = PairCounter.count(observations);
 
         // 검증: 과소병합율 분모 = 맞게 묶음(0)+놓침(0) = 0 → empty, 과병합율 = 1÷(0+1) = 100%
         assertThat(result.underMergeRate()).isEmpty();
@@ -99,7 +99,7 @@ class PairCounterTest {
                 obs(3, Label.SAME, true, true));
 
         // 실행
-        Result result = PairCounter.count(observations);
+        PairCountResult result = PairCounter.count(observations);
 
         // 검증: 모르겠음 1, 미배정 1(UNSURE 쌍은 미배정에 안 셈), 놓침 0, 과소병합율 = 0÷(1+0) = 0%
         assertThat(result.excludedUnsure()).isEqualTo(1);

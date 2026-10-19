@@ -18,24 +18,10 @@ public final class PairCounter {
     public record Observation(long alertA, long alertB, Label label, boolean assigned, boolean sameEvent) {
     }
 
-    public enum WrongKind { MISSED, OVER_MERGED }
-
-    public record WrongPair(long alertA, long alertB, WrongKind kind) {
-    }
-
-    /**
-     * 비율은 퍼센트 값(0~100). 분모가 0 이면 empty.
-     */
-    public record Result(int correctlyMerged, int missed, int overMerged,
-                         int excludedUnsure, int excludedUnassigned,
-                         OptionalDouble underMergeRate, OptionalDouble overMergeRate,
-                         List<WrongPair> wrongPairs) {
-    }
-
     private PairCounter() {
     }
 
-    public static Result count(List<Observation> observations) {
-        return new Result(0, 0, 0, 0, 0, OptionalDouble.empty(), OptionalDouble.empty(), List.of());
+    public static PairCountResult count(List<Observation> observations) {
+        return new PairCountResult(0, 0, 0, 0, 0, OptionalDouble.empty(), OptionalDouble.empty(), List.of());
     }
 }

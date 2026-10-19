@@ -2,16 +2,14 @@ package com.disaster.alert.alertapi.domain.event.evaluation;
 
 import com.disaster.alert.alertapi.domain.event.evaluation.LabelCsv.Label;
 import com.disaster.alert.alertapi.domain.event.evaluation.LabelCsv.LabeledPair;
+import org.assertj.core.api.SoftAssertions;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.Arguments;
-import org.junit.jupiter.params.provider.MethodSource;
 
+import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.stream.Stream;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class LabelCsvTest {
 
@@ -20,31 +18,30 @@ class LabelCsvTest {
     // 형식이 틀린 CSV 는 조용히 건너뛰면 평가 숫자가 슬그머니 달라진다. 그래서 즉시 실패하고,
     // 사용자가 고칠 수 있게 "몇 번째 줄" 인지 메시지에 넣는다(헤더가 1번째 줄).
     // Red 단계: 뼈대는 예외 없이 빈 목록을 돌려주므로 assertThatThrownBy 에서 "예외가 없다" 로 실패한다.
-    @ParameterizedTest(name = "{0}")
-    @MethodSource("badCsvs")
-    void 형식_오류는_줄_번호와_함께_예외(String caseName, String csv, int errorLine) {
-        // 준비: 케이스별로 errorLine 번째 줄에 오류가 있는 CSV (badCsvs 참고)
-        // 실행 + 검증: IllegalArgumentException 이고 메시지에 "N번째 줄" 이 있어야 한다
-        assertThatThrownBy(() -> LabelCsv.parse(csv))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining(errorLine + "번째 줄");
-    }
+    @Test
+    void 형식_오류는_줄_번호와_함께_예외() {
+        // 준비: 케이스 이름 → [errorLine 번째 줄에 오류가 있는 CSV, errorLine]
+        Map<String, Object[]> badCsvs = new LinkedHashMap<>();
+        // 헤더가 약속과 다름(컬럼 이름 오타) → 1번째 줄
+        badCsvs.put("헤더 불일치", new Object[]{"a,b,label,stratum,sub_type\n1,2,SAME,x,y\n", 1});
+        // 3번째 줄만 컬럼이 4개
+        badCsvs.put("컬럼 수 오류", new Object[]{HEADER + "\n1,2,SAME,x,y\n3,4,SAME,x\n", 3});
+        // 2번째 줄의 alert_a_id 가 숫자가 아님
+        badCsvs.put("숫자 아님", new Object[]{HEADER + "\nabc,2,SAME,x,y\n", 2});
+        // 자기 자신과의 쌍은 정답을 가릴 수 없다
+        badCsvs.put("같은 id", new Object[]{HEADER + "\n5,5,DIFF,x,y\n", 2});
+        // SAME/DIFF/UNSURE 외의 라벨
+        badCsvs.put("알 수 없는 label", new Object[]{HEADER + "\n1,2,MAYBE,x,y\n", 2});
+        // 2번째 줄의 (1,2) 를 4번째 줄이 (2,1) 로 뒤집어 다시 적음 → 중복은 뒤쪽 줄을 지목
+        badCsvs.put("(a,b)/(b,a) 중복", new Object[]{HEADER + "\n1,2,SAME,x,y\n3,4,DIFF,x,y\n2,1,SAME,x,y\n", 4});
 
-    static Stream<Arguments> badCsvs() {
-        return Stream.of(
-                // 헤더가 약속과 다름(컬럼 이름 오타) → 1번째 줄
-                Arguments.of("헤더 불일치", "a,b,label,stratum,sub_type\n1,2,SAME,x,y\n", 1),
-                // 3번째 줄만 컬럼이 4개
-                Arguments.of("컬럼 수 오류", HEADER + "\n1,2,SAME,x,y\n3,4,SAME,x\n", 3),
-                // 2번째 줄의 alert_a_id 가 숫자가 아님
-                Arguments.of("숫자 아님", HEADER + "\nabc,2,SAME,x,y\n", 2),
-                // 자기 자신과의 쌍은 정답을 가릴 수 없다
-                Arguments.of("같은 id", HEADER + "\n5,5,DIFF,x,y\n", 2),
-                // SAME/DIFF/UNSURE 외의 라벨
-                Arguments.of("알 수 없는 label", HEADER + "\n1,2,MAYBE,x,y\n", 2),
-                // 2번째 줄의 (1,2) 를 4번째 줄이 (2,1) 로 뒤집어 다시 적음 → 중복은 뒤쪽 줄을 지목
-                Arguments.of("(a,b)/(b,a) 중복", HEADER + "\n1,2,SAME,x,y\n3,4,DIFF,x,y\n2,1,SAME,x,y\n", 4)
-        );
+        // 실행 + 검증: 케이스마다 IllegalArgumentException 이고 메시지에 "N번째 줄" 이 있어야 한다
+        // (SoftAssertions 로 한 케이스가 틀려도 나머지를 계속 보고, 실패 메시지에는 케이스 이름이 붙는다)
+        SoftAssertions.assertSoftly(softly -> badCsvs.forEach((caseName, c) ->
+                softly.assertThatThrownBy(() -> LabelCsv.parse((String) c[0]))
+                        .as(caseName)
+                        .isInstanceOf(IllegalArgumentException.class)
+                        .hasMessageContaining(c[1] + "번째 줄")));
     }
 
     // 엑셀 등이 저장한 CSV 는 BOM(﻿)이 앞에 붙고 중간에 빈 줄이 끼기도 한다. 이건 오류가 아니라 정상 입력이다.
