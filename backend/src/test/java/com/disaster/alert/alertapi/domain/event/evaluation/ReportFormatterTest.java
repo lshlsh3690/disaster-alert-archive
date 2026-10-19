@@ -1,7 +1,7 @@
 package com.disaster.alert.alertapi.domain.event.evaluation;
 
 import com.disaster.alert.alertapi.domain.event.evaluation.AssignmentReader.PairFacts;
-import com.disaster.alert.alertapi.domain.event.evaluation.PairCounter.Result;
+import com.disaster.alert.alertapi.domain.event.evaluation.PairCountResult;
 import com.disaster.alert.alertapi.domain.event.evaluation.ReportFormatter.Row;
 import org.junit.jupiter.api.Test;
 
@@ -16,9 +16,9 @@ class ReportFormatterTest {
 
     private static final LocalDateTime RUN_AT = LocalDateTime.of(2026, 10, 19, 9, 0);
 
-    private static Result guideExample() {
+    private static PairCountResult guideExample() {
         // 가이드 예시(쌍 6개)의 결과: 맞게 묶음 2, 놓침 2, 잘못 묶음 1 → 50.0% / 33.3%
-        return new Result(2, 2, 1, 0, 0, OptionalDouble.of(50.0), OptionalDouble.of(100.0 / 3),
+        return new PairCountResult(2, 2, 1, 0, 0, OptionalDouble.of(50.0), OptionalDouble.of(100.0 / 3),
                 List.of());
     }
 
@@ -27,7 +27,7 @@ class ReportFormatterTest {
     @Test
     void 가이드_예시가_문장형_요약으로_그대로_나온다() {
         // 준비: 모르겠음 3쌍, 미배정 4쌍이 따로 제외된 결과
-        Result result = new Result(2, 2, 1, 3, 4, OptionalDouble.of(50.0), OptionalDouble.of(100.0 / 3),
+        PairCountResult result = new PairCountResult(2, 2, 1, 3, 4, OptionalDouble.of(50.0), OptionalDouble.of(100.0 / 3),
                 List.of());
 
         // 실행
@@ -57,7 +57,7 @@ class ReportFormatterTest {
     @Test
     void 분모가_0이면_비율_자리에_대시() {
         // 준비: 비율이 둘 다 없는(empty) 결과
-        Result result = new Result(0, 0, 0, 1, 0, OptionalDouble.empty(), OptionalDouble.empty(), List.of());
+        PairCountResult result = new PairCountResult(0, 0, 0, 1, 0, OptionalDouble.empty(), OptionalDouble.empty(), List.of());
 
         // 실행
         String report = ReportFormatter.format("ds", RUN_AT, result, List.of());
