@@ -2,129 +2,52 @@ package com.disaster.alert.alertapi.domain.event.evaluation;
 
 import org.junit.jupiter.api.Test;
 
-import java.util.EnumMap;
 import java.util.List;
-import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class EvaluationReportFormatterTest {
 
-    private static Confusion conf(int tp, int fp, int fn, int tn, double p, double r, double f1) {
-        return new Confusion(tp, fp, fn, tn, p, r, f1);
-    }
-
-    /** tp69 fn42 tn36 fp0 → precision 1.0, recall 69/111=0.6216. */
-    private static PairwiseReport sample(List<ErrorCase> errors, int unsure) {
-        Map<EvaluationStratum, Confusion> by = new EnumMap<>(EvaluationStratum.class);
-        by.put(EvaluationStratum.TRAP, conf(1, 0, 2, 3, 1.0, 0.3333, 0.5));
-        by.put(EvaluationStratum.GENERAL, conf(60, 0, 20, 30, 1.0, 0.75, 0.8571));
-        by.put(EvaluationStratum.BOUNDARY, conf(8, 0, 20, 3, 1.0, 0.2857, 0.4444));
-        return new PairwiseReport(conf(69, 0, 42, 36, 1.0, 69 / 111.0, 2 * 69 / (2 * 69 + 42.0)),
-                by, errors, unsure);
-    }
-
+    /**
+     * 리포트는 요약 3줄로 시작한다: 과소병합율·과병합율은 "N쌍 중 M쌍" 과 퍼센트(소수 첫째 자리)를 같이 보여주고,
+     * 제외 줄에는 모르겠음·이벤트 미배정 건수가 나온다.
+     * Red: 뼈대 포매터는 제목 줄만 출력해 아래 요약 줄 단언들이 실패한다.
+     */
     @Test
-    void 제목에_dataset_이름과_전체_지표가_들어간다() {
-        String md = EvaluationReportFormatter.toMarkdown("ds-1", sample(List.of(), 0));
+    void 요약_세_줄에_과소병합율_과병합율_제외_건수가_나온다() {
+        // 준비: 묶음 6, 놓침 2 -> 같은 사건 8쌍, 과소병합율 2/8 = 25.0%
+        //       묶음 6 + 잘못 묶음 3 = 묶은 9쌍, 과병합율 3/9 = 33.3%
+        var report = new PairwiseReport(6, 2, 3, 4, 5, List.of(), List.of());
 
-        assertThat(md).contains("ds-1");
-        assertThat(md).contains("0.6216").contains("1.0000");
-        assertThat(md).contains("69").contains("42").contains("36");
-    }
+        String md = EvaluationReportFormatter.toMarkdown("ds-1", report);
 
-    @Test
-    void 층별_표는_GENERAL_BOUNDARY_TRAP_순서() {
-        String md = EvaluationReportFormatter.toMarkdown("ds", sample(List.of(), 0));
-
-        int g = md.indexOf("GENERAL");
-        int b = md.indexOf("BOUNDARY");
-        int t = md.indexOf("TRAP");
-        assertThat(g).isGreaterThanOrEqualTo(0);
-        assertThat(b).isGreaterThan(g);
-        assertThat(t).isGreaterThan(b);
-    }
-
-    @Test
-    void report_에_없는_층은_표에_나오지_않는다() {
-        Map<EvaluationStratum, Confusion> by = new EnumMap<>(EvaluationStratum.class);
-        by.put(EvaluationStratum.GENERAL, conf(1, 0, 0, 1, 1.0, 1.0, 1.0));
-        var report = new PairwiseReport(conf(1, 0, 0, 1, 1.0, 1.0, 1.0), by, List.of(), 0);
-
-        String md = EvaluationReportFormatter.toMarkdown("ds", report);
-
-        assertThat(md).contains("GENERAL").doesNotContain("BOUNDARY").doesNotContain("TRAP");
-    }
-
-    @Test
-    void UNSURE_제외_건수가_나온다() {
-        String md = EvaluationReportFormatter.toMarkdown("ds", sample(List.of(), 7));
-
-        assertThat(md).contains("UNSURE").contains("7");
-    }
-
-    @Test
-    void 원인별_건수_요약은_0건_원인도_표시한다() {
-        var errors = List.of(
-                new ErrorCase(1, 2, EvaluationStratum.GENERAL, ErrorCause.RETRIEVAL_MISS),
-                new ErrorCase(3, 4, EvaluationStratum.TRAP, ErrorCause.RETRIEVAL_MISS),
-                new ErrorCase(5, 6, EvaluationStratum.BOUNDARY, ErrorCause.DECISION_MISS));
-
-        String md = EvaluationReportFormatter.toMarkdown("ds", sample(errors, 0));
-
-        assertThat(md).contains("과병합").contains("검색 실패").contains("판정 실패").contains("알 수 없음");
-        assertThat(md).containsPattern("검색 실패\\D*2");
-        assertThat(md).containsPattern("판정 실패\\D*1");
-        assertThat(md).containsPattern("과병합\\D*0");
-    }
-
-    @Test
-    void 오류_사례_표에_알림_ID_층_원인이_나온다() {
-        var errors = List.of(new ErrorCase(101, 202, EvaluationStratum.BOUNDARY, ErrorCause.OVER_MERGE));
-
-        String md = EvaluationReportFormatter.toMarkdown("ds", sample(errors, 0));
-
-        assertThat(md).contains("101").contains("202").contains("BOUNDARY");
-        assertThat(md).doesNotContain("오류 없음");
-    }
-
-    @Test
-    void 오류가_없으면_표_대신_오류_없음_한_줄() {
-        String md = EvaluationReportFormatter.toMarkdown("ds", sample(List.of(), 0));
-
-        assertThat(md).contains("오류 없음");
-    }
-
-    @Test
-    void 빈_report_도_NaN_없이_0_0000() {
-        var empty = new PairwiseReport(conf(0, 0, 0, 0, 0, 0, 0), new EnumMap<>(EvaluationStratum.class), List.of(), 0);
-
-        String md = EvaluationReportFormatter.toMarkdown("ds", empty);
-
-        assertThat(md).contains("0.0000").doesNotContain("NaN");
+        assertThat(md).contains("# 클러스터링 평가 리포트: ds-1");
+        assertThat(md).contains("- 같은 사건 8쌍 중 6쌍 묶음, 2쌍 놓침 → 과소병합율 25.0%");
+        assertThat(md).contains("- 묶은 9쌍 중 6쌍 맞음, 3쌍 잘못 묶음 → 과병합율 33.3%");
+        assertThat(md).contains("- 제외: 모르겠음 4쌍, 이벤트 미배정 5쌍");
     }
 
     /**
-     * 미배정으로 뺀 건수와 키 병합 경로 오류의 문구가 리포트에 나와야 전/후 비교에서 왜곡 여부를 알 수 있다.
-     * Red: 뼈대 포매터는 미배정 줄을 출력하지 않고 KEY_PATH_MISS 를 "알 수 없음"으로 찍어 두 단언 모두 실패한다.
+     * 놓친 쌍 표는 열(유형·같은 시군구·간격·본문 거리)과 한 행의 값을 보여준다. 임베딩이 없으면 거리는 "-",
+     * 목록이 비면 표 대신 "없음", 분모가 0 이면 비율은 0.0% 가 아니라 "해당 없음"이다.
+     * Red: 뼈대 포매터는 표·"없음"·"해당 없음"을 모두 출력하지 않아 단언이 실패한다.
      */
     @Test
-    void 미배정_건수와_키_병합_경로_문구가_나온다() {
-        var errors = List.of(new ErrorCase(1, 2, EvaluationStratum.GENERAL, ErrorCause.KEY_PATH_MISS));
-        var base = sample(errors, 0);
-        // 미배정 제외 3건 — 기존 report 값에 excludedUnassigned 만 더한다
-        var report = new PairwiseReport(base.overall(), base.byStratum(), base.errors(), 0, 3);
+    void 놓친_쌍_표_행과_없음_그리고_분모_0이면_해당_없음() {
+        var missed = List.of(new ErrorPair(101, 202, new PairFacts("호우/산불", true, 3, null)));
+        var withRow = new PairwiseReport(1, 1, 0, 0, 0, missed, List.of());
 
-        String md = EvaluationReportFormatter.toMarkdown("ds", report);
+        String md = EvaluationReportFormatter.toMarkdown("ds", withRow);
 
-        assertThat(md).containsPattern("미배정\\D*3");
-        assertThat(md).contains("키 병합 경로 — 검색·판정 해당 없음");
-    }
+        assertThat(md).contains("| alertA | alertB | 유형 | 같은 시군구 | 간격(시간) | 본문 거리 |");
+        // 거리 null -> "-", 시군구 공유 -> "예", 간격 3 시간
+        assertThat(md).contains("| 101 | 202 | 호우/산불 | 예 | 3 | - |");
+        // 잘못 묶은 쌍은 없으니 표 대신 "없음"
+        assertThat(md).contains("## 잘못 묶은 쌍").contains("없음");
 
-    @Test
-    void dataset_이_null_이면_예외() {
-        assertThatThrownBy(() -> EvaluationReportFormatter.toMarkdown(null, sample(List.of(), 0)))
-                .isInstanceOf(IllegalArgumentException.class);
+        // 묶음·놓침·잘못 묶음이 모두 0 이면 두 분모가 0 이다
+        String empty = EvaluationReportFormatter.toMarkdown("ds",
+                new PairwiseReport(0, 0, 0, 0, 0, List.of(), List.of()));
+        assertThat(empty).contains("해당 없음").doesNotContain("0.0%").doesNotContain("NaN");
     }
 }

@@ -1,20 +1,34 @@
 package com.disaster.alert.alertapi.domain.event.evaluation;
 
 import java.util.List;
-import java.util.Map;
+import java.util.Optional;
 
-/** 쌍 단위 평가 결과. UNSURE 는 모든 지표에서 빠지고 excludedUnsure 로만 센다.
- * 이벤트에 배정되지 않은 쌍도 지표에서 빠지고 excludedUnassigned 로만 센다. */
+/**
+ * 쌍 단위 평가 결과. 맞게 분리한 DIFF 쌍은 세지 않는다.
+ * UNSURE 와 이벤트 미배정 쌍은 개수에서 빠지고 제외 건수로만 센다.
+ *
+ * @param merged 맞게 묶음(SAME, 같은 이벤트)
+ * @param missed 놓침(SAME, 다른 이벤트)
+ * @param wrongMerged 잘못 묶음(DIFF, 같은 이벤트)
+ */
 public record PairwiseReport(
-        Confusion overall,
-        Map<EvaluationStratum, Confusion> byStratum,
-        List<ErrorCase> errors,
+        int merged,
+        int missed,
+        int wrongMerged,
         int excludedUnsure,
-        int excludedUnassigned) {
+        int excludedUnassigned,
+        List<ErrorPair> missedPairs,
+        List<ErrorPair> wrongMergedPairs) {
 
-    /** 미배정 제외 건수가 없는 기존 호출용. */
-    public PairwiseReport(Confusion overall, Map<EvaluationStratum, Confusion> byStratum,
-                          List<ErrorCase> errors, int excludedUnsure) {
-        this(overall, byStratum, errors, excludedUnsure, 0);
+    // Red 단계 뼈대 — 구현은 Green 에서
+    /** missed ÷ (merged + missed). 분모가 0 이면 empty. */
+    public Optional<Double> underMergeRate() {
+        return Optional.empty();
+    }
+
+    // Red 단계 뼈대 — 구현은 Green 에서
+    /** wrongMerged ÷ (merged + wrongMerged). 분모가 0 이면 empty. */
+    public Optional<Double> overMergeRate() {
+        return Optional.empty();
     }
 }

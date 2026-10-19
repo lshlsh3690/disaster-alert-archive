@@ -27,10 +27,6 @@ public class EvaluationAssignmentReader {
     public record CandidateDistance(long eventId, double distance) {
     }
 
-    /** 알림의 유형·본문·시군구(앞 5자) 목록 — 클러스터링 경로 판별용. */
-    public record AlertInfo(String disasterType, String message, List<String> sigunguCodes) {
-    }
-
     private final JdbcTemplate jdbc;
 
     private static final String MIN_DISTANCE = "MIN(da.embedding <=> b.embedding)";
@@ -71,7 +67,8 @@ public class EvaluationAssignmentReader {
     }
 
     // Red 단계 뼈대 — 구현은 Green 에서
-    public Optional<AlertInfo> findAlertInfo(long alertId) {
+    /** 두 알림의 유형·시군구 공유·발송 간격·본문 거리. 알림이 없으면 empty. */
+    public Optional<PairFacts> findPairFacts(long alertAId, long alertBId) {
         return Optional.empty();
     }
 

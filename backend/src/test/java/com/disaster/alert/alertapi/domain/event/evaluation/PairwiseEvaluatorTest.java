@@ -3,271 +3,98 @@ package com.disaster.alert.alertapi.domain.event.evaluation;
 import static com.disaster.alert.alertapi.domain.event.evaluation.EvaluationLabelType.DIFF;
 import static com.disaster.alert.alertapi.domain.event.evaluation.EvaluationLabelType.SAME;
 import static com.disaster.alert.alertapi.domain.event.evaluation.EvaluationLabelType.UNSURE;
-import static com.disaster.alert.alertapi.domain.event.evaluation.EvaluationStratum.BOUNDARY;
-import static com.disaster.alert.alertapi.domain.event.evaluation.EvaluationStratum.GENERAL;
-import static com.disaster.alert.alertapi.domain.event.evaluation.EvaluationStratum.TRAP;
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.within;
 
-import java.util.ArrayList;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 class PairwiseEvaluatorTest {
 
-    private static final double EPS = 1e-9;
-    private static long seq = 0;
+    private static final PairFacts NO_FACTS = null;
 
-    private static EvaluatedPair pair(EvaluationLabelType label, EvaluationStratum stratum,
-                                      boolean predictedSame, Boolean gold) {
-        long n = ++seq;
-        return new EvaluatedPair(n * 10, n * 10 + 1, label, stratum, predictedSame, gold);
-    }
-
-    private static void add(List<EvaluatedPair> list, int count, EvaluationLabelType label,
-                            EvaluationStratum stratum, boolean predictedSame) {
-        for (int i = 0; i < count; i++) {
-            list.add(pair(label, stratum, predictedSame, null));
-        }
-    }
-
-    @Test
-    @DisplayName("라벨과 예측 조합이 tp/fp/fn/tn 으로 분류되고 정밀도·재현율·F1 이 계산된다")
-    void classifiesAndComputesMetrics() {
-        List<EvaluatedPair> pairs = new ArrayList<>();
-        add(pairs, 2, SAME, GENERAL, true);   // tp
-        add(pairs, 1, DIFF, GENERAL, true);   // fp
-        add(pairs, 1, SAME, GENERAL, false);  // fn
-        add(pairs, 3, DIFF, GENERAL, false);  // tn
-
-        Confusion c = PairwiseEvaluator.evaluate(pairs).overall();
-
-        assertThat(c.tp()).isEqualTo(2);
-        assertThat(c.fp()).isEqualTo(1);
-        assertThat(c.fn()).isEqualTo(1);
-        assertThat(c.tn()).isEqualTo(3);
-        assertThat(c.precision()).isCloseTo(2.0 / 3, within(EPS));
-        assertThat(c.recall()).isCloseTo(2.0 / 3, within(EPS));
-        assertThat(c.f1()).isCloseTo(2.0 / 3, within(EPS));
-    }
-
-    @Test
-    @DisplayName("UNSURE 는 지표와 errors 에서 제외되고 excludedUnsure 로만 센다")
-    void excludesUnsure() {
-        List<EvaluatedPair> pairs = new ArrayList<>();
-        add(pairs, 1, SAME, GENERAL, true);
-        add(pairs, 2, UNSURE, GENERAL, true);
-        add(pairs, 1, UNSURE, TRAP, false);
-
-        PairwiseReport r = PairwiseEvaluator.evaluate(pairs);
-
-        assertThat(r.excludedUnsure()).isEqualTo(3);
-        assertThat(r.overall().tp()).isEqualTo(1);
-        assertThat(r.overall().fp() + r.overall().fn() + r.overall().tn()).isZero();
-        assertThat(r.errors()).isEmpty();
-        assertThat(r.byStratum()).containsOnlyKeys(GENERAL);
-    }
-
-    @Test
-    @DisplayName("분모가 0 이면 NaN 이 아니라 0.0")
-    void zeroDenominatorsYieldZero() {
-        List<EvaluatedPair> onlyTn = new ArrayList<>();
-        add(onlyTn, 2, DIFF, GENERAL, false);
-        Confusion tnOnly = PairwiseEvaluator.evaluate(onlyTn).overall();
-        assertThat(tnOnly.tn()).isEqualTo(2);
-        assertThat(tnOnly.precision()).isEqualTo(0.0);
-        assertThat(tnOnly.recall()).isEqualTo(0.0);
-        assertThat(tnOnly.f1()).isEqualTo(0.0);
-
-        List<EvaluatedPair> onlyFn = new ArrayList<>();
-        add(onlyFn, 2, SAME, GENERAL, false);
-        Confusion fnOnly = PairwiseEvaluator.evaluate(onlyFn).overall();
-        assertThat(fnOnly.fn()).isEqualTo(2);
-        assertThat(fnOnly.precision()).isEqualTo(0.0);
-        assertThat(fnOnly.recall()).isEqualTo(0.0);
-        assertThat(fnOnly.f1()).isEqualTo(0.0);
-
-        List<EvaluatedPair> onlyFp = new ArrayList<>();
-        add(onlyFp, 2, DIFF, GENERAL, true);
-        Confusion fpOnly = PairwiseEvaluator.evaluate(onlyFp).overall();
-        assertThat(fpOnly.fp()).isEqualTo(2);
-        assertThat(fpOnly.precision()).isEqualTo(0.0);
-        assertThat(fpOnly.recall()).isEqualTo(0.0);
-        assertThat(fpOnly.f1()).isEqualTo(0.0);
-    }
-
-    @Test
-    @DisplayName("층별로 독립 계산하고, 데이터 없는 층은 키가 없으며, 순서는 GENERAL, BOUNDARY, TRAP")
-    void computesPerStratum() {
-        List<EvaluatedPair> pairs = new ArrayList<>();
-        add(pairs, 3, SAME, TRAP, false);     // 함정 층은 전부 fn
-        add(pairs, 2, SAME, GENERAL, true);   // 일반 층은 완벽
-        add(pairs, 2, DIFF, GENERAL, false);
-
-        PairwiseReport r = PairwiseEvaluator.evaluate(pairs);
-
-        assertThat(r.byStratum().keySet()).containsExactly(GENERAL, TRAP);
-        Confusion general = r.byStratum().get(GENERAL);
-        assertThat(general.tp()).isEqualTo(2);
-        assertThat(general.tn()).isEqualTo(2);
-        assertThat(general.precision()).isCloseTo(1.0, within(EPS));
-        assertThat(general.recall()).isCloseTo(1.0, within(EPS));
-        assertThat(general.f1()).isCloseTo(1.0, within(EPS));
-        Confusion trap = r.byStratum().get(TRAP);
-        assertThat(trap.fn()).isEqualTo(3);
-        assertThat(trap.tp()).isZero();
-        assertThat(trap.recall()).isEqualTo(0.0);
-
-        assertThat(r.overall().tp()).isEqualTo(2);
-        assertThat(r.overall().fn()).isEqualTo(3);
-        assertThat(r.overall().recall()).isCloseTo(2.0 / 5, within(EPS));
-    }
-
-    @Test
-    @DisplayName("층별 혼동 행렬 합이 overall 과 일치한다")
-    void stratumSumsMatchOverall() {
-        List<EvaluatedPair> pairs = new ArrayList<>();
-        add(pairs, 2, SAME, GENERAL, true);
-        add(pairs, 1, DIFF, GENERAL, true);
-        add(pairs, 1, SAME, BOUNDARY, false);
-        add(pairs, 2, DIFF, BOUNDARY, false);
-        add(pairs, 1, SAME, TRAP, true);
-        add(pairs, 1, DIFF, TRAP, false);
-
-        PairwiseReport r = PairwiseEvaluator.evaluate(pairs);
-
-        assertThat(r.byStratum().keySet()).containsExactly(GENERAL, BOUNDARY, TRAP);
-        int tp = 0, fp = 0, fn = 0, tn = 0;
-        for (Confusion c : r.byStratum().values()) {
-            tp += c.tp();
-            fp += c.fp();
-            fn += c.fn();
-            tn += c.tn();
-        }
-        assertThat(r.overall().tp()).isEqualTo(tp).isEqualTo(3);
-        assertThat(r.overall().fp()).isEqualTo(fp).isEqualTo(1);
-        assertThat(r.overall().fn()).isEqualTo(fn).isEqualTo(1);
-        assertThat(r.overall().tn()).isEqualTo(tn).isEqualTo(3);
-    }
-
-    @Test
-    @DisplayName("오류 원인: fp 는 OVER_MERGE, fn 은 후보 포함 여부에 따라 DECISION/RETRIEVAL/UNKNOWN, 입력 순서 유지")
-    void classifiesErrorCauses() {
-        EvaluatedPair tp = new EvaluatedPair(1, 2, SAME, GENERAL, true, true);
-        EvaluatedPair fp = new EvaluatedPair(3, 4, DIFF, BOUNDARY, true, null);
-        EvaluatedPair fnDecision = new EvaluatedPair(5, 6, SAME, TRAP, false, Boolean.TRUE);
-        EvaluatedPair tn = new EvaluatedPair(7, 8, DIFF, GENERAL, false, false);
-        EvaluatedPair fnRetrieval = new EvaluatedPair(9, 10, SAME, GENERAL, false, Boolean.FALSE);
-        EvaluatedPair unsure = new EvaluatedPair(11, 12, UNSURE, TRAP, false, false);
-        EvaluatedPair fnUnknown = new EvaluatedPair(13, 14, SAME, BOUNDARY, false, null);
-
-        PairwiseReport r = PairwiseEvaluator.evaluate(
-                List.of(tp, fp, fnDecision, tn, fnRetrieval, unsure, fnUnknown));
-
-        assertThat(r.errors()).containsExactly(
-                new ErrorCase(3, 4, BOUNDARY, ErrorCause.OVER_MERGE),
-                new ErrorCase(5, 6, TRAP, ErrorCause.DECISION_MISS),
-                new ErrorCase(9, 10, GENERAL, ErrorCause.RETRIEVAL_MISS),
-                new ErrorCase(13, 14, BOUNDARY, ErrorCause.UNKNOWN_MISS));
-    }
-
-    private static EvaluatedPair pathPair(long id, EvaluationLabelType label, boolean predictedSame, Boolean gold,
-                                          EvaluationPath path, boolean sharesSigungu, boolean assigned) {
-        return new EvaluatedPair(id, id + 1, label, GENERAL, predictedSame, gold, path, sharesSigungu, assigned);
+    private static EvaluatedPair pair(long id, EvaluationLabelType label, boolean assigned, boolean predictedSame,
+                                      PairFacts facts) {
+        return new EvaluatedPair(id, id + 1, label, assigned, predictedSame, facts);
     }
 
     /**
-     * 놓친 SAME 쌍의 원인은 쌍이 탄 경로로 먼저 가른다. 키 병합 경로는 후보 검색·판정이 없으니 KEY_PATH_MISS,
-     * 광역 경로나 시군구를 공유하지 않는 인접 쌍은 임베딩 후보에 원래 없으므로 검색 실패로 단정하지 않고 UNKNOWN_MISS.
-     * Red: 현재는 경로를 무시하고 goldEventInCandidates 만 봐서 KEY/false -> RETRIEVAL_MISS,
-     * BROADCAST/true -> DECISION_MISS, 비공유/false -> RETRIEVAL_MISS 가 나와 세 기대 모두 다르다.
+     * 평가는 SAME/DIFF 라벨과 "같은 이벤트인가"만 본다. SAME+같은 이벤트=묶음, SAME+다른 이벤트=놓침,
+     * DIFF+같은 이벤트=잘못 묶음이고, 맞게 분리한 DIFF 는 세지 않는다. 비율의 분모에도 들어가지 않는다.
+     * Red: 뼈대는 개수를 모두 0 으로 돌려주고 비율은 항상 empty 라 개수·비율 단언이 실패한다
+     * (마지막 "분모 0 이면 empty" 단언은 뼈대와 같아 우연히 통과하는 가드다).
      */
     @Test
-    @DisplayName("놓친 SAME 쌍: KEY 는 KEY_PATH_MISS, BROADCAST·시군구 비공유는 UNKNOWN_MISS")
-    void missedPairCauseDependsOnPath() {
-        // 키 병합 경로: 후보 목록에 없었다(false)고 해도 검색 실패가 아니다
-        EvaluatedPair key = pathPair(10, SAME, false, Boolean.FALSE, EvaluationPath.KEY, true, true);
-        // 광역 경로: 후보에 있었다(true)고 나와도 판정 실패로 믿을 수 없다
-        EvaluatedPair broadcast = pathPair(20, SAME, false, Boolean.TRUE, EvaluationPath.BROADCAST, true, true);
-        // 임베딩 경로지만 시군구를 공유하지 않는 인접 쌍: 평가 쿼리가 같은 시군구만 찾으므로 항상 후보 밖
-        EvaluatedPair adjacent = pathPair(30, SAME, false, Boolean.FALSE, EvaluationPath.EMBEDDING, false, true);
+    @DisplayName("묶음·놓침·잘못 묶음을 세고 과소병합율·과병합율을 낸다 (분모 0 이면 empty)")
+    void countsAndRates() {
+        List<EvaluatedPair> pairs = List.of(
+                pair(10, SAME, true, true, NO_FACTS),    // 묶음
+                pair(20, SAME, true, true, NO_FACTS),    // 묶음
+                pair(30, SAME, true, false, NO_FACTS),   // 놓침
+                pair(40, SAME, true, false, NO_FACTS),   // 놓침
+                pair(50, DIFF, true, true, NO_FACTS),    // 잘못 묶음
+                pair(60, DIFF, true, false, NO_FACTS),   // 맞게 분리 — 세지 않는다
+                pair(70, DIFF, true, false, NO_FACTS),
+                pair(80, DIFF, true, false, NO_FACTS));
 
-        PairwiseReport r = PairwiseEvaluator.evaluate(List.of(key, broadcast, adjacent));
+        PairwiseReport r = PairwiseEvaluator.evaluate(pairs);
 
-        assertThat(r.errors()).extracting(ErrorCase::cause).containsExactly(
-                ErrorCause.KEY_PATH_MISS, ErrorCause.UNKNOWN_MISS, ErrorCause.UNKNOWN_MISS);
+        assertThat(r.merged()).isEqualTo(2);
+        assertThat(r.missed()).isEqualTo(2);
+        assertThat(r.wrongMerged()).isEqualTo(1);
+        // 과소병합율 = 놓침 ÷ (묶음+놓침) = 2/4
+        assertThat(r.underMergeRate()).hasValueSatisfying(v -> assertThat(v).isCloseTo(0.5, within(1e-9)));
+        // 과병합율 = 잘못 묶음 ÷ (묶음+잘못 묶음) = 1/3 — 맞게 분리한 DIFF 3건은 분모에 없다
+        assertThat(r.overMergeRate()).hasValueSatisfying(v -> assertThat(v).isCloseTo(1.0 / 3, within(1e-9)));
+
+        // 맞게 분리한 DIFF 만 있으면 두 분모가 모두 0 이라 비율이 없다 (NaN·0.0 아님)
+        PairwiseReport onlySeparated = PairwiseEvaluator.evaluate(List.of(pair(90, DIFF, true, false, NO_FACTS)));
+        assertThat(onlySeparated.underMergeRate()).isEmpty();
+        assertThat(onlySeparated.overMergeRate()).isEmpty();
     }
 
     /**
-     * 이벤트에 배정되지 않은 알림(예: 클러스터링에서 제외된 비사건)이 낀 쌍은 시스템이 아무것도 안 한 것이라
-     * tn/fn 으로 세면 지표가 왜곡된다. 지표·오류에서 빼고 excludedUnassigned 로만 센다. UNSURE 가 우선이다.
-     * Red: 뼈대는 assigned 를 무시해 SAME 미배정이 fn, DIFF 미배정이 tn 으로 잡히고 excludedUnassigned 는 0 이다.
+     * 모르겠음(UNSURE)과 이벤트 미배정 쌍은 개수에서 빼고 각각 제외 건수로만 센다. UNSURE 가 우선이라
+     * UNSURE 이면서 미배정인 쌍은 excludedUnsure 에만 센다.
+     * Red: 뼈대는 모든 값이 0 이라 merged=1 단언에서 실패한다 (제외 건수 단언도 실패).
      */
     @Test
-    @DisplayName("미배정 쌍은 지표·오류에서 빠지고 excludedUnassigned 로 센다 (UNSURE 가 우선)")
-    void unassignedPairsAreExcludedFromMetrics() {
-        EvaluatedPair tp = pathPair(10, SAME, true, null, EvaluationPath.EMBEDDING, true, true);
-        // 미배정 SAME: fn 이 아니라 제외 (예측 same=false 로 들어와도)
-        EvaluatedPair unassignedSame = pathPair(20, SAME, false, null, EvaluationPath.EMBEDDING, true, false);
-        // 미배정 DIFF: tn 이 아니라 제외
-        EvaluatedPair unassignedDiff = pathPair(30, DIFF, false, null, EvaluationPath.EMBEDDING, true, false);
-        // UNSURE 이면서 미배정: excludedUnsure 에만 세고 excludedUnassigned 에는 세지 않는다
-        EvaluatedPair unsureUnassigned = pathPair(40, UNSURE, false, null, EvaluationPath.EMBEDDING, true, false);
+    @DisplayName("UNSURE·미배정 쌍은 개수에서 빠지고 제외 건수로 센다 (UNSURE 우선)")
+    void excludesUnsureAndUnassigned() {
+        List<EvaluatedPair> pairs = List.of(
+                pair(10, SAME, true, true, NO_FACTS),         // 묶음 1건만 남는다
+                pair(20, SAME, false, false, NO_FACTS),       // 미배정 SAME: 놓침이 아니라 제외
+                pair(30, DIFF, false, false, NO_FACTS),       // 미배정 DIFF: 제외
+                pair(40, UNSURE, true, false, NO_FACTS),      // UNSURE
+                pair(50, UNSURE, false, false, NO_FACTS));    // UNSURE + 미배정: UNSURE 로만 센다
 
-        PairwiseReport r = PairwiseEvaluator.evaluate(List.of(tp, unassignedSame, unassignedDiff, unsureUnassigned));
+        PairwiseReport r = PairwiseEvaluator.evaluate(pairs);
 
+        assertThat(r.merged()).isEqualTo(1);
+        assertThat(r.missed()).isZero();
         assertThat(r.excludedUnassigned()).isEqualTo(2);
-        assertThat(r.excludedUnsure()).isEqualTo(1);
-        // 배정된 tp 1건만 남는다
-        assertThat(r.overall()).isEqualTo(new Confusion(1, 0, 0, 0, 1.0, 1.0, 1.0));
-        assertThat(r.errors()).isEmpty();
+        assertThat(r.excludedUnsure()).isEqualTo(2);
     }
 
+    /**
+     * 놓친 쌍과 잘못 묶은 쌍은 목록으로 나오고, 원인 추정 없이 입력의 사실(PairFacts)이 그대로 붙는다.
+     * Red: 뼈대는 두 목록을 비워 돌려줘 크기 단언에서 실패한다.
+     */
     @Test
-    @DisplayName("빈 리스트는 예외 없이 모두 0 인 report")
-    void emptyInput() {
-        PairwiseReport r = PairwiseEvaluator.evaluate(List.of());
+    @DisplayName("놓친 쌍·잘못 묶은 쌍 목록에 사실(PairFacts)이 담긴다")
+    void errorPairsCarryFacts() {
+        PairFacts missedFacts = new PairFacts("호우/산불", false, 3, 0.412);
+        PairFacts wrongFacts = new PairFacts("폭염", true, 1, null);   // 임베딩 없음 -> 거리 null
+        List<EvaluatedPair> pairs = List.of(
+                pair(10, SAME, true, true, NO_FACTS),
+                pair(20, SAME, true, false, missedFacts),
+                pair(30, DIFF, true, true, wrongFacts));
 
-        assertThat(r).isNotNull();
-        assertThat(r.overall()).isEqualTo(new Confusion(0, 0, 0, 0, 0.0, 0.0, 0.0));
-        assertThat(r.byStratum()).isEmpty();
-        assertThat(r.errors()).isEmpty();
-        assertThat(r.excludedUnsure()).isZero();
-    }
+        PairwiseReport r = PairwiseEvaluator.evaluate(pairs);
 
-    @Test
-    @DisplayName("null 입력은 IllegalArgumentException")
-    void nullInputThrows() {
-        assertThatThrownBy(() -> PairwiseEvaluator.evaluate(null))
-                .isInstanceOf(IllegalArgumentException.class);
-    }
-
-    @Test
-    @DisplayName("실제 규모(147쌍): tp 69, fn 42, tn 36, fp 0 이면 precision 1.0, recall 69/111")
-    void realScale() {
-        List<EvaluatedPair> pairs = new ArrayList<>();
-        add(pairs, 40, SAME, GENERAL, true);
-        add(pairs, 20, SAME, BOUNDARY, true);
-        add(pairs, 9, SAME, TRAP, true);
-        add(pairs, 10, SAME, GENERAL, false);
-        add(pairs, 12, SAME, BOUNDARY, false);
-        add(pairs, 20, SAME, TRAP, false);
-        add(pairs, 16, DIFF, GENERAL, false);
-        add(pairs, 10, DIFF, BOUNDARY, false);
-        add(pairs, 10, DIFF, TRAP, false);
-        assertThat(pairs).hasSize(147);
-
-        Confusion c = PairwiseEvaluator.evaluate(pairs).overall();
-
-        double recall = 69.0 / 111;
-        assertThat(c.tp()).isEqualTo(69);
-        assertThat(c.fn()).isEqualTo(42);
-        assertThat(c.tn()).isEqualTo(36);
-        assertThat(c.fp()).isZero();
-        assertThat(c.precision()).isCloseTo(1.0, within(EPS));
-        assertThat(c.recall()).isCloseTo(recall, within(EPS));
-        assertThat(c.f1()).isCloseTo(2 * 1.0 * recall / (1.0 + recall), within(EPS));
+        // 묶음(10)은 오류 목록에 없고, 놓침(20)과 잘못 묶음(30)만 각 목록에 한 건씩
+        assertThat(r.missedPairs()).containsExactly(new ErrorPair(20, 21, missedFacts));
+        assertThat(r.wrongMergedPairs()).containsExactly(new ErrorPair(30, 31, wrongFacts));
     }
 }

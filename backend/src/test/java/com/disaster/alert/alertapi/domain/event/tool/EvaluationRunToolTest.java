@@ -1,9 +1,7 @@
 package com.disaster.alert.alertapi.domain.event.tool;
 
-import com.disaster.alert.alertapi.domain.event.evaluation.Confusion;
 import com.disaster.alert.alertapi.domain.event.evaluation.EvaluationLabelLoader;
 import com.disaster.alert.alertapi.domain.event.evaluation.EvaluationReportFormatter;
-import com.disaster.alert.alertapi.domain.event.evaluation.EvaluationStratum;
 import com.disaster.alert.alertapi.domain.event.evaluation.EventEvaluationService;
 import com.disaster.alert.alertapi.domain.event.evaluation.PairwiseReport;
 import org.junit.jupiter.api.BeforeEach;
@@ -15,7 +13,6 @@ import org.springframework.boot.DefaultApplicationArguments;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.EnumMap;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -43,8 +40,7 @@ class EvaluationRunToolTest {
         loader = mock(EvaluationLabelLoader.class);
         service = mock(EventEvaluationService.class);
         tool = new EvaluationRunTool(loader, service);
-        report = new PairwiseReport(new Confusion(69, 0, 42, 36, 1.0, 0.6216, 0.7667),
-                new EnumMap<>(EvaluationStratum.class), List.of(), 0);
+        report = new PairwiseReport(69, 42, 0, 0, 0, List.of(), List.of());
         when(service.evaluate(anyString())).thenReturn(report);
     }
 

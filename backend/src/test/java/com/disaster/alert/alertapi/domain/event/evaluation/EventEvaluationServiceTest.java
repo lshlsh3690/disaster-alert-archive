@@ -15,10 +15,11 @@ import java.util.UUID;
 import java.util.concurrent.atomic.AtomicLong;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 /**
  * 운영 사본 DB 의 기존 이벤트 배정을 라벨과 비교하는 {@link EventEvaluationService} 를 실제 DB 로 검증한다.
+ * 평가는 "두 알림이 같은 이벤트에 있는가"만 보고, 원인 대신 사실(유형·시군구·간격·본문 거리)을 붙인다.
  *
  * <p>클래스에 {@code @Transactional} 을 붙이지 않고, 테스트 전용 dataset 이름과 직접 INSERT 한 행만
  * 매 테스트 후 JdbcTemplate 으로 정리한다. 시각은 모두 기준 시각 {@link #T}(= b 알림 시각) 상대값이다.
@@ -63,318 +64,78 @@ class EventEvaluationServiceTest {
         alertIds.forEach(id -> jdbc.update("delete from disaster_alert where disaster_alert_id = ?", id));
     }
 
-    // ---------------------------------------------------------------- 예측(predictedSame) 집계
-
-    @Test
-    void 두_알림이_같은_이벤트면_SAME_라벨_쌍이_tp로_집계된다() {
-        long e = event(false, false);
-        long a = alert(T.minusHours(2), sigungu1, vec(1, 0));
-        long b = alert(T, sigungu1, vec(0.9, 0.1));
-        map(e, a, 1);
-        map(e, b, 2);
-        label(a, b, EvaluationLabelType.SAME, EvaluationStratum.GENERAL);
-
-        PairwiseReport report = service.evaluate(dataset);
-
-        assertConfusion(report.overall(), 1, 0, 0, 0);
-        assertTrue(report.errors().isEmpty());
-    }
-
-    @Test
-    void 서로_다른_이벤트이고_DIFF_라벨이면_tn으로_집계된다() {
-        long a = alert(T.minusHours(2), sigungu1, vec(1, 0));
-        long b = alert(T, sigungu1, vec(0.9, 0.1));
-        map(event(false, false), a, 1);
-        map(event(false, false), b, 1);
-        label(a, b, EvaluationLabelType.DIFF, EvaluationStratum.GENERAL);
-
-        PairwiseReport report = service.evaluate(dataset);
-
-        assertConfusion(report.overall(), 0, 0, 0, 1);
-        assertTrue(report.errors().isEmpty());
-    }
-
-    @Test
-    void 서로_다른_이벤트이고_SAME_라벨이면_fn으로_집계된다() {
-        long a = alert(T.minusHours(2), sigungu1, vec(1, 0));
-        long b = alert(T, sigungu1, vec(0.9, 0.1));
-        map(event(false, false), a, 1);
-        map(event(false, false), b, 1);
-        label(a, b, EvaluationLabelType.SAME, EvaluationStratum.GENERAL);
-
-        PairwiseReport report = service.evaluate(dataset);
-
-        assertConfusion(report.overall(), 0, 0, 1, 0);
-        assertEquals(1, report.errors().size());
-    }
-
-    @Test
-    void 같은_이벤트인데_DIFF_라벨이면_fp이고_OVER_MERGE다() {
-        long e = event(false, false);
-        long a = alert(T.minusHours(2), sigungu1, vec(1, 0));
-        long b = alert(T, sigungu1, vec(0.9, 0.1));
-        map(e, a, 1);
-        map(e, b, 2);
-        label(a, b, EvaluationLabelType.DIFF, EvaluationStratum.TRAP);
-
-        PairwiseReport report = service.evaluate(dataset);
-
-        assertConfusion(report.overall(), 0, 1, 0, 0);
-        assertSingleError(report, a, b, EvaluationStratum.TRAP, ErrorCause.OVER_MERGE);
-    }
-
-    @Test
-    void 한쪽_알림이_이벤트에_배정되지_않은_쌍은_지표에서_빠지고_excludedUnassigned로_센다() {
-        long a = alert(T.minusHours(2), sigungu1, vec(1, 0));
-        long b = alert(T, sigungu1, vec(0.9, 0.1));
-        map(event(false, false), a, 1);
-        // b 는 event_alert_mapping 에 없다 (클러스터링 제외된 비사건 등)
-        label(a, b, EvaluationLabelType.SAME, EvaluationStratum.GENERAL);
-
-        PairwiseReport report = service.evaluate(dataset);
-
-        // 시스템이 아무것도 안 한 쌍이라 fn 으로 세지 않고 제외 건수로만 센다
-        assertEquals(1, report.excludedUnassigned());
-        assertConfusion(report.overall(), 0, 0, 0, 0);
-        assertTrue(report.errors().isEmpty());
-    }
-
     /**
-     * 산불은 지역 한정 유형이라 후보 검색 없이 키로 병합된다. 두 산불 알림이 서로 다른 이벤트에 있으면 원인은
-     * 검색/판정 실패가 아니라 KEY_PATH_MISS 여야 한다. 서비스가 알림 유형(DB 의 disaster_type)을 읽어 경로를 판별한다.
-     * Red: 서비스가 아직 알림 유형을 읽지 않아 임베딩 경로로 간주하고, 같은 시군구·가까운 벡터라 DECISION_MISS 가 나온다.
-     * (위 미배정 테스트도 Red: 서비스가 assigned 를 채우지 않아 fn 1건으로 집계되고 excludedUnassigned 는 0 이다.)
+     * 같은 이벤트에 있는 SAME 쌍은 "묶음", 다른 이벤트에 있는 SAME 쌍은 "놓침"으로 센다.
+     * Red: 뼈대 평가기는 항상 0 을 돌려줘 merged=0, missed=0 이라 두 단언 모두 실패한다.
      */
     @Test
-    void 산불_두_알림이_다른_이벤트면_원인은_KEY_PATH_MISS다() {
-        long a = alertOfType("산불", T.minusHours(2), sigungu1, vec(1, 0));
-        long b = alertOfType("산불", T, sigungu1, vec(0.9, 0.1));
-        map(event(false, false), a, 1);
-        map(event(false, false), b, 1);
-        label(a, b, EvaluationLabelType.SAME, EvaluationStratum.GENERAL);
-
-        PairwiseReport report = service.evaluate(dataset);
-
-        assertSingleError(report, a, b, EvaluationStratum.GENERAL, ErrorCause.KEY_PATH_MISS);
-    }
-
-    @Test
-    void 임베딩이_없는_알림이_있으면_후보_계산_불가로_UNKNOWN_MISS다() {
-        long a = alert(T.minusHours(2), sigungu1, vec(1, 0));
-        long b = alert(T, sigungu1, null);
-        map(event(false, false), a, 1);
-        map(event(false, false), b, 1);
-        label(a, b, EvaluationLabelType.SAME, EvaluationStratum.GENERAL);
-
-        PairwiseReport report = service.evaluate(dataset);
-
-        assertSingleError(report, a, b, EvaluationStratum.GENERAL, ErrorCause.UNKNOWN_MISS);
-    }
-
-    // ---------------------------------------------------------------- 후보 재현: DECISION_MISS / RETRIEVAL_MISS
-
-    @Test
-    void fn이고_a의_이벤트가_b_시점_후보_안에_있으면_DECISION_MISS다_라벨_순서가_뒤바뀌어도_시각으로_판단한다() {
-        long a = alert(T.minusHours(2), sigungu1, vec(1, 0));
-        long b = alert(T, sigungu1, vec(0.9, 0.1));
-        map(event(false, false), a, 1);
-        map(event(false, false), b, 1);
-        // 라벨에는 나중 알림(b)이 alert_a_id 로 적혀 있다
-        label(b, a, EvaluationLabelType.SAME, EvaluationStratum.BOUNDARY);
-
-        PairwiseReport report = service.evaluate(dataset);
-
-        assertSingleError(report, b, a, EvaluationStratum.BOUNDARY, ErrorCause.DECISION_MISS);
-    }
-
-    @Test
-    void 시군구가_다르면_후보가_못_돼_RETRIEVAL_MISS다() {
-        long a = alert(T.minusHours(2), sigungu2, vec(1, 0));
-        long b = alert(T, sigungu1, vec(0.9, 0.1));
-        map(event(false, false), a, 1);
-        map(event(false, false), b, 1);
-        label(a, b, EvaluationLabelType.SAME, EvaluationStratum.GENERAL);
-
-        PairwiseReport report = service.evaluate(dataset);
-
-        assertSingleError(report, a, b, EvaluationStratum.GENERAL, ErrorCause.RETRIEVAL_MISS);
-    }
-
-    @Test
-    void b보다_168시간_넘게_이른_이벤트는_후보가_못_돼_RETRIEVAL_MISS다() {
-        long a = alert(T.minusHours(200), sigungu1, vec(1, 0));
-        long b = alert(T, sigungu1, vec(0.9, 0.1));
-        map(event(false, false), a, 1);
-        map(event(false, false), b, 1);
-        label(a, b, EvaluationLabelType.SAME, EvaluationStratum.GENERAL);
-
-        PairwiseReport report = service.evaluate(dataset);
-
-        assertSingleError(report, a, b, EvaluationStratum.GENERAL, ErrorCause.RETRIEVAL_MISS);
-    }
-
-    @Test
-    void 시점_복원_b보다_나중에_생긴_알림_때문에_후보가_되지_않는다() {
-        long e = event(false, false);
-        long a = alert(T.minusHours(200), sigungu1, vec(1, 0));      // b 이전 알림은 윈도우 밖
-        long later = alert(T.plusHours(5), sigungu1, vec(1, 0));     // b 이후 알림 — 현재 상태로는 윈도우 안
-        long b = alert(T, sigungu1, vec(0.9, 0.1));
-        map(e, a, 1);
-        map(e, later, 2);
-        map(event(false, false), b, 1);
-        label(a, b, EvaluationLabelType.SAME, EvaluationStratum.GENERAL);
-
-        PairwiseReport report = service.evaluate(dataset);
-
-        assertSingleError(report, a, b, EvaluationStratum.GENERAL, ErrorCause.RETRIEVAL_MISS);
-    }
-
-    @Test
-    void broadcast_이벤트는_후보에서_제외돼_RETRIEVAL_MISS다() {
-        long a = alert(T.minusHours(2), sigungu1, vec(1, 0));
-        long b = alert(T, sigungu1, vec(0.9, 0.1));
-        map(event(true, false), a, 1);
-        map(event(false, false), b, 1);
-        label(a, b, EvaluationLabelType.SAME, EvaluationStratum.GENERAL);
-
-        PairwiseReport report = service.evaluate(dataset);
-
-        assertSingleError(report, a, b, EvaluationStratum.GENERAL, ErrorCause.RETRIEVAL_MISS);
-    }
-
-    @Test
-    void advisory_이벤트는_후보에서_제외돼_RETRIEVAL_MISS다() {
-        long a = alert(T.minusHours(2), sigungu1, vec(1, 0));
-        long b = alert(T, sigungu1, vec(0.9, 0.1));
-        map(event(false, true), a, 1);
-        map(event(false, false), b, 1);
-        label(a, b, EvaluationLabelType.SAME, EvaluationStratum.GENERAL);
-
-        PairwiseReport report = service.evaluate(dataset);
-
-        assertSingleError(report, a, b, EvaluationStratum.GENERAL, ErrorCause.RETRIEVAL_MISS);
-    }
-
-    @Test
-    void 더_가까운_다른_이벤트_3개가_있으면_a의_이벤트는_4위로_밀려_RETRIEVAL_MISS다() {
-        long a = alert(T.minusHours(2), sigungu1, vec(0.5, 0.5));    // 코사인 거리 약 0.29
-        long b = alert(T, sigungu1, vec(1, 0));
-        map(event(false, false), a, 1);
-        map(event(false, false), b, 1);
-        closerEvent(vec(0.99, 0.01));
-        closerEvent(vec(0.98, 0.02));
-        closerEvent(vec(0.97, 0.03));
-        label(a, b, EvaluationLabelType.SAME, EvaluationStratum.GENERAL);
-
-        PairwiseReport report = service.evaluate(dataset);
-
-        assertSingleError(report, a, b, EvaluationStratum.GENERAL, ErrorCause.RETRIEVAL_MISS);
-    }
-
-    @Test
-    void 더_가까운_다른_이벤트가_2개면_a의_이벤트는_3위로_후보에_남아_DECISION_MISS다() {
-        long a = alert(T.minusHours(2), sigungu1, vec(0.5, 0.5));
-        long b = alert(T, sigungu1, vec(1, 0));
-        map(event(false, false), a, 1);
-        map(event(false, false), b, 1);
-        closerEvent(vec(0.99, 0.01));
-        closerEvent(vec(0.98, 0.02));
-        label(a, b, EvaluationLabelType.SAME, EvaluationStratum.GENERAL);
-
-        PairwiseReport report = service.evaluate(dataset);
-
-        assertSingleError(report, a, b, EvaluationStratum.GENERAL, ErrorCause.DECISION_MISS);
-    }
-
-    @Test
-    void 순위는_알림이_아니라_이벤트별_최소_거리로_매긴다() {
-        long a = alert(T.minusHours(2), sigungu1, vec(0.5, 0.5));
-        long b = alert(T, sigungu1, vec(1, 0));
-        map(event(false, false), a, 1);
-        map(event(false, false), b, 1);
-        // 매우 가까운 알림 3개를 가진 이벤트 하나 — 알림 단위로 세면 top-3 를 독점해 a 가 밀려난다
-        long crowded = event(false, false);
-        map(crowded, alert(T.minusHours(3), sigungu1, vec(0.999, 0.001)), 1);
-        map(crowded, alert(T.minusHours(3), sigungu1, vec(0.998, 0.002)), 2);
-        map(crowded, alert(T.minusHours(3), sigungu1, vec(0.997, 0.003)), 3);
-        closerEvent(vec(0.99, 0.01));
-        label(a, b, EvaluationLabelType.SAME, EvaluationStratum.GENERAL);
-
-        PairwiseReport report = service.evaluate(dataset);
-
-        assertSingleError(report, a, b, EvaluationStratum.GENERAL, ErrorCause.DECISION_MISS);
-    }
-
-    // ---------------------------------------------------------------- UNSURE / 층별 / 빈 dataset
-
-    @Test
-    void UNSURE_라벨은_지표에서_빠지고_excludedUnsure로만_센다() {
+    void 같은_이벤트의_SAME_쌍은_묶음_다른_이벤트의_SAME_쌍은_놓침으로_센다() {
+        // 준비: 쌍1 은 한 이벤트에 함께, 쌍2 는 각자 다른 이벤트에 있다
         long e = event(false, false);
         long a1 = alert(T.minusHours(2), sigungu1, vec(1, 0));
         long b1 = alert(T, sigungu1, vec(0.9, 0.1));
-        long a2 = alert(T.minusHours(3), sigungu1, vec(1, 0));
-        long b2 = alert(T.minusHours(1), sigungu1, vec(0.9, 0.1));
         map(e, a1, 1);
         map(e, b1, 2);
-        map(e, a2, 3);
-        map(e, b2, 4);
-        label(a1, b1, EvaluationLabelType.SAME, EvaluationStratum.GENERAL);
-        label(a2, b2, EvaluationLabelType.UNSURE, EvaluationStratum.GENERAL);
-
-        PairwiseReport report = service.evaluate(dataset);
-
-        assertEquals(1, report.excludedUnsure());
-        assertConfusion(report.overall(), 1, 0, 0, 0);
-    }
-
-    @Test
-    void byStratum은_라벨의_stratum별로_집계한다() {
-        long e = event(false, false);
-        long g1 = alert(T.minusHours(2), sigungu1, vec(1, 0));
-        long g2 = alert(T, sigungu1, vec(0.9, 0.1));
-        map(e, g1, 1);
-        map(e, g2, 2);
-        long t1 = alert(T.minusHours(2), sigungu1, vec(1, 0));
-        long t2 = alert(T, sigungu1, vec(0.9, 0.1));
-        map(event(false, false), t1, 1);
-        map(event(false, false), t2, 1);
-        long b1 = alert(T.minusHours(2), sigungu1, vec(1, 0));
+        long a2 = alert(T.minusHours(2), sigungu1, vec(1, 0));
         long b2 = alert(T, sigungu1, vec(0.9, 0.1));
-        map(event(false, false), b1, 1);
-        map(event(false, false), b2, 1);   // b1, b2 가 서로 다른 이벤트 -> fn (미배정이면 제외되므로 배정해 둔다)
-        label(g1, g2, EvaluationLabelType.SAME, EvaluationStratum.GENERAL);
-        label(t1, t2, EvaluationLabelType.DIFF, EvaluationStratum.TRAP);
-        label(b1, b2, EvaluationLabelType.SAME, EvaluationStratum.BOUNDARY);
+        map(event(false, false), a2, 1);
+        map(event(false, false), b2, 1);
+        label(a1, b1, EvaluationLabelType.SAME);
+        label(a2, b2, EvaluationLabelType.SAME);
 
         PairwiseReport report = service.evaluate(dataset);
 
-        assertConfusion(report.overall(), 1, 0, 1, 1);
-        assertConfusion(report.byStratum().get(EvaluationStratum.GENERAL), 1, 0, 0, 0);
-        assertConfusion(report.byStratum().get(EvaluationStratum.TRAP), 0, 0, 0, 1);
-        assertConfusion(report.byStratum().get(EvaluationStratum.BOUNDARY), 0, 0, 1, 0);
+        // 같은 이벤트 1쌍 = 묶음, 다른 이벤트 1쌍 = 놓침, DIFF 는 없으니 잘못 묶음 0
+        assertEquals(1, report.merged());
+        assertEquals(1, report.missed());
+        assertEquals(0, report.wrongMerged());
     }
 
-    /** 참고: 뼈대(빈 report)도 이 기대를 만족하므로 Red 단계에서 우연히 통과한다 — 회귀 방지용. */
+    /**
+     * 한쪽 알림이 이벤트에 배정되지 않은 쌍(클러스터링에서 제외된 비사건 등)은 시스템이 아무것도 안 한 것이라
+     * 묶음·놓침에 넣지 않고 excludedUnassigned 로만 센다.
+     * Red: 서비스는 assigned 를 채우지만 평가기 뼈대가 0 만 돌려줘 excludedUnassigned 가 0 이다.
+     */
     @Test
-    void 라벨이_없는_dataset은_빈_report다() {
+    void 한쪽_알림이_이벤트에_배정되지_않은_쌍은_excludedUnassigned로_세고_놓침에_넣지_않는다() {
+        long a = alert(T.minusHours(2), sigungu1, vec(1, 0));
+        long b = alert(T, sigungu1, vec(0.9, 0.1));
+        map(event(false, false), a, 1);
+        // b 는 event_alert_mapping 에 없다
+        label(a, b, EvaluationLabelType.SAME);
+
         PairwiseReport report = service.evaluate(dataset);
 
-        assertConfusion(report.overall(), 0, 0, 0, 0);
-        assertTrue(report.byStratum().isEmpty());
-        assertTrue(report.errors().isEmpty());
-        assertEquals(0, report.excludedUnsure());
+        assertEquals(1, report.excludedUnassigned());
+        assertEquals(0, report.missed());
+        assertEquals(0, report.merged());
     }
 
-    // ---------------------------------------------------------------- 단언 헬퍼
+    /**
+     * 놓친 쌍에는 원인 대신 사실이 붙는다: 유형("A/B"), 시군구 공유, 발송 간격(시간), 본문 거리.
+     * Red: 평가기 뼈대가 빈 목록을 돌려줘 missedPairs 크기 단언에서 실패한다.
+     */
+    @Test
+    void 놓친_쌍에는_유형_시군구_간격_본문_거리가_사실로_채워진다() {
+        // 준비: a 는 3시간 전 호우(시군구1, 벡터 x축), b 는 산불(시군구2, 벡터 y축) -> 서로 직교라 코사인 거리 1.0
+        long a = alertOfType("호우", T.minusHours(3), sigungu1, vec(1, 0));
+        long b = alertOfType("산불", T, sigungu2, vec(0, 1));
+        map(event(false, false), a, 1);
+        map(event(false, false), b, 1);
+        label(a, b, EvaluationLabelType.SAME);
 
-    private static void assertConfusion(Confusion c, int tp, int fp, int fn, int tn) {
-        assertEquals(List.of(tp, fp, fn, tn), List.of(c.tp(), c.fp(), c.fn(), c.tn()),
-                "혼동 행렬 (tp, fp, fn, tn)");
-    }
+        PairwiseReport report = service.evaluate(dataset);
 
-    private static void assertSingleError(PairwiseReport report, long a, long b,
-                                          EvaluationStratum stratum, ErrorCause cause) {
-        assertEquals(List.of(new ErrorCase(a, b, stratum, cause)), report.errors());
+        assertEquals(1, report.missedPairs().size());
+        ErrorPair pair = report.missedPairs().get(0);
+        assertEquals(a, pair.alertAId());
+        assertEquals(b, pair.alertBId());
+        PairFacts facts = pair.facts();
+        assertNotNull(facts);
+        assertEquals("호우/산불", facts.types());   // 유형이 다르면 라벨의 a/b 순서로 "A/B"
+        assertEquals(false, facts.sameSigungu());     // 앞 5자리가 다름
+        assertEquals(3L, facts.gapHours());           // T-3h ~ T
+        assertEquals(1.0, facts.textDistance(), 1e-3);
     }
 
     // ---------------------------------------------------------------- 픽스처 헬퍼
@@ -383,11 +144,6 @@ class EventEvaluationServiceTest {
         return jdbc.queryForObject(
                 "select code from legal_district where left(code, 5) = ? order by code limit 1",
                 String.class, prefix);
-    }
-
-    /** b 와 같은 시군구에서 b 직전에 생긴, 알림 1개짜리 별도 이벤트. */
-    private void closerEvent(String vector) {
-        map(event(false, false), alert(T.minusHours(1), sigungu1, vector), 1);
     }
 
     private long alert(LocalDateTime createdAt, String districtCode, String vector) {
@@ -425,11 +181,12 @@ class EventEvaluationServiceTest {
                 eventId, alertId, sequenceNo);
     }
 
-    private void label(long alertAId, long alertBId, EvaluationLabelType label, EvaluationStratum stratum) {
+    // stratum 컬럼은 CSV 형식 호환 때문에 남아 있어 값을 채우기만 한다 (평가에는 쓰지 않는다).
+    private void label(long alertAId, long alertBId, EvaluationLabelType label) {
         jdbc.update("""
                 insert into evaluation_label (dataset, alert_a_id, alert_b_id, label, stratum, sub_type)
-                values (?, ?, ?, ?, ?, 'test')
-                """, dataset, alertAId, alertBId, label.name(), stratum.name());
+                values (?, ?, ?, ?, 'GENERAL', 'test')
+                """, dataset, alertAId, alertBId, label.name());
     }
 
     /** 앞 몇 성분만 값이 있고 나머지는 0 인 1536 차원 pgvector 리터럴. 임베딩이 없는 알림은 호출 측에서 null 을 넘긴다. */
