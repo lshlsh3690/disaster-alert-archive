@@ -1,7 +1,6 @@
 package com.disaster.alert.alertapi.domain.event.evaluation;
 
 import com.disaster.alert.alertapi.domain.event.evaluation.AssignmentReader.PairFacts;
-import com.disaster.alert.alertapi.domain.event.evaluation.PairCountResult;
 import com.disaster.alert.alertapi.domain.event.evaluation.ReportFormatter.Row;
 import org.junit.jupiter.api.Test;
 
