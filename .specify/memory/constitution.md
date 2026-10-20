@@ -74,12 +74,12 @@ Commits)을 따른다. `type`은 `feat`/`fix`/`chore`/`docs`/`refactor`/`test`/`
 - 브랜치명은 성격에 따라 `feature/`, `fix/`, `chore/`, `docs/`, `ci/` 접두사를 사용한다.
 - 커밋/PR 생성은 사용자가 명시적으로 요청했을 때만 수행하며, 민감 파일(`.env`,
   `credentials.json`, `firebase-service-account.json` 등)은 절대 커밋하지 않는다.
-  - **예외(2026-08-12 사용자 상설 승인)**: `test-writer` agent는 테스트 작성을 마치면
-    되묻지 않고 `commit-message` 스킬로 바로 커밋한다(`.claude/agents/test-writer.md` 절차 3).
+  - **예외(2026-08-12 사용자 상설 승인)**: `tdd-developer` agent는 RED 단계에서 테스트 작성을 마치면
+    되묻지 않고 `commit-message` 스킬로 바로 커밋한다(`.claude/agents/tdd-developer.md` RED 단계 커밋 절).
     테스트 작성은 되돌리기 쉽고 결과물이 명확해 매번 확인을 받는 것이 왕복만 늘리기
     때문이다. 이 예외의 범위는 **커밋까지이며 `git push`에는 적용되지 않는다.** 또한
     스테이징 범위는 그 agent 가 작성한 테스트와 테스트 컴파일에 필요한 최소 스텁으로
-    제한되고, 다른 agent(`green-implementer` 등)나 메인 에이전트의 커밋에는 확대되지
+    제한되고, 다른 agent(GREEN 단계 구현 등)나 메인 에이전트의 커밋에는 확대되지
     않는다.
 - 원격 브랜치는 PR이 머지되면 정리 대상이며, 머지되지 않은 브랜치를 삭제하기 전에는
   반드시 unmerged 커밋 여부를 확인하고 사용자에게 확인받는다.
