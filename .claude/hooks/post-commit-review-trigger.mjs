@@ -87,8 +87,8 @@ const changedFiles = diffOutput
   .filter(Boolean);
 
 const frontendFiles = changedFiles.filter((f) => f.startsWith("frontend/src/"));
-// backend/src/test는 제외 — test-writer의 Red-Green 검증 흐름이 이미 따로
-// 있고, dev-reviewer는 실제 운영 코드의 컨벤션 준수 여부를 보는 용도다.
+// backend/src/test는 제외 — tdd-developer의 Red-Green 검증 흐름이 이미 따로
+// 있고, code-reviewer는 실제 운영 코드의 컨벤션 준수 여부를 보는 용도다.
 const reviewableFiles = changedFiles.filter(
   (f) => f.startsWith("backend/src/main/") || f.startsWith("frontend/src/")
 );
@@ -110,8 +110,8 @@ if (frontendFiles.length > 0) {
 if (reviewableFiles.length > 0) {
   sections.push(
     `\n코드 리뷰 대상(백엔드 운영 코드/프론트엔드):\n${reviewableFiles.map((f) => `- ${f}`).join("\n")}\n\n` +
-      `1. 사용자에게 먼저 물어보지 말고 바로 \`dev-reviewer\` agent를 백그라운드(run_in_background: true)로 실행해서 이 커밋(${headSha.slice(0, 7)})의 diff(\`git show ${headSha}\`)를 이 저장소 컨벤션(CLAUDE.md) 기준으로 검토해라.\n` +
-      `2. \`dev-reviewer\`는 읽기 전용이라 스스로 코드를 고치지 못한다 — 결과가 오면 발견사항을 사용자에게 그대로 보고만 하고, 실제 수정은 사용자 승인을 받은 뒤에만 진행해라.\n` +
+      `1. 사용자에게 먼저 물어보지 말고 바로 \`code-reviewer\` agent를 백그라운드(run_in_background: true)로 실행해서 이 커밋(${headSha.slice(0, 7)})의 diff(\`git show ${headSha}\`)를 이 저장소 컨벤션(CLAUDE.md) 기준으로 검토해라.\n` +
+      `2. \`code-reviewer\`는 읽기 전용이라 스스로 코드를 고치지 못한다 — 결과가 오면 발견사항을 사용자에게 그대로 보고만 하고, 실제 수정은 사용자 승인을 받은 뒤에만 진행해라.\n` +
       `3. 발견사항이 없으면 그 사실만 짧게 알리면 된다.`
   );
 }
