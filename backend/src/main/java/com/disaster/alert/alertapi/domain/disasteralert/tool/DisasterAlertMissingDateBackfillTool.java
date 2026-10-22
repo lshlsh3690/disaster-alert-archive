@@ -1,8 +1,8 @@
 package com.disaster.alert.alertapi.domain.disasteralert.tool;
 
 import com.disaster.alert.alertapi.api.DisasterOpenApiClient;
-import com.disaster.alert.alertapi.domain.disasteralert.dto.DisasterApiResponse;
 import com.disaster.alert.alertapi.domain.disasteralert.service.DisasterAlertService;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -53,6 +53,8 @@ public class DisasterAlertMissingDateBackfillTool implements ApplicationRunner {
     private String fromDate; // yyyyMMdd
 
     private static final int NUM_OF_ROWS = 1000;
+    // totalCount/totalSeen 계산이 어떤 이유로든 어긋나도 무한루프에 빠지지 않도록 하는 안전장치.
+    private static final int MAX_PAGES = 50;
 
     @Override
     public void run(ApplicationArguments args) {
@@ -62,19 +64,26 @@ public class DisasterAlertMissingDateBackfillTool implements ApplicationRunner {
         int totalSaved = 0;
         int totalSeen = 0;
 
-        while (true) {
+        while (pageNo <= MAX_PAGES) {
             String raw = disasterOpenApiClient.fetchData(fromDate, pageNo, NUM_OF_ROWS);
             if (raw == null || raw.isBlank()) {
                 log.warn("page {} 응답 없음, 중단", pageNo);
                 break;
             }
 
+            // 엄격한 DTO 바인딩 대신 트리 파싱으로 totalCount/건수만 가볍게 확인한다 — body가
+            // 배열이 아니라 {"items":[...]}로 오는 페이지도 있어(실제 저장은 saveData 내부의
+            // parseBodyElements가 두 형태 다 처리한다), 여기서도 둘 다 건수를 셀 수 있어야 한다.
             int bodySize;
             int totalCount;
             try {
-                DisasterApiResponse response = objectMapper.readValue(raw, DisasterApiResponse.class);
-                bodySize = response.getBody() == null ? 0 : response.getBody().size();
-                totalCount = response.getTotalCount();
+                JsonNode root = objectMapper.readTree(raw);
+                JsonNode body = root.path("body");
+                if (!body.isArray() && body.path("items").isArray()) {
+                    body = body.path("items");
+                }
+                bodySize = body.isArray() ? body.size() : 0;
+                totalCount = root.path("totalCount").asInt(0);
             } catch (Exception e) {
                 log.error("page {} 응답 파싱 실패, 중단", pageNo, e);
                 break;
