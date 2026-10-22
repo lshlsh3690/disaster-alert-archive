@@ -49,8 +49,10 @@ public class DisasterAlert {
     @Column(name = "modified_date")
     private LocalDateTime modifiedDate;   // MDFCN_YMD
 
-    @Column(name = "original_region", length = 1000)
-    private String originalRegion; // 수신지역명 (RCPTN_RGN_NM) - 원본 지역명
+    @Column(name = "original_region", columnDefinition = "TEXT")
+    private String originalRegion; // 수신지역명 (RCPTN_RGN_NM) - 원본 지역명. 읍면동이 많은 광역
+    // 경보는 쉽게 1000자를 넘겨 VARCHAR(1000)에서 INSERT 실패가 났었다(V131) — 조회/조인에 쓰이지
+    // 않는 참고용 원본 텍스트라 길이 제한 둘 이유가 없어 TEXT로 둔다.
 
     public void addRegion(LegalDistrict region) {
         DisasterAlertRegion link = new DisasterAlertRegion(this, region);
