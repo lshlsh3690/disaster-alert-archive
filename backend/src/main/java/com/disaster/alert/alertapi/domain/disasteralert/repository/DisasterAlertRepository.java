@@ -16,6 +16,12 @@ public interface DisasterAlertRepository extends JpaRepository<DisasterAlert, Lo
     @Query("SELECT d.sn FROM DisasterAlert d WHERE d.sn IN :snList")
     List<Long> findExistingSn(@Param("snList") List<Long> snList);
 
+    /**
+     * alert_kind 가 비어 있는(미분류) 알림 id 를 오름차순으로. 분류 백필 도구의 대상 목록이다.
+     */
+    @Query("SELECT d.id FROM DisasterAlert d WHERE d.alertKind IS NULL ORDER BY d.id")
+    List<Long> findUnclassifiedIds();
+
     @Query("SELECT d.legalDistrict.name FROM DisasterAlertRegion d WHERE d.disasterAlert.id = :id")
     List<String> legalDistrictNamesByAlertId(Long id);
 

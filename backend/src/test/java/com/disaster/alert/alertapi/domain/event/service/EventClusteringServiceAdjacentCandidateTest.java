@@ -83,7 +83,6 @@ class EventClusteringServiceAdjacentCandidateTest {
         ReflectionTestUtils.setField(service, "globalTypesCsv", "태풍");
         ReflectionTestUtils.setField(service, "globalWindowHours", 168);
         ReflectionTestUtils.setField(service, "regionalTypesCsv", "산불:336,산사태:168,홍수:168");
-        ReflectionTestUtils.setField(service, "advisorySplitTypesCsv", "산불");
         ReflectionTestUtils.setField(service, "relaxedThresholdTypesCsv", "폭염,한파,대설,강풍,가축질병");
         ReflectionTestUtils.setField(service, "relaxedSimilarityThreshold", 0.65);
         ReflectionTestUtils.setField(service, "episodicTypesCsv", "");

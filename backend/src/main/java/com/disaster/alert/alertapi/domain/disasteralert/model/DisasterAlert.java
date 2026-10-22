@@ -54,6 +54,14 @@ public class DisasterAlert {
     // 경보는 쉽게 1000자를 넘겨 VARCHAR(1000)에서 INSERT 실패가 났었다(V131) — 조회/조인에 쓰이지
     // 않는 참고용 원본 텍스트라 길이 제한 둘 이유가 없어 TEXT로 둔다.
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "alert_kind", length = 16)
+    private AlertKind alertKind;    // LLM 분류 결과(사건/비사건), 미분류면 null
+
+    public void classifyAs(AlertKind kind) {
+        this.alertKind = kind;
+    }
+
     public void addRegion(LegalDistrict region) {
         DisasterAlertRegion link = new DisasterAlertRegion(this, region);
         this.disasterAlertRegions.add(link);

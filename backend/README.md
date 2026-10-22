@@ -53,7 +53,7 @@ Postgres/Redis만 컨테이너로 띄우고 애플리케이션은 위처럼 직�
 
 | 종류 | 작성 방식 | 예 |
 |------|-----------|-----|
-| 순수 로직 단위 테스트 | Spring 컨텍스트 없이 순수 JUnit | `FireAlertClassifierTest`, `DisasterCooldownTest`, `MissingPersonIdentityTest`, `IntensityExtractorTest` |
+| 순수 로직 단위 테스트 | Spring 컨텍스트 없이 순수 JUnit | `AlertKindTest`, `DisasterCooldownTest`, `MissingPersonIdentityTest`, `IntensityExtractorTest` |
 | 통합 테스트 | `@IntegrationTest` (= `@SpringBootTest` + `test` 프로파일 + `.env.test` 주입) | `AuthServiceTest`, `DisasterAlertServiceTest` |
 | 실 API 테스트 | `@Tag("realApi")` — 기본 `test` 태스크에서 제외 | `OpenAiTranslationClientRealApiTest` |
 

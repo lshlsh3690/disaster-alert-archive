@@ -194,60 +194,6 @@ public class DisasterEvent {
     }
 
     /**
-     * 안내성 롤링 이벤트 생성용 팩토리 — 산불 건조특보·소각금지·예방캠페인 등 실제 화재가 아닌
-     * 안내 알림을 시군구별로 모은다. 제목 {@code "{지역명} 산불예방안내"}(산불) / {@code "{지역명} {유형} 안내"}(그 외), {@code is_advisory=true}.
-     *
-     * <p>{@link #createFromFirstAlert}(사건)와 달리 본문/임베딩을 제목에 안 쓴다 — 안내성은 같은
-     * 시군구의 반복 발령이라 본문이 제각각이고, 묶음 자체가 "이 동네 산불 예방안내 모음"이기 때문.
-     */
-    public static DisasterEvent createAdvisory(
-            String disasterType,
-            String regionCode,
-            String regionName,
-            LocalDateTime alertAt
-    ) {
-        return createAdvisory(disasterType, regionCode, regionName, alertAt, false);
-    }
-
-    /**
-     * 안내 이벤트 팩토리. {@code broadcast=true} 는 시군구 2개 이상에 걸친 안내문을 시도/전국 단위로 모으는 용도로,
-     * 일반 광역 이벤트와 {@code is_advisory} 로만 구분된다.
-     */
-    public static DisasterEvent createAdvisory(
-            String disasterType,
-            String regionCode,
-            String regionName,
-            LocalDateTime alertAt,
-            boolean broadcast
-    ) {
-        String safeRegion = regionName == null ? "지역미상" : regionName;
-        // '기타' 안내 판별 규칙(AdvisoryClassifier)이 물놀이·수상안전 한 가지뿐이라 라벨을 고정한다.
-        // 규칙이 늘면 본문에서 라벨을 뽑도록 바꿔야 한다.
-        String label = "기타".equals(disasterType) ? "물놀이"
-                : isInformativeType(disasterType) ? disasterType : "재난";
-        return DisasterEvent.builder()
-                .eventTitle(advisoryTitle(safeRegion, label))
-                .primaryDisasterType(disasterType == null ? "UNKNOWN" : disasterType)
-                .primaryRegionCode(regionCode)
-                .primaryRegionName(safeRegion)
-                .firstAlertAt(alertAt)
-                .lastAlertAt(alertAt)
-                .alertCount(1)
-                .cooldownHours(DisasterCooldown.hoursFor(disasterType))
-                .broadcast(broadcast)
-                .advisory(true)
-                .build();
-    }
-
-    // 산불은 기존 제목("{시군구} 산불예방안내")을 유지해 이미 저장된 이벤트·화면과 호환시킨다.
-    // 폭염·한파 등은 "예방"이 맞지 않는 일반 안내라 "{시군구} {유형} 안내".
-    private static String advisoryTitle(String region, String label) {
-        return "산불".equals(label)
-                ? String.format("%s %s예방안내", region, label)
-                : String.format("%s %s 안내", region, label);
-    }
-
-    /**
      * '기타' 유형의 제목 가운데말 — 본문에서 규칙으로 깔끔한 라벨을 만든다.
      * (유형명이 없어 본문 앞부분을 그대로 잘라 쓰면 문장 중간에서 끊겨 지저분하므로.)
      *

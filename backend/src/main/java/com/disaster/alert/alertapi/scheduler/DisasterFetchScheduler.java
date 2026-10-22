@@ -1,6 +1,7 @@
 package com.disaster.alert.alertapi.scheduler;
 
 import com.disaster.alert.alertapi.api.DisasterOpenApiClient;
+import com.disaster.alert.alertapi.domain.disasteralert.service.AlertKindService;
 import com.disaster.alert.alertapi.domain.disasteralert.service.DisasterAlertService;
 import com.disaster.alert.alertapi.domain.event.service.EventClusteringService;
 import com.disaster.alert.alertapi.domain.event.service.EventCrossRegionService;
@@ -22,6 +23,7 @@ public class DisasterFetchScheduler {
     private final DisasterAlertService alertService;
     private final TranslationService translationService;
     private final AlertNotificationService alertNotificationService;
+    private final AlertKindService alertKindService;
     private final EventClusteringService eventClusteringService;
     private final EventCrossRegionService eventCrossRegionService;
 
@@ -44,6 +46,9 @@ public class DisasterFetchScheduler {
             translationService.translateAndSaveAsync(alertId);
             // FCM 알림 트리거
             alertNotificationService.triggerNotification(alertId);
+            // 사건/비사건 분류 — 동기 LLM 호출이라 시간이 중요한 FCM 알림 뒤에 둔다.
+            // 분류기·서비스가 모든 예외를 삼켜(실패는 null=미분류) 클러스터링을 막지 않는다. 지연은 OpenAI 호출 시간만큼이다.
+            alertKindService.classifyAndSave(alertId);
             // 이벤트 클러스터링
             eventClusteringService.clusterNewAlert(alertId);
             // 기타(지역 이동 유형) cross-region LLM 병합
