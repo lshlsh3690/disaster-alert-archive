@@ -184,6 +184,13 @@ public class DisasterAlertService {
      * (최대 10건까지 미리보기 — 그 이상은 페이로드 비대화 방지를 위해 개수만 표기).
      */
     private List<DisasterAlertDto> parseBodyElements(JsonNode bodyNode) {
+        // 2026-10-22 실측: 페이지에 따라 body가 배열이 아니라 {"items":[...]}로 한 번 더 감싸서
+        // 오는 경우가 있다(공공API 쪽의 비일관된 응답 포맷 — 재현 조건 불명, 특정 pageNo에서만
+        // 관찰됨). 감싸진 형태면 풀어서 그 안의 배열을 쓴다 — 안 그러면 이 페이지(최대 1000건)가
+        // 통째로 조용히 누락된다.
+        if (!bodyNode.isArray() && bodyNode.has("items") && bodyNode.path("items").isArray()) {
+            bodyNode = bodyNode.path("items");
+        }
         if (!bodyNode.isArray()) {
             if (!bodyNode.isMissingNode()) {
                 log.warn("재난문자 응답 body가 배열이 아닙니다({}) - 빈 것으로 처리", bodyNode.getNodeType());

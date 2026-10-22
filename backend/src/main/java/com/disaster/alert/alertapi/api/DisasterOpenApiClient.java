@@ -45,6 +45,23 @@ public class DisasterOpenApiClient {
         }
     }
 
+    /**
+     * crtDt 는 "해당 날짜 이후 전체"를 반환한다(단일 날짜 필터가 아님) — 과거 특정 기간을
+     * 백필할 때 pageNo 로 전체를 끝까지 페이지네이션해야 totalCount 만큼 다 받는다.
+     */
+    public String fetchData(String crtDt, int pageNo, int numOfRows) {
+        String url = URL + serviceKey + "&crtDt=" + crtDt + "&pageNo=" + pageNo + "&numOfRows=" + numOfRows;
+        try {
+            String forObject = restTemplate.getForObject(url, String.class);
+            log.info("Response from Disaster Open API fetched (crtDt={}, pageNo={}, length={})",
+                    crtDt, pageNo, forObject != null ? forObject.length() : 0);
+            return forObject;
+        } catch (Exception e) {
+            log.warn("DisasterOpenApiClient.fetchData(crtDt={}, pageNo={}) 실패", crtDt, pageNo);
+            return null;
+        }
+    }
+
     public String fetchData(int pageNo, int numOfRows) {
         String url = URL + serviceKey + "&pageNo=" + pageNo + "&numOfRows=" + numOfRows;
         try {
