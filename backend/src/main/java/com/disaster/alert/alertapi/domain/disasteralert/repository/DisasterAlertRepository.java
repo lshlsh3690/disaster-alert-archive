@@ -2,10 +2,13 @@ package com.disaster.alert.alertapi.domain.disasteralert.repository;
 
 import com.disaster.alert.alertapi.domain.disasteralert.dto.LatestAlertResponse;
 import com.disaster.alert.alertapi.domain.disasteralert.model.DisasterAlert;
+import com.disaster.alert.alertapi.domain.disasteralert.model.AlertKind;
 import io.lettuce.core.dynamic.annotation.Param;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -21,6 +24,16 @@ public interface DisasterAlertRepository extends JpaRepository<DisasterAlert, Lo
      */
     @Query("SELECT d.id FROM DisasterAlert d WHERE d.alertKind IS NULL ORDER BY d.id")
     List<Long> findUnclassifiedIds();
+
+    /**
+     * alert_kind 만 직접 UPDATE — findById 후 save(merge) 하면 detached 엔티티의 지연 로딩
+     * 컬렉션(disasterAlertRegions)을 건드리려다 LazyInitializationException이 난다
+     * (2026-10-23 실측, 100% 재현). 이 한 컬럼만 바꾸는 거라 엔티티를 읽어올 필요 자체가 없다.
+     */
+    @Modifying
+    @Transactional
+    @Query("UPDATE DisasterAlert d SET d.alertKind = :kind WHERE d.id = :id")
+    void updateAlertKind(@Param("id") Long id, @Param("kind") AlertKind kind);
 
     @Query("SELECT d.legalDistrict.name FROM DisasterAlertRegion d WHERE d.disasterAlert.id = :id")
     List<String> legalDistrictNamesByAlertId(Long id);
