@@ -2,7 +2,7 @@
 
 이벤트 클러스터링은 RAG가 아니지만, RAG 평가처럼 검색 → 판정(생성에 대응) → 엔드투엔드로 쪼개 보면 오류 원인을 단계별로 분리할 수 있다. 이 문서는 (1) 단계 대응, (2) 구현 파이프라인, (3) 검증 파이프라인, (4) 단계별 지표, (5) 평가 데이터, (6) 실측 사례, (7) 남은 과제를 기록한다. 마지막으로 갱신한 시점은 품질 개선 PR #292~#298이 모두 머지된 뒤다.
 
-> 한 줄 요약: 사람이 직접 라벨한 **총 250쌍**(개발용 150 + 최종용 100)으로 측정해, 개발용 재현율 0.615 → 0.844(+22.9%p), 정밀도 1.000 유지, 전체 이벤트 9,697 → 5,388로 줄였다. 자세한 비교는 `docs/CLUSTERING_QUALITY_REPORT.md`.
+> 한 줄 요약: 사람이 직접 라벨한 **총 250쌍**(개발용 150 + 최종용 100)으로 측정해, 개발용 재현율 0.615 → 0.844(+22.9%p), 정밀도 1.000 유지, 전체 이벤트 9,697 → 5,388로 줄였다. 자세한 비교는 `docs/event-clustering/CLUSTERING_QUALITY_REPORT.md`.
 
 ---
 
@@ -14,7 +14,7 @@
 | 생성 (Generation) | 후보와 **묶을지 말지를 결정**. 묶으면 병합, 아니면 신규 이벤트 | 새 문자 + 후보 → 병합 / 신규 |
 | 엔드투엔드 | 최종 결과로 **여러 재난문자가 묶인 이벤트**가 나오는 것 | 문자 스트림 → 이벤트 집합 |
 
-![단계 대응: 검색, 판정, 엔드투엔드와 실패 유형](images/clustering-eval/stage-mapping.png)
+![단계 대응: 검색, 판정, 엔드투엔드와 실패 유형](images/stage-mapping.png)
 
 ### 검토 의견: 이 대응은 맞고, 세 가지를 보정해서 기록한다
 
@@ -30,11 +30,11 @@
 
 **① 키 병합 경로** — 본문을 보지 않고 키가 같으면 병합하는 분기(위에서부터 판단, 앞에서 처리되면 건너뜀)
 
-![구현 파이프라인 1: 키 병합 경로](images/clustering-eval/implementation-keys.png)
+![구현 파이프라인 1: 키 병합 경로](images/implementation-keys.png)
 
 **② 임베딩 경로** — 위 분기에 걸리지 않은 알림이 도달하는 기본 경로(유사도 병합)
 
-![구현 파이프라인 2: 임베딩 경로](images/clustering-eval/implementation-embedding.png)
+![구현 파이프라인 2: 임베딩 경로](images/implementation-embedding.png)
 
 이 그림에는 실종자·탈출 동물을 다루는 cross-region 보조 패스(`EventCrossRegionService`)를 넣지 않았다(별도 패스).
 
@@ -52,7 +52,7 @@
 
 ## 3. 검증 파이프라인
 
-![검증 파이프라인](images/clustering-eval/verification-pipeline.png)
+![검증 파이프라인](images/verification-pipeline.png)
 
 | 단계 | 내용 | 도구·산출물 |
 |---|---|---|
@@ -63,7 +63,7 @@
 | 5 지표·오류 분해 | tp/fp/fn/tn, 정밀도·재현율·F1(전체·층별), 오류를 `ErrorCause`로 분류 | `EvaluationReportFormatter`(마크다운), `EventTuningService`(임계값 스윕) |
 | 6 이벤트 구조 점검 | 쌍 라벨로 안 잡히는 문제를 SQL로 직접 확인 | 수동 SQL (자동화 안 됨) |
 | 7 병목 진단·튜닝 | 오류 원인을 보고 개선 → Red-Green → 단위 테스트 → 코드 리뷰 → 재클러스터링 → 재측정 | 버전별 DB 클론 비교 |
-| 8 보고서 | V0 대비 단계별 개선량과 한계 | `docs/CLUSTERING_QUALITY_REPORT.md` |
+| 8 보고서 | V0 대비 단계별 개선량과 한계 | `docs/event-clustering/CLUSTERING_QUALITY_REPORT.md` |
 
 판정 기준(rubric)은 `backend/evaluation/datasets/cluster-eval-2026-10.rubric.md`에 있다. 같은 에피소드와 되풀이 안내는 같은 사건, 별개의 사고와 서로 다른 지역에서 병렬로 안내되는 같은 기상 상황은 다른 사건으로 본다.
 
@@ -160,7 +160,7 @@
 | #294 | 최종용 평가 표본 100쌍 + 이 문서의 이전 판 |
 | #295 | 산불 다지역 안내를 안내 광역 이벤트로 |
 | #296 | 일반 광역 조회 메서드 이름 정리 |
-| #297 | 최종 보고서 `docs/CLUSTERING_QUALITY_REPORT.md` |
+| #297 | 최종 보고서 `docs/event-clustering/CLUSTERING_QUALITY_REPORT.md` |
 | #298 | 산불 지역 한정 윈도우 14일 → 7일 |
 | #299, #300 | 용어 정리: "지역앵커" → "지역 한정", "앵커링" → "키 병합" |
 
@@ -168,9 +168,9 @@
 
 ## 11. 도식 원본과 다시 그리는 법
 
-그림(`docs/images/clustering-eval/*.png`)은 mermaid 소스(`docs/images/clustering-eval/src/*.mmd`)에서 만들었다. 흐름이 바뀌면 소스를 고치고 아래처럼 다시 변환한다(Node.js와 Chrome 필요).
+그림(`docs/images/*.png`)은 mermaid 소스(`docs/images/src/*.mmd`)에서 만들었다. 흐름이 바뀌면 소스를 고치고 아래처럼 다시 변환한다(Node.js와 Chrome 필요).
 
 ```
-npx @mermaid-js/mermaid-cli -i docs/images/clustering-eval/src/<이름>.mmd -o docs/images/clustering-eval/<이름>.png -c docs/images/clustering-eval/src/mermaid.json -b white -s 2
+npx @mermaid-js/mermaid-cli -i docs/images/src/<이름>.mmd -o docs/images/<이름>.png -c docs/images/src/mermaid.json -b white -s 2
 ```
 

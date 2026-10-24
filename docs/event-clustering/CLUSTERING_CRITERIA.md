@@ -3,7 +3,7 @@
 새 재난문자를 **어느 이벤트에 넣을지, 새 이벤트로 만들지**를 정하는 기준만 적은 문서다. 이 문서가 기준의 기준 문서이고, 다른 문서(`CLAUDE.md`, `specs/001-event-clustering-pipeline`)는 기준을 다시 쓰지 않고 이 문서를 참고한다. 기준을 바꾸면 이 문서를 먼저 고친다.
 
 - 값의 원본은 `backend/src/main/resources/application.yml`의 `clustering.*`이다. 아래에는 현재 값과 설정 키를 같이 적는다.
-- 구현 절차는 `specs/001-event-clustering-pipeline/`, 평가 방법과 측정 결과는 `docs/CLUSTERING_EVALUATION.md`를 본다. 이 문서에는 절차·성능 수치·이력을 적지 않는다.
+- 구현 절차는 `specs/001-event-clustering-pipeline/`, 평가 방법과 측정 결과는 `docs/event-clustering/CLUSTERING_EVALUATION.md`를 본다. 이 문서에는 절차·성능 수치·이력을 적지 않는다.
 
 ---
 
