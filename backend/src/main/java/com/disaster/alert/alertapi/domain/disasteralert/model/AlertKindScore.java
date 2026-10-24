@@ -1,5 +1,6 @@
 package com.disaster.alert.alertapi.domain.disasteralert.model;
 
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -28,8 +29,30 @@ public final class AlertKindScore {
                          List<Long> failed) {
     }
 
-    // Red 단계 뼈대 — 구현은 Green 에서
     public static Result score(List<Item> items) {
-        return new Result(0, List.of(), 0, List.of(), List.of());
+        int incidents = 0;
+        int advisories = 0;
+        List<Long> incidentAsAdvisory = new ArrayList<>();
+        List<Long> advisoryAsIncident = new ArrayList<>();
+        List<Long> failed = new ArrayList<>();
+        for (Item it : items) {
+            // 분류 실패는 null 로 남아 클러스터링에 그대로 들어간다 — 어느 오류와도 결과가 달라 따로 모은다
+            if (it.predicted() == null) {
+                failed.add(it.alertId());
+                continue;
+            }
+            if (it.human() == AlertKind.INCIDENT) {
+                incidents++;
+                if (it.predicted() != AlertKind.INCIDENT) {
+                    incidentAsAdvisory.add(it.alertId());
+                }
+            } else {
+                advisories++;
+                if (it.predicted() != AlertKind.ADVISORY) {
+                    advisoryAsIncident.add(it.alertId());
+                }
+            }
+        }
+        return new Result(incidents, incidentAsAdvisory, advisories, advisoryAsIncident, failed);
     }
 }
