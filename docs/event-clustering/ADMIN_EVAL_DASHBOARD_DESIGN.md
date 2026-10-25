@@ -50,9 +50,25 @@
 | `event_id` | 최종 배정 이벤트 |
 | `created_at` | 기록 시각 |
 
-- 새 Flyway 마이그레이션으로 테이블을 만든다. 이미 적용된 마이그레이션은 건드리지 않는다.
+`path` 와 `EventClusteringService` 의 대응(`CLUSTERING_CRITERIA.md` 3절 순서):
+
+| `path` | 어디서 끝나는가 | `candidates` / `threshold` |
+|---|---|---|
+| `SKIPPED` | `clusterNewAlert` 앞단 — 비사건(`ADVISORY`) 또는 본문이 빈 알림. `result=SKIPPED`, `event_id` null | null / null |
+| `PERSON` | `clusterPerson` | null / null |
+| `GLOBAL` | `clusterGlobalType` | null / null |
+| `REGIONAL` | `clusterRegionalType`(인접 시군구 산불 병합 `mergeIntoAdjacentRegionalEvent` 포함) | null / null |
+| `EPISODIC` | `clusterEpisodicType`, 시군구 1개 | null / null |
+| `BROADCAST` | `clusterBroadcast` — 시군구 10개 초과, 또는 에피소드형 시군구 2개 이상 | null / null |
+| `NO_REGION` | 임베딩 경로에 왔는데 지역 코드가 없음(항상 신규) | null / null |
+| `EMBEDDING` | 임베딩 경로 후보 검색·임계값·인접·LLM 폴백 | 후보 목록(0건이면 `[]`) / 적용한 병합 거리 상한 |
+
+- `candidates` 는 `[]`(검색했는데 0건)와 null(검색하지 않는 경로)을 구분한다. `adjacent_candidates` 는 인접 후보를 실제로 조회했을 때만 채운다(사고성 유형이고 같은 시군구 병합에 실패한 경우). 같은 시군구에서 병합되면 null 이다.
+- `llm_called` 는 LLM 폴백(`pickSameGeneralIncident`)을 실제로 호출했을 때만 true 다. 게이트(유형·borderline 후보·후보 이벤트 가드)에서 걸러져 호출하지 않았으면 false.
+- `clusterNewAlert` 안에서 예외가 나 이벤트 배정이 끝나지 않은 알림은 **기록하지 않는다**(결과를 모르므로). 이 경우는 이미 `log.error` 로 남고, ④의 "판정 기록 없음"에 저장 실패와 함께 잡힌다.
+- 새 Flyway 마이그레이션으로 테이블을 만든다. 이미 적용된 마이그레이션은 건드리지 않는다. 외래 키는 두지 않는다 — `event_id` 가 가리키는 이벤트는 재클러스터링·cross-region 병합 때 지워지고, 이 표는 판정 순간의 기록이라 지워진 이벤트 id 도 그대로 남아야 한다.
 - `EventClusteringService` 가 판정 중에 이미 아는 값을 모아 `clusterNewAlert` 끝에서 한 번 저장한다. 판정 로직은 바꾸지 않는다.
-- **저장 실패는 수집을 막지 않는다.** 예외를 삼키고 `warn` 로그만 남긴다(분류 저장 LazyInitializationException 사고 참고).
+- **저장 실패는 수집을 막지 않는다.** 예외를 삼키고 `warn` 로그만 남긴다(분류 저장 LazyInitializationException 사고 참고). JPA 엔티티 merge 가 아니라 `JdbcTemplate` 단일 UPSERT 로 쓰고, 클러스터링 트랜잭션과 분리된 별도 트랜잭션(`REQUIRES_NEW`)에서 실행한다 — 같은 트랜잭션에서 SQL 이 실패하면 Postgres 가 트랜잭션 전체를 중단 상태로 만들어 클러스터링 결과(매핑·이벤트)까지 커밋되지 않기 때문이다(`DeadTokenCleanupService` 와 같은 이유).
 - 같은 알림을 다시 클러스터링하면(백필) 기존 줄을 덮어써 알림당 1줄을 유지한다.
 - 원문·임베딩은 넣지 않는다(`disaster_alert` 에 있음). cross-region 패스(동물 탈출)는 범위 밖.
 - 하루 수백 줄 수준이다.
@@ -80,7 +96,7 @@
 
 | 단계 | 대상 (분모) | 오류 (M) |
 |---|---|---|
-| 데이터 적재 — 누락 | 기간 내 전체 알림 | 임베딩 없음, 지역 매핑 없음, 분류 실패(`alert_kind` null), **판정 기록 없음**(저장 실패. 이 알림은 검색·생성·엔드투엔드 표본에서 빠진다. 판정 기록 배포 시점을 저장해 두고 **그 이후 알림만** 센다 — 배포 전 알림은 기록이 없는 게 정상이다) |
+| 데이터 적재 — 누락 | 기간 내 전체 알림 | 임베딩 없음, 지역 매핑 없음, 분류 실패(`alert_kind` null), **판정 기록 없음**(저장 실패 또는 클러스터링 중 오류. 이 알림은 검색·생성·엔드투엔드 표본에서 빠진다. 판정 기록 배포 시점을 저장해 두고 **그 이후 알림만** 센다 — 배포 전 알림은 기록이 없는 게 정상이다) |
 | 데이터 적재 — 분류 | 판사가 사건이라 한 알림 / 비사건이라 한 알림 | 분류기가 비사건으로 분류 / 사건으로 분류 |
 | 검색 | 판사 `SAME` 이고 나중 알림이 `EMBEDDING` 경로인 쌍 | 먼저 알림의 이벤트가 `candidates`·`adjacent_candidates` 에 없음 |
 | 생성 | 위에서 후보에 든 쌍 / 판사 `DIFF` 인데 후보에 든 쌍 | 안 묶음 / 묶음 |
