@@ -8,7 +8,7 @@
 
 **입력**: 사용자 설명: "재난 안전 문자 아카이브 서비스의 이벤트 클러스터링 파이프라인 — 개별 재난문자(disaster_alert)를 같은 사건(disaster_event)으로 자동 그룹핑하는 서브시스템을 기존 코드 기준으로 문서화"
 
-> **기준 문서**: 유형별 병합·분리 기준(키, 윈도우, 임계값, 비사건 제외)은 [`docs/CLUSTERING_CRITERIA.md`](../../docs/CLUSTERING_CRITERIA.md)가 기준 문서다. 이 명세는 2026-08 시점의 as-built 서술이므로 기준이 다르면 그 문서를 따른다.
+> **기준 문서**: 유형별 병합·분리 기준(키, 윈도우, 임계값, 비사건 제외)은 [`docs/event-clustering/CLUSTERING_CRITERIA.md`](../../docs/event-clustering/CLUSTERING_CRITERIA.md)가 기준 문서다. 이 명세는 2026-08 시점의 as-built 서술이므로 기준이 다르면 그 문서를 따른다.
 
 > **문서 성격**: 이 명세는 신규 기능 요청이 아니라 **이미 운영 중인(as-built) 시스템의 사후 명세**다. "사용자 스토리"는 향후 구현할 요구사항이 아니라 현재 코드가 실제로 수행하는 동작을 서술한다. 모든 FR/시나리오는 실제 소스 코드(`backend/src/main/java/.../domain/event/`)와 `backend/src/main/resources/application.yml`의 `clustering.*` 블록을 근거로 작성했으며, 파일 경로:줄번호를 함께 표기한다.
 
