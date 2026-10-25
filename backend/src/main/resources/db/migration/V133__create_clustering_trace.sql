@@ -5,7 +5,7 @@
 -- 검색·생성 단계의 N개 중 M개를 셀 때 읽는다. 운영 판정 로직은 이 표를 읽지 않는다.
 --
 -- alert_id : 알림 id (PK). 같은 알림을 다시 클러스터링(백필)하면 UPSERT 로 덮어써 알림당 1줄을 유지한다.
--- path : EMBEDDING / REGIONAL / EPISODIC / PERSON / GLOBAL / BROADCAST / NO_REGION / SKIPPED
+-- path : EMBEDDING / REGIONAL / EPISODIC / PERSON / GLOBAL_TYPE / BROADCAST / NO_REGION / SKIPPED
 -- candidates : 같은 시군구 후보 [{"event":15918,"dist":0.387}]. 검색했는데 0건이면 [], 검색하지 않는 경로는 NULL
 -- adjacent_candidates : 인접 시군구 후보(사고성 유형이 같은 시군구 병합에 실패해 실제 조회했을 때만), 그 외 NULL
 -- threshold : 적용된 병합 거리 상한(임베딩 경로만)

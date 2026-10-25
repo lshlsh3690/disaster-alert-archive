@@ -14,9 +14,15 @@ public enum ClusteringTracePath {
     EPISODIC,
     /** 실종자 신원 키 경로. */
     PERSON,
-    /** 전국 통합 유형(태풍) 경로. */
-    GLOBAL,
-    /** 광역 broadcast 경로. */
+    /**
+     * 전국 통합 유형(태풍) 키 경로 — <b>유형</b>이 기준이라 발송 시군구가 1개여도 여기로 온다. 키는 유형만.
+     * {@code MergeMethod.GLOBAL_TYPE}, {@code clustering.global-types} 와 같은 이름.
+     */
+    GLOBAL_TYPE,
+    /**
+     * 광역 broadcast 경로 — <b>발송 시군구 수</b>가 기준: {@code max-region-span}(10) 초과, 또는 에피소드형 유형이
+     * 시군구 2개 이상. 키는 시도+유형(시도 {@code nationwide-sido-span}(8) 이상이면 전국+유형).
+     */
     BROADCAST,
     /** 임베딩 경로에 왔는데 지역 코드가 없어 항상 신규로 만든 경우. */
     NO_REGION,

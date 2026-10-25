@@ -41,7 +41,7 @@
 | 컬럼 | 내용 |
 |---|---|
 | `alert_id` | 알림 id (PK) |
-| `path` | `EMBEDDING`, `REGIONAL`(지역 한정), `EPISODIC`, `PERSON`(신원 키), `GLOBAL`(태풍), `BROADCAST`, `NO_REGION`, `SKIPPED`(비사건 제외) |
+| `path` | `EMBEDDING`, `REGIONAL`(지역 한정), `EPISODIC`, `PERSON`(신원 키), `GLOBAL_TYPE`(태풍), `BROADCAST`, `NO_REGION`, `SKIPPED`(비사건 제외) |
 | `candidates` | 같은 시군구 후보 이벤트와 거리 JSON `[{"event":15918,"dist":0.387}]` |
 | `adjacent_candidates` | 인접 시군구 후보(사고성 유형만) JSON, 없으면 null |
 | `threshold` | 적용된 병합 기준 거리 |
@@ -56,10 +56,10 @@
 |---|---|---|
 | `SKIPPED` | `clusterNewAlert` 앞단 — 비사건(`ADVISORY`) 또는 본문이 빈 알림. `result=SKIPPED`, `event_id` null | null / null |
 | `PERSON` | `clusterPerson` | null / null |
-| `GLOBAL` | `clusterGlobalType` | null / null |
+| `GLOBAL_TYPE` | `clusterGlobalType` — 유형이 태풍이면 발송 시군구 수와 무관하게 여기로 온다. 키는 유형만 | null / null |
 | `REGIONAL` | `clusterRegionalType`(인접 시군구 산불 병합 `mergeIntoAdjacentRegionalEvent` 포함) | null / null |
 | `EPISODIC` | `clusterEpisodicType`, 시군구 1개 | null / null |
-| `BROADCAST` | `clusterBroadcast` — 시군구 10개 초과, 또는 에피소드형 시군구 2개 이상 | null / null |
+| `BROADCAST` | `clusterBroadcast` — 발송 시군구 수가 기준: 10개 초과, 또는 에피소드형 유형이 2개 이상. 키는 시도+유형(시도 8개 이상이면 전국+유형) | null / null |
 | `NO_REGION` | 임베딩 경로에 왔는데 지역 코드가 없음(항상 신규) | null / null |
 | `EMBEDDING` | 임베딩 경로 후보 검색·임계값·인접·LLM 폴백 | 후보 목록(0건이면 `[]`) / 적용한 병합 거리 상한 |
 
@@ -78,7 +78,7 @@
 - **쌍 표본**: 최근 N일 알림 중 같은 유형, 같은·인접 시군구, 발송 간격 7일 이내인 쌍을 시스템 결과와 무관하게 무작위로 뽑는다(사건 셋을 만든 방식과 같음). 판정 기록이 있는 알림만 대상으로 한다. 판정 기록이 없는 알림 수는 회차마다 데이터 적재 단계에 함께 표시해, 저장 실패로 표본에서 조용히 빠진 알림이 보이게 한다(수집을 막지 않는 원칙은 유지).
 - **알림 표본**: 분류 단계용으로 최근 N일 알림을 무작위로 뽑는다(사건·비사건 모두).
 - 기본값 예: 쌍 300개, 알림 100건. 실행 시 바꿀 수 있게 한다.
-- **실종자(`PERSON`)·태풍(`GLOBAL`) 경로는 이번 표본 대상에서 뺀다.** 실종자는 지역 무관·14일, 태풍은 전국이 같은 사건 범위라 위 조건(같은·인접 시군구, 7일)으로는 거의 뽑히지 않는다. 두 경로를 대표하는 표본 조건은 나중에 따로 정한다(6절).
+- **실종자(`PERSON`)·태풍(`GLOBAL_TYPE`) 경로는 이번 표본 대상에서 뺀다.** 실종자는 지역 무관·14일, 태풍은 전국이 같은 사건 범위라 위 조건(같은·인접 시군구, 7일)으로는 거의 뽑히지 않는다. 두 경로를 대표하는 표본 조건은 나중에 따로 정한다(6절).
 
 ### ③ 판사
 
