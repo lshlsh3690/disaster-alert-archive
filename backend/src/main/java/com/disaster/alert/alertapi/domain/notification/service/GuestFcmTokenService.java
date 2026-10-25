@@ -48,8 +48,8 @@ public class GuestFcmTokenService {
                     // 이미 회원에 연결된 토큰이면 게스트 등록 스킵
                     if (existing.getMember() != null) return;
                     existing.updateToken(token);
-                    // 웹 푸시를 모바일 전용으로 바꾸며 deviceType 이 WEB → MOBILE_WEB 으로 바뀌었다.
-                    // 갱신하지 않으면 모바일 게스트 토큰이 옛 WEB 으로 남아, 데스크톱 WEB 토큰 정리 때 함께 지워진다.
+                    // 웹 푸시를 모바일 전용으로 바꾸며 deviceType 이 WEB → MOBILE_WEB 으로 바뀌었다(V134 가 기존 WEB 삭제).
+                    // 캐시된 옛 프론트가 배포 직후 WEB 으로 다시 등록해도, 새 프론트로 재등록할 때 MOBILE_WEB 으로 바로잡힌다.
                     existing.updateDeviceType(request.deviceType());
                 },
                 () -> fcmTokenRepository.save(

@@ -12,7 +12,7 @@ public class FcmTokenDtos {
             String token,
 
             @NotBlank(message = "deviceType은 필수입니다.")
-            String deviceType  // MOBILE_WEB / ANDROID(TWA) / IOS. WEB 은 모바일 전용 전환(2026-10) 전 값 — 데스크톱 포함이라 정리 대상
+            String deviceType  // MOBILE_WEB / ANDROID(TWA) / IOS. WEB 은 모바일 전용 전환(2026-10) 전 값 — 데스크톱 포함이라 V134 가 삭제
     ) {}
 
     public record GuestRegisterRequest(

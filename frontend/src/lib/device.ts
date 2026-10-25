@@ -19,7 +19,7 @@ export function isMobileDevice(): boolean {
 
 /**
  * 서버에 보내는 FCM 토큰의 기기 구분. TWA(안드로이드 앱 래퍼)는 ANDROID, 그 밖의 모바일 브라우저는 MOBILE_WEB.
- * 예전 값 WEB 은 데스크톱이 섞여 있어, 전환 후 유예 기간이 지나면 남은 WEB 토큰을 정리한다.
+ * 예전 값 WEB 은 데스크톱이 섞여 있어 V134 마이그레이션으로 일괄 삭제했다.
  */
 export function pushDeviceType(): "ANDROID" | "MOBILE_WEB" {
   return document.referrer.includes("android-app://") ? "ANDROID" : "MOBILE_WEB";
