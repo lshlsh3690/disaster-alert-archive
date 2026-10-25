@@ -92,12 +92,49 @@
 
 ### ⑤ 결과 저장과 관리자 페이지
 
-- 테이블 `evaluation_run`(회차: 실행 시각, 기간, 표본 크기, 판사 모델, 분류 프롬프트 버전, 판사 신뢰도 두 숫자, 비용 추정) + `evaluation_stage_result`(회차 id, 단계, 분모, 오류 수, 오류 표본 id 목록).
-- 백엔드 API(관리자 권한 `@PreAuthorize("hasRole('ADMIN')")`, 응답은 `ApiResponse`):
-  - `GET /api/v1/admin/evaluation/runs` — 회차 목록과 단계별 수치
-  - `GET /api/v1/admin/evaluation/runs/{id}` — 단계별 오류 표본(원문 두 개씩)
-  - `POST /api/v1/admin/evaluation/runs` — 평가 실행(판사 호출 비용이 들므로 관리자만, 동시 실행 1개)
-- 프론트(관리자 페이지): 단계별 "N개 중 M개" 표, 회차별 추이, 오류 표본 보기, 판사 신뢰도 표시. 검색·생성 수치에는 "판정 기록 배포 이후 알림만"이라고 적는다.
+#### 오류는 두 종류로 나뉜다
+
+| 종류 | 무엇 | 어떻게 아는가 | 범위 |
+|---|---|---|---|
+| **전수 오류** | 임베딩 누락, 지역 매핑 누락, 분류 실패(`alert_kind` null), 판정 기록 저장 실패 | 정답 없이 DB·로그로 바로 앎 | 기간 내 **모든 알림**을 날짜별로 센다 |
+| **표본 오류** | 분류 오판, 검색 실패, 판정 실패, 과병합, 키 경로 오류, 과소병합 | 판사 정답과 비교해야 앎 | 평가 회차에서 뽑은 **표본 안에서만** 나온다 |
+
+표본 오류의 날짜별 건수는 "그날 들어온 알림 중 표본에 뽑힌 것" 기준이라, 그날 전체 오류 수가 아니라는 점을 화면에 밝힌다.
+
+#### 저장
+
+- `evaluation_run` — 회차: 실행 시각, 대상 기간, 표본 크기, 판사 모델, 분류 프롬프트 버전, 판사 신뢰도 두 숫자, 비용 추정.
+- `evaluation_stage_result` — 회차 × 단계: 분모, 오류 수.
+- `evaluation_error` — **오류 1건당 1줄.** 대시보드에서 "언제, 어떤 문자에서" 났는지 보기 위한 테이블.
+
+| 컬럼 | 내용 |
+|---|---|
+| `id`, `run_id` | 오류 id, 회차(전수 오류는 null) |
+| `stage` | `LOAD`(데이터 적재), `RETRIEVAL`(검색), `DECISION`(생성), `KEY_PATH`, `END_TO_END` |
+| `error_type` | `EMBEDDING_MISSING`, `REGION_MISSING`, `KIND_UNCLASSIFIED`, `INCIDENT_AS_ADVISORY`, `ADVISORY_AS_INCIDENT`, `NOT_IN_CANDIDATES`, `NOT_MERGED`, `WRONG_MERGE` 등 |
+| `occurred_at` | 오류가 난 시점 = **문제가 된 알림(쌍이면 나중 알림)의 수신 시각**. 날짜별 집계 기준 |
+| `alert_id`, `pair_alert_id` | 문제 알림, 쌍의 상대 알림(먼저 온 알림, 쌍 오류만) |
+| `disaster_type`, `sigungu` | 필터용 유형·시군구 |
+| `path`, `distance`, `threshold`, `llm_called`, `llm_result` | 그 순간의 판정 기록 요약(판정 기록에서 복사) |
+| `judge_answer`, `system_result` | 판사 답과 시스템 결과(표본 오류만) |
+
+원문은 복사하지 않고 `alert_id` 로 `disaster_alert` 에서 읽는다.
+
+#### 백엔드 API (관리자 권한 `@PreAuthorize("hasRole('ADMIN')")`, 응답은 `ApiResponse`)
+
+- `GET /api/v1/admin/evaluation/runs` — 회차 목록과 단계별 "N개 중 M개"
+- `GET /api/v1/admin/evaluation/errors/daily?from=&to=&stage=` — 날짜 × 단계별 오류 건수(전수·표본 구분)
+- `GET /api/v1/admin/evaluation/errors?date=&stage=&type=&disasterType=&page=` — 오류 목록. 행마다 원문(쌍이면 두 개), 유형, 지역, 시각, 경로, 거리, 기준값, LLM 결과, 판사 답
+- `POST /api/v1/admin/evaluation/runs` — 평가 실행(판사 호출 비용이 들므로 관리자만, 동시 실행 1개)
+
+#### 화면 (관리자 페이지)
+
+1. **요약**: 최근 회차의 단계별 "N개 중 M개" 표와 판사 신뢰도.
+2. **날짜별 오류**: 날짜 × 단계 막대 그래프. 전수 오류와 표본 오류를 구분해 표시. 막대를 누르면 그날 오류 목록으로 이동.
+3. **오류 목록**: 날짜·단계·오류 종류·재난 유형으로 거른다. 행을 펼치면 원문, 그 순간의 판정 기록(경로, 후보 이벤트와 거리, 기준값, LLM 결과), 판사 답을 보여 주고, 해당 이벤트 상세로 갈 수 있다.
+4. **회차별 추이**: 단계별 오류 비율의 회차별 변화(튜닝 전후 비교).
+
+검색·생성 수치와 오류에는 "판정 기록 배포 이후 알림만"이라고 적는다.
 
 ## 5. 비용
 
@@ -121,7 +158,9 @@
 |---|---|---|
 | 1 | ① 판정 기록 (운영 기록) | 배포한 날부터 데이터가 쌓이므로 가장 먼저 |
 | 2 | ③ 판사 + 판사 신뢰도 측정 | 판사를 믿을 수 있는지부터 확인 |
-| 3 | ② 표본 뽑기 + ④ 단계별 계산 + 결과 테이블 | 판정 기록이 며칠 쌓인 뒤 |
-| 4 | ⑤ 관리자 API·화면 | 결과가 저장되기 시작한 뒤 |
+| 3 | ② 표본 뽑기 + ④ 단계별 계산 + 결과·오류 테이블(`evaluation_run`, `evaluation_stage_result`, `evaluation_error`) | 판정 기록이 며칠 쌓인 뒤 |
+| 4 | ⑤ 관리자 API·화면 (요약 → 날짜별 오류 → 오류 목록 → 회차별 추이) | 결과가 저장되기 시작한 뒤 |
+
+전수 오류(임베딩·지역 누락, 분류 실패)는 판사 없이 DB 만 세면 되므로, 3 이전에도 날짜별 화면을 먼저 만들 수 있다.
 
 각 단계는 백엔드 TDD(`tdd-developer` RED → 사용자 확인 → GREEN → `code-reviewer`)로 진행하고, 배포 전 평가 사본에서 먼저 동작을 확인한다.
