@@ -9,7 +9,6 @@ import java.util.List;
  * <p>필드 의미와 {@code null} 규칙(후보 {@code []} 와 null 의 구분 등)은
  * docs/event-clustering/ADMIN_EVAL_DASHBOARD_DESIGN.md 4절 ① 참고.
  */
-// Red 단계 뼈대 — 구현은 Green 에서
 public class ClusteringTrace {
 
     /** 후보 이벤트와 알림 사이의 코사인 거리. JSON 으로는 {@code {"event":id,"dist":값}} 으로 저장한다. */

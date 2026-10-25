@@ -4,6 +4,9 @@ import com.disaster.alert.alertapi.domain.disasteralert.model.AlertKind;
 import com.disaster.alert.alertapi.domain.disasteralert.model.DisasterAlert;
 import com.disaster.alert.alertapi.domain.disasteralert.model.DisasterAlertRegion;
 import com.disaster.alert.alertapi.domain.disasteralert.repository.DisasterAlertRepository;
+import com.disaster.alert.alertapi.domain.event.model.ClusteringTrace;
+import com.disaster.alert.alertapi.domain.event.model.ClusteringTracePath;
+import com.disaster.alert.alertapi.domain.event.model.ClusteringTraceResult;
 import com.disaster.alert.alertapi.domain.event.model.DisasterCooldown;
 import com.disaster.alert.alertapi.domain.event.model.DisasterEvent;
 import com.disaster.alert.alertapi.domain.event.model.EventAlertMapping;
@@ -65,7 +68,7 @@ public class EventClusteringService {
     private final ApplicationEventPublisher eventPublisher;
     /** 사고성 borderline 후보를 LLM 에 "같은 사건인가" 묻는 폴백 판정. */
     private final EventLLMDecisionService llmDecisionService;
-    /** 판정 기록 저장소 — Red 단계 뼈대: 필드만 추가, 호출은 Green 에서. */
+    /** 판정 기록(clustering_trace) 저장 — 실패해도 클러스터링 결과에는 영향 없음(별도 트랜잭션, 예외는 삼킴). */
     private final ClusteringTraceRepository clusteringTraceRepository;
 
     /** 임베딩 병합 유사도 하한 — 후보 거리가 1 - 이 값(0.15) 이하면 병합한다. */
@@ -177,22 +180,49 @@ public class EventClusteringService {
             return;
         }
         DisasterAlert alert = opt.get();
+        // 판정 기록 — 알림별 값이라 필드가 아니라 지역 변수로 만들어 메서드 인자로 넘긴다(싱글턴 빈, 백필은 다중 스레드).
+        ClusteringTrace trace = new ClusteringTrace(alertId);
         // 비사건(ADVISORY)은 이벤트로 묶지 않기로 한 결정이라 임베딩·후보 검색·LLM 폴백보다 앞에서 끊는다.
         // null(분류 실패·분류 도입 전 기존 알림)은 통과시킨다 — 분류 실패가 사건을 이벤트에서 빼면 안 된다.
         if (alert.getAlertKind() == AlertKind.ADVISORY) {
             log.info("clusterNewAlert: alertId={} 비사건(ADVISORY, type={}) — 클러스터링 제외", alertId, alert.getDisasterType());
+            recordSkipped(trace);
             return;
         }
         if (alert.getMessage() == null || alert.getMessage().isBlank()) {
             log.warn("clusterNewAlert: alertId={} message 가 비어있음 — skip", alertId);
+            recordSkipped(trace);
             return;
         }
 
         try {
-            doCluster(alert);
+            doCluster(alert, trace);
         } catch (Exception e) {
             // 한 건 실패가 수집 사이클을 막지 않도록 여기서 잡음.
+            // 판정이 끝나지 못한 알림이라 기록도 남기지 않는다(설계안: 예외 시 기록 없음).
             log.error("clusterNewAlert: alertId={} 처리 중 오류 — skip", alertId, e);
+            return;
+        }
+        // doCluster 의 try 밖에서 저장한다 — 기록 저장 실패가 "처리 중 오류"(error) 로 찍히지 않게.
+        saveTrace(trace);
+    }
+
+    /** 클러스터링에서 제외된 알림(비사건·본문 없음)의 기록. 기록이 없으면 대시보드가 "저장 실패"로 세게 된다. */
+    private void recordSkipped(ClusteringTrace trace) {
+        trace.recordPath(ClusteringTracePath.SKIPPED);
+        trace.recordResult(ClusteringTraceResult.SKIPPED, null);
+        saveTrace(trace);
+    }
+
+    /**
+     * 판정 기록 저장. 기록은 부가 정보라 저장이 실패해도 클러스터링 결과를 되돌리지 않는다.
+     * 로그 레벨이 warn 인 이유: 사람이 즉시 조치할 장애가 아니라 대시보드 집계에서 1건이 빠지는 문제다.
+     */
+    private void saveTrace(ClusteringTrace trace) {
+        try {
+            clusteringTraceRepository.upsert(trace);
+        } catch (RuntimeException e) {
+            log.warn("clusterNewAlert: alertId={} 판정 기록 저장 실패 — 클러스터링 결과에는 영향 없음", trace.getAlertId(), e);
         }
     }
 
@@ -214,17 +244,17 @@ public class EventClusteringService {
         return alertIds.size();
     }
 
-    private void doCluster(DisasterAlert alert) {
+    private void doCluster(DisasterAlert alert, ClusteringTrace trace) {
         // 0. 실종 인물(기타 + 이름·나이)은 신원(이름+나이+키)으로만 클러스터링 — 시군구·임베딩 무관.
         //    같은 사람=한 이벤트(지역 옮겨도), 다른 사람=다른 이벤트(같은 시군구라도). broadcast 도 안 탐.
-        if (clusterPerson(alert)) {
+        if (clusterPerson(alert, trace)) {
             return;
         }
 
         // 0.5 전국 통합 유형(태풍 등)은 지역·임베딩 무관하게 시간 윈도우로만 단일 이벤트에 묶는다.
         //     태풍 알림은 대부분 시군구 단위로 쪼개져 발송돼(span 게이트 미달) local 경로의 지역
         //     hard 필터에 막혀 시군구마다 이벤트가 생겼다. 유형 자체를 키로 써서 임베딩 전에 분기.
-        if (clusterGlobalType(alert)) {
+        if (clusterGlobalType(alert, trace)) {
             return;
         }
 
@@ -232,7 +262,7 @@ public class EventClusteringService {
         //     윈도우 안이면 임베딩 무관하게 단일 이벤트로 묶는다. 한 산불/호우 episode 가 같은 시군구에서
         //     며칠 burst 로 쏟아질 때 본문 텍스트가 갈려(코사인<0.85) 임베딩 경로가 한 사건을 수십 개로
         //     파편화하던 것을 차단. 태풍(GLOBAL_TYPE)과 같은 철학이되 전국이 아니라 시군구 스코프(blob 방지).
-        if (clusterRegionalType(alert)) {
+        if (clusterRegionalType(alert, trace)) {
             return;
         }
 
@@ -240,7 +270,7 @@ public class EventClusteringService {
         //     이어지는 동안은 안내/특보·문장 유사도와 무관하게 하나의 이벤트. 임베딩·LLM 호출 전에 분기해
         //     비용도 들지 않는다. 시군구 1개는 키 병합, 2개 이상(다지역)은 지역 이벤트와 섞이지 않게
         //     곧바로 광역(broadcast) 경로로 보낸다(시군구 간 다리 방지). 사고성은 전파 허용이라 대상 아님.
-        if (clusterEpisodicType(alert)) {
+        if (clusterEpisodicType(alert, trace)) {
             return;
         }
 
@@ -258,7 +288,8 @@ public class EventClusteringService {
         if (regionCodes.length == 0) {
             // 지역 정보 없으면 후보 검색 불가 → 항상 신규 이벤트
             log.info("clusterNewAlert: alertId={} 지역 코드 없음 — 신규 이벤트 생성", alert.getId());
-            createNewEvent(alert, null, null, false);
+            trace.recordPath(ClusteringTracePath.NO_REGION);
+            createNewEvent(alert, null, null, false, trace);
             return;
         }
 
@@ -266,10 +297,11 @@ public class EventClusteringService {
         // 단, 같은 시도+유형 broadcast 끼리는 묶어 "{시도} {유형}" 단일 사건으로 통합(파편 방지).
         int sigunguSpan = distinctSigunguCount(regionCodes);
         if (sigunguSpan > maxRegionSpan) {
-            clusterBroadcast(alert, regionCodes, sigunguSpan);
+            clusterBroadcast(alert, regionCodes, sigunguSpan, trace);
             return;
         }
 
+        trace.recordPath(ClusteringTracePath.EMBEDDING);
         LocalDateTime since = alert.getCreatedAt().minusHours(candidateWindowHours);
         // 후보는 이미 지역 hard 필터(시군구 교집합) 통과한 같은 지역 이벤트들.
         // 코드 granularity 차이(군레벨 4886000000 vs 읍면동 4886036000)를 흡수하려 시군구(앞 5자) 교집합으로 매칭.
@@ -281,28 +313,31 @@ public class EventClusteringService {
 
         // 5. 임계값 판정 — 같은 지역 후보 중 코사인 유사도 >= threshold 면 머지
         double mergeMaxDistance = mergeMaxDistanceFor(alert.getDisasterType());
+        // 판정 기록: 조회 결과 그대로(0건이면 빈 목록)와 적용 기준을 남긴다.
+        trace.recordCandidates(toTraceCandidates(candidates));
+        trace.recordThreshold(mergeMaxDistance);
         for (Object[] row : candidates) {
             Long eventId = ((Number) row[0]).longValue();
             double dist = ((Number) row[1]).doubleValue();
             if (dist <= mergeMaxDistance) {
-                mergeIntoExisting(eventId, alert, 1.0 - dist, MergeMethod.EMBEDDING);
+                mergeIntoExisting(eventId, alert, 1.0 - dist, MergeMethod.EMBEDDING, trace);
                 return;
             }
         }
 
         // 5.2 인접 시군구 후보 — 사고성 유형만, 임계값 병합만(LLM 폴백 없음).
-        if (tryMergeAdjacent(alert, embeddingText, regionCodes, mergeMaxDistance)) {
+        if (tryMergeAdjacent(alert, embeddingText, regionCodes, mergeMaxDistance, trace)) {
             return;
         }
 
         // 5.5 LLM 폴백 — 임베딩은 임계 미만이지만 같은 사건일 수 있는 사고성 알림을 LLM 으로 판정.
         //     "서소문 고가 붕괴"처럼 같은 사고를 여러 기관이 다른 측면(도로통제/열차중지)으로 보내
         //     본문 임베딩이 갈리는 케이스를 묶는다. 폭염 등 기상특보는 화이트리스트에서 제외(과병합 방지).
-        if (tryLlmFallback(alert, candidates, mergeMaxDistance)) {
+        if (tryLlmFallback(alert, candidates, mergeMaxDistance, trace)) {
             return;
         }
 
-        createNewEvent(alert, regionCodes[0], extractFirstRegionName(alert), false);
+        createNewEvent(alert, regionCodes[0], extractFirstRegionName(alert), false, trace);
     }
 
     /**
@@ -317,13 +352,15 @@ public class EventClusteringService {
      * @return 인접 이벤트에 병합했으면 true
      */
     private boolean tryMergeAdjacent(DisasterAlert alert, String embeddingText, String[] regionCodes,
-                                     double mergeMaxDistance) {
+                                     double mergeMaxDistance, ClusteringTrace trace) {
         if (!isAccidentType(alert.getDisasterType())) {
             return false;
         }
         LocalDateTime adjacentSince = alert.getCreatedAt().minusHours(adjacentWindowHours);
         List<Object[]> adjacent = disasterEventRepository.findTopAdjacentCandidates(
                 embeddingText, sigunguPrefixes(regionCodes), adjacentSince);
+        // 실제로 조회한 경우만 기록한다(조기 return 한 비사고성은 null 유지) — 0건이면 빈 목록.
+        trace.recordAdjacentCandidates(toTraceCandidates(adjacent));
         log.info("clusterNewAlert: alertId={} 인접 시군구 후보 {}건 (윈도우 {}h)",
                 alert.getId(), adjacent.size(), adjacentWindowHours);
         logCandidates(alert.getId(), adjacent);
@@ -338,7 +375,7 @@ public class EventClusteringService {
             // 가드 실패 후보는 건너뛰고 다음(더 먼) 후보를 본다.
             DisasterEvent ev = disasterEventRepository.findById(eventId).orElse(null);
             if (allowsAccidentMerge(alert, ev) && withinAdjacentEventAge(alert, ev)) {
-                mergeIntoExisting(eventId, alert, 1.0 - dist, MergeMethod.EMBEDDING);
+                mergeIntoExisting(eventId, alert, 1.0 - dist, MergeMethod.EMBEDDING, trace);
                 return true;
             }
         }
@@ -366,7 +403,8 @@ public class EventClusteringService {
      *
      * @return LLM 이 같은 사건으로 판정해 머지하면 true
      */
-    private boolean tryLlmFallback(DisasterAlert alert, List<Object[]> candidates, double mergeMaxDistance) {
+    private boolean tryLlmFallback(DisasterAlert alert, List<Object[]> candidates, double mergeMaxDistance,
+                                   ClusteringTrace trace) {
         if (!isAccidentType(alert.getDisasterType()) || isAnimalCase(alert.getMessage())) {
             return false;
         }
@@ -399,13 +437,15 @@ public class EventClusteringService {
         }
 
         Integer pick = llmDecisionService.pickSameGeneralIncident(alert.getMessage(), cands);
+        // LLM 을 실제로 부른 알림만 기록한다(가드에서 걸러져 부르지 않은 알림은 llm_called=false 유지).
+        trace.recordLlmCall(pick == null ? null : cands.get(pick).eventId());
         if (pick == null) {
             return false;
         }
         Long targetEventId = cands.get(pick).eventId();
         log.info("clusterNewAlert(LLM폴백): alertId={} → event={} 같은 사건 판정 머지 (type={}, 후보 {}건)",
                 alert.getId(), targetEventId, alert.getDisasterType(), cands.size());
-        mergeIntoExisting(targetEventId, alert, null, MergeMethod.LLM_FALLBACK);
+        mergeIntoExisting(targetEventId, alert, null, MergeMethod.LLM_FALLBACK, trace);
         return true;
     }
 
@@ -463,10 +503,11 @@ public class EventClusteringService {
      *
      * @return 인물로 처리하면 true, 아니면(일반 재난·동물·비정형) false → 임베딩 경로로.
      */
-    private boolean clusterPerson(DisasterAlert alert) {
+    private boolean clusterPerson(DisasterAlert alert, ClusteringTrace trace) {
         if (!"기타".equals(alert.getDisasterType()) || !MissingPersonIdentity.isPerson(alert.getMessage())) {
             return false;
         }
+        trace.recordPath(ClusteringTracePath.PERSON);
         String name = MissingPersonIdentity.name(alert.getMessage());
         String age = MissingPersonIdentity.age(alert.getMessage());
         String height = MissingPersonIdentity.height(alert.getMessage());
@@ -478,11 +519,11 @@ public class EventClusteringService {
                 name, age, height, since, -1L, 1);
         if (!rows.isEmpty()) {
             Long targetEventId = ((Number) rows.get(0)[0]).longValue();
-            mergeIntoExisting(targetEventId, alert, null, MergeMethod.IDENTITY);
+            mergeIntoExisting(targetEventId, alert, null, MergeMethod.IDENTITY, trace);
             log.info("clusterNewAlert(인물): alertId={} → event={} 동일인 머지({})", alert.getId(), targetEventId, key);
         } else {
             String[] codes = extractRegionCodes(alert);
-            createNewEvent(alert, codes.length > 0 ? codes[0] : null, extractFirstRegionName(alert), false);
+            createNewEvent(alert, codes.length > 0 ? codes[0] : null, extractFirstRegionName(alert), false, trace);
             log.info("clusterNewAlert(인물): alertId={} → 신규 이벤트({})", alert.getId(), key);
         }
         return true;
@@ -499,10 +540,11 @@ public class EventClusteringService {
      *
      * @return 전국 통합 유형으로 처리하면 true, 아니면(일반 유형) false → 임베딩 경로로.
      */
-    private boolean clusterGlobalType(DisasterAlert alert) {
+    private boolean clusterGlobalType(DisasterAlert alert, ClusteringTrace trace) {
         if (!isGlobalType(alert.getDisasterType())) {
             return false;
         }
+        trace.recordPath(ClusteringTracePath.GLOBAL_TYPE);
         String type = alert.getDisasterType();
         LocalDateTime since = alert.getCreatedAt().minusHours(globalWindowHours);
         // 전국 broadcast(region_code=null) 이벤트만 키로 — broadcast 격리 규칙과 일관(local 과 안 섞임).
@@ -510,12 +552,12 @@ public class EventClusteringService {
                 .findLatestGeneralBroadcastNationwide(
                         type, since);
         if (target.isPresent()) {
-            mergeIntoExisting(target.get().getId(), alert, null, MergeMethod.GLOBAL_TYPE);
+            mergeIntoExisting(target.get().getId(), alert, null, MergeMethod.GLOBAL_TYPE, trace);
             upgradeGlobalTitleIfNamed(target.get().getId(), type, alert.getMessage());
             log.info("clusterNewAlert(전국통합): alertId={} → event={} 유형 머지({})",
                     alert.getId(), target.get().getId(), type);
         } else {
-            createNewEvent(alert, null, "전국", true);
+            createNewEvent(alert, null, "전국", true, trace);
             log.info("clusterNewAlert(전국통합): alertId={} → 신규 전국 이벤트({})", alert.getId(), type);
         }
         return true;
@@ -563,7 +605,7 @@ public class EventClusteringService {
      *
      * @return 지역 한정 유형으로 처리하면 true, 아니면(일반 유형·광역·지역없음) false → 임베딩 경로로.
      */
-    private boolean clusterRegionalType(DisasterAlert alert) {
+    private boolean clusterRegionalType(DisasterAlert alert, ClusteringTrace trace) {
         Integer windowHours = regionalTypeWindowHours(alert.getDisasterType());
         if (windowHours == null) {
             return false;
@@ -578,18 +620,20 @@ public class EventClusteringService {
             return false;
         }
 
+        // 위 false 분기를 모두 통과해야 이 경로가 확정이다 — 인접 산불 병합(mergeIntoAdjacentRegionalEvent)도 REGIONAL.
+        trace.recordPath(ClusteringTracePath.REGIONAL);
         String[] sigungu = sigunguPrefixes(regionCodes);
         LocalDateTime since = alert.getCreatedAt().minusHours(windowHours);
         Optional<Long> target = disasterEventRepository.findRegionalTypeMergeTarget(
                 alert.getDisasterType(), sigungu, since);
         if (target.isPresent()) {
-            mergeIntoExisting(target.get(), alert, null, MergeMethod.REGIONAL_TYPE);
+            mergeIntoExisting(target.get(), alert, null, MergeMethod.REGIONAL_TYPE, trace);
             log.info("clusterNewAlert(지역 한정): alertId={} → event={} 유형+시군구 머지({}, window={}h)",
                     alert.getId(), target.get(), alert.getDisasterType(), windowHours);
-        } else if (mergeIntoAdjacentRegionalEvent(alert, sigungu)) {
+        } else if (mergeIntoAdjacentRegionalEvent(alert, sigungu, trace)) {
             return true;
         } else {
-            createNewEvent(alert, regionCodes[0], extractFirstRegionName(alert), false);
+            createNewEvent(alert, regionCodes[0], extractFirstRegionName(alert), false, trace);
             log.info("clusterNewAlert(지역 한정): alertId={} → 신규 이벤트({}, window={}h)",
                     alert.getId(), alert.getDisasterType(), windowHours);
         }
@@ -604,7 +648,7 @@ public class EventClusteringService {
      *
      * @return 병합했으면 true, 대상 유형이 아니거나 인접 이벤트가 없으면 false(호출 측이 신규 생성)
      */
-    private boolean mergeIntoAdjacentRegionalEvent(DisasterAlert alert, String[] sigungu) {
+    private boolean mergeIntoAdjacentRegionalEvent(DisasterAlert alert, String[] sigungu, ClusteringTrace trace) {
         String type = alert.getDisasterType();
         if (type == null || !parseCsvSet(regionalAdjacentTypesCsv).contains(type.trim())) {
             return false;
@@ -614,7 +658,7 @@ public class EventClusteringService {
         if (target.isEmpty()) {
             return false;
         }
-        mergeIntoExisting(target.get(), alert, null, MergeMethod.REGIONAL_TYPE);
+        mergeIntoExisting(target.get(), alert, null, MergeMethod.REGIONAL_TYPE, trace);
         log.info("clusterNewAlert(지역 한정·인접): alertId={} → event={} 인접 시군구 병합({}, window={}h)",
                 alert.getId(), target.get(), type, regionalAdjacentWindowHours);
         return true;
@@ -633,7 +677,7 @@ public class EventClusteringService {
      *
      * @return 에피소드형으로 처리하면 true (지역코드가 없으면 false)
      */
-    private boolean clusterEpisodicType(DisasterAlert alert) {
+    private boolean clusterEpisodicType(DisasterAlert alert, ClusteringTrace trace) {
         String type = alert.getDisasterType();
         if (!isEpisodicType(type)) {
             return false;
@@ -644,18 +688,19 @@ public class EventClusteringService {
         }
         int sigunguSpan = distinctSigunguCount(regionCodes);
         if (sigunguSpan > 1) {
-            clusterBroadcast(alert, regionCodes, sigunguSpan);
+            clusterBroadcast(alert, regionCodes, sigunguSpan, trace);   // 경로는 BROADCAST 로 기록된다
             return true;
         }
+        trace.recordPath(ClusteringTracePath.EPISODIC);
         LocalDateTime since = alert.getCreatedAt().minusHours(episodicWindowHours);
         Optional<Long> target = disasterEventRepository.findRegionalTypeMergeTarget(
                 type, sigunguPrefixes(regionCodes), since);
         if (target.isPresent()) {
-            mergeIntoExisting(target.get(), alert, null, MergeMethod.REGIONAL_TYPE);
+            mergeIntoExisting(target.get(), alert, null, MergeMethod.REGIONAL_TYPE, trace);
             log.info("clusterNewAlert(에피소드형): alertId={} → event={} 유형+시군구 머지({}, window={}h)",
                     alert.getId(), target.get(), type, episodicWindowHours);
         } else {
-            createNewEvent(alert, regionCodes[0], extractFirstRegionName(alert), false);
+            createNewEvent(alert, regionCodes[0], extractFirstRegionName(alert), false, trace);
             log.info("clusterNewAlert(에피소드형): alertId={} → 신규 이벤트({}, window={}h)",
                     alert.getId(), type, episodicWindowHours);
         }
@@ -750,22 +795,34 @@ public class EventClusteringService {
         log.info("clusterNewAlert: alertId={} top-{} 후보: {}", alertId, candidates.size(), sb.toString().trim());
     }
 
+    /** 후보 조회 결과(row[0]=이벤트 id, row[1]=코사인 거리)를 판정 기록용 값으로 바꾼다. 0건이면 빈 목록. */
+    private static List<ClusteringTrace.Candidate> toTraceCandidates(List<Object[]> rows) {
+        List<ClusteringTrace.Candidate> result = new ArrayList<>(rows.size());
+        for (Object[] row : rows) {
+            result.add(new ClusteringTrace.Candidate(((Number) row[0]).longValue(), ((Number) row[1]).doubleValue()));
+        }
+        return result;
+    }
+
     /**
      * 기존 이벤트에 알림 머지. {@code similarity} 는 합류 시점 코사인 유사도(1 - dist)로,
      * event_alert_mapping 에 저장한다. broadcast 머지(임베딩 미사용)는 null 을 넘긴다.
      * {@code method} 는 합류 방식 표식(EMBEDDING/BROADCAST).
      */
-    private void mergeIntoExisting(Long eventId, DisasterAlert alert, Double similarity, MergeMethod method) {
+    private void mergeIntoExisting(Long eventId, DisasterAlert alert, Double similarity, MergeMethod method,
+                                   ClusteringTrace trace) {
         int nextSeq = eventAlertMappingRepository.countByEventId(eventId) + 1;
         eventAlertMappingRepository.save(EventAlertMapping.of(eventId, alert.getId(), nextSeq, similarity, method));
         disasterEventRepository.incrementOnMerge(eventId, alert.getCreatedAt());
         // 위험도 모듈 트리거 (커밋 후 @TransactionalEventListener 가 수신)
         eventPublisher.publishEvent(new AlertClusteredEvent(eventId, alert.getId()));
+        trace.recordResult(ClusteringTraceResult.MERGED, eventId);
         log.info("clusterNewAlert: alertId={} → event={} 머지 (method={}, similarity={}, seq={})",
                 alert.getId(), eventId, method, similarity, nextSeq);
     }
 
-    private void createNewEvent(DisasterAlert alert, String regionCode, String regionName, boolean broadcast) {
+    private void createNewEvent(DisasterAlert alert, String regionCode, String regionName, boolean broadcast,
+                                ClusteringTrace trace) {
         DisasterEvent event = DisasterEvent.createFromFirstAlert(
                 alert.getDisasterType(),
                 regionCode,
@@ -778,6 +835,7 @@ public class EventClusteringService {
         eventAlertMappingRepository.save(EventAlertMapping.of(saved.getId(), alert.getId(), 1, null, MergeMethod.SEED));
         // 위험도 모듈 트리거 (커밋 후 @TransactionalEventListener 가 수신)
         eventPublisher.publishEvent(new AlertClusteredEvent(saved.getId(), alert.getId()));
+        trace.recordResult(ClusteringTraceResult.NEW, saved.getId());
         log.info("clusterNewAlert: alertId={} → 신규 event={} (broadcast={}, title='{}')",
                 alert.getId(), saved.getId(), broadcast, saved.getEventTitle());
     }
@@ -815,9 +873,10 @@ public class EventClusteringService {
      * <p>임베딩(본문)은 보지 않는다 — "발효/해제/격상" 처럼 본문이 달라도 같은 사건으로 묶기 위함.
      * 유형이 '기타'/null 이면 본문이 제각각(물놀이 안전수칙·댐방류 등)이라 머지하지 않고 신규로 둔다.
      */
-    private void clusterBroadcast(DisasterAlert alert, String[] regionCodes, int sigunguSpan) {
+    private void clusterBroadcast(DisasterAlert alert, String[] regionCodes, int sigunguSpan, ClusteringTrace trace) {
         String type = alert.getDisasterType();
         boolean informative = DisasterEvent.isInformativeType(type);
+        trace.recordPath(ClusteringTracePath.BROADCAST);
         LocalDateTime since = alert.getCreatedAt().minusHours(candidateWindowHours);
         int sidoSpan = distinctSidoCount(regionCodes);
 
@@ -830,12 +889,12 @@ public class EventClusteringService {
                 if (target.isPresent()) {
                     log.info("clusterNewAlert: alertId={} 전국({}시도) → broadcast event={} 유형 머지({})",
                             alert.getId(), sidoSpan, target.get().getId(), type);
-                    mergeIntoExisting(target.get().getId(), alert, null, MergeMethod.BROADCAST);
+                    mergeIntoExisting(target.get().getId(), alert, null, MergeMethod.BROADCAST, trace);
                     return;
                 }
             }
             log.info("clusterNewAlert: alertId={} 전국({}시도) — 신규 broadcast 이벤트", alert.getId(), sidoSpan);
-            createNewEvent(alert, null, "전국", true);
+            createNewEvent(alert, null, "전국", true, trace);
             return;
         }
 
@@ -848,13 +907,13 @@ public class EventClusteringService {
             if (target.isPresent()) {
                 log.info("clusterNewAlert: alertId={} 광역({}시군구) → broadcast event={} 시도+유형 머지({} {})",
                         alert.getId(), sigunguSpan, target.get().getId(), sido, type);
-                mergeIntoExisting(target.get().getId(), alert, null, MergeMethod.BROADCAST);
+                mergeIntoExisting(target.get().getId(), alert, null, MergeMethod.BROADCAST, trace);
                 return;
             }
         }
         log.info("clusterNewAlert: alertId={} 광역({}시군구>{}, {}시도) — 신규 broadcast 이벤트",
                 alert.getId(), sigunguSpan, maxRegionSpan, sidoSpan);
-        createNewEvent(alert, firstCodeOfSido(regionCodes, sido), sidoNameForPrefix(alert, sido), true);
+        createNewEvent(alert, firstCodeOfSido(regionCodes, sido), sidoNameForPrefix(alert, sido), true, trace);
     }
 
     /** 시도 코드(법정동 코드 앞 2자) — broadcast 시도 키. */
