@@ -56,8 +56,10 @@ Zustand(`guestFavoriteRegionsStore`), React Query(회원 관심지역 캐시 무
 여전히 단위/통합 테스트가 코드베이스에 **존재하지 않는다** — 이는 헌법 원칙 III(검증 가능한
 변경) 대비 실제 격차로, 아래 헌법 검사에 기록한다.
 
-**대상 플랫폼**: 웹(PWA, Chrome/Edge 등 데스크톱·모바일 브라우저) — Web Push API +
-Firebase Cloud Messaging. 코드 내 `deviceType` 값으로 `WEB`/`ANDROID`/`IOS`를 구분하지만,
+**대상 플랫폼**: 모바일 웹(PWA, 휴대폰·태블릿 브라우저) — Web Push API +
+Firebase Cloud Messaging. 2026-10 부터 데스크톱 브라우저는 대상이 아니다(`frontend/src/lib/device.ts`
+`isMobileDevice()` 로 판정, 데스크톱은 권한 요청·토큰 등록을 하지 않고 기존 구독을 정리).
+코드 내 `deviceType` 값으로 `MOBILE_WEB`(전환 전 `WEB`)/`ANDROID`/`IOS`를 구분하지만,
 현재 저장소에는 네이티브 Android/iOS 클라이언트 코드는 없고 TWA(Trusted Web Activity,
 `document.referrer.includes("android-app://")`로 판별) 환경만 `ANDROID`로 취급한다
 (`frontend/src/hooks/useNotificationPermission.ts:112-113`).

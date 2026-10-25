@@ -86,6 +86,8 @@ docker compose -f docker-compose.dev.yml up postgres redis   # Postgres(pgvector
 
 `domain/notification/` — `AlertNotificationService`는 알림의 법정동 코드로부터 알릴 대상 회원/게스트를 찾습니다 (특정 구가 아닌 시도 전체를 등록한 사용자를 위해 파생된 시도 레벨 코드도 포함). `FcmSendService`는 Firebase Admin SDK로 발송합니다. **FCM 메시지는 반드시 data-only여야 합니다** (`.setNotification()` 사용 금지) — `notification` 필드가 있으면 Chrome이 자동 표시와 백그라운드 핸들러 실행을 동시에 하여 알림이 중복 표시됩니다 (과거에 수정된 버그이므로 이 필드를 다시 추가하지 마세요). 프론트엔드 서비스워커(`frontend/public/firebase-messaging-sw.js`)는 Firebase JS SDK의 `onBackgroundMessage()`가 아니라 표준 Push API의 `push` 이벤트를 직접 파싱해 처리합니다 (SDK의 push 이벤트 라우팅 이슈로 알림을 못 받거나 씹는 문제가 있어 재작성됨) — 반드시 `event.waitUntil()`로 감싸 비동기 처리(파싱+`showNotification()`)가 끝날 때까지 SW가 살아있게 해야 합니다. (`fcm_token.token`도 전역 UNIQUE 제약이 걸려 있어, 토큰 UPSERT 시 다른 행과의 충돌을 먼저 정리해야 합니다 — `FcmTokenService.registerToken` 참고. (memberId, alertId) 단위 중복 발송 방지는 2026-08-03 제거되어 현재 존재하지 않습니다.)
 
+**푸시는 모바일(휴대폰·태블릿) 전용입니다** (2026-10 전환). 데스크톱 브라우저에서는 권한 배너·토큰 발급·등록을 하지 않고 설정 화면에 안내만 보이며, 예전에 데스크톱에서 켜 둔 구독은 다시 접속할 때 서버 토큰 삭제·구독 해제로 정리합니다 — 판정은 `frontend/src/lib/device.ts`의 `isMobileDevice()`, 정리는 `useNotificationPermission`의 `cleanUpDesktopPush`. `deviceType`은 TWA면 `ANDROID`, 그 밖의 모바일 브라우저는 `MOBILE_WEB`입니다. 예전 값 `WEB`은 데스크톱이 섞여 있어 전환 후 유예 기간이 지나면 남은 `WEB` 토큰을 정리합니다(운영 DB 작업, 사용자 승인 필요).
+
 이 서브시스템의 as-built 상세 동작은 `specs/003-fcm-notification/spec.md`·`plan.md` 참고.
 
 ### 법정동
