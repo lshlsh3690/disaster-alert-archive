@@ -204,8 +204,9 @@ public class EventClusteringBackfillTool implements ApplicationRunner {
      */
     private List<Long> fetchAlertIds(Integer limit, boolean recluster) {
         String where = recluster ? "embedding IS NOT NULL" : "embedding IS NULL";
+        // created_at 이 같은 알림은 id 오름차순으로 처리한다 — 평가(stages.py)가 동시각이면 id 큰 쪽을 나중으로 보기 때문
         String sql = "SELECT disaster_alert_id FROM disaster_alert WHERE " + where
-                + " ORDER BY created_at ASC"
+                + " ORDER BY created_at ASC, disaster_alert_id ASC"
                 + (limit == null ? "" : " LIMIT " + limit);
         return jdbcTemplate.queryForList(sql, Long.class);
     }
