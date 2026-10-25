@@ -53,6 +53,8 @@ public class ClusteringTraceRepository {
      *
      * <p>REQUIRES_NEW 인 이유: 클러스터링 트랜잭션 안에서 이 SQL 이 실패하면 Postgres 가 트랜잭션 전체를 중단 상태로
      * 만들어 클러스터링 결과(매핑·이벤트)까지 커밋되지 않는다.
+     * 행 잠금 자기 교착이 없는 전제: 바깥 트랜잭션은 clustering_trace 를 건드리지 않고(외래 키도 없음) 호출부
+     * (DisasterFetchScheduler·EventClusteringBackfillTool)가 순차라 스레드당 커넥션 2개까지만 쓴다 — 호출부를 병렬화하면 다시 볼 것.
      */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void upsert(ClusteringTrace trace) {
