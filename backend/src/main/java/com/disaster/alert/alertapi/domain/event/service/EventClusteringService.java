@@ -51,19 +51,28 @@ import java.util.stream.Collectors;
 @Slf4j
 public class EventClusteringService {
 
+    /** 알림 본문 → 벡터(1536차원) 변환. 저장된 임베딩이 없을 때만 OpenAI 를 호출한다. */
     private final EmbeddingModel embeddingModel;
+    /** 클러스터링할 알림(유형·본문·지역·분류) 조회. */
     private final DisasterAlertRepository disasterAlertRepository;
+    /** 이벤트 저장·병합 갱신과 후보 이벤트 검색(임베딩 거리·유형+시군구·광역 키). */
     private final DisasterEventRepository disasterEventRepository;
+    /** 알림↔이벤트 매핑(순번·병합 방식·유사도) 저장, LLM 프롬프트용 대표 본문 조회. */
     private final EventAlertMappingRepository eventAlertMappingRepository;
+    /** disaster_alert.embedding 컬럼 읽기·쓰기(JPA 엔티티에 매핑하지 않은 pgvector 컬럼). */
     private final AlertEmbeddingRepository alertEmbeddingRepository;
+    /** 배정이 끝나면 AlertClusteredEvent 를 발행해 위험도 계산을 트리거(커밋 후 수신). */
     private final ApplicationEventPublisher eventPublisher;
+    /** 사고성 borderline 후보를 LLM 에 "같은 사건인가" 묻는 폴백 판정. */
     private final EventLLMDecisionService llmDecisionService;
     /** 판정 기록 저장소 — Red 단계 뼈대: 필드만 추가, 호출은 Green 에서. */
     private final ClusteringTraceRepository clusteringTraceRepository;
 
+    /** 임베딩 병합 유사도 하한 — 후보 거리가 1 - 이 값(0.15) 이하면 병합한다. */
     @Value("${clustering.similarity-threshold:0.85}")
     private double similarityThreshold;
 
+    /** 후보 이벤트 검색 윈도우(시간) — 이벤트의 마지막 알림이 이 시간 이내여야 후보. 광역 키 조회에도 쓴다. */
     @Value("${clustering.candidate-time-window-hours:168}")
     private int candidateWindowHours;
 
@@ -108,11 +117,11 @@ public class EventClusteringService {
     @Value("${clustering.regional-types:산불:168,산사태:168,홍수:168}")
     private String regionalTypesCsv;
 
-    /** 인접 시군구 병합을 허용하는 지역 한정 유형(쉼표 구분) — Red 뼈대, 사용 로직은 Green 에서. */
+    /** 같은 시군구에 이벤트가 없을 때 인접 시군구 이벤트에 병합을 허용하는 지역 한정 유형(쉼표 구분). 현재 산불. */
     @Value("${clustering.regional-adjacent-types:산불}")
     private String regionalAdjacentTypesCsv;
 
-    /** 인접 시군구 이벤트의 마지막 알림이 이 시간 이내여야 병합 — Red 뼈대, 사용 로직은 Green 에서. */
+    /** 지역 한정 유형의 인접 시군구 병합 윈도우(시간) — 인접 이벤트의 마지막 알림이 이 시간 이내여야 병합. */
     @Value("${clustering.regional-adjacent-window-hours:24}")
     private int regionalAdjacentWindowHours;
 
@@ -140,11 +149,18 @@ public class EventClusteringService {
     @Value("${clustering.adjacent-max-event-age-hours:72}")
     private int adjacentMaxEventAgeHours;
 
+    // 아래는 위 CSV·정규식 설정을 처음 쓸 때 한 번 파싱해 두는 캐시다(null 이면 아직 파싱 전).
+    /** accidentTypesCsv 파싱 결과 — 사고성 유형 집합. */
     private Set<String> accidentTypes;
+    /** animalKeywords 컴파일 결과 — 동물·비정형 알림 판별 정규식. */
     private Pattern animalPattern;
+    /** globalTypesCsv 파싱 결과 — 전국 통합 유형 집합. */
     private Set<String> globalTypes;
+    /** regionalTypesCsv 파싱 결과 — 지역 한정 유형 → 머지 윈도우(시간). */
     private Map<String, Integer> regionalTypeWindows;
+    /** relaxedThresholdTypesCsv 파싱 결과 — 병합 임계값 완화 유형 집합. */
     private Set<String> relaxedThresholdTypes;
+    /** episodicTypesCsv 파싱 결과 — 에피소드형 유형 집합. */
     private Set<String> episodicTypes;
 
     /**
