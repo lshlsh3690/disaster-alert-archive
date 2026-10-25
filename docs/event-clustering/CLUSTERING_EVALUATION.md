@@ -30,11 +30,9 @@
 
 1. **평가 사본**: 운영 스냅샷(2026-10-10, 알림 62,554건)을 로컬 docker Postgres 에 복사한다. 운영 DB 에서는 측정하지 않는다.
 2. **분류 채우기**: 사본에서 `AlertKindBackfillTool`(프로필 `alert-kind-backfill`)로 `alert_kind` 를 채운다. 비용을 줄일 때는 라벨된 알림의 시군구·인접 시군구 앞뒤 7일 안 알림만 분류하고, 나머지는 `INCIDENT` 로 채운다(클러스터링에서 `INCIDENT` 와 `null` 은 같게 처리된다). 도구에는 범위 지정 기능이 없어(`--alert-kind.limit`, `--alert-kind.threads` 뿐), 대상 범위를 고르고 나머지를 `INCIDENT` 로 채우는 일은 도구를 돌리기 전에 SQL 로 직접 한다.
-3. **재클러스터링**: 이벤트 테이블을 비우고 `EventClusteringBackfillTool --backfill.recluster=true` 로 다시 묶는다. 로그를 파일로 남긴다(검색·생성 단계 측정에 쓴다). LLM 폴백은 켠 상태가 기준이다.
+3. **재클러스터링**: 이벤트 테이블을 비우고 `EventClusteringBackfillTool --backfill.recluster=true` 로 다시 묶는다. 로그를 파일로 남긴다. LLM 폴백은 켠 상태가 기준이다.
 4. **엔드투엔드**: `backend/evaluation/eval.sh <DB> <라벨 CSV>` — `eval_rates.sql` 이 라벨 쌍마다 두 알림의 이벤트 번호를 비교해 개수·두 비율·틀린 쌍 목록을 낸다.
-5. **검색·생성**: 재클러스터링 로그에는 알림마다 탄 경로, 후보 이벤트와 거리(`event=… dist=…`), 병합 결과가 찍힌다. 이것이 판정 기록이다(추정·재현이 아니라 실제로 일어난 판정).
-   - `python parse_log.py <재클러스터링 로그> trace.json` — 로그를 알림별 기록으로 바꾼다.
-   - `stage_pairs.sql` 로 라벨 쌍의 시각·최종 이벤트를 뽑고(`pairs.txt`), `python stages.py trace.json pairs.txt` 로 단계별로 센다.
+5. **검색·생성**: 재클러스터링 로그에는 알림마다 탄 경로, 후보 이벤트와 거리(`event=… dist=…`), 병합 결과가 찍힌다. 3.2·3.3 의 2026-10-23 수치는 이 로그를 판정 기록 삼아 라벨 쌍과 맞춰 센 것이다(추정·재현이 아니라 실제로 일어난 판정). 그때 쓴 임시 파이썬 스크립트는 2026-10-25 저장소에서 지웠고, 앞으로 이 두 단계는 판정 기록 테이블(`clustering_trace`)과 Java 단계별 계산으로 잰다(`ADMIN_EVAL_DASHBOARD_DESIGN.md`). 그 구현 전까지는 검색·생성 단계를 다시 잴 도구가 없다.
 6. **분류 단계**: `AlertKindEvalTool`(프로필 `alert-kind-eval`)이 라벨 셋의 알림을 실제 `AlertKindClassifier` 로 분류해(저장 안 함) 사람 라벨과 대조하고 결과를 로그로 남긴다. 특보·안내는 비사건으로 합쳐 센다. `--alert-kind-eval.labels=<라벨 json>` `--alert-kind-eval.override=alert-kind-recheck-labels.json`. 검증 셋 1회 약 $0.03.
 
 비용: 분류 1건과 LLM 폴백 1회가 각각 약 $0.0003(`gpt-4o-mini`). 2026-10-23 측정은 분류 14,498건(약 $4.3) + 재클러스터링 폴백 1,608회(약 $0.5).
@@ -138,8 +136,6 @@
 | 파일 (`backend/evaluation/`) | 역할 |
 |---|---|
 | `eval.sh`, `eval_rates.sql` | 엔드투엔드 개수·두 비율·틀린 쌍 목록 |
-| `parse_log.py` | 재클러스터링 로그 → 알림별 판정 기록(경로, 후보:거리, 결과) |
-| `stage_pairs.sql`, `stages.py` | 라벨 쌍을 판정 기록에 붙여 검색·생성 단계 집계 |
 | `AlertKindEvalTool` (backend, 프로필 `alert-kind-eval`) | 사건/비사건 분류기를 사람 라벨과 대조해 로그로 보고 |
 
 `backend/evaluation/reports/` 의 리포트와 `EvaluationRunTool` 등 Java 평가 도구는 이전 방식(개발용 150쌍, 정밀도·재현율)의 것이다.

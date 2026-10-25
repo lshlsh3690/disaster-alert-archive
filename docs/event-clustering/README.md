@@ -12,4 +12,4 @@
 
 관련 위치
 - 구현 상세(as-built): `specs/001-event-clustering-pipeline/spec.md`, `plan.md`
-- 평가 데이터와 측정 스크립트: `backend/evaluation/` (`datasets/`, `eval.sh`, `parse_log.py`, `stages.py`)
+- 평가 데이터와 측정 스크립트: `backend/evaluation/` (`datasets/`, `eval.sh`)
