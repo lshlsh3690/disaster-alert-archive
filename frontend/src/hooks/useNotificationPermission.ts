@@ -142,7 +142,8 @@ export const useNotificationPermission = () => {
 /**
  * 모바일 전용 전환 전에 데스크톱에서 알림을 켜 둔 브라우저 정리 — 서버 토큰을 지우고 브라우저 구독을 해제한다.
  * 게스트 삭제는 회원 소유 토큰을 건드리지 않고, 회원 삭제는 로그인 쿠키가 없으면 401 로 끝나므로 둘 다 부른다.
- * 다시 들어오지 않는 데스크톱의 토큰은 서버의 남은 WEB 토큰 정리로 지운다.
+ * 전환 전에 WEB 으로 등록된 토큰은 V134 마이그레이션이 서버에서 일괄 삭제했으므로, 여기서는 그 뒤에도 남은
+ * 브라우저 쪽 구독(서비스워커·localStorage)과 혹시 남은 서버 행을 정리한다.
  */
 async function cleanUpDesktopPush() {
   const token = localStorage.getItem("fcm-token");
@@ -153,8 +154,10 @@ async function cleanUpDesktopPush() {
   }
   if (!("serviceWorker" in navigator)) return;
   try {
+    // getRegistration 의 인자는 스코프가 아니라 "이 URL 을 담당하는 등록"을 찾는 주소라, FCM 워커가 없으면
+    // 루트 스코프(/)의 next-pwa sw.js 가 대신 반환된다. 스코프가 정확히 FCM 스코프일 때만 해제한다.
     const registration = await navigator.serviceWorker.getRegistration(FCM_SW_SCOPE);
-    if (!registration) return;
+    if (!registration || new URL(registration.scope).pathname !== FCM_SW_SCOPE) return;
     const subscription = await registration.pushManager.getSubscription();
     await subscription?.unsubscribe();
     await registration.unregister();
