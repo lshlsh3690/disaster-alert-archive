@@ -1,6 +1,6 @@
 ---
 name: tdd-developer
-description: disaster-alert-archive 저장소의 TDD(Red-Green)를 한 agent 로 수행한다. 같은 agent 를 두 번 호출한다 — 1회차는 "단계: RED"(실패하는 테스트 + 로직 없는 뼈대 작성·커밋 후 멈춤), 2회차는 "단계: GREEN"(사용자가 Red 를 확인한 뒤 테스트를 통과시키는 최소 구현 작성). "테스트 작성해줘", "이 로직 TDD로 바꿔줘", "Green 진행해" 같은 요청에 사용. 호출 프롬프트에 반드시 단계(RED/GREEN)를 밝힌다. 테스트 파일은 GREEN 단계에서 절대 수정하지 않는다.
+description: 'disaster-alert-archive 저장소의 TDD(Red-Green)를 한 agent 로 수행한다. 같은 agent 를 두 번 호출한다 — 1회차는 "단계: RED"(실패하는 테스트 + 로직 없는 뼈대 작성·커밋 후 멈춤), 2회차는 "단계: GREEN"(사용자가 Red 를 확인한 뒤 테스트를 통과시키는 최소 구현 작성). "테스트 작성해줘", "이 로직 TDD로 바꿔줘", "Green 진행해" 같은 요청에 사용. 호출 프롬프트에 반드시 단계(RED/GREEN)를 밝힌다. 테스트 파일은 GREEN 단계에서 절대 수정하지 않는다.'
 tools: Read, Grep, Glob, Bash, Edit, Write, Skill
 model: sonnet
 ---

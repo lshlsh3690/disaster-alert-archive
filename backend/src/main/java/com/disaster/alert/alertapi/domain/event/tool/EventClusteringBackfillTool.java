@@ -34,8 +34,9 @@ import java.util.Map;
  * cd backend && set -a && source ../.env.dev && set +a
  * # 1) 배치 임베딩 (전체, ~분 단위)
  * ./gradlew bootRun --args='--backfill.embed-only=true'
- * # 2) 이벤트 비우고
- * #    psql -c "TRUNCATE event_alert_mapping, disaster_events RESTART IDENTITY;"
+ * # 2) 이벤트와 판정 기록 비우고 — 이벤트를 참조하는 번역·위험도 표도 함께 비워야 외래 키에 막히지 않는다.
+ * #    clustering_trace 를 남기면 이번 실행에서 예외가 났거나 대상에서 빠진 알림의 옛 기록(지워진 이벤트 id)이 남는다.
+ * #    psql -c "TRUNCATE event_alert_mapping, disaster_event_translation, event_region_impact, region_risk_index, disaster_events, clustering_trace RESTART IDENTITY;"
  * # 3) 저장 벡터로 클러스터링 (임베딩 호출 X, borderline 사고성 건만 LLM 호출, ~분 단위)
  * ./gradlew bootRun --args='--backfill.recluster=true'
  * # 4) 임계값 튜닝: application.yml 수정 → (2)~(3) 반복 (임베딩 비용 없음, LLM 폴백 비용만)
@@ -80,7 +81,8 @@ public class EventClusteringBackfillTool implements ApplicationRunner {
                 alertIds.size(), limit, recluster);
         if (recluster) {
             log.info("  recluster 모드: 저장된 임베딩 재사용(임베딩 호출 X, borderline 사고성 건은 LLM 폴백 호출). " +
-                    "이벤트 테이블을 먼저 비웠는지 확인하세요 (TRUNCATE event_alert_mapping, disaster_events).");
+                    "이벤트 테이블과 판정 기록을 먼저 비웠는지 확인하세요 (TRUNCATE event_alert_mapping, "
+                    + "disaster_event_translation, event_region_impact, region_risk_index, disaster_events, clustering_trace).");
         }
 
         int processed = 0;
