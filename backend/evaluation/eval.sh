@@ -7,4 +7,4 @@ DB="$1"; CSV="$2"
 HERE="$(cd "$(dirname "$0")" && pwd)"
 export MSYS_NO_PATHCONV=1
 docker cp "$CSV" postgres:/tmp/labels.csv
-docker exec -i postgres psql -U postgres -d "$DB" -q < "$HERE/eval_rates.sql"
+docker exec -i postgres psql -U postgres -d "$DB" -q -v ON_ERROR_STOP=1 < "$HERE/eval_rates.sql"
