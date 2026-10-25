@@ -10,6 +10,7 @@ import com.disaster.alert.alertapi.domain.event.model.EventAlertMapping;
 import com.disaster.alert.alertapi.domain.event.model.MergeMethod;
 import com.disaster.alert.alertapi.domain.event.model.MissingPersonIdentity;
 import com.disaster.alert.alertapi.domain.event.repository.AlertEmbeddingRepository;
+import com.disaster.alert.alertapi.domain.event.repository.ClusteringTraceRepository;
 import com.disaster.alert.alertapi.domain.event.repository.DisasterEventRepository;
 import com.disaster.alert.alertapi.domain.event.repository.EventAlertMappingRepository;
 import com.disaster.alert.alertapi.domain.legaldistrict.model.LegalDistrict;
@@ -57,6 +58,8 @@ public class EventClusteringService {
     private final AlertEmbeddingRepository alertEmbeddingRepository;
     private final ApplicationEventPublisher eventPublisher;
     private final EventLLMDecisionService llmDecisionService;
+    /** 판정 기록 저장소 — Red 단계 뼈대: 필드만 추가, 호출은 Green 에서. */
+    private final ClusteringTraceRepository clusteringTraceRepository;
 
     @Value("${clustering.similarity-threshold:0.85}")
     private double similarityThreshold;
