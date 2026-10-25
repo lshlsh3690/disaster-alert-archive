@@ -8,7 +8,7 @@ import { useTranslation } from "react-i18next";
 export default function NotificationPermissionBanner() {
   const { t } = useTranslation();
   const user = useAuthStore((state) => state.user);
-  const { permission, isLoading, requestPermission } = useNotificationPermission();
+  const { permission, isLoading, requestPermission, isPushTarget } = useNotificationPermission();
   const [dismissed, setDismissed] = useState(false);
 
   const isLoggedIn = !!user;
@@ -17,7 +17,8 @@ export default function NotificationPermissionBanner() {
   // useNotificationPermission 의 동기화 effect 들이 나중에 지역이 채워지면 등록해주므로 문제없다.
   // requestPermission 은 반드시 버튼 클릭(사용자 제스처)으로만 호출한다 — 자동 호출은
   // Firefox/Safari 에서 무시된다.
-  const shouldShow = permission === "default" && !dismissed;
+  // 푸시는 모바일 전용이라 데스크톱에서는 권한을 묻지 않는다.
+  const shouldShow = isPushTarget && permission === "default" && !dismissed;
 
   if (!shouldShow) return null;
 

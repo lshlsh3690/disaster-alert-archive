@@ -37,7 +37,7 @@ function NotificationTypeIcon({ type }: { type: NotificationType }) {
 export default function NotificationSettings() {
   const { t } = useTranslation();
   const NOTIFICATION_OPTIONS = useNotificationOptions();
-  const { permission, isLoading, requestPermission } = useNotificationPermission();
+  const { permission, isLoading, requestPermission, isPushTarget } = useNotificationPermission();
   const [selectedType, setSelectedType] = useState<NotificationType>("PUSH");
   const [isSaving, setIsSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState("");
@@ -96,6 +96,18 @@ export default function NotificationSettings() {
       setIsSaving(false);
     }
   };
+
+  // 푸시는 모바일 전용이다 — 데스크톱에서는 설정 대신 안내만 보여 준다(권한 요청·선택지 없음).
+  if (!isPushTarget) {
+    return (
+      <div className="space-y-4">
+        <h2 className="text-lg font-semibold text-[var(--ink)]">{t("notificationSettings.title")}</h2>
+        <p className="rounded-[var(--radius-compact)] border border-[#cfe0fb] bg-[var(--blue-soft)] px-3 py-2.5 text-[13px] text-[var(--blue)]">
+          {t("notificationSettings.mobileOnly")}
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4">
