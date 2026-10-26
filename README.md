@@ -114,6 +114,70 @@ AI 기반 이벤트 클러스터링으로 중복 알림을 제거하고, 기상 
 
 ---
 
+## 이벤트 클러스터링 파이프라인
+
+원본 알림이 이벤트 데이터로 가공되는 과정과, 평가용 데이터가 검증 지표로 변환되는 과정을 정리한다.
+
+### 구현 파이프라인
+
+```text
+재난문자 API 수집·저장 — 매 1분
+(DisasterFetchScheduler → DisasterAlertService)
+    ↓
+원본 알림 데이터 + 지역 매핑
+(disaster_alert + disaster_alert_region)
+    ↓ AlertKindService → AlertKindClassifier
+사건/비사건 분류값이 추가된 알림
+(alert_kind)
+    ↓ EventClusteringService
+클러스터링 비교용 데이터 준비
+(지역·발송 시각·필요한 경우 본문 임베딩)
+    ↓ DisasterEventRepository
+연관 이벤트 후보 데이터
+(후보 이벤트 ID·유사도 등 비교 정보)
+    ↓ EventClusteringService + 필요한 경우 LLM 판정
+이벤트 배정 결과
+(배정 이벤트 ID·신규/병합 여부·병합 방식)
+    ↓
+이벤트·알림 연결·판정 기록 저장
+(disaster_events + event_alert_mapping + clustering_trace)
+    ↓ EventCrossRegionService
+이벤트 묶음 후처리
+    ↓ EventQueryService → EventController
+이벤트 목록·상세·타임라인 UI
+```
+
+### 검증 파이프라인
+
+```text
+운영 데이터 스냅샷
+    ↓ 평가 환경으로 복사
+평가 사본 DB
+    ↓ AlertKindBackfillTool
+사건/비사건 분류값이 채워진 평가 데이터
+    ↓ EventClusteringBackfillTool — 임베딩 준비
+임베딩이 준비된 평가 데이터
+    ↓ 이벤트·매핑·판정 기록 초기화 후 재클러스터링
+평가용 이벤트 배정 + 판정 기록
+    ↓ 필요한 경우 지역 간 병합 후처리
+최종 클러스터링 결과
+    ↓ 사람 정답 라벨 CSV와 연결
+정답과 실제 이벤트 배정을 비교할 수 있는 알림 쌍
+    ↓ EvaluationRunTool → EventEvaluationService
+쌍별 비교 결과
+(맞게 묶음·놓침·잘못 묶음·맞게 분리)
+    ↓ PairwiseEvaluator
+전체·표본층별 지표 + 오류 원인 집계
+    ↓ EvaluationReportFormatter
+Markdown 평가 보고서 + 오류 사례
+```
+
+현재 평가기는 최종 이벤트 배정을 비교하며, 검색·판정 오류 원인은 후보를 근사해 계산한다. 실제 `clustering_trace`를 이용한 단계별 자동 검증은 추가 연결이 필요하다.
+
+유형별 기준과 평가 방법은 [이벤트 클러스터링 문서](docs/event-clustering/README.md)를 참고한다.
+
+---
+
 ## 프로젝트 구조
 
 ```
