@@ -1,5 +1,6 @@
 package com.disaster.alert.alertapi.domain.event.evaluation;
 
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -7,7 +8,6 @@ import java.util.List;
  * 쌍은 SAME, 분류는 INCIDENT 를 positive 로 두고, 사람이 positive 라 한 쪽과 아니라고 한 쪽을
  * 각자의 분모로 따로 센다 — 한쪽 오류만 많은 판사가 평균에 가려지지 않게 하기 위해서다.
  */
-// Red 단계 뼈대 — 구현은 Green 에서
 public final class JudgeAgreement {
 
     private JudgeAgreement() {
@@ -30,6 +30,31 @@ public final class JudgeAgreement {
     }
 
     public static <T> Result score(List<Item<T>> items, T positive) {
-        return new Result(0, List.of(), 0, List.of(), List.of());
+        int positives = 0;
+        int negatives = 0;
+        List<Long> positiveMissed = new ArrayList<>();
+        List<Long> negativeMissed = new ArrayList<>();
+        List<Long> undecided = new ArrayList<>();
+        for (Item<T> it : items) {
+            // 1) 판정 불가는 어느 분모에도 넣지 않는다 — 넣으면 "판사가 틀렸다"로 읽히고, 빼고 안 세면 조용히 사라진다
+            if (it.judge() == null) {
+                undecided.add(it.id());
+                continue;
+            }
+            // 2) 사람이 positive 라 한 쪽: 판사가 다른 답이면 놓친 것
+            if (it.human() == positive) {
+                positives++;
+                if (it.judge() != positive) {
+                    positiveMissed.add(it.id());
+                }
+            } else {
+                // 3) 그 밖은 negative 쪽: 판사가 positive 라 답하면 놓친 것
+                negatives++;
+                if (it.judge() == positive) {
+                    negativeMissed.add(it.id());
+                }
+            }
+        }
+        return new Result(positives, positiveMissed, negatives, negativeMissed, undecided);
     }
 }
