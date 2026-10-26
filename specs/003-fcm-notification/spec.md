@@ -376,7 +376,8 @@
   (`domain/disasteralert/model/DisasterAlert.java`,
   `domain/disasteralert/model/DisasterAlertRegionId.java`).
 - **FcmToken** (`fcm_token`): 회원 또는 게스트(‘member’ 컬럼 null 허용)의 디바이스 FCM
-  토큰. `deviceType`(WEB/ANDROID/IOS)별로 회원당 최대 1개 UPSERT (`FcmToken.java`).
+  토큰. `deviceType`(MOBILE_WEB/ANDROID/IOS, 2026-10 모바일 전용 전환 전 값은 WEB)별로 회원당 최대 1개 UPSERT (`FcmToken.java`).
+  게스트 토큰은 다시 등록하면 `deviceType`도 갱신한다(`GuestFcmTokenService.registerGuestToken`).
 - **GuestFcmRegion** (`guest_fcm_region`): 비로그인 FCM 토큰과 법정동 코드의 다대다 매핑
   (토큰당 최대 5개 행). `MemberFavoriteRegion`의 게스트용 대응물이지만 회원 테이블과
   독립적인 별도 엔티티다 (`GuestFcmRegion.java`).

@@ -54,4 +54,9 @@ public class FcmToken {
     public void updateToken(String token) {
         this.token = token;
     }
+
+    /** 같은 토큰을 다시 등록할 때 기기 구분을 최신 값으로 맞춘다(예: WEB → MOBILE_WEB 전환). */
+    public void updateDeviceType(String deviceType) {
+        this.deviceType = deviceType;
+    }
 }

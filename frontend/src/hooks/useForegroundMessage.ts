@@ -3,9 +3,12 @@
 
 import { useEffect } from "react";
 import { getFirebaseMessaging, onMessage } from "@/lib/firebase";
+import { isMobileDevice } from "@/lib/device";
 
 export const useForegroundMessage = () => {
   useEffect(() => {
+    // 푸시는 모바일 전용이라 데스크톱에서는 수신 핸들러를 걸지 않는다.
+    if (!isMobileDevice()) return;
     const messaging = getFirebaseMessaging();
     if (!messaging) return;
 

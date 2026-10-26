@@ -1,5 +1,4 @@
-const getDeviceType = () =>
-  document.referrer.includes("android-app://") ? "ANDROID" : "WEB";
+import { pushDeviceType } from "@/lib/device";
 
 export async function registerGuestFcmToken(token: string, legalDistrictCodes: string[]) {
   if (legalDistrictCodes.length === 0) return;
@@ -7,7 +6,7 @@ export async function registerGuestFcmToken(token: string, legalDistrictCodes: s
     await fetch("/api/v1/fcm-token/guest", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ token, deviceType: getDeviceType(), legalDistrictCodes }),
+      body: JSON.stringify({ token, deviceType: pushDeviceType(), legalDistrictCodes }),
     });
   } catch (error) {
     console.error("게스트 FCM 토큰 등록 실패:", error);
