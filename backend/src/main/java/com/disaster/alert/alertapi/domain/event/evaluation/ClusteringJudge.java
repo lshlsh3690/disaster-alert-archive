@@ -101,7 +101,8 @@ public class ClusteringJudge {
     }
 
     private static String normalize(String text) {
-        return text.replaceAll("\s+", " ").trim();
+        // "\\s+" 여야 한다 — 문자열 리터럴의 "\s" 는 Java 15+ 에서 공백 한 칸 이스케이프라 줄바꿈이 남는다
+        return text.replaceAll("\\s+", " ").trim();
     }
 
     private static boolean isBlank(String s) {
