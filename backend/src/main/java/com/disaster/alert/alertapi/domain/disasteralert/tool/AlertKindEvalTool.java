@@ -5,8 +5,7 @@ import com.disaster.alert.alertapi.domain.disasteralert.model.AlertKindScore;
 import com.disaster.alert.alertapi.domain.disasteralert.model.DisasterAlert;
 import com.disaster.alert.alertapi.domain.disasteralert.repository.DisasterAlertRepository;
 import com.disaster.alert.alertapi.domain.disasteralert.service.AlertKindClassifier;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import com.disaster.alert.alertapi.global.util.ToolOptions;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.ApplicationArguments;
@@ -16,11 +15,7 @@ import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 
-import java.io.File;
-import java.io.IOException;
-import java.io.UncheckedIOException;
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -55,22 +50,13 @@ public class AlertKindEvalTool implements ApplicationRunner {
 
     @Override
     public void run(ApplicationArguments args) {
-        List<String> labelFiles = optionList(args, "alert-kind-eval.labels");
+        List<String> labelFiles = ToolOptions.optionList(args, "alert-kind-eval.labels");
         if (labelFiles.isEmpty()) {
             throw new IllegalArgumentException("--alert-kind-eval.labels 옵션이 필요합니다");
         }
-        // 1) 라벨 읽기 — 뒤에 읽은 재판정 파일이 같은 id 를 덮어쓴다. 모르겠음은 뺀다
-        Map<Long, AlertKind> human = new LinkedHashMap<>();
-        labelFiles.forEach(f -> readLabels(f, human));
-        // 재판정 파일은 여러 셋의 알림을 함께 담고 있다 — 평가 대상(labels)에 있는 id 의 라벨만 바꾸고 새 id 는 더하지 않는다
-        Map<Long, AlertKind> override = new LinkedHashMap<>();
-        optionList(args, "alert-kind-eval.override").forEach(f -> readLabels(f, override));
-        override.forEach((id, kind) -> {
-            if (human.containsKey(id)) {
-                human.put(id, kind);
-            }
-        });
-        human.values().removeIf(v -> v == null);
+        // 1) 라벨 읽기 — 재판정 파일은 평가 대상 id 의 라벨만 덮어쓰고, 모르겠음은 빠진다
+        Map<Long, AlertKind> human = AlertKindLabelFiles.read(
+                labelFiles, ToolOptions.optionList(args, "alert-kind-eval.override"));
 
         // 2) 원문은 DB 에서, 분류는 운영과 같은 분류기로(저장 안 함)
         Map<Long, DisasterAlert> alerts = disasterAlertRepository.findAllById(human.keySet()).stream()
@@ -93,33 +79,6 @@ public class AlertKindEvalTool implements ApplicationRunner {
         // 3) 보고서는 로그로
         log.info("사건/비사건 분류 평가 결과\n{}", report(labelFiles, notInDb, AlertKindScore.score(items), alerts));
         System.exit(SpringApplication.exit(context, () -> 0));
-    }
-
-    private static void readLabels(String path, Map<Long, AlertKind> into) {
-        try {
-            int index = 0;
-            for (JsonNode n : new ObjectMapper().readTree(new File(path))) {
-                // 어느 파일의 몇 번째 항목이 틀렸는지 알 수 있게 위치를 붙여 멈춘다
-                String where = path + " 의 " + index++ + "번째 항목";
-                if (!n.hasNonNull("id") || !n.hasNonNull("label")) {
-                    throw new IllegalArgumentException(where + "에 id 또는 label 이 없습니다: " + n);
-                }
-                long id = n.get("id").asLong();
-                into.put(id, toKind(n.get("label").asText(), where + "(id=" + id + ")"));
-            }
-        } catch (IOException e) {
-            throw new UncheckedIOException("라벨 파일을 읽을 수 없습니다: " + path, e);
-        }
-    }
-
-    /** 사람 라벨 → 저장 값. 특보·안내는 비사건으로 합친다. 모르겠음은 null(평가에서 뺌). */
-    private static AlertKind toKind(String label, String where) {
-        return switch (label.trim()) {
-            case "사건" -> AlertKind.INCIDENT;
-            case "특보", "안내", "비사건" -> AlertKind.ADVISORY;
-            case "UNSURE", "모르겠음" -> null;
-            default -> throw new IllegalArgumentException(where + ": 알 수 없는 라벨 '" + label + "'");
-        };
     }
 
     private static String report(List<String> files, List<Long> notInDb, AlertKindScore.Result r,
@@ -151,14 +110,5 @@ public class AlertKindEvalTool implements ApplicationRunner {
             sb.append("  ").append(id).append(" [").append(a.getDisasterType()).append("] ")
                     .append(msg, 0, Math.min(MESSAGE_PREVIEW, msg.length())).append('\n');
         }
-    }
-
-    private static List<String> optionList(ApplicationArguments args, String name) {
-        List<String> values = args.getOptionValues(name);
-        if (values == null) {
-            return List.of();
-        }
-        return values.stream().flatMap(v -> List.of(v.split(",")).stream())
-                .map(String::trim).filter(s -> !s.isEmpty()).toList();
     }
 }

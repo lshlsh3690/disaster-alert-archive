@@ -2,8 +2,10 @@ package com.disaster.alert.alertapi.domain.event.evaluation;
 
 import com.disaster.alert.alertapi.domain.disasteralert.model.DisasterAlert;
 import com.disaster.alert.alertapi.domain.disasteralert.repository.DisasterAlertRepository;
+import com.disaster.alert.alertapi.domain.disasteralert.tool.AlertKindLabelFiles;
 import com.disaster.alert.alertapi.domain.event.evaluation.JudgeAgreement.Item;
 import com.disaster.alert.alertapi.domain.event.evaluation.JudgeAgreement.Result;
+import com.disaster.alert.alertapi.global.util.ToolOptions;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -63,15 +65,15 @@ public class JudgeReliabilityTool implements ApplicationRunner {
 
     @Override
     public void run(ApplicationArguments args) {
-        List<String> pairFiles = optionList(args, "judge-reliability.pairs");
-        List<String> kindFiles = optionList(args, "judge-reliability.kinds");
+        List<String> pairFiles = ToolOptions.optionList(args, "judge-reliability.pairs");
+        List<String> kindFiles = ToolOptions.optionList(args, "judge-reliability.kinds");
         if (pairFiles.isEmpty() && kindFiles.isEmpty()) {
             throw new IllegalArgumentException("--judge-reliability.pairs 또는 --judge-reliability.kinds 옵션이 필요합니다");
         }
         // 1) 라벨을 읽는다 — 모르겠음은 이 단계에서 빠진다
         List<LabeledPair> pairs = new ArrayList<>();
         pairFiles.forEach(f -> readPairs(f, pairs));
-        Map<Long, KindVerdict> kinds = readKinds(kindFiles, optionList(args, "judge-reliability.kind-override"));
+        Map<Long, KindVerdict> kinds = readKinds(kindFiles, ToolOptions.optionList(args, "judge-reliability.kind-override"));
 
         // 2) 알림 원문을 한 번에 읽는다 — 쌍과 분류가 같은 알림을 쓸 수 있다
         Set<Long> ids = new HashSet<>(kinds.keySet());
@@ -161,39 +163,12 @@ public class JudgeReliabilityTool implements ApplicationRunner {
         return a.getId() < b.getId();
     }
 
-    /** 분류 라벨 읽기 — 뒤 파일이 같은 id 를 덮어쓰고, override 는 이미 있는 id 만 바꾼다. 모르겠음은 뺀다. */
+    /** 분류 라벨 읽기 — 분류기 평가(AlertKindEvalTool)와 같은 라벨 규칙을 써야 두 측정이 같은 정답으로 잰다. */
     private static Map<Long, KindVerdict> readKinds(List<String> files, List<String> overrideFiles) {
         Map<Long, KindVerdict> human = new LinkedHashMap<>();
-        files.forEach(f -> readKindLabels(f, human));
-        // 재판정 파일은 여러 셋의 알림을 함께 담고 있다 — 평가 대상에 있는 id 의 라벨만 바꾸고 새 id 는 더하지 않는다
-        Map<Long, KindVerdict> override = new LinkedHashMap<>();
-        overrideFiles.forEach(f -> readKindLabels(f, override));
-        override.forEach((id, verdict) -> {
-            if (human.containsKey(id)) {
-                human.put(id, verdict);
-            }
-        });
-        human.values().removeIf(Objects::isNull);
+        AlertKindLabelFiles.read(files, overrideFiles)
+                .forEach((id, kind) -> human.put(id, KindVerdict.valueOf(kind.name())));
         return human;
-    }
-
-    private static void readKindLabels(String path, Map<Long, KindVerdict> into) {
-        int index = 0;
-        for (JsonNode n : readJson(path)) {
-            // 어느 파일의 몇 번째 항목이 틀렸는지 알 수 있게 위치를 붙여 멈춘다
-            String where = path + " 의 " + index++ + "번째 항목";
-            if (!n.hasNonNull("id") || !n.hasNonNull("label")) {
-                throw new IllegalArgumentException(where + "에 id 또는 label 이 없습니다: " + n);
-            }
-            long id = n.get("id").asLong();
-            String label = n.get("label").asText().trim();
-            into.put(id, switch (label) {
-                case "사건" -> KindVerdict.INCIDENT;
-                case "특보", "안내", "비사건" -> KindVerdict.ADVISORY;
-                case "UNSURE", "모르겠음" -> null;
-                default -> throw new IllegalArgumentException(where + "(id=" + id + "): 알 수 없는 라벨 '" + label + "'");
-            });
-        }
     }
 
     private static void readPairs(String path, List<LabeledPair> into) {
@@ -252,14 +227,5 @@ public class JudgeReliabilityTool implements ApplicationRunner {
     private static String row(DisasterAlert a) {
         String msg = Objects.toString(a.getMessage(), "(본문 없음)").replaceAll("\\s+", " ").trim();
         return a.getId() + " [" + a.getDisasterType() + "] " + msg.substring(0, Math.min(MESSAGE_PREVIEW, msg.length()));
-    }
-
-    private static List<String> optionList(ApplicationArguments args, String name) {
-        List<String> values = args.getOptionValues(name);
-        if (values == null) {
-            return List.of();
-        }
-        return values.stream().flatMap(v -> List.of(v.split(",")).stream())
-                .map(String::trim).filter(s -> !s.isEmpty()).toList();
     }
 }
