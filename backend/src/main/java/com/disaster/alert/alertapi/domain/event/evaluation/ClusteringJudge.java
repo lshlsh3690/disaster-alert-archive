@@ -5,6 +5,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.messages.SystemMessage;
 import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.ai.chat.model.ChatModel;
+import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.ai.openai.OpenAiChatOptions;
 import org.springframework.core.io.ClassPathResource;
@@ -15,6 +16,8 @@ import java.nio.charset.StandardCharsets;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Function;
 
 /**
  * 클러스터링 성능 평가의 정답을 매기는 판사(LLM-as-a-Judge). 설계안 ③ 참조
@@ -35,8 +38,10 @@ public class ClusteringJudge {
     static final String KIND_PROMPT_RESOURCE = "judge/kind-system-prompt.txt";
 
     private static final DateTimeFormatter SENT_AT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
+    private static final int ANSWER_PREVIEW = 80;
 
     private final ChatModel chatModel;
+    private final AtomicBoolean servedModelLogged = new AtomicBoolean(false);
     /** 로드 실패 시 null — 해당 판정은 항상 empty 다. */
     private final String pairPrompt;
     private final String kindPrompt;
@@ -58,7 +63,7 @@ public class ClusteringJudge {
             return Optional.empty();
         }
         String user = alertBlock("알림 1", earlier) + "\n\n" + alertBlock("알림 2", later);
-        return ask(pairPrompt, user).map(PairVerdict::fromModelAnswer);
+        return parse(ask(pairPrompt, user), PairVerdict::fromModelAnswer, "쌍");
     }
 
     /** @return 알림이 사건인지 비사건인지. 본문이 비었거나 LLM 실패·해석 불가면 empty. */
@@ -68,7 +73,24 @@ public class ClusteringJudge {
         }
         // 분류기(AlertKindClassifier)와 같은 입력 모양: [유형:X] 공백 정리한 원문
         String user = "[유형:" + alert.getDisasterType() + "] " + normalize(alert.getMessage());
-        return ask(kindPrompt, user).map(KindVerdict::fromModelAnswer);
+        return parse(ask(kindPrompt, user), KindVerdict::fromModelAnswer, "분류");
+    }
+
+    /**
+     * 답을 판정으로 바꾼다. 답은 왔는데 약속한 한 단어가 아니면 그 답을 로그로 남긴다 —
+     * 남기지 않으면 측정 결과의 판정 불가가 호출 실패(ask 의 warn)인지 형식 위반인지 가를 수 없다.
+     */
+    private static <T> Optional<T> parse(Optional<String> answer, Function<String, T> parser, String kind) {
+        if (answer.isEmpty()) {
+            return Optional.empty();
+        }
+        T verdict = parser.apply(answer.get());
+        if (verdict == null) {
+            String head = answer.get().replaceAll("\\s+", " ").trim();
+            log.warn("판사 답이 약속한 형식이 아니라 판정 불가로 둡니다({}): '{}'",
+                    kind, head.substring(0, Math.min(ANSWER_PREVIEW, head.length())));
+        }
+        return Optional.ofNullable(verdict);
     }
 
     /** 시스템 프롬프트 + 입력으로 gpt-4o·온도 0 호출. 프롬프트가 없거나 호출이 실패하면 empty. */
@@ -81,11 +103,23 @@ public class ClusteringJudge {
             Prompt prompt = new Prompt(
                     List.of(new SystemMessage(systemPrompt), new UserMessage(user)),
                     OpenAiChatOptions.builder().model(MODEL).temperature(0.0).build());
-            return Optional.ofNullable(chatModel.call(prompt).getResult().getOutput().getText());
+            ChatResponse response = chatModel.call(prompt);
+            logServedModelOnce(response);
+            return Optional.ofNullable(response.getResult().getOutput().getText());
         } catch (Exception e) {
             // 판정 불가는 정상 흐름이라 사람이 조치할 일이 아니다 — error 가 아닌 warn
             log.warn("판사 호출 실패, 판정 불가로 둡니다: {}", e.toString());
             return Optional.empty();
+        }
+    }
+
+    /**
+     * 실제로 응답한 모델을 첫 응답에서 한 번 남긴다. 테스트는 요청에 실린 옵션만 확인하므로, 공유 설정과 합쳐진 뒤
+     * 정말 gpt-4o 로 갔는지는 측정 도구를 돌릴 때 이 로그로 확인한다.
+     */
+    private void logServedModelOnce(ChatResponse response) {
+        if (response.getMetadata() != null && servedModelLogged.compareAndSet(false, true)) {
+            log.info("판사 응답 모델: {} (요청 {})", response.getMetadata().getModel(), MODEL);
         }
     }
 
