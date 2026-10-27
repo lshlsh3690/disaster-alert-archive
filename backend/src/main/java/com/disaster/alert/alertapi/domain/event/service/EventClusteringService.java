@@ -103,6 +103,27 @@ public class EventClusteringService {
     @Value("${clustering.cross-region.animal-keywords:탈출|출몰|멧돼지|들개|늑대}")
     private String animalKeywords;
 
+    // Red 단계 뼈대 — 동물 경로(clusterAnimal) 구현은 Green 에서. 아래 값은 EventCrossRegionService 와 같은 설정 키·기본값이다.
+    /** 동물 경로 후보 이벤트 윈도우(시간) — 알림 시각 기준 직전 이 시간 안에 시작·갱신된 이벤트만 후보. */
+    @Value("${clustering.cross-region.candidate-window-hours:336}")
+    private int crossRegionWindowHours;
+
+    /** 동물 경로 후보 상한(LLM 에 보여 줄 후보 수). */
+    @Value("${clustering.cross-region.top-k:5}")
+    private int crossRegionTopK;
+
+    /** 동물 경로 후보 유사도 하한 — 후보 거리 상한은 1 - 이 값. */
+    @Value("${clustering.cross-region.similarity-floor:0.6}")
+    private double crossRegionSimilarityFloor;
+
+    /** 동물 이벤트 알림 수 상한 — 병합 후 이 수를 넘으면 붙이지 않는다(blob 방지). */
+    @Value("${clustering.cross-region.span-cap-alerts:30}")
+    private int crossRegionSpanCapAlerts;
+
+    /** 동물 이벤트 시도 수 상한 — 이미 이 수 이상 시도에 걸친 이벤트에는 붙이지 않는다. */
+    @Value("${clustering.cross-region.span-cap-sido:10}")
+    private int crossRegionSpanCapSido;
+
     /** 전국 통합 유형(쉼표 구분) — 지역 무관 단일 사건. 태풍처럼 시군구 단위로 쪼개져도 하나로 묶는다. */
     @Value("${clustering.global-types:태풍}")
     private String globalTypesCsv;
