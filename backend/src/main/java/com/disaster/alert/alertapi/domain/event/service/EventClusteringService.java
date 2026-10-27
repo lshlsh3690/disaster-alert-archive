@@ -550,15 +550,17 @@ public class EventClusteringService {
             return false;
         }
         // 2) 지역이 없으면 후보 게이트(IN 목록)를 만들 수 없다 — 임베딩 경로의 NO_REGION 처리에 맡긴다.
+        //    코드가 있어도 전부 짧아 종 단위(시군구 5자·시도 2자)로 못 자르면 빈 IN () 쿼리가 오류가 나므로 같이 넘긴다.
         String[] regionCodes = extractRegionCodes(alert);
-        if (regionCodes.length == 0) {
+        String[] unitCodes = codePrefixes(regionCodes, AnimalIdentity.isEndemic(species) ? 5 : 2);
+        if (unitCodes.length == 0) {
             return false;
         }
         trace.recordPath(ClusteringTracePath.ANIMAL);
 
         // 3) 같은 종 후보 조회(시간 상한은 알림 시각 — 백필에서 판정 순간에 없던 미래 이벤트 차단).
         String embeddingText = ensureEmbedding(alert);
-        List<Object[]> rows = findAnimalCandidates(alert, species, embeddingText, regionCodes);
+        List<Object[]> rows = findAnimalCandidates(alert, species, embeddingText, unitCodes);
         trace.recordCandidates(toTraceCandidates(rows));
 
         // 4) 후보가 없으면 LLM 을 부르지 않는다(호출당 비용) — 곧바로 새 이벤트.
@@ -593,17 +595,18 @@ public class EventClusteringService {
      * 거리 상한은 1 - similarity-floor(0.6 -> 0.4), 자기 이벤트는 아직 없으므로 selfEventId=-1(제외 없음).
      */
     private List<Object[]> findAnimalCandidates(DisasterAlert alert, String species, String embeddingText,
-                                                String[] regionCodes) {
+                                                String[] unitCodes) {
         LocalDateTime until = alert.getCreatedAt();
         LocalDateTime since = until.minusHours(crossRegionWindowHours);
         String speciesRegex = AnimalIdentity.speciesRegex(species);
         double maxDistance = 1.0 - crossRegionSimilarityFloor;
+        // unitCodes 는 호출 측이 종에 맞춰 자른 지역 코드(토착종 시군구 5자, 이동종 시도 2자)
         if (AnimalIdentity.isEndemic(species)) {
             return disasterEventRepository.findCrossRegionCandidatesSigungu(embeddingText, since, until, -1L,
-                    speciesRegex, List.of(codePrefixes(regionCodes, 5)), maxDistance, crossRegionTopK);
+                    speciesRegex, List.of(unitCodes), maxDistance, crossRegionTopK);
         }
         return disasterEventRepository.findCrossRegionCandidatesSido(embeddingText, since, until, -1L,
-                speciesRegex, List.of(codePrefixes(regionCodes, 2)), maxDistance, crossRegionTopK);
+                speciesRegex, List.of(unitCodes), maxDistance, crossRegionTopK);
     }
 
     /** 후보 행(거리순)을 대표 본문과 묶어 LLM 입력으로 — 순서를 유지해야 LLM 이 돌려준 index 가 맞는다. */
