@@ -1,6 +1,7 @@
 package com.disaster.alert.alertapi.global.translation;
 
 import com.disaster.alert.alertapi.domain.disasteralert.model.DisasterAlert;
+import com.disaster.alert.alertapi.domain.disasteralert.model.DisasterAlertTranslation;
 import com.disaster.alert.alertapi.domain.disasteralert.repository.DisasterAlertRepository;
 import com.disaster.alert.alertapi.domain.disasteralert.repository.DisasterAlertTranslationRepository;
 import lombok.RequiredArgsConstructor;
@@ -138,11 +139,14 @@ public class TranslationService {
     /**
      * 실제 번역 + 저장 로직 (내부 공용).
      *
-     * <p>저장은 {@code translationRepository.upsert(...)}(ON CONFLICT DO NOTHING)로 하므로
-     * 동시에 중복 호출돼도 PK 충돌 예외는 나지 않는다 — 먼저 저장된 쪽이 유지되고 나머지는
-     * 조용히 무시된다. 다만 호출 측(예: {@link #ensureTranslated})이 여전히 존재 여부를 먼저
-     * 확인하는 이유는 이미 캐시가 있는데도 매번 번역 API를 호출하는 낭비(비용·지연)를 막기
-     * 위해서다.
+     * <p>저장은 {@code save()}를 쓴다(과거에 네이티브 {@code upsert()}(ON CONFLICT DO NOTHING)로
+     * 바꿨던 적이 있으나, 그건 동시 요청이 같은 (alertId, language) 키를 거의 동시에 저장할 때
+     * 나는 PK 충돌을 DB 레벨에서 우회하는 임시방편이었다 — 되돌렸다). 호출 측(예:
+     * {@link #ensureTranslated})이 존재 여부를 먼저 확인하는 이유는 이미 캐시가 있는데도 매번
+     * 번역 API를 호출하는 낭비(비용·지연)를 막기 위해서지만, 그 확인과 이 저장 사이의 틈에서
+     * 동시 요청이 겹치면 여전히 PK 충돌이 날 수 있다. 이 틈을 없애는 근본 해법은
+     * {@link TranslationRequestCoalescer}로 같은 키의 동시 호출 자체를 하나로 병합하는
+     * 것이다(Green 단계에서 연동).
      */
     private void translateAndSaveInternal(Long alertId, SupportedLanguage language) {
         try {
@@ -165,11 +169,16 @@ public class TranslationService {
             }
 
             // 지역명(region_names)은 legal_district_translation 에서 처리하므로 여기서는 null 로 저장.
-            // save() 대신 upsert() — 동시 요청 간 check-then-act 틈에서 나는 PK 충돌을
-            // DB 레벨 ON CONFLICT DO NOTHING 으로 원천 차단한다(TranslationService.ensureTranslated
-            // 동시성 회귀 테스트 참고). 네이티브 쿼리라 save() 와 달리 즉시 실행되므로 예외도
-            // 여기 try 블록 안에서 바로 잡힌다.
-            translationRepository.upsert(alertId, targetLang, translatedMessage, translatedType);
+            // 중복 호출 시 PK 충돌이 발생할 수 있으므로 호출 측(ensureTranslated 등)에서 존재
+            // 여부를 사전에 체크해야 한다 — 다만 그 체크와 이 저장 사이에도 틈이 있어 동시 요청이
+            // 겹치면 여전히 PK 충돌이 날 수 있다(과거에는 ON CONFLICT DO NOTHING 으로 DB 레벨
+            // 우회를 했었다). 이제는 TranslationRequestCoalescer 가 같은 키의 동시 호출을 애초에
+            // 하나로 병합해 이 메서드에 동시에 두 번 도달하는 상황 자체를 없애는 방향으로 간다 —
+            // 다만 이 코알레서 연동은 아직 없다(Green 단계에서 TranslationService 가 코알레서를
+            // 통해 translateAndSaveInternal 을 감싸도록 연결한다).
+            translationRepository.save(
+                    DisasterAlertTranslation.of(alertId, targetLang, translatedMessage, translatedType, null)
+            );
             log.info("번역 완료: alertId={}, lang={}", alertId, targetLang);
 
         } catch (Exception e) {
