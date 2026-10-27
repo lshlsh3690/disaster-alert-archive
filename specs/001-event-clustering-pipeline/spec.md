@@ -98,21 +98,19 @@
 
 ---
 
-### 사용자 스토리 6 - 동물 등 비정형 이동 사건의 cross-region LLM 병합 (우선순위: P6)
+### 사용자 스토리 6 - 동물 탈출·출몰의 동물 경로 LLM 판정 (우선순위: P6)
 
-탈출한 멧돼지·들개·늑대 등 지역을 넘나드는 비정형 사건은, 정형 신원 키가 없어 실종 인물처럼 결정적으로 묶을 수 없다. 대신 종(species) 하드 게이트 + 지역 인접(토착종은 시군구 인접, 이동종은 시도 인접) + 시간 윈도우로 후보를 좁힌 뒤 LLM(`gpt-4o-mini`)이 "동일 개체의 같은 사건"인지 최종 판정한다. 로컬 클러스터링(`clusterNewAlert`)이 이미 어떤 이벤트에 배정한 뒤 실행되는 별도 후속 패스다.
+탈출한 멧돼지·들개·늑대 등 지역을 넘나드는 동물 사건은, 정형 신원 키가 없어 실종 인물처럼 결정적으로 묶을 수 없다. 대신 종(species) 하드 게이트 + 지역 인접(토착종은 시군구, 이동종은 시도) + 직전 시간 윈도우로 후보를 좁힌 뒤 LLM(`gpt-4o-mini`)이 "같은 개체의 같은 사건"인지 판정한다. 2026-10-27 부터 `clusterNewAlert` 안에서 실종 인물(`clusterPerson`) 바로 다음 경로(`clusterAnimal`)로 **판정 순간에** 처리한다. 그 전에는 클러스터링 뒤 이벤트끼리 합치던 별도 패스(`EventCrossRegionService`)였으나, 원래 이벤트를 지워 판정 기록(`clustering_trace`)과 어긋나고 평가에서 빠져 옮겼다.
 
-**우선순위 이유**: 발생 건수가 적고(멧돼지·들개 등 한정된 종) LLM 비용이 드는 borderline 경로라 전체 파이프라인에서 차지하는 비중은 낮지만, 정형 키가 없는 유일한 이동성 사건 유형이라 별도 서비스(`EventCrossRegionService`)로 분리돼 있다.
+**우선순위 이유**: 발생 건수가 적지만(3년치 동물 알림 약 200건) 정형 키가 없는 유일한 이동성 사건 유형이다.
 
-**독립 테스트 방법**: 같은 멧돼지 출몰 알림을 인접 시군구 2곳에서 발송시키면 두 이벤트가 하나로 합쳐지는지 확인.
+**독립 테스트 방법**: 같은 늑대 탈출 알림이 인접 시도에서 이어 발송되면 LLM 이 고른 기존 이벤트에 붙는지 확인 (`EventClusteringServiceAnimalTest`).
 
 **인수 시나리오**:
 
-1. **Given** `disaster_type='기타'`이고 실종 인물이 아니며 `AnimalIdentity.species(message)`로 종이 식별되면, **When** `linkCrossRegion`이 호출되면, **Then** `linkAnimal`로 진입한다. 사전에 없는 종(미식별)이면 보수적으로 아무 것도 하지 않는다 (`EventCrossRegionService.java:92-101`, `142-147`).
-2. **Given** 대상 알림이 이미 2개 이상 시도에 걸친(=이미 cross-region 링크됨) 이벤트에 속해 있으면, **When** `linkAnimal`이 호출되면, **Then** 재처리를 skip한다(idempotency 가드) (`EventCrossRegionService.java:138-141`).
-3. **Given** 토착종(멧돼지·들개·뱀)이면 시군구 인접, 그 외(늑대·사슴·곰·소)면 시도 인접 조건으로 top-5(`clustering.cross-region.top-k`) 후보를 코사인 유사도 0.6(`similarity-floor`) 이상으로 좁히고, **When** `EventLLMDecisionService.pickSameIncident`가 "동일 개체"로 판정하면, **Then** 두 이벤트가 `MergeMethod.LLM`으로 병합된다. 단 병합 후 알림 수가 30건(`span-cap-alerts`)을 넘거나 걸친 시도 수가 10개(`span-cap-sido`) 이상이 되면 병합을 취소한다 (`EventCrossRegionService.java:160-198`, `209-220`).
-
----
+1. **Given** `disaster_type='기타'`이고 `AnimalIdentity.species(message)`로 종이 식별되며 지역 코드를 종 단위(토착종 앞 5자, 이동종 앞 2자)로 자를 수 있으면, **When** `clusterNewAlert`가 호출되면, **Then** `clusterAnimal`이 처리하고 판정 기록 경로는 `ANIMAL`이다. 종 미식별이거나 지역이 없으면 기존 경로(임베딩, 지역 없음이면 `NO_REGION`)로 넘어간다 (`EventClusteringService.clusterAnimal`).
+2. **Given** 같은 종 알림이 든 이벤트 중 새 알림 직전 336시간(`clustering.cross-region.candidate-window-hours`) 안에 있고, 이벤트 footprint 가 새 알림 지역과 같거나 인접한(토착종 시군구·이동종 시도) 이벤트를 유사도 0.6(`similarity-floor`) 이상 상위 5개(`top-k`)로 찾았을 때, **When** 후보가 1건 이상이면, **Then** 항상 `EventLLMDecisionService.pickSameIncident`를 호출해 고른 이벤트에 `MergeMethod.LLM`으로 병합한다. 단 병합 후 알림이 30건(`span-cap-alerts`)을 넘거나 그 이벤트의 시도 수가 10개(`span-cap-sido`) 이상이면 새 이벤트를 만든다 (`clusterAnimal`, `findAnimalCandidates`, `exceedsAnimalSpanCap`).
+3. **Given** 후보가 0건이면, **When** `clusterAnimal`이 처리하면, **Then** LLM 을 부르지 않고 새 이벤트를 만든다.
 
 ### 사용자 스토리 7 - 사고성 사건의 LLM borderline 폴백 병합 (우선순위: P7)
 
@@ -157,19 +155,19 @@
 
 1. **Given** `SPRING_PROFILES_ACTIVE=backfill`이고 `--backfill.embed-only=true`이면, **When** 애플리케이션이 기동되면, **Then** `embedding IS NULL`인 알림을 200건(`EMBED_BATCH_SIZE`)씩 묶어 OpenAI 임베딩 API를 배치 호출하고 클러스터링은 수행하지 않는다 (`EventClusteringBackfillTool.java:57`, `67-68`, `129-160`).
 2. **Given** `--backfill.recluster=true`이면, **When** 애플리케이션이 기동되면, **Then** `embedding IS NOT NULL`인 알림 전체를 `created_at ASC` 순으로 `clusterNewAlert`에 재통과시킨다(OpenAI 미호출) — 호출 전 `event_alert_mapping`/`disaster_events`를 비워야 함을 로그로 경고한다 (`EventClusteringBackfillTool.java:76-83`, `205-211`).
-3. **Given** `--backfill.cross-region=true`이면, **When** 애플리케이션이 기동되면, **Then** `disaster_type='기타'`이고 임베딩이 존재하는 알림만 `created_at ASC`로 `linkCrossRegion`에 재통과시킨다(recluster 완료 후 실행을 전제) (`EventClusteringBackfillTool.java:71-74`, `162-196`).
+3. (2026-10-27 삭제) `--backfill.cross-region` 모드는 동물 경로가 `clusterNewAlert` 안으로 옮겨지며 없어졌다. recluster 가 동물 알림도 함께 처리한다.
 
 ---
 
 ### 예외 상황
 
-- **클러스터링은 끌 수 없다**: 2026-10-10 에 `clustering.enabled`·`llm-fallback.enabled`·`cross-region.enabled` 와 대응 환경변수를 삭제했다. `clusterNewAlert`·`linkCrossRegion` 은 알림이 존재하고 본문이 비어있지 않으면 항상 실행된다 (`EventClusteringService.java:129`, `EventCrossRegionService.java:68`). 클러스터링이 꺼지면 이벤트가 생기지 않아 위험도(`AlertClusteredEvent` 구독)에도 새 알림이 반영되지 않았기 때문이다.
+- **클러스터링은 끌 수 없다**: 2026-10-10 에 `clustering.enabled`·`llm-fallback.enabled`·`cross-region.enabled` 와 대응 환경변수를 삭제했다. `clusterNewAlert` 는 알림이 존재하고 본문이 비어있지 않으면 항상 실행된다(동물 경로 포함). 클러스터링이 꺼지면 이벤트가 생기지 않아 위험도(`AlertClusteredEvent` 구독)에도 새 알림이 반영되지 않았기 때문이다.
 - **알림 본문이 비어 있음**: `alert.getMessage()`가 null/blank면 경고 로그만 남기고 skip한다 (`EventClusteringService.java:149-152`).
 - **알림 조회 실패**(존재하지 않는 alertId): 경고 로그 후 조용히 반환한다 (`EventClusteringService.java:143-147`).
-- **클러스터링 처리 중 예외 발생**(OpenAI 임베딩 API 실패 등): 개별 알림 단위에서 예외를 잡아 로그만 남기고 스케줄러 사이클 전체를 막지 않는다. 예외를 재던지지 않으므로 실패한 알림은 다음 수집 사이클이나 백필 도구로만 복구된다 (`EventClusteringService.java:154-159`, `EventCrossRegionService.java:83-88`).
-- **cross-region LLM 호출 실패**: `ChatModel.call`이 예외를 던지면 경고 로그 후 null(매칭 없음)로 처리 — 병합하지 않고 원래 이벤트에 남긴다 (`EventLLMDecisionService.java:115-122`).
+- **클러스터링 처리 중 예외 발생**(OpenAI 임베딩 API 실패 등): 개별 알림 단위에서 예외를 잡아 로그만 남기고 스케줄러 사이클 전체를 막지 않는다. 예외를 재던지지 않으므로 실패한 알림은 다음 수집 사이클이나 백필 도구로만 복구된다 (`EventClusteringService.java:154-159`).
+- **동물 경로 LLM 호출 실패**: `ChatModel.call`이 예외를 던지면 경고 로그 후 null(매칭 없음)로 처리 — 병합하지 않고 새 이벤트를 만든다 (`EventLLMDecisionService.java:115-122`).
 - **LLM 응답이 모호하거나 범위를 벗어남**("NONE" 포함, 숫자 없음, 후보 범위 밖 숫자): 모두 보수적으로 null 처리한다 (`EventLLMDecisionService.java:126-138`).
-- **동물 종을 식별할 수 없음**(`AnimalIdentity.species`가 null): cross-region 병합을 시도하지 않는다(보수적) (`EventCrossRegionService.java:142-147`).
+- **동물 종을 식별할 수 없음**(`AnimalIdentity.species`가 null): 동물 경로를 타지 않고 임베딩 경로로 간다(보수적) — LLM 폴백에서는 `animal-keywords` 로 계속 제외된다.
 - **광역 알림의 유형이 정보성이 아님**("기타"/null): 병합을 시도하지 않고 항상 신규 이벤트로 생성한다 (`EventClusteringService.java:646`, `652`, `670`).
 - **regional-types CSV 파싱 실패**(잘못된 `유형:시간` 토큰): 해당 토큰만 건너뛰고 나머지는 정상 파싱한다 — 부분 실패가 전체를 막지 않는다 (`EventClusteringService.java:545-553`).
 - **백필 중 알림 순서가 뒤섞임**(시간 역행 입력): `incrementOnMerge`의 `GREATEST(last_alert_at, :alertAt)` 연산으로 `last_alert_at`이 감소하지 않도록 방어한다 (`DisasterEventRepository.java:267-274`).
@@ -180,9 +178,9 @@
 
 **공통 게이트 / 트리거**
 
-- **FR-001**: 시스템은 재난문자 수집 스케줄러(`DisasterFetchScheduler`, 1분 주기 cron `0 * * * * *`)가 새 알림을 저장한 직후, 알림마다 순서대로 번역 → FCM 알림 트리거 → `EventClusteringService.clusterNewAlert` → `EventCrossRegionService.linkCrossRegion`을 호출해야 한다(MUST) (`DisasterFetchScheduler.java:29-51`).
+- **FR-001**: 시스템은 재난문자 수집 스케줄러(`DisasterFetchScheduler`, 1분 주기 cron `0 * * * * *`)가 새 알림을 저장한 직후, 알림마다 순서대로 번역 → FCM 알림 트리거 → `EventClusteringService.clusterNewAlert`를 호출해야 한다(MUST, 동물 경로 포함 — 2026-10-27 전에는 이어서 `linkCrossRegion`을 호출했다) (`DisasterFetchScheduler.java:29-51`).
 - **FR-002**: 시스템은 설정 플래그 없이 모든 신규 알림에 대해 `clusterNewAlert`를 실행해야 한다(MUST) (`EventClusteringService.java:129`). 2026-10-10 이전에는 `CLUSTERING_ENABLED`(기본 `false`)가 꺼져 있으면 no-op 이었다.
-- **FR-003**: 시스템은 설정 플래그 없이 `linkCrossRegion`을 실행해야 하며, 동물·비정형 키워드 게이트(`isAnimalCase`)만으로 대상을 거른다(MUST) (`EventCrossRegionService.java:68`, `74`). 2026-10-10 이전에는 `CROSS_REGION_ENABLED`(기본 `false`) 게이트가 있었다.
+- **FR-003**: 시스템은 설정 플래그 없이 동물 경로(`clusterAnimal`)를 실행해야 하며, `기타` + 종 식별 게이트만으로 대상을 거른다(MUST). 2026-10-10 이전에는 `CROSS_REGION_ENABLED`(기본 `false`) 게이트가 있었고, 2026-10-27 이전에는 별도 사후 패스(`linkCrossRegion`)였다.
 - **FR-004**: 시스템은 설정 플래그 없이 로컬 borderline LLM 폴백을 시도해야 하며, 대상은 FR-025 의 유형·거리 게이트로만 좁힌다(MUST) (`EventClusteringService.java:254-255`). 2026-10-10 이전에는 `LLM_FALLBACK_ENABLED`(기본 `false`) 게이트가 있었다.
 
 **임베딩 기반 로컬 클러스터링**
@@ -216,13 +214,13 @@
 - **FR-018**: 시스템은 `disaster_type='기타'`이고 본문에서 이름(`[가-힣]{2,4}씨`)과 나이(`\d{1,3}세`)를 모두 추출할 수 있으면, 임베딩/지역 로직을 건너뛰고 신원(이름+나이+키, 있으면 `\d{2,3}cm`) 기반 클러스터링을 수행해야 한다(MUST) (`EventClusteringService.java:358-381`; `MissingPersonIdentity.java:15-40`).
 - **FR-019**: 시스템은 `clustering.person-window-hours`(기본 336시간/14일) 이내에 같은 이름+나이(+키)를 가진 이벤트가 있으면 시군구와 무관하게 `MergeMethod.IDENTITY`로 병합해야 한다(MUST). 키가 추출되지 않으면 이름+나이만으로 매칭해야 한다(MUST) (`EventClusteringService.java:81-82`, `367-374`; `DisasterEventRepository.java:436-459`).
 
-**동물 등 비정형 이동 사건(cross-region)**
+**동물 탈출·출몰 (동물 경로)**
 
-- **FR-020**: 시스템은 `disaster_type='기타'`이고 실종 인물이 아니며 `AnimalIdentity.species(message)`로 종이 식별될 때만 cross-region 병합을 시도해야 한다(MUST). 사전에 없는 종은 처리하지 않아야 한다(MUST NOT) (`EventCrossRegionService.java:92-101`; `AnimalIdentity.java:32-39`, `61-71`).
-- **FR-021**: 시스템은 이미 2개 이상 시도에 걸친 이벤트에 속한 알림은 cross-region 재처리를 skip해야 한다(MUST) — 동일 알림에 대한 idempotent 재실행 보장 (`EventCrossRegionService.java:138-141`).
-- **FR-022**: 시스템은 토착종(멧돼지·들개·뱀)은 시군구(코드 앞 5자) 인접, 그 외 이동종(늑대·사슴·곰·소)은 시도(코드 앞 2자) 인접을 게이트로 사용해 후보를 찾아야 한다(MUST). 인접 관계는 `region_adjacency` 테이블의 직접 매칭 1-hop만 사용한다(MUST) — 다단계(BFS) 전이 확장은 하지 않는다 (`EventCrossRegionService.java:157-174`; `AnimalIdentity.java:53`; `DisasterEventRepository.java:320-423`).
-- **FR-023**: 시스템은 cross-region 후보를, 대상 알림의 `[created_at - candidate-window-hours, created_at + candidate-window-hours]`(기본 ±336시간) 양방향 시간 윈도우와 코사인 거리 `1.0 - similarity-floor`(기본 0.6) 이하로 제한하고, 같은 종의 알림을 가진 이벤트만(종 하드 게이트) 상위 `top-k`(기본 5)건 조회해야 한다(MUST) (`EventCrossRegionService.java:51-64`, `152-174`; `DisasterEventRepository.java:320-423`).
-- **FR-024**: 시스템은 `EventLLMDecisionService.pickSameIncident`가 후보 중 하나를 "동일 개체"로 판정하면, 병합 후 알림 수가 `span-cap-alerts`(기본 30)를 초과하거나 걸친 시도 수가 `span-cap-sido`(기본 10) 이상이 되지 않는 한 두 이벤트를 `MergeMethod.LLM`으로 병합해야 한다(MUST) (`EventCrossRegionService.java:188-198`, `209-220`).
+- **FR-020**: 시스템은 `disaster_type='기타'`이고 `AnimalIdentity.species(message)`로 종이 식별될 때만 동물 경로로 처리해야 한다(MUST). 실종 인물은 앞 단계(`clusterPerson`)가 먼저 가져간다. 사전에 없는 종은 동물 경로로 처리하지 않아야 한다(MUST NOT) (`EventClusteringService.clusterAnimal`; `AnimalIdentity.java`).
+- **FR-021**: (2026-10-27 삭제) 옛 사후 패스의 "이미 2개 이상 시도에 걸친 이벤트는 재처리 skip" 가드는 이벤트끼리 사후 병합할 때의 재처리 방지용이라, 알림 단위로 판정 순간에 붙이는 동물 경로에는 없다.
+- **FR-022**: 시스템은 토착종(멧돼지·들개·뱀)은 시군구(코드 앞 5자), 그 외 이동종(늑대·사슴·곰·소)은 시도(코드 앞 2자) 단위로, 후보 이벤트 footprint 가 새 알림 지역과 같거나 `region_adjacency` 1-hop 으로 인접한지를 게이트로 써야 한다(MUST) — 다단계(BFS) 전이 확장은 하지 않는다. 종 단위로 자른 코드가 비면 동물 경로를 건너뛴다 (`clusterAnimal`, `findAnimalCandidates`; `DisasterEventRepository.findCrossRegionCandidatesSido/Sigungu`).
+- **FR-023**: 시스템은 동물 후보를, 새 알림의 `[created_at - candidate-window-hours, created_at]`(기본 직전 336시간, 상한 포함) 윈도우와 코사인 거리 `1.0 - similarity-floor`(기본 0.6 → 0.4) 이하로 제한하고, 같은 종의 알림을 가진 이벤트만(종 하드 게이트) 상위 `top-k`(기본 5)건 조회해야 한다(MUST).
+- **FR-024**: 시스템은 후보가 있으면 항상 `EventLLMDecisionService.pickSameIncident`로 판정하고, 고른 이벤트의 알림 수 + 1 이 `span-cap-alerts`(기본 30)를 넘거나 그 이벤트의 시도 수가 `span-cap-sido`(기본 10) 이상이 아니면 `MergeMethod.LLM`으로 병합해야 한다(MUST). 그 밖(후보 0건·LLM 미선택·상한)은 새 이벤트를 만든다 (`clusterAnimal`, `exceedsAnimalSpanCap`).
 
 **사고성 사건 LLM 폴백**
 
@@ -269,14 +267,14 @@
 - **SC-001 (정성)**: 같은 시군구·7일 이내·코사인 유사도 0.85 이상인 재난문자는 하나의 이벤트로 병합되도록 코드 경로상 작성되어 있음(자동화 검증 없음) — `backend/src/test/.../domain/event/` 디렉터리가 존재하지 않아(plan.md 헌법 검사 III 참고) 이 동작은 코드 리딩으로만 확인했으며, 운영 성공률 측정치도 없다.
 - **SC-002 (정성)**: 산불·산사태·홍수 알림은 지역 한정 유형 경로에 의해 본문 텍스트 차이와 무관하게 같은 시군구·유형·윈도우 안에서 항상 하나의 이벤트로 유지된다(코드 경로상 보장).
 - **SC-003 (정성)**: LLM 판정이 개입하는 모든 경로(`LLM`, `LLM_FALLBACK`)는 실패·모호·범위 초과 시 예외 없이 병합하지 않는(false) 쪽으로 수렴한다 — 즉 "모르면 합치지 않는다"는 보수적 정책이 코드 전 경로에서 일관되게 적용된다.
-- **SC-004 (정성)**: 파이프라인의 모든 진입점(`clusterNewAlert`, `linkCrossRegion`, 백필 도구)은 알림 1건의 처리 실패가 나머지 알림이나 스케줄러 사이클 전체의 실행을 막지 않는다(각 진입점에서 try/catch로 격리).
+- **SC-004 (정성)**: 파이프라인의 모든 진입점(`clusterNewAlert`, 백필 도구)은 알림 1건의 처리 실패가 나머지 알림이나 스케줄러 사이클 전체의 실행을 막지 않는다(각 진입점에서 try/catch로 격리).
 
 ## 가정
 
 - **on/off 플래그는 없다(2026-10-10 삭제)**: 예전의 `CLUSTERING_ENABLED`/`LLM_FALLBACK_ENABLED`/`CROSS_REGION_ENABLED`(기본 `false`)는 제거됐고, 이 문서가 서술하는 경로는 모든 환경에서 항상 실행된다. 비용 통제는 유형 화이트리스트·거리 구간·키워드 게이트로만 한다.
-- **자동 로컬 병합은 항상 동일 시군구(코드 앞 5자리) 내에서만 발생한다.** 인접 시군구로의 확산은 오직 cross-region 동물 케이스(`EventCrossRegionService`)에서 `region_adjacency` 테이블의 1-hop 직접 인접만으로 이루어지며, 산불·지진 등 일반 재난 유형에는 인접 확산(다단계 BFS 등) 로직이 전혀 없다. (아래 "발견된 문서-코드 불일치" 참고.)
+- **자동 로컬 병합은 항상 동일 시군구(코드 앞 5자리) 내에서만 발생한다.** 인접 시군구로의 확산은 오직 동물 경로(`clusterAnimal`)에서 `region_adjacency` 테이블의 1-hop 직접 인접만으로 이루어지며, 산불·지진 등 일반 재난 유형에는 인접 확산(다단계 BFS 등) 로직이 전혀 없다. (아래 "발견된 문서-코드 불일치" 참고.)
 - **인물(실종)과 태풍/지역 한정 유형은 임베딩을 전혀 쓰지 않는다.** 신원/유형 자체가 결정적 키이므로 재클러스터링 시 OpenAI 비용이 들지 않는다.
-- **`ClusteringProperties`라는 단일 `@ConfigurationProperties` 바인딩 클래스는 존재하지 않는다.** `clustering.*` 설정은 `EventClusteringService`와 `EventCrossRegionService`에 개별 `@Value` 필드로 흩어져 바인딩돼 있다. (아래 "발견된 문서-코드 불일치" 참고.)
+- **`ClusteringProperties`라는 단일 `@ConfigurationProperties` 바인딩 클래스는 존재하지 않는다.** `clustering.*` 설정은 `EventClusteringService`에 개별 `@Value` 필드로 흩어져 바인딩돼 있다. (아래 "발견된 문서-코드 불일치" 참고.)
 - **`EventFragmentMergeService`(30분 주기 파편 이벤트 정합화 스케줄러)는 코드베이스에 존재하지 않는다.** `git log --all`로 전체 히스토리를 확인해도 해당 이름의 파일이 추가된 이력이 없다. `application.yml`의 Sentry 섹션 주석(`application.yml:165`)에 "fragment-merge"라는 표현이 남아 있을 뿐 실제 서비스/스케줄러/설정 키(`FRAGMENT_MERGE_ENABLED`, `incident-specific-check`)는 어디에도 없다. (아래 "발견된 문서-코드 불일치" 참고.)
 - **계절성 안전안내의 쿨다운 억제는 "쿨다운 갱신을 건너뛰는" 방식이 아니라 "안내성 알림을 아예 별도의 이벤트 버킷(`is_advisory=true`)으로 분리"하는 방식으로 구현돼 있다.** 안내 이벤트 자체는 자신의 `cooldownHours`를 정상적으로 가지며(`DisasterEvent.java:219`), 다만 사건(incident) 이벤트의 `last_alert_at`을 안내성 알림이 갱신하지 않을 뿐이다. 현재 이 분리는 산불(`clustering.advisory-split-types`)에만 적용돼 있다.
 - **`clustering.cross-region.mover-keywords` 설정 키는 `application.yml`에 정의돼 있지만 백엔드 어떤 코드에서도 읽지 않는다(dead config).** 실제 동물 게이트는 `AnimalIdentity.species()` 사전 매칭이 담당한다.
@@ -288,7 +286,7 @@
 
 1. **`EventFragmentMergeService`** — "30분 주기 스케줄러로 동작하는 정합화 패스, 작은 파편 이벤트를 흡수" 라고 설명되지만 해당 클래스/파일이 존재한 적이 없다.
 2. **`FRAGMENT_MERGE_ENABLED`, `INCIDENT_SPECIFIC_CHECK_ENABLED` 환경변수 및 `incident-specific-check` 설정** — `application.yml`, Java 소스 어디에도 없다.
-3. **`ClusteringProperties` 바인딩 클래스** — 존재하지 않으며, 설정은 `EventClusteringService`/`EventCrossRegionService`의 개별 `@Value` 필드로 흩어져 있다.
-4. **"산불/지진 등 인접 시군구 BFS 확산 hop" 설정** — 이 표현이 맞는 곳은 클러스터링이 아니라 **위험도(risk) 모듈**의 `RiskCalculationService`/`RegionAdjacencyRepository`다. 클러스터링 쪽 `region_adjacency` 사용(`EventCrossRegionService`)은 다단계 BFS가 아니라 1-hop 직접 인접 매칭뿐이다.
+3. **`ClusteringProperties` 바인딩 클래스** — 존재하지 않으며, 설정은 `EventClusteringService`의 개별 `@Value` 필드로 흩어져 있다.
+4. **"산불/지진 등 인접 시군구 BFS 확산 hop" 설정** — 이 표현이 맞는 곳은 클러스터링이 아니라 **위험도(risk) 모듈**의 `RiskCalculationService`/`RegionAdjacencyRepository`다. 클러스터링 쪽 `region_adjacency` 사용(동물 경로 `clusterAnimal`, 사고성 인접 병합)은 다단계 BFS가 아니라 1-hop 직접 인접 매칭뿐이다.
 
 이 항목들은 이번 명세 작성 과정에서 소스 코드 대조를 통해 발견됐으며, 추측이 아니라 실제 부재를 확인한 것이다(`git log --all --diff-filter=A --name-only | grep -i fragment` 결과 없음, `grep -r ClusteringProperties` 결과 없음).
