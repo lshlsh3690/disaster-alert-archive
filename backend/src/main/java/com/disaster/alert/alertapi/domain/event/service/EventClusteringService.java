@@ -104,7 +104,7 @@ public class EventClusteringService {
     @Value("${clustering.cross-region.animal-keywords:탈출|출몰|멧돼지|들개|늑대}")
     private String animalKeywords;
 
-    // Red 단계 뼈대 — 동물 경로(clusterAnimal) 구현은 Green 에서. 아래 값은 EventCrossRegionService 와 같은 설정 키·기본값이다.
+    // 동물 경로(clusterAnimal) 설정 — 옛 별도 cross-region 패스의 설정 키·기본값을 그대로 쓴다.
     /** 동물 경로 후보 이벤트 윈도우(시간) — 알림 시각 기준 직전 이 시간 안에 시작·갱신된 이벤트만 후보. */
     @Value("${clustering.cross-region.candidate-window-hours:336}")
     private int crossRegionWindowHours;
@@ -979,26 +979,6 @@ public class EventClusteringService {
         trace.recordResult(ClusteringTraceResult.NEW, saved.getId());
         log.info("clusterNewAlert: alertId={} → 신규 event={} (broadcast={}, title='{}')",
                 alert.getId(), saved.getId(), broadcast, saved.getEventTitle());
-    }
-
-    /**
-     * cross-region 병합 primitive — source 이벤트의 모든 매핑을 target 으로 옮기고 source 를 삭제.
-     *
-     * <p>실종자·탈출 동물이 시군구를 옮겨다녀 따로 만들어진 이벤트(대개 단일 알림)를, LLM 이 같은
-     * 사건으로 판정했을 때 하나로 합친다. 옮겨진 매핑은 sequence_no 를 이어붙이고 merge_method 를
-     * 지정(LLM)한다. 합친 뒤 target 의 alert_count/first/last_alert_at 을 재계산.
-     */
-    @Transactional
-    public void mergeEvents(Long sourceEventId, Long targetEventId, MergeMethod method) {
-        if (sourceEventId == null || targetEventId == null || sourceEventId.equals(targetEventId)) {
-            return;
-        }
-        int offset = eventAlertMappingRepository.countByEventId(targetEventId);
-        int moved = eventAlertMappingRepository.reassignToEvent(sourceEventId, targetEventId, offset, method.name());
-        disasterEventRepository.recomputeAggregates(targetEventId);
-        disasterEventRepository.deleteById(sourceEventId);
-        log.info("cross-region 머지: event {} → {} (method={}, moved={}, offset={})",
-                sourceEventId, targetEventId, method, moved, offset);
     }
 
     /**

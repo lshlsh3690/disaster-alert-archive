@@ -58,21 +58,4 @@ public interface EventAlertMappingRepository extends JpaRepository<EventAlertMap
             WHERE m.event_id IN (:eventIds) AND m.sequence_no = 1
             """, nativeQuery = true)
     List<Object[]> findRepresentativeMessages(@Param("eventIds") List<Long> eventIds);
-
-    /**
-     * source 이벤트의 모든 매핑을 target 이벤트로 재배치 (cross-region 병합 primitive).
-     * sequence_no 는 target 의 기존 매핑 수만큼 밀어 이어붙이고, merge_method 를 지정.
-     */
-    @Modifying
-    @Query(value = """
-            UPDATE event_alert_mapping
-            SET event_id = :targetEventId,
-                sequence_no = sequence_no + :offset,
-                merge_method = :method
-            WHERE event_id = :sourceEventId
-            """, nativeQuery = true)
-    int reassignToEvent(@Param("sourceEventId") Long sourceEventId,
-                        @Param("targetEventId") Long targetEventId,
-                        @Param("offset") int offset,
-                        @Param("method") String method);
 }

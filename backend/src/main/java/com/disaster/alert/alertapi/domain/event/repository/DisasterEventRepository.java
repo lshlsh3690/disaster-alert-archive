@@ -526,22 +526,4 @@ public interface DisasterEventRepository extends JpaRepository<DisasterEvent, Lo
             @Param("selfEventId") Long selfEventId,
             @Param("limit") int limit
     );
-
-    /**
-     * 이벤트 집계 재계산 (cross-region 병합 후) — alert_count / first_alert_at / last_alert_at 을
-     * 현재 매핑된 알림들의 created_at 으로 다시 산정.
-     */
-    @Modifying
-    @Query(value = """
-            UPDATE disaster_events SET
-                alert_count = (SELECT count(*) FROM event_alert_mapping WHERE event_id = :eventId),
-                first_alert_at = (SELECT min(da.created_at) FROM event_alert_mapping m
-                                  JOIN disaster_alert da ON da.disaster_alert_id = m.alert_id
-                                  WHERE m.event_id = :eventId),
-                last_alert_at = (SELECT max(da.created_at) FROM event_alert_mapping m
-                                 JOIN disaster_alert da ON da.disaster_alert_id = m.alert_id
-                                 WHERE m.event_id = :eventId)
-            WHERE id = :eventId
-            """, nativeQuery = true)
-    int recomputeAggregates(@Param("eventId") Long eventId);
 }
