@@ -72,7 +72,6 @@ public class LogTraceAdvice implements MethodInterceptor {
         String name = declaringClass.getName();
         return name.startsWith("com.disaster.alert.alertapi.domain.risk.")
                 || name.equals("com.disaster.alert.alertapi.domain.event.service.EventClusteringService")
-                || name.equals("com.disaster.alert.alertapi.domain.event.service.EventCrossRegionService")
                 || name.equals("com.disaster.alert.alertapi.domain.event.service.EventLLMDecisionService")
                 || name.startsWith("com.disaster.alert.alertapi.domain.auth.");
     }

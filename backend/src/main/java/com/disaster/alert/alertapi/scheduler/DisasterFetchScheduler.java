@@ -4,7 +4,6 @@ import com.disaster.alert.alertapi.api.DisasterOpenApiClient;
 import com.disaster.alert.alertapi.domain.disasteralert.service.AlertKindService;
 import com.disaster.alert.alertapi.domain.disasteralert.service.DisasterAlertService;
 import com.disaster.alert.alertapi.domain.event.service.EventClusteringService;
-import com.disaster.alert.alertapi.domain.event.service.EventCrossRegionService;
 import com.disaster.alert.alertapi.domain.notification.service.AlertNotificationService;
 import com.disaster.alert.alertapi.global.translation.TranslationService;
 import lombok.RequiredArgsConstructor;
@@ -25,7 +24,6 @@ public class DisasterFetchScheduler {
     private final AlertNotificationService alertNotificationService;
     private final AlertKindService alertKindService;
     private final EventClusteringService eventClusteringService;
-    private final EventCrossRegionService eventCrossRegionService;
 
     // 매 1분마다 실행 (2026-10-10 10분 → 1분). 한 사이클이 1분을 넘기면 cron 특성상 겹쳐 돌지 않고
     // 그 사이 지나간 실행 시점은 건너뛴다 — 스케줄러 스레드가 1개라 다른 @Scheduled 도 그동안 밀린다.
@@ -49,10 +47,8 @@ public class DisasterFetchScheduler {
             // 사건/비사건 분류 — 동기 LLM 호출이라 시간이 중요한 FCM 알림 뒤에 둔다.
             // 분류기·서비스가 모든 예외를 삼켜(실패는 null=미분류) 클러스터링을 막지 않는다. 지연은 OpenAI 호출 시간만큼이다.
             alertKindService.classifyAndSave(alertId);
-            // 이벤트 클러스터링
+            // 이벤트 클러스터링 (동물 탈출·출몰도 이 안의 동물 경로가 판정 순간에 처리한다)
             eventClusteringService.clusterNewAlert(alertId);
-            // 기타(지역 이동 유형) cross-region LLM 병합
-            eventCrossRegionService.linkCrossRegion(alertId);
         });
     }
 }
