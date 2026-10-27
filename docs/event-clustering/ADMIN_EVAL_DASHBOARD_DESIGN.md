@@ -56,6 +56,7 @@
 |---|---|---|
 | `SKIPPED` | `clusterNewAlert` 앞단 — 비사건(`ADVISORY`) 또는 본문이 빈 알림. `result=SKIPPED`, `event_id` null | null / null |
 | `PERSON` | `clusterPerson` | null / null |
+| `ANIMAL` | `clusterAnimal` — 동물 탈출·출몰(같은 종 + 같은·인접 지역 후보, 항상 LLM 판정. 2026-10-27 별도 cross-region 패스에서 옮김) | 후보 목록(0건이면 `[]`) / null |
 | `GLOBAL_TYPE` | `clusterGlobalType` — 유형이 태풍이면 발송 시군구 수와 무관하게 여기로 온다. 키는 유형만 | null / null |
 | `REGIONAL` | `clusterRegionalType`(인접 시군구 산불 병합 `mergeIntoAdjacentRegionalEvent` 포함) | null / null |
 | `EPISODIC` | `clusterEpisodicType`, 시군구 1개 | null / null |
@@ -70,7 +71,7 @@
 - `EventClusteringService` 가 판정 중에 이미 아는 값을 모아 `clusterNewAlert` 끝에서 한 번 저장한다. 판정 로직은 바꾸지 않는다.
 - **저장 실패는 수집을 막지 않는다.** 예외를 삼키고 `warn` 로그만 남긴다(분류 저장 LazyInitializationException 사고 참고). JPA 엔티티 merge 가 아니라 `JdbcTemplate` 단일 UPSERT 로 쓰고, 클러스터링 트랜잭션과 분리된 별도 트랜잭션(`REQUIRES_NEW`)에서 실행한다 — 같은 트랜잭션에서 SQL 이 실패하면 Postgres 가 트랜잭션 전체를 중단 상태로 만들어 클러스터링 결과(매핑·이벤트)까지 커밋되지 않기 때문이다(`DeadTokenCleanupService` 와 같은 이유).
 - 같은 알림을 다시 클러스터링하면(백필) 기존 줄을 덮어써 알림당 1줄을 유지한다.
-- 원문·임베딩은 넣지 않는다(`disaster_alert` 에 있음). cross-region 패스(동물 탈출)는 범위 밖.
+- 원문·임베딩은 넣지 않는다(`disaster_alert` 에 있음). 동물 탈출은 2026-10-27 부터 `ANIMAL` 경로로 판정 순간에 기록된다(그 전의 별도 cross-region 패스는 기록하지 않았다).
 - 하루 수백 줄 수준이다.
 
 ### ② 표본 뽑기
