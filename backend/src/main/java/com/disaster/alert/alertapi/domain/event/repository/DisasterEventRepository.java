@@ -367,7 +367,9 @@ public interface DisasterEventRepository extends JpaRepository<DisasterEvent, Lo
     //      옆 지역을 거쳐 이동하므로 비인접은 다른 개체로 보고 차단. 인접 단위는 종에 따라 둘로 나뉜다
     //      (아래 Sido/Sigungu 두 메서드). 통과한 top-K 후보의 동일개체 판정은 LLM 이 한다.
     //   ③ 시간 게이트(양방향): 후보 이벤트가 처리 알림의 ±윈도우와 겹쳐야 함
-    //      (last_alert_at > sinceTime AND first_alert_at < untilTime). 하한만 두면 cross-region 백필이
+    //      (last_alert_at > sinceTime AND first_alert_at <= untilTime). 상한은 포함이다 — 동물 경로는
+    //      untilTime 에 새 알림 시각을 넘기는데, 같은 초에 여러 지역으로 동시 발송된 같은 사건의 앞 알림이
+    //      만든 이벤트(first_alert_at 이 같은 시각)가 "<" 이면 후보에서 빠져 사건이 둘로 갈라진다. 하한만 두면 cross-region 백필이
     //      base 후 '모든 이벤트 선존재' 상태로 돌아, 처리 알림보다 몇 년 미래의 같은 종·인접 이벤트도
     //      last_alert_at > sinceTime 을 만족해 후보가 된다 → LLM 이 "같은 동네 같은 동물" 이라 묶어
     //      같은 시군구 멧돼지 출몰 수년치가 한 사건(수백일 span)으로 과병합. 상한(untilTime)으로
@@ -391,7 +393,7 @@ public interface DisasterEventRepository extends JpaRepository<DisasterEvent, Lo
             JOIN event_alert_mapping m ON m.event_id = e.id
             JOIN disaster_alert da ON da.disaster_alert_id = m.alert_id
             WHERE e.last_alert_at > :sinceTime
-              AND e.first_alert_at < :untilTime
+              AND e.first_alert_at <= :untilTime
               AND e.is_broadcast = false
               AND e.id <> :selfEventId
               AND da.embedding IS NOT NULL
@@ -449,7 +451,7 @@ public interface DisasterEventRepository extends JpaRepository<DisasterEvent, Lo
             JOIN event_alert_mapping m ON m.event_id = e.id
             JOIN disaster_alert da ON da.disaster_alert_id = m.alert_id
             WHERE e.last_alert_at > :sinceTime
-              AND e.first_alert_at < :untilTime
+              AND e.first_alert_at <= :untilTime
               AND e.is_broadcast = false
               AND e.id <> :selfEventId
               AND da.embedding IS NOT NULL
