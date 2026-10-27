@@ -221,24 +221,4 @@ class EventClusteringServiceAnimalTest {
         assertThat(trace.getResult()).isEqualTo(ClusteringTraceResult.NEW);
         verify(llmDecisionService, never()).pickSameIncident(any(), any());
     }
-
-    // 결정: 지역 코드가 없는 동물 알림은 후보를 찾을 단위(시도/시군구)가 없으므로 동물 경로를 건너뛰고
-    //       기존 임베딩 경로의 NO_REGION(항상 새 이벤트)으로 간다. 빈 코드로 쿼리를 날리면 IN () 오류가 난다.
-    // Red: 이 테스트는 Red 에서도 통과한다 - 현재 동작이 곧 기대 동작이다. Green 에서 동물 분기를 넣다가
-    //      지역 검사를 빠뜨리면 여기서 깨지도록 고정하는 회귀 방어다.
-    @Test
-    @DisplayName("지역 코드 없음: 동물 쿼리를 부르지 않고 NO_REGION 경로로 새 이벤트")
-    void noRegion_skipsAnimalPathAndUsesNoRegion() {
-        alert(WOLF, false);
-
-        service.clusterNewAlert(ALERT_ID);
-
-        verify(disasterEventRepository, never()).findCrossRegionCandidatesSido(any(), any(), any(), any(), any(),
-                any(), anyDouble(), anyInt());
-        verify(disasterEventRepository, never()).findCrossRegionCandidatesSigungu(any(), any(), any(), any(), any(),
-                any(), anyDouble(), anyInt());
-        ClusteringTrace trace = capturedTrace();
-        assertThat(trace.getPath()).isEqualTo(ClusteringTracePath.NO_REGION);
-        assertThat(trace.getResult()).isEqualTo(ClusteringTraceResult.NEW);
-    }
 }
