@@ -272,7 +272,7 @@
 ## 가정
 
 - **on/off 플래그는 없다(2026-10-10 삭제)**: 예전의 `CLUSTERING_ENABLED`/`LLM_FALLBACK_ENABLED`/`CROSS_REGION_ENABLED`(기본 `false`)는 제거됐고, 이 문서가 서술하는 경로는 모든 환경에서 항상 실행된다. 비용 통제는 유형 화이트리스트·거리 구간·키워드 게이트로만 한다.
-- **자동 로컬 병합은 항상 동일 시군구(코드 앞 5자리) 내에서만 발생한다.** 인접 시군구로의 확산은 오직 동물 경로(`clusterAnimal`)에서 `region_adjacency` 테이블의 1-hop 직접 인접만으로 이루어지며, 산불·지진 등 일반 재난 유형에는 인접 확산(다단계 BFS 등) 로직이 전혀 없다. (아래 "발견된 문서-코드 불일치" 참고.)
+- **자동 로컬 병합은 기본적으로 동일 시군구(코드 앞 5자리) 내에서 발생한다.** 인접 시군구로 넘어가는 경로는 `region_adjacency` 1-hop 직접 인접만 쓰는 세 가지뿐이다 — 동물 경로(`clusterAnimal`), 산불의 `mergeIntoAdjacentRegionalEvent`, 사고성 유형의 `tryMergeAdjacent`. 클러스터링에는 다단계 BFS 확산이 없다(BFS 는 위험도 모듈 몫). (아래 "발견된 문서-코드 불일치" 참고.)
 - **인물(실종)과 태풍/지역 한정 유형은 임베딩을 전혀 쓰지 않는다.** 신원/유형 자체가 결정적 키이므로 재클러스터링 시 OpenAI 비용이 들지 않는다.
 - **`ClusteringProperties`라는 단일 `@ConfigurationProperties` 바인딩 클래스는 존재하지 않는다.** `clustering.*` 설정은 `EventClusteringService`에 개별 `@Value` 필드로 흩어져 바인딩돼 있다. (아래 "발견된 문서-코드 불일치" 참고.)
 - **`EventFragmentMergeService`(30분 주기 파편 이벤트 정합화 스케줄러)는 코드베이스에 존재하지 않는다.** `git log --all`로 전체 히스토리를 확인해도 해당 이름의 파일이 추가된 이력이 없다. `application.yml`의 Sentry 섹션 주석(`application.yml:165`)에 "fragment-merge"라는 표현이 남아 있을 뿐 실제 서비스/스케줄러/설정 키(`FRAGMENT_MERGE_ENABLED`, `incident-specific-check`)는 어디에도 없다. (아래 "발견된 문서-코드 불일치" 참고.)

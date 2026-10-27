@@ -56,7 +56,7 @@
 |---|---|---|
 | `SKIPPED` | `clusterNewAlert` 앞단 — 비사건(`ADVISORY`) 또는 본문이 빈 알림. `result=SKIPPED`, `event_id` null | null / null |
 | `PERSON` | `clusterPerson` | null / null |
-| `ANIMAL` | `clusterAnimal` — 동물 탈출·출몰(같은 종 + 같은·인접 지역 후보, 항상 LLM 판정. 2026-10-27 별도 cross-region 패스에서 옮김) | 후보 목록(0건이면 `[]`) / null |
+| `ANIMAL` | `clusterAnimal` — 동물 탈출·출몰(같은 종 + 같은·인접 지역 후보, 후보가 있으면 항상 LLM 판정 — 후보 0건이면 LLM 없이 새 이벤트라 `llm_called=false` 도 정상. 2026-10-27 별도 cross-region 패스에서 옮김) | 후보 목록(0건이면 `[]`) / null |
 | `GLOBAL_TYPE` | `clusterGlobalType` — 유형이 태풍이면 발송 시군구 수와 무관하게 여기로 온다. 키는 유형만 | null / null |
 | `REGIONAL` | `clusterRegionalType`(인접 시군구 산불 병합 `mergeIntoAdjacentRegionalEvent` 포함) | null / null |
 | `EPISODIC` | `clusterEpisodicType`, 시군구 1개 | null / null |
