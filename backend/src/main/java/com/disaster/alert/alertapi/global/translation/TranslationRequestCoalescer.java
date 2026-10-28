@@ -38,15 +38,26 @@ public class TranslationRequestCoalescer<K, V> {
         if (existing != null) {
             // 2) 합류자 — 이미 등록된 실행자의 future 가 끝나길 기다려 같은 결과/예외를 공유한다.
             //    내가 만든 myFuture 는 맵에 들어가지 못했으므로 그대로 버려진다(사용 안 함).
-            return awaitSharedResult(existing);
+            try {
+                return existing.join();
+            } catch (CompletionException e) {
+                Throwable cause = e.getCause();
+                if (cause instanceof Exception ex) {
+                    throw ex;
+                }
+                if (cause instanceof Error err) {
+                    throw err;
+                }
+                throw e;
+            }
         }
-
         // 3) 실행자 — 내가 최초로 이 키를 선점했으니 실제로 work 를 실행한다.
         try {
             V result = work.call();
             myFuture.complete(result);
             return result;
-        } catch (Exception e) {
+        } catch (
+                Exception e) {
             myFuture.completeExceptionally(e);
             throw e;
         } finally {
@@ -54,29 +65,6 @@ public class TranslationRequestCoalescer<K, V> {
             //    (key, myFuture) 두 값을 모두 비교해서 지우므로, 혹시 다른 future 로 교체돼
             //    있었다면(이론상 일어나지 않지만) 그 쪽을 잘못 지우지 않는다.
             inFlight.remove(key, myFuture);
-        }
-    }
-
-    /**
-     * 실행자의 future 가 끝나길 기다렸다가 결과를 반환하거나, 실행자가 던진 예외를 그대로
-     * 다시 던진다.
-     *
-     * <p>{@code CompletableFuture#join()}은 실패 시 항상 {@link CompletionException}으로
-     * 감싸서 던지므로(unchecked), 호출 측의 기존 {@code catch (Exception e)} 로직이 원래
-     * 예외 타입으로 처리할 수 있게 원인(cause)을 풀어서 던진다.
-     */
-    private V awaitSharedResult(CompletableFuture<V> future) throws Exception {
-        try {
-            return future.join();
-        } catch (CompletionException e) {
-            Throwable cause = e.getCause();
-            if (cause instanceof Exception ex) {
-                throw ex;
-            }
-            if (cause instanceof Error err) {
-                throw err;
-            }
-            throw e;
         }
     }
 }

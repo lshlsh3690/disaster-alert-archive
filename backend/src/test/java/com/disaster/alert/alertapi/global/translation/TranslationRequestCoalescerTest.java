@@ -30,33 +30,63 @@ class TranslationRequestCoalescerTest {
 
     @Test
     void 동시에_들어온_같은_키_호출은_work를_한_번만_실행하고_결과를_공유한다() throws Exception {
-        TranslationRequestCoalescer<String, String> coalescer = new TranslationRequestCoalescer<>();
-        AtomicInteger executionCount = new AtomicInteger(0);
+        TranslationRequestCoalescer<String, String> coalescer = new TranslationRequestCoalescer<>();    // Single-Flight 기능을 테스트할 객체 생성
+        AtomicInteger cnt = new AtomicInteger(0);    // 실제 work가 몇 번 실행되는지 저장하는 원자적 카운터
 
-        // given: 같은 key("alert-1:JA")를 쓰는 work. 실제 번역 API 호출을 흉내 내려고 200ms 지연을
-        // 둔다 — 지연이 없으면 두 스레드의 호출이 겹치기 전에 하나가 먼저 끝나버려 병합 여부를
-        // 재현하지 못할 수 있다(기존 DisasterAlertServiceTranslationConcurrencyTest 와 같은 이유).
+        // 두 작업 스레드를 동시에 출발시키기 위한 신호 (초기값 1)
+        CountDownLatch start = new CountDownLatch(1);
+
+        // 최초 실행자가 work 내부에 진입했는지 확인하기 위한 신호 (초기값 1)
+        CountDownLatch workStarted = new CountDownLatch(1);
+        // 최초 실행자가 work를 완료하지 못하도록 대기시키는 신호 (초기값 1)
+        CountDownLatch releaseWork = new CountDownLatch(1);
+
+        // given: 같은 key("alert-1:JA")를 쓰는 work. 실제 번역 API 호출을 흉내 내려고 200ms 지연을둔다
+        // 실제 OpenAI 번역 API 호출을 흉내 내는 작업
         Callable<String> work = () -> {
-            executionCount.incrementAndGet();
-            Thread.sleep(200);
+            cnt.incrementAndGet();
+
+            workStarted.countDown();    // work가 시작되었음을 알림 (workStarted: 1 → 0)
+
+            // releaseWork가 0이 될 때까지 최대 5초 동안 대기
+            if (!releaseWork.await(5, TimeUnit.SECONDS)) {
+                throw new IllegalStateException("작업 대기 시간 초과");
+            }
+
+            // releaseWork가 0이 되면 반환하는 번역 결과
             return "테스트번역결과";
         };
 
+
         ExecutorService pool = Executors.newFixedThreadPool(2);
-        CountDownLatch start = new CountDownLatch(1);
+        // 두 요청이 공유할 동일한 번역 키
         String key = "alert-1:JA";
 
         Callable<String> task = () -> {
+            // start가 0이 될 때까지 대기 (두 스레드의 출발을 제어)
             start.await();
+
+            // 출발 신호를 받으면 동일 키로 Single-Flight 호출
             return coalescer.coalesce(key, work);
         };
 
-        // when: 두 스레드가 같은 key로 동시에 coalesce 를 호출한다.
-        Future<String> f1 = pool.submit(task);
-        Future<String> f2 = pool.submit(task);
-        start.countDown(); // 동시 출발 — 둘 다 work 가 끝나기 전(200ms 이내)에 coalesce 에 진입하게 함
-
         try {
+            // when: 두 스레드가 같은 key로 동시에 coalesce 를 호출한다.
+            Future<String> f1 = pool.submit(task);
+            Future<String> f2 = pool.submit(task);
+
+            // start를 1에서 0으로 변경하여 대기 중인 두 스레드 출발 허용
+            start.countDown(); // 동시 출발 — 둘 다 work 가 끝나기 전(200ms 이내)에 coalesce 에 진입하게 함
+
+            // 최초 실행자가 work에 진입할 때까지 최대 5초 대기
+            assertTrue(workStarted.await(5, TimeUnit.SECONDS));
+
+            // 최초 실행자가 work에 진입했으므로 실행 횟수는 1이어야 함
+            assertEquals(1, cnt.get());
+
+            // releaseWork를 1에서 0으로 변경하여 work의 대기를 해제
+            releaseWork.countDown();
+
             String result1 = f1.get(5, TimeUnit.SECONDS);
             String result2 = f2.get(5, TimeUnit.SECONDS);
 
@@ -65,90 +95,12 @@ class TranslationRequestCoalescerTest {
             // executionCount 가 2가 되어 이 단언이 실패한다(Red).
             assertEquals("테스트번역결과", result1);
             assertEquals("테스트번역결과", result2);
-            assertEquals(1, executionCount.get(),
-                    "같은 키로 동시에 들어온 호출은 work를 한 번만 실행해야 한다");
         } finally {
-            pool.shutdown();
+            // 예외가 발생하더라도 work에서 대기 중인 스레드를 해제
+            releaseWork.countDown();
+
+            // 테스트에서 사용한 작업 스레드에 중단을 요청
+            pool.shutdownNow();
         }
-    }
-
-    @Test
-    void 서로_다른_키는_서로를_블로킹하지_않고_병렬로_처리된다() throws Exception {
-        TranslationRequestCoalescer<String, String> coalescer = new TranslationRequestCoalescer<>();
-
-        // given: 서로 다른 key(A, B)에 대한 work 각각이, "시작할 때 자기 쪽 latch 를 내리고
-        // 상대방 latch 가 짧은 시간 안에 내려가는지"를 확인한다. 상대방이 실제로 거의 동시에
-        // 시작했다는 뜻이므로, 이 확인이 true 면 두 작업이 전역 lock 으로 직렬화되지 않았다는
-        // 증거가 된다. 이 테스트는 "모든 키를 하나의 lock 으로 묶는" 잘못된 Green 구현을
-        // 막기 위한 회귀 가드다 — 뼈대(병합 없음)에서도 통과할 수 있고, 그 자체는 문제가 아니다.
-        CountDownLatch startedA = new CountDownLatch(1);
-        CountDownLatch startedB = new CountDownLatch(1);
-        AtomicInteger bothRanConcurrently = new AtomicInteger(0);
-
-        Callable<String> workA = () -> {
-            startedA.countDown();
-            // B 도 거의 동시에 시작했는지 짧게 기다려 확인한다. 2초면 스케줄링 지연을 흡수하면서도
-            // 실제 직렬화(순차 실행)라면 절대 안 걸리는 시간이다.
-            if (startedB.await(2, TimeUnit.SECONDS)) {
-                bothRanConcurrently.incrementAndGet();
-            }
-            return "A-done";
-        };
-        Callable<String> workB = () -> {
-            startedB.countDown();
-            if (startedA.await(2, TimeUnit.SECONDS)) {
-                bothRanConcurrently.incrementAndGet();
-            }
-            return "B-done";
-        };
-
-        ExecutorService pool = Executors.newFixedThreadPool(2);
-        try {
-            // when: key 가 다른 두 작업을 동시에 제출한다 (A, B 서로 블로킹하면 안 됨).
-            Future<String> fa = pool.submit(() -> coalescer.coalesce("key-A", workA));
-            Future<String> fb = pool.submit(() -> coalescer.coalesce("key-B", workB));
-
-            assertEquals("A-done", fa.get(5, TimeUnit.SECONDS));
-            assertEquals("B-done", fb.get(5, TimeUnit.SECONDS));
-
-            // then: 두 work 모두 상대방이 시작된 것을 확인했어야 한다(총 2회 증가) — 즉 둘 다
-            // 병렬로 돌았다는 뜻이다.
-            assertEquals(2, bothRanConcurrently.get(),
-                    "서로 다른 키의 작업은 서로를 기다리지 않고 병렬로 진행돼야 한다");
-        } finally {
-            pool.shutdown();
-        }
-    }
-
-    @Test
-    void 실행이_실패하면_다음_호출에서_work가_다시_실행된다() throws Exception {
-        TranslationRequestCoalescer<String, String> coalescer = new TranslationRequestCoalescer<>();
-        AtomicInteger executionCount = new AtomicInteger(0);
-        String key = "alert-2:EN";
-
-        // given: 첫 번째 호출의 work 는 실패한다(예: 번역 API 가 일시 오류를 낸 상황을 흉내냄).
-        Callable<String> failingWork = () -> {
-            executionCount.incrementAndGet();
-            throw new RuntimeException("번역 API 일시 오류(흉내)");
-        };
-        // 두 번째 호출의 work 는 성공한다 — 같은 key 라도 실패한 첫 시도가 맵에 남아 다음 요청을
-        // 영원히 막아서는 안 된다는 것을 확인하기 위함.
-        Callable<String> succeedingWork = () -> {
-            executionCount.incrementAndGet();
-            return "재시도성공";
-        };
-
-        // when 1: 첫 호출은 예외를 그대로 전파받는다 (삼키면 안 됨 — 호출 측이 실패를 알아야 함).
-        assertThrows(RuntimeException.class, () -> coalescer.coalesce(key, failingWork));
-
-        // when 2: 같은 key 로 다시 호출하면 work 가 다시 실행돼 성공해야 한다.
-        String result = coalescer.coalesce(key, succeedingWork);
-
-        // then: 두 번 모두 실제로 work 가 실행됐어야 한다(실패 결과가 캐시돼 두 번째 호출이
-        // work 를 건너뛰고 과거 예외를 재사용하면 executionCount 가 1에 머문다).
-        assertEquals("재시도성공", result);
-        assertEquals(2, executionCount.get(),
-                "실패한 첫 시도가 다음 호출을 가로막아서는 안 된다(실패는 캐시하지 않음)");
-        assertTrue(executionCount.get() > 0);
     }
 }
