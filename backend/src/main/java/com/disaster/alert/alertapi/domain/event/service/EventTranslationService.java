@@ -23,14 +23,28 @@ import java.util.stream.Collectors;
  * <p>조회 시 lazy: 해당 언어 캐시 없으면 {@code event_title} 을 OpenAI 로 번역해 저장.
  * 지역/유형은 별도 필드로 안 줌(제목 안에 포함). 타임라인 알림 번역은 alert 쪽 재사용.
  *
- * <p>{@code @Transactional} 은 이 클래스에도, 호출부 {@code EventQueryService.list/detail} 에도
- * 없다(재난문자 쪽과 같은 방향). 둘 다 있어야 의미가 있다 — 이 클래스에서만 떼면 호출부 트랜잭션에
- * 합류해 {@code save()} 의 INSERT 가 커밋까지 미뤄지고, 그러면 아래 요청 병합의 캐시 재확인이
- * 커밋 안 된 행을 보지 못해 중복 호출과 PK 충돌(HTTP 500)이 되살아난다. 지금은 저장이 Spring Data
- * 리포지토리 프록시의 짧은 트랜잭션에서 즉시 커밋된다.
+ * <p><b>번역 경로에 {@code @Transactional} 을 붙이지 않는 이유</b> — 이 클래스뿐 아니라 호출부
+ * {@code EventQueryService.list/detail}, 재난문자 쪽 {@code TranslationService} 와 그 호출부까지
+ * 모두 같은 규칙을 따른다. 이 설명이 그 규칙의 기준점이다.
  *
- * <p>트랜잭션 밖에서 안전한 근거: 이 클래스가 읽는 {@code DisasterEvent}/번역 엔티티에 지연 로딩
- * 연관관계가 없다.
+ * <p>번역 캐시 테이블은 복합 {@code @EmbeddedId} 라 {@code save()} 가 INSERT 를 즉시 실행하지 않고
+ * 예약만 한다. 그래서 저장이 긴 트랜잭션에 합류하면 INSERT 가 커밋 시점까지 미뤄지고 두 가지가
+ * 한꺼번에 깨진다. (1) PK 충돌이 번역 서비스의 try/catch 를 이미 벗어난 뒤에 터져 원문 폴백 대신
+ * HTTP 500 이 된다(2026-08 에 실제로 겪은 결함). (2) 커밋 전 행은 다른 트랜잭션에 보이지 않으므로
+ * (READ COMMITTED) 아래 요청 병합의 캐시 재확인이 무력해져 OpenAI 를 중복 호출한다.
+ *
+ * <p>2026-11-04 에 이벤트 제목 저장을 {@code upsert} 에서 {@code save()} 로 되돌리면서 이 결함이
+ * 실제로 되살아났고, 호출부 {@code @Transactional} 을 걷어 닫았다. <b>요청 병합과 트랜잭션 경계는
+ * 세트다</b> — 하나만 넣으면 UPSERT 라는 안전망까지 걷어낸 만큼 전보다 나빠진다.
+ *
+ * <p>{@code @Transactional(readOnly = true)} 로 바꾸는 것도 답이 아니다. 합류는 그대로인 데다,
+ * {@code readOnly} 세션은 flush 를 하지 않아 합류한 INSERT 가 예외 없이 조용히 사라질 수 있다 —
+ * 500 보다 찾기 어려운 증상이 된다.
+ *
+ * <p>트랜잭션 밖에서 안전한 근거는 "연관관계가 없다"가 아니라 <b>"연관관계 필드를 건드리지
+ * 않는다"</b> 이다. 이 경로가 읽는 {@code DisasterEvent} 와 이벤트 번역 엔티티에는 연관관계가 없지만,
+ * 타임라인에서 쓰는 {@code DisasterAlertTranslation} 에는 {@code disasterAlert} LAZY
+ * {@code @ManyToOne} 이 있다. 지금은 컬럼 getter 만 읽어 안전하니, 그 연관 필드에는 접근하지 말 것.
  */
 @Slf4j
 @Service

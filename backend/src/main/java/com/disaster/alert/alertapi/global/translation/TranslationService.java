@@ -77,16 +77,11 @@ public class TranslationService {
      *
      * <p>언어 하나가 번역 API 오류 등으로 실패해도 나머지 언어는 계속 진행한다.
      *
-     * <p>메서드 레벨 {@code @Transactional}을 떼어냈다 — 붙어 있을 때는 EN/JA/ZH 세 언어가 하나의
-     * 트랜잭션으로 묶여 마지막 언어까지 끝난 뒤에야 커밋됐다. 그러면 두 가지가 생긴다. (1) 먼저 끝난
-     * 언어의 행이 커밋 전이라, 그사이 들어온 사용자 요청의 캐시 확인·재확인이 모두 미스가 되어
-     * OpenAI를 중복 호출하고 PK 충돌까지 난다 — 요청 병합은 같은 JVM 안의 동시 호출만 묶지, 이미
-     * 반환된 뒤의 커밋 지연 구간은 덮지 못한다. (2) 한 언어의 저장이 실패하면 트랜잭션이
-     * rollback-only가 되어 이미 번역해 둔 다른 언어까지 함께 버려진다 — "언어 하나가 실패해도
-     * 나머지는 계속"이라는 위 약속이 저장 단계에서 깨지는 셈이었다.
-     *
-     * <p>떼어내면 각 언어의 저장이 Spring Data 리포지토리 프록시의 짧은 트랜잭션에서 즉시 커밋되어
-     * 두 문제가 모두 사라진다. 이 메서드는 조회 결과를 반환하지 않으므로 지연 로딩 문제도 없다.
+     * <p><b>메서드 레벨 {@code @Transactional}을 붙이지 않는다</b> — 공통 이유는
+     * {@link com.disaster.alert.alertapi.domain.event.service.EventTranslationService} 클래스
+     * javadoc에 있다. 여기에는 이유가 하나 더 있다: 붙어 있으면 EN/JA/ZH 세 언어가 한 트랜잭션으로
+     * 묶여, 한 언어의 저장 실패가 rollback-only를 찍어 이미 번역해 둔 다른 언어까지 함께 버린다.
+     * 위에 적은 "언어 하나가 실패해도 나머지는 계속"이 저장 단계에서 깨지는 셈이었다.
      */
     @Async("translationExecutor")
     public void translateAndSaveAsync(Long alertId) {
