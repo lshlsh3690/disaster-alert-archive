@@ -103,8 +103,8 @@ class EventTranslationServiceTest {
         // when
         service.ensureTranslated(7L, SupportedLanguage.JA);
 
-        // then: 재확인에서 캐시를 발견했으므로 번역도, 저장(upsert)도 없어야 한다
+        // then: 재확인에서 캐시를 발견했으므로 번역도, 저장(save)도 없어야 한다
         verify(translationClient, never()).translate(anyString(), anyString());
-        verify(translationRepository, never()).upsert(any(), any(), any());
+        verify(translationRepository, never()).save(any());
     }
 }
