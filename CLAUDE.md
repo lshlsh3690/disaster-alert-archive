@@ -102,6 +102,8 @@ docker compose -f docker-compose.dev.yml up postgres redis   # Postgres(pgvector
 
 `global/translation/` — 재난문자 본문/유형과 이벤트 제목을 KO → EN/JA/ZH 로 번역합니다. 수집 스케줄러가 새 알림을 저장하면 `translateAndSaveAsync`가 `@Async("translationExecutor")`로 3개 언어를 미리 번역해 캐시(`disaster_alert_translation`)에 적재하고, 캐시 미스는 조회 시점 lazy 번역(`ensureTranslated`/`ensureTranslatedBatch`)이 동기로 보정합니다.
 
+같은 키 `(alertId|eventId, language)`의 동시 요청은 DB UPSERT 가 아니라 앱 레벨 요청 병합(`TranslationRequestCoalescer`, single-flight)+실행자 첫머리 캐시 재확인으로 처리해 번역 API 가 한 번만 불립니다(2026-11, UPSERT 는 충돌만 막고 API 중복 호출은 못 막아 대체). 코알레서는 인스턴스 안에서만 병합하고, 호출자 `@Transactional`에 합류하는 경로(이벤트 제목 등)는 저장이 지연 커밋되는 좁은 틈이 남아 있습니다 — 상세는 `specs/005-translation-pipeline/plan.md`.
+
 VI/TH 는 2026-08-11 에 제거했습니다 — 법정동 명칭 시드가 EN/JA/ZH 뿐이라 본문만 모국어이고 지역명은 영어로 나오는 반쪽 상태였고, 오역을 검증할 수단도 없었습니다(한글 잔존·기호 개수 같은 기계적 검사는 오역이어도 전부 통과합니다). 이제 번역 대상 언어와 법정동 시드 언어가 **일치**합니다 — 새 언어를 추가할 때 이 둘을 함께 늘리지 않으면 그 불일치가 다시 생깁니다.
 
 모델은 `application.yml`의 `spring.ai.openai.chat` 기본값(`gpt-4o-mini`)이 아니라 `OpenAiTranslationClient.MODEL`이 per-call로 **`gpt-4o`를 오버라이드**합니다. 임베딩·LLM 판정은 그대로 `gpt-4o-mini`를 씁니다.
