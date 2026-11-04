@@ -4,6 +4,7 @@ import org.junit.jupiter.api.Test;
 
 import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -11,6 +12,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -102,5 +104,49 @@ class TranslationRequestCoalescerTest {
             // 테스트에서 사용한 작업 스레드에 중단을 요청
             pool.shutdownNow();
         }
+    }
+
+    @Test
+    void 실행자가_Error를_던져도_합류자는_영구_대기하지_않고_같은_Error를_받는다() throws Exception {
+        TranslationRequestCoalescer<String, String> coalescer = new TranslationRequestCoalescer<>();
+        CountDownLatch workStarted = new CountDownLatch(1);
+        CountDownLatch releaseWork = new CountDownLatch(1);
+        StackOverflowError boom = new StackOverflowError("테스트용");
+
+        Callable<String> work = () -> {
+            workStarted.countDown();
+            releaseWork.await(5, TimeUnit.SECONDS);
+            throw boom;
+        };
+
+        ExecutorService pool = Executors.newFixedThreadPool(2);
+        try {
+            Future<String> executor = pool.submit(() -> coalescer.coalesce("alert-2:EN", work));
+            assertTrue(workStarted.await(5, TimeUnit.SECONDS));
+            // 실행자가 work 안에서 대기 중일 때 합류자가 들어온다
+            Future<String> joiner = pool.submit(() -> coalescer.coalesce("alert-2:EN", () -> "실행되면 안 됨"));
+            Thread.sleep(200);
+            releaseWork.countDown();
+
+            // Error 를 future 에 완료시키지 않으면 합류자가 타임아웃 없이 기다려 이 get 이 TimeoutException 으로 끝난다
+            ExecutionException executorFailure = assertThrows(ExecutionException.class, () -> executor.get(5, TimeUnit.SECONDS));
+            ExecutionException joinerFailure = assertThrows(ExecutionException.class, () -> joiner.get(5, TimeUnit.SECONDS));
+            assertSame(boom, executorFailure.getCause());
+            assertSame(boom, joinerFailure.getCause());
+        } finally {
+            releaseWork.countDown();
+            pool.shutdownNow();
+        }
+    }
+
+    @Test
+    void 실행자가_실패해도_키가_제거돼_다음_호출은_새로_실행된다() throws Exception {
+        TranslationRequestCoalescer<String, String> coalescer = new TranslationRequestCoalescer<>();
+
+        assertThrows(IllegalStateException.class, () -> coalescer.coalesce("alert-3:ZH", () -> {
+            throw new IllegalStateException("일시 오류");
+        }));
+
+        assertEquals("재시도결과", coalescer.coalesce("alert-3:ZH", () -> "재시도결과"));
     }
 }

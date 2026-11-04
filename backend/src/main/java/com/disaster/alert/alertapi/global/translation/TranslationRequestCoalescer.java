@@ -56,10 +56,12 @@ public class TranslationRequestCoalescer<K, V> {
             V result = work.call();
             myFuture.complete(result);
             return result;
-        } catch (
-                Exception e) {
-            myFuture.completeExceptionally(e);
-            throw e;
+        } catch (Throwable t) {
+            // Exception 뿐 아니라 Error(NoClassDefFoundError, StackOverflowError 등)도 잡아 future 를
+            // 완료시킨다 — 그렇지 않으면 이미 existing.join() 에 들어간 합류자가 타임아웃 없이 영원히 대기한다.
+            // coalesce 가 throws Exception 이라 precise rethrow 로 그대로 다시 던질 수 있다.
+            myFuture.completeExceptionally(t);
+            throw t;
         } finally {
             // 4) 성공/실패 어느 쪽이든 맵에서 제거한다 — 다음 호출이 새로 시작할 수 있게 한다.
             //    (key, myFuture) 두 값을 모두 비교해서 지우므로, 혹시 다른 future 로 교체돼
