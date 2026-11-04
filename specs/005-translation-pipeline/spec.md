@@ -75,9 +75,9 @@ lazy 번역(P2)은 캐시 미스 보정용으로만 쓰인다. 이 경로가 막
 
 **인수 시나리오**:
 
-1. **Given** 이벤트 목록 조회에 `lang`이 지정됨, **When** `EventQueryService.list`가 실행됨, **Then** `eventTranslationService.ensureTranslatedBatch(eventIds, language)`가 미번역 제목만 번역한다 — `backend/src/main/java/com/disaster/alert/alertapi/domain/event/service/EventQueryService.java:89`
-2. **Given** 이벤트 상세 조회에 `lang`이 지정됨, **When** `EventQueryService.detail`이 실행됨, **Then** `eventTranslationService.ensureTranslated(id, language)`가 호출된다 — `EventQueryService.java:121`
-3. **Given** 이벤트 제목 번역 실패, **When** 예외가 발생함, **Then** 예외를 삼키고 원문 제목으로 폴백한다 — `backend/src/main/java/com/disaster/alert/alertapi/domain/event/service/EventTranslationService.java:63-68`
+1. **Given** 이벤트 목록 조회에 `lang`이 지정됨, **When** `EventQueryService.list`가 실행됨, **Then** `eventTranslationService.ensureTranslatedBatch(eventIds, language)`가 미번역 제목만 번역한다 — `backend/src/main/java/com/disaster/alert/alertapi/domain/event/service/EventQueryService.java:91`
+2. **Given** 이벤트 상세 조회에 `lang`이 지정됨, **When** `EventQueryService.detail`이 실행됨, **Then** `eventTranslationService.ensureTranslated(id, language)`가 호출된다 — `EventQueryService.java:131`
+3. **Given** 이벤트 제목 번역 실패, **When** 예외가 발생함, **Then** 예외를 삼키고 원문 제목으로 폴백한다 — `backend/src/main/java/com/disaster/alert/alertapi/domain/event/service/EventTranslationService.java`의 단건 `:80-85`, 배치 `:107-111`
 4. **Given** `lang`이 지원 언어 중 하나, **When** 이벤트 목록/상세를 조회함, **Then** 재난문자와 동일한 언어 범위가 적용된다 — `EventTranslationService`는 `language.getDbCode()`를 그대로 넘기므로 `SupportedLanguage`를 단일 출처로 따르며, 언어를 늘리거나 줄일 때 이벤트 경로를 따로 손댈 필요가 없다 (`EventTranslationService.java:133`)
 
 ---
