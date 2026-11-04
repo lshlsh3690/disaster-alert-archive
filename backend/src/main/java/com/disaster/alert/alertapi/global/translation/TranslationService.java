@@ -16,6 +16,7 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
@@ -208,9 +209,23 @@ public class TranslationService {
      * #saveTranslation}의 짧은 트랜잭션 범위로 분리했다 — 과거에는 이 메서드 전체가 호출 측의
      * {@code @Transactional} 안에서 실행돼 느린 네트워크 호출 동안 DB 커넥션을 쥐고 있었다.
      *
-     * @return 저장된 번역 결과. 번역 대상이 없으면(본문 없음) null.
+     * <p><b>첫머리에서 캐시를 한 번 더 확인하는 이유.</b> 호출 측({@code ensureTranslated} 등)의
+     * 선확인은 코알레서에 들어가기 <i>전</i>의 확인이라, 그 뒤에 다른 요청 A 가 번역·저장을 끝내고
+     * 코알레서 맵에서 빠져나가면 늦게 온 요청 B 는 합류할 대상이 없어 새 실행자가 되고, 이미
+     * 있는 번역을 위해 OpenAI 를 또 부르게 된다. 실행자가 된 직후 여기서 다시 확인해야 이 틈이
+     * 닫힌다. (선확인은 코알레서 진입 자체를 아끼는 빠른 경로로 그대로 둔다.)
+     *
+     * @return 저장된(또는 이미 저장돼 있던) 번역 결과. 번역 대상이 없으면(본문 없음) null.
      */
     private DisasterAlertTranslation translateAndSaveInternal(Long alertId, SupportedLanguage language) {
+        // 1) 실행자가 된 직후 캐시를 다시 본다 — 선확인과 코알레서 진입 사이에 다른 요청이 저장을 끝냈을 수 있다.
+        //    있으면 번역 API·저장 없이 그 값을 돌려준다. cache.hit 카운터는 올리지 않는다 — 이 호출은
+        //    이미 coalesce.executed 로 집계돼 이중 집계가 되고 두 지표의 의미가 흐려진다.
+        Optional<DisasterAlertTranslation> cached =
+                translationRepository.findByIdAlertIdAndIdLanguageCode(alertId, language.getDbCode());
+        if (cached.isPresent()) {
+            return cached.get();
+        }
         try {
             DisasterAlert alert = disasterAlertRepository.findById(alertId).orElse(null);
             if (alert == null || alert.getMessage() == null || alert.getMessage().isBlank()) {

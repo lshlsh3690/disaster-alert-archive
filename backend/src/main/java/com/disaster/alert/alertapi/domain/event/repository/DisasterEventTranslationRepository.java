@@ -18,10 +18,11 @@ public interface DisasterEventTranslationRepository
     List<DisasterEventTranslation> findByIdEventIdInAndIdLanguageCode(List<Long> eventIds, String languageCode);
 
     /**
-     * 이벤트 제목 번역 캐시 저장 — {@code disaster_alert_translation} 과 동일한 복합 PK +
-     * check-then-act 패턴이라 같은 동시성 위험이 있다
-     * ({@code DisasterAlertTranslationRepository.upsert} 참고). 확인과 저장을 원자적 단일 SQL
-     * 문으로 묶어 그 틈을 없앤다.
+     * <b>현재 운영 코드에서 호출하지 않는다.</b> 저장은 {@code EventTranslationService} 의 요청 병합
+     * (single-flight)+안쪽 재확인 후 {@code save()} 로 한다. 이 메서드가 남아 있는 이유는
+     * {@code EventTranslationServiceTest} 가 "저장 경로가 upsert 로 새지 않는다"를
+     * {@code verify(..., never()).upsert(...)} 로 고정하고 있어, 지우면 그 테스트가 컴파일되지 않기
+     * 때문이다. 테스트에서 그 단언을 뺄 때 함께 지운다.
      */
     @Modifying
     @Query(value = """
