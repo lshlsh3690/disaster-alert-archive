@@ -15,12 +15,15 @@ public enum MergeMethod {
     BROADCAST,
     /** cross-region 인물 결정적 매칭 머지 (이름+나이+키 일치, LLM 미사용). */
     IDENTITY,
-    /** cross-region LLM 판정 머지 (동물·비정형 — 정형 키가 없어 LLM 으로 판정). */
+    /**
+     * 동물 탈출·출몰의 LLM 판정 머지 — 같은 종·같거나 인접한 지역 후보 중 LLM 이 같은 개체로 고른 이벤트에 붙음
+     * ({@code EventClusteringService.clusterAnimal}). 2026-10-27 전에는 사후 cross-region 패스가 이벤트끼리 합칠 때 썼다.
+     */
     LLM,
     /**
      * local borderline LLM 폴백 머지 — 같은 지역 후보지만 임베딩이 임계(0.85) 미만이라
      * 임베딩으로는 못 묶은 사고성 사건(서소문 고가 붕괴처럼 같은 사건의 다른 측면 안내)을
-     * LLM 판정으로 묶는다. cross-region({@link #LLM})과 달리 같은 시군구 안에서 일어난다.
+     * LLM 판정으로 묶는다. 동물 경로({@link #LLM})와 달리 같은 시군구 안 사고성 유형에서 일어난다.
      */
     LLM_FALLBACK,
     /**

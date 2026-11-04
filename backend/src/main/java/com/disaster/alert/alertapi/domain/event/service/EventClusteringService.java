@@ -4,6 +4,7 @@ import com.disaster.alert.alertapi.domain.disasteralert.model.AlertKind;
 import com.disaster.alert.alertapi.domain.disasteralert.model.DisasterAlert;
 import com.disaster.alert.alertapi.domain.disasteralert.model.DisasterAlertRegion;
 import com.disaster.alert.alertapi.domain.disasteralert.repository.DisasterAlertRepository;
+import com.disaster.alert.alertapi.domain.event.model.AnimalIdentity;
 import com.disaster.alert.alertapi.domain.event.model.ClusteringTrace;
 import com.disaster.alert.alertapi.domain.event.model.ClusteringTracePath;
 import com.disaster.alert.alertapi.domain.event.model.ClusteringTraceResult;
@@ -102,6 +103,27 @@ public class EventClusteringService {
     /** 동물·비정형 키워드 — LLM 폴백에서 제외(cross-region 단계가 담당). cross-region 설정과 공유. */
     @Value("${clustering.cross-region.animal-keywords:탈출|출몰|멧돼지|들개|늑대}")
     private String animalKeywords;
+
+    // 동물 경로(clusterAnimal) 설정 — 옛 별도 cross-region 패스의 설정 키·기본값을 그대로 쓴다.
+    /** 동물 경로 후보 이벤트 윈도우(시간) — 알림 시각 기준 직전 이 시간 안에 시작·갱신된 이벤트만 후보. */
+    @Value("${clustering.cross-region.candidate-window-hours:336}")
+    private int crossRegionWindowHours;
+
+    /** 동물 경로 후보 상한(LLM 에 보여 줄 후보 수). */
+    @Value("${clustering.cross-region.top-k:5}")
+    private int crossRegionTopK;
+
+    /** 동물 경로 후보 유사도 하한 — 후보 거리 상한은 1 - 이 값. */
+    @Value("${clustering.cross-region.similarity-floor:0.6}")
+    private double crossRegionSimilarityFloor;
+
+    /** 동물 이벤트 알림 수 상한 — 병합 후 이 수를 넘으면 붙이지 않는다(blob 방지). */
+    @Value("${clustering.cross-region.span-cap-alerts:30}")
+    private int crossRegionSpanCapAlerts;
+
+    /** 동물 이벤트 시도 수 상한 — 이미 이 수 이상 시도에 걸친 이벤트에는 붙이지 않는다. */
+    @Value("${clustering.cross-region.span-cap-sido:10}")
+    private int crossRegionSpanCapSido;
 
     /** 전국 통합 유형(쉼표 구분) — 지역 무관 단일 사건. 태풍처럼 시군구 단위로 쪼개져도 하나로 묶는다. */
     @Value("${clustering.global-types:태풍}")
@@ -251,6 +273,13 @@ public class EventClusteringService {
             return;
         }
 
+        // 0.2 동물 탈출·출몰(기타 + 종 식별) — 종 하드게이트 + 임베딩 후보 + LLM 판정을 판정 순간에 한 번에 처리.
+        //     예전엔 일단 임베딩 경로로 이벤트를 만든 뒤 별도 cross-region 패스가 다시 합쳤다(이벤트가 두 번 바뀜).
+        //     실종 인물처럼 유형 안에서 먼저 분기해 지역별로 갈린 이벤트가 생기지 않게 한다.
+        if (clusterAnimal(alert, trace)) {
+            return;
+        }
+
         // 0.5 전국 통합 유형(태풍 등)은 지역·임베딩 무관하게 시간 윈도우로만 단일 이벤트에 묶는다.
         //     태풍 알림은 대부분 시군구 단위로 쪼개져 발송돼(span 게이트 미달) local 경로의 지역
         //     hard 필터에 막혀 시군구마다 이벤트가 생겼다. 유형 자체를 키로 써서 임베딩 전에 분기.
@@ -276,12 +305,7 @@ public class EventClusteringService {
 
         // 1. 임베딩 확보 — 이미 저장돼 있으면 재사용(OpenAI 재호출 X), 없으면 생성 후 저장.
         //    덕분에 재클러스터링(임계값 튜닝)이 공짜+빠름: 비싼 임베딩은 1회만.
-        String embeddingText = alertEmbeddingRepository.findEmbeddingText(alert.getId());
-        if (embeddingText == null) {
-            float[] embedding = embeddingModel.embed(alert.getMessage());
-            embeddingText = toVectorText(embedding);
-            alertEmbeddingRepository.updateEmbedding(alert.getId(), embeddingText);
-        }
+        String embeddingText = ensureEmbedding(alert);
 
         // 3. 후보 이벤트 검색
         String[] regionCodes = extractRegionCodes(alert);
@@ -492,6 +516,123 @@ public class EventClusteringService {
             map.put(((Number) row[0]).longValue(), (String) row[1]);
         }
         return map;
+    }
+
+    /**
+     * 알림 임베딩을 pgvector 텍스트로 돌려준다 — 저장된 게 있으면 재사용하고, 없을 때만 생성·저장한다.
+     * 재클러스터링(임계값 튜닝)에서 비싼 OpenAI 임베딩 호출을 알림당 1회로 묶으려는 것이다.
+     * 임베딩 경로와 동물 경로가 같이 쓴다.
+     */
+    private String ensureEmbedding(DisasterAlert alert) {
+        String embeddingText = alertEmbeddingRepository.findEmbeddingText(alert.getId());
+        if (embeddingText == null) {
+            float[] embedding = embeddingModel.embed(alert.getMessage());
+            embeddingText = toVectorText(embedding);
+            alertEmbeddingRepository.updateEmbedding(alert.getId(), embeddingText);
+        }
+        return embeddingText;
+    }
+
+    /**
+     * 동물 탈출·출몰 클러스터링 — 종(늑대·멧돼지 등)을 하드게이트로 삼아 같은 종의 이벤트만 후보로 올리고,
+     * 후보가 있으면 LLM 이 같은 사건인지 고른다. 기준: CLUSTERING_CRITERIA.md 3절 2번.
+     *
+     * <p>동물 문자는 "[지역] 인근 [동물] 출몰/탈출" 거의 같은 템플릿이라 임베딩만으로는 종을 못 가르고
+     * (늑대 탈출 ≈ 멧돼지 출몰), 지역 hard 필터를 쓰면 이동하는 동물이 시군구마다 이벤트로 쪼개진다.
+     * 그래서 종은 정규식으로 못 박고, 이동종은 시도·토착종은 시군구 단위로 후보를 넓힌다.
+     *
+     * @return 동물로 처리하면 true. 기타가 아니거나 종 미식별·지역 없음이면 false → 기존 경로(임베딩 등)로.
+     */
+    private boolean clusterAnimal(DisasterAlert alert, ClusteringTrace trace) {
+        // 1) 게이트 — 종이 식별돼야만 동물 경로. 미식별 "출몰" 문자는 기존 임베딩 경로(보수적)로 보낸다.
+        String species = "기타".equals(alert.getDisasterType()) ? AnimalIdentity.species(alert.getMessage()) : null;
+        if (species == null) {
+            return false;
+        }
+        // 2) 지역이 없으면 후보 게이트(IN 목록)를 만들 수 없다 — 임베딩 경로의 NO_REGION 처리에 맡긴다.
+        //    코드가 있어도 전부 짧아 종 단위(시군구 5자·시도 2자)로 못 자르면 빈 IN () 쿼리가 오류가 나므로 같이 넘긴다.
+        String[] regionCodes = extractRegionCodes(alert);
+        String[] unitCodes = codePrefixes(regionCodes, AnimalIdentity.isEndemic(species) ? 5 : 2);
+        if (unitCodes.length == 0) {
+            return false;
+        }
+        trace.recordPath(ClusteringTracePath.ANIMAL);
+
+        // 3) 같은 종 후보 조회(시간 상한은 알림 시각 — 백필에서 판정 순간에 없던 미래 이벤트 차단).
+        String embeddingText = ensureEmbedding(alert);
+        List<Object[]> rows = findAnimalCandidates(alert, species, embeddingText, unitCodes);
+        trace.recordCandidates(toTraceCandidates(rows));
+
+        // 4) 후보가 없으면 LLM 을 부르지 않는다(호출당 비용) — 곧바로 새 이벤트.
+        if (rows.isEmpty()) {
+            log.info("clusterNewAlert(동물): alertId={} 종={} → 후보 없음, 신규 이벤트", alert.getId(), species);
+            createNewEvent(alert, regionCodes[0], extractFirstRegionName(alert), false, trace);
+            return true;
+        }
+
+        // 5) LLM 이 후보 중 같은 사건을 고른다. 템플릿이 같아 거리만으로는 못 가르므로 후보가 있으면 항상 부른다.
+        List<EventLLMDecisionService.Candidate> cands = toAnimalCandidates(rows);
+        Integer pick = llmDecisionService.pickSameIncident(alert.getMessage(), cands);
+        trace.recordLlmCall(pick == null ? null : cands.get(pick).eventId());
+
+        // 6) 못 고르거나 병합하면 blob 이 되는 이벤트면 새 이벤트 — 지나치게 큰 이벤트로 번지는 걸 막는다.
+        if (pick == null || exceedsAnimalSpanCap(cands.get(pick).eventId())) {
+            log.info("clusterNewAlert(동물): alertId={} 종={} → 같은 사건 없음/상한 초과, 신규 이벤트 (후보 {}건)",
+                    alert.getId(), species, cands.size());
+            createNewEvent(alert, regionCodes[0], extractFirstRegionName(alert), false, trace);
+            return true;
+        }
+        Long targetEventId = cands.get(pick).eventId();
+        log.info("clusterNewAlert(동물): alertId={} 종={} → event={} LLM 같은 사건 머지 (후보 {}건)",
+                alert.getId(), species, targetEventId, cands.size());
+        mergeIntoExisting(targetEventId, alert, null, MergeMethod.LLM, trace);
+        return true;
+    }
+
+    /**
+     * 동물 후보 이벤트 조회 — 토착종(멧돼지·들개·뱀)은 시군구 인접, 이동종(늑대·사슴·곰·소)은 시도 인접.
+     * 토착종을 시도로 넓히면 인접 시도를 타고 전국이 한 사건으로 묶이는 과병합이 나서 단위를 나눈다.
+     * 거리 상한은 1 - similarity-floor(0.6 -> 0.4), 자기 이벤트는 아직 없으므로 selfEventId=-1(제외 없음).
+     */
+    private List<Object[]> findAnimalCandidates(DisasterAlert alert, String species, String embeddingText,
+                                                String[] unitCodes) {
+        LocalDateTime until = alert.getCreatedAt();
+        LocalDateTime since = until.minusHours(crossRegionWindowHours);
+        String speciesRegex = AnimalIdentity.speciesRegex(species);
+        double maxDistance = 1.0 - crossRegionSimilarityFloor;
+        // unitCodes 는 호출 측이 종에 맞춰 자른 지역 코드(토착종 시군구 5자, 이동종 시도 2자)
+        if (AnimalIdentity.isEndemic(species)) {
+            return disasterEventRepository.findCrossRegionCandidatesSigungu(embeddingText, since, until, -1L,
+                    speciesRegex, List.of(unitCodes), maxDistance, crossRegionTopK);
+        }
+        return disasterEventRepository.findCrossRegionCandidatesSido(embeddingText, since, until, -1L,
+                speciesRegex, List.of(unitCodes), maxDistance, crossRegionTopK);
+    }
+
+    /** 후보 행(거리순)을 대표 본문과 묶어 LLM 입력으로 — 순서를 유지해야 LLM 이 돌려준 index 가 맞는다. */
+    private List<EventLLMDecisionService.Candidate> toAnimalCandidates(List<Object[]> rows) {
+        List<Long> ids = new ArrayList<>(rows.size());
+        for (Object[] row : rows) {
+            ids.add(((Number) row[0]).longValue());
+        }
+        Map<Long, String> repMessages = representativeMessages(ids);
+        List<EventLLMDecisionService.Candidate> cands = new ArrayList<>(ids.size());
+        for (Long id : ids) {
+            cands.add(new EventLLMDecisionService.Candidate(id, repMessages.getOrDefault(id, "")));
+        }
+        return cands;
+    }
+
+    /**
+     * 대상 이벤트가 알림 1건을 더 흡수하면 너무 커지는지 — 알림 수(span-cap-alerts) 또는 걸친 시도 수
+     * (span-cap-sido) 상한. 이벤트를 못 찾으면 안전하게 상한 초과로 본다(새 이벤트가 오병합보다 낫다).
+     */
+    private boolean exceedsAnimalSpanCap(Long targetEventId) {
+        DisasterEvent target = disasterEventRepository.findById(targetEventId).orElse(null);
+        if (target == null || target.getAlertCount() + 1 > crossRegionSpanCapAlerts) {
+            return true;
+        }
+        return eventAlertMappingRepository.countDistinctSidoByEventId(targetEventId) >= crossRegionSpanCapSido;
     }
 
     /**
@@ -841,26 +982,6 @@ public class EventClusteringService {
     }
 
     /**
-     * cross-region 병합 primitive — source 이벤트의 모든 매핑을 target 으로 옮기고 source 를 삭제.
-     *
-     * <p>실종자·탈출 동물이 시군구를 옮겨다녀 따로 만들어진 이벤트(대개 단일 알림)를, LLM 이 같은
-     * 사건으로 판정했을 때 하나로 합친다. 옮겨진 매핑은 sequence_no 를 이어붙이고 merge_method 를
-     * 지정(LLM)한다. 합친 뒤 target 의 alert_count/first/last_alert_at 을 재계산.
-     */
-    @Transactional
-    public void mergeEvents(Long sourceEventId, Long targetEventId, MergeMethod method) {
-        if (sourceEventId == null || targetEventId == null || sourceEventId.equals(targetEventId)) {
-            return;
-        }
-        int offset = eventAlertMappingRepository.countByEventId(targetEventId);
-        int moved = eventAlertMappingRepository.reassignToEvent(sourceEventId, targetEventId, offset, method.name());
-        disasterEventRepository.recomputeAggregates(targetEventId);
-        disasterEventRepository.deleteById(sourceEventId);
-        log.info("cross-region 머지: event {} → {} (method={}, moved={}, offset={})",
-                sourceEventId, targetEventId, method, moved, offset);
-    }
-
-    /**
      * 광역 broadcast 알림 처리. local 이벤트와는 절대 안 섞고(규칙 1·2), 같은 broadcast 끼리만 묶는다.
      * 묶음 키는 시도 범위에 따라 두 갈래:
      * <ul>
@@ -969,9 +1090,14 @@ public class EventClusteringService {
      * 시군구·유사본문·근접시각만 묶인다.
      */
     private String[] sigunguPrefixes(String[] regionCodes) {
+        return codePrefixes(regionCodes, 5);
+    }
+
+    /** 지역 코드를 앞 {@code len}자로 잘라 distinct(순서 보존). 시군구=5, 시도=2. 짧은 코드는 건너뛴다. */
+    private String[] codePrefixes(String[] regionCodes, int len) {
         java.util.LinkedHashSet<String> set = new java.util.LinkedHashSet<>();
         for (String code : regionCodes) {
-            if (code != null && code.length() >= 5) set.add(code.substring(0, 5));
+            if (code != null && code.length() >= len) set.add(code.substring(0, len));
         }
         return set.toArray(new String[0]);
     }

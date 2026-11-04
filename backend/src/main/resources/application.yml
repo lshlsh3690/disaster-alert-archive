@@ -177,16 +177,16 @@ clustering:
     distance-ceil: 0.40                        # (mergeMaxDistance=0.15, 0.40] 구간 후보만 LLM 에 질의
     # 특정 장소·시설의 일회성 사고만 (실데이터 borderline 분석 기반). 기타는 동물·실종 게이트로 추가 제외.
     accident-types: "기타,화재,산불,붕괴,교통사고,교통통제,교통,환경오염사고,정전,통신,테러,지진,지진해일,수도"
-  # cross-region LLM 병합 — 지역 이동 사건(탈출 동물 등 비정형)을 LLM 으로 같은 사건 판정해 묶음.
-  # clusterNewAlert(local+broadcast)와 분리된 별도 단계라 백필 recluster 에는 cross-region 단계 자체가 없다
-  # (백필은 --backfill.cross-region 으로 따로 실행). recluster 의 LLM 호출은 위 llm-fallback 에서만 생긴다.
+  # 동물 탈출·출몰 경로(EventClusteringService.clusterAnimal) — 같은 종·같거나 인접한 지역 후보를 LLM 으로
+  # 같은 개체인지 판정해 판정 순간에 붙인다. 키 이름은 2026-10-27 까지 쓰던 사후 cross-region 패스의 것을 그대로 쓴다.
+  # 동물 알림이 있으면 recluster 도 이 경로에서 LLM 을 호출한다(위 llm-fallback 과 별도).
   cross-region:
-    candidate-window-hours: 336               # 14일 (실종·이동은 며칠~몇 주)
+    candidate-window-hours: 336               # 14일 — 새 알림 직전 이 기간 안의 이벤트만 후보
     top-k: 5                                  # 임베딩 후보 상위 K (LLM 에 배치로 전달)
-    similarity-floor: 0.6                     # 무관한 기타 거름용 (동일인 판정은 LLM 몫)
-    span-cap-alerts: 30                       # cross-region 이벤트 최대 알림 수 (blob 방지)
+    similarity-floor: 0.6                     # 무관한 기타 거름용 (같은 개체 판정은 LLM 몫)
+    span-cap-alerts: 30                       # 동물 이벤트 최대 알림 수 (blob 방지)
     span-cap-sido: 10                         # 최대 걸친 시도 수
-    mover-keywords: "찾습니다|실종|수배|가출|배회|탈출|출몰|멧돼지|들개|늑대"   # 게이트(전체 이동신호)
+    mover-keywords: "찾습니다|실종|수배|가출|배회|탈출|출몰|멧돼지|들개|늑대"   # 현재 읽는 코드 없음(옛 게이트)
     animal-keywords: "탈출|출몰|멧돼지|들개|늑대"   # 인물(이름+나이) 아닌 동물·비정형만 임베딩+LLM
 
 springdoc:

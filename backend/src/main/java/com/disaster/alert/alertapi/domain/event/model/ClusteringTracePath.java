@@ -14,6 +14,8 @@ public enum ClusteringTracePath {
     EPISODIC,
     /** 실종자 신원 키 경로. */
     PERSON,
+    /** 동물 탈출·출몰 경로 — 종 식별된 '기타' 알림을 종 정규식 후보 + LLM 판정으로 처리. 실종자 다음 순서. */
+    ANIMAL,
     /**
      * 전국 통합 유형(태풍) 키 경로 — <b>유형</b>이 기준이라 발송 시군구가 1개여도 여기로 온다. 키는 유형만.
      * {@code MergeMethod.GLOBAL_TYPE}, {@code clustering.global-types} 와 같은 이름.
