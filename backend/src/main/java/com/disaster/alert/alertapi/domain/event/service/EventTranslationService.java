@@ -23,11 +23,14 @@ import java.util.stream.Collectors;
  * <p>조회 시 lazy: 해당 언어 캐시 없으면 {@code event_title} 을 OpenAI 로 번역해 저장.
  * 지역/유형은 별도 필드로 안 줌(제목 안에 포함). 타임라인 알림 번역은 alert 쪽 재사용.
  *
- * <p>{@code @Transactional} 을 이 클래스에서 떼어냈다(재난문자 쪽과 같은 방향). 다만 지금 호출부
- * {@code EventQueryService.list/detail} 이 자체 {@code @Transactional} 이라 실제로는 그 트랜잭션에
- * 합류하므로, 느린 OpenAI 호출 중 커넥션을 쥐는 문제는 호출부를 떼기 전까지 남아 있다.
- * 이 클래스가 읽는 {@code DisasterEvent}/번역 엔티티에는 지연 로딩 연관이 없어 트랜잭션 밖에서도
- * 안전하다 — 호출부를 정리할 때 이 점을 근거로 쓸 수 있다.
+ * <p>{@code @Transactional} 은 이 클래스에도, 호출부 {@code EventQueryService.list/detail} 에도
+ * 없다(재난문자 쪽과 같은 방향). 둘 다 있어야 의미가 있다 — 이 클래스에서만 떼면 호출부 트랜잭션에
+ * 합류해 {@code save()} 의 INSERT 가 커밋까지 미뤄지고, 그러면 아래 요청 병합의 캐시 재확인이
+ * 커밋 안 된 행을 보지 못해 중복 호출과 PK 충돌(HTTP 500)이 되살아난다. 지금은 저장이 Spring Data
+ * 리포지토리 프록시의 짧은 트랜잭션에서 즉시 커밋된다.
+ *
+ * <p>트랜잭션 밖에서 안전한 근거: 이 클래스가 읽는 {@code DisasterEvent}/번역 엔티티에 지연 로딩
+ * 연관관계가 없다.
  */
 @Slf4j
 @Service
