@@ -114,3 +114,9 @@ cd backend && export SPRING_PROFILES_ACTIVE=fanout-trigger
 
 측정 결과와 원인 분석(세션 누적 + N+1, 단계별 기여도 분리, 이력서 문장, 면접 대비)은
 `docs/PERF_NOTIFICATION_FANOUT.md` 참고.
+
+## 번역 요청 병합(single-flight) 전후 비교
+
+같은 키의 동시 요청이 외부 번역 API를 몇 번 부르는지 재는 측정이다. 절차와 해석은
+`docs/PERF_TRANSLATION_COALESCING.md` 참고. 스크립트는 `k6/translation-coalescing.js`,
+OpenAI mock은 `mock/openai-mock.mjs`.
