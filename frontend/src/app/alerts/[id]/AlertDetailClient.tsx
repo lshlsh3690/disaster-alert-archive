@@ -179,8 +179,10 @@ export default function AlertDetailClient() {
           ) : (
             <div className="flex items-center justify-between gap-3 rounded-[var(--radius-control)] border border-[var(--line)] bg-[var(--canvas)] px-3 py-2">
               <span className="text-sm text-[var(--text-muted)]">{t("alertDetail.loginToComment")}</span>
+              {/* shrink-0 + whitespace-nowrap — 안내문이 두 줄로 밀리면 버튼이 눌려
+                  "로그/인" 처럼 글자가 꺾였다(320~390px 폭에서 관찰) */}
               <button
-                className="rounded-[var(--radius-control)] bg-[var(--blue)] px-3 py-1.5 text-sm font-medium text-white transition hover:brightness-95"
+                className="shrink-0 whitespace-nowrap rounded-[var(--radius-control)] bg-[var(--blue)] px-3 py-1.5 text-sm font-medium text-white transition hover:brightness-95"
                 onClick={() => {
                   const redirect = encodeURIComponent(location.pathname + location.search);
                   router.push(`/login?redirect=${redirect}`);
