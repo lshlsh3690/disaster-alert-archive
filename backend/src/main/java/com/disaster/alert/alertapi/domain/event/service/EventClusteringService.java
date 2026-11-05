@@ -18,12 +18,10 @@ import com.disaster.alert.alertapi.domain.event.repository.ClusteringTraceReposi
 import com.disaster.alert.alertapi.domain.event.repository.DisasterEventRepository;
 import com.disaster.alert.alertapi.domain.event.repository.EventAlertMappingRepository;
 import com.disaster.alert.alertapi.domain.legaldistrict.model.LegalDistrict;
-import com.disaster.alert.alertapi.domain.risk.event.AlertClusteredEvent;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.embedding.EmbeddingModel;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -65,8 +63,6 @@ public class EventClusteringService {
     private final EventAlertMappingRepository eventAlertMappingRepository;
     /** disaster_alert.embedding 컬럼 읽기·쓰기(JPA 엔티티에 매핑하지 않은 pgvector 컬럼). */
     private final AlertEmbeddingRepository alertEmbeddingRepository;
-    /** 배정이 끝나면 AlertClusteredEvent 를 발행해 위험도 계산을 트리거(커밋 후 수신). */
-    private final ApplicationEventPublisher eventPublisher;
     /** 사고성 borderline 후보를 LLM 에 "같은 사건인가" 묻는 폴백 판정. */
     private final EventLLMDecisionService llmDecisionService;
     /** 판정 기록(clustering_trace) 저장 — 실패해도 클러스터링 결과에는 영향 없음(별도 트랜잭션, 예외는 삼킴). */
@@ -955,8 +951,6 @@ public class EventClusteringService {
         int nextSeq = eventAlertMappingRepository.countByEventId(eventId) + 1;
         eventAlertMappingRepository.save(EventAlertMapping.of(eventId, alert.getId(), nextSeq, similarity, method));
         disasterEventRepository.incrementOnMerge(eventId, alert.getCreatedAt());
-        // 위험도 모듈 트리거 (커밋 후 @TransactionalEventListener 가 수신)
-        eventPublisher.publishEvent(new AlertClusteredEvent(eventId, alert.getId()));
         trace.recordResult(ClusteringTraceResult.MERGED, eventId);
         log.info("clusterNewAlert: alertId={} → event={} 머지 (method={}, similarity={}, seq={})",
                 alert.getId(), eventId, method, similarity, nextSeq);
@@ -974,8 +968,6 @@ public class EventClusteringService {
         );
         DisasterEvent saved = disasterEventRepository.save(event);
         eventAlertMappingRepository.save(EventAlertMapping.of(saved.getId(), alert.getId(), 1, null, MergeMethod.SEED));
-        // 위험도 모듈 트리거 (커밋 후 @TransactionalEventListener 가 수신)
-        eventPublisher.publishEvent(new AlertClusteredEvent(saved.getId(), alert.getId()));
         trace.recordResult(ClusteringTraceResult.NEW, saved.getId());
         log.info("clusterNewAlert: alertId={} → 신규 event={} (broadcast={}, title='{}')",
                 alert.getId(), saved.getId(), broadcast, saved.getEventTitle());

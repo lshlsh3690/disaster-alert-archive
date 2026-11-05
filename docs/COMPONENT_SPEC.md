@@ -17,7 +17,7 @@
 |---|---|---|---|
 | `/alerts` | `app/alerts/page.tsx` | 검색/필터 + 페이지네이션 목록 + 폴리곤 지도 + 통계 요약 | `useSearchCombinedAlerts`, `useSigungu`, `useSidoStats`, `useAlertStats`, `useSigunguStats` |
 | `/alerts/new` | `app/alerts/new/page.tsx` | 사용자 제보 작성 폼 (주소 검색 모달 포함) | `useCreateUserAlert` |
-| `/alerts/:id` | `app/alerts/[id]/page.tsx` | 알림 상세 — 공식/사용자 제보, 위험도 섹션, 무한스크롤 댓글 | `useAlert`/`useUserAlert`, `useComments`, `useInfiniteComments` |
+| `/alerts/:id` | `app/alerts/[id]/page.tsx` | 알림 상세 — 공식/사용자 제보, 무한스크롤 댓글 (위험도 섹션은 2026-11-05 삭제) | `useAlert`/`useUserAlert`, `useComments`, `useInfiniteComments` |
 | `/alerts/:id/edit` | `app/alerts/[id]/edit/page.tsx` | 사용자 제보 수정 폼 | `useUserAlert`, `useUpdateUserAlert` |
 | `/alerts/map` | `app/alerts/map/page.tsx` | **미구현 스텁** — 정적 회색 박스만 존재 | — |
 

@@ -22,7 +22,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import org.springframework.ai.embedding.EmbeddingModel;
-import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.test.util.ReflectionTestUtils;
 
@@ -62,7 +61,6 @@ class EventClusteringServiceTraceTest {
     @Mock DisasterEventRepository disasterEventRepository;
     @Mock EventAlertMappingRepository eventAlertMappingRepository;
     @Mock AlertEmbeddingRepository alertEmbeddingRepository;
-    @Mock ApplicationEventPublisher eventPublisher;
     @Mock EventLLMDecisionService llmDecisionService;
     @Mock ClusteringTraceRepository clusteringTraceRepository;
 
@@ -72,7 +70,7 @@ class EventClusteringServiceTraceTest {
     @BeforeEach
     void setUp() {
         service = new EventClusteringService(embeddingModel, disasterAlertRepository, disasterEventRepository,
-                eventAlertMappingRepository, alertEmbeddingRepository, eventPublisher, llmDecisionService,
+                eventAlertMappingRepository, alertEmbeddingRepository, llmDecisionService,
                 clusteringTraceRepository);
         // 운영 기본값(application.yml)과 같게 맞춘다 - 경로 분기가 이 값들에 의존한다.
         ReflectionTestUtils.setField(service, "similarityThreshold", 0.85);
@@ -214,7 +212,6 @@ class EventClusteringServiceTraceTest {
         assertDoesNotThrow(() -> service.clusterNewAlert(ALERT_ID));
 
         verify(eventAlertMappingRepository).save(any());
-        verify(eventPublisher).publishEvent(any(Object.class));
         verify(clusteringTraceRepository).upsert(any());
     }
 }

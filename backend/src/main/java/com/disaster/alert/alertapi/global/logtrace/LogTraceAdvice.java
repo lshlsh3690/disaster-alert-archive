@@ -9,7 +9,7 @@ import java.util.stream.Collectors;
 // LogTraceConfig의 포인트컷에 걸린 모든 Controller/Service/Repository 메서드 호출을 감싸
 // begin -> proceed -> end(정상)/exception(예외) 순으로 LogTrace를 호출한다.
 //
-// risk/클러스터링/auth 도메인은 여기서 통째로 억제한다. 처음엔 포인트컷 표현식에
+// 클러스터링/auth 도메인은 여기서 통째로 억제한다. 처음엔 포인트컷 표현식에
 // !within(...)/!cflow(...)로 걸러보려 했는데, Spring AOP는 execution/within/args 등
 // 일부 AspectJ 지시자만 지원하고 cflow()는 지원하지 않는다(Spring 공식 문서에 명시된
 // 제약 — 실제로 넣어보니 포인트컷 전체가 조용히 아무 것도 안 걸리는 것으로 확인됨).
@@ -66,12 +66,11 @@ public class LogTraceAdvice implements MethodInterceptor {
         }
     }
 
-    // risk 도메인 전체, event의 클러스터링 관련 서비스, auth 도메인 전체를 억제한다.
+    // event의 클러스터링 관련 서비스와 auth 도메인 전체를 억제한다.
     // 이유는 LogTraceConfig 주석 참고.
     private static boolean isSuppressedDomain(Class<?> declaringClass) {
         String name = declaringClass.getName();
-        return name.startsWith("com.disaster.alert.alertapi.domain.risk.")
-                || name.equals("com.disaster.alert.alertapi.domain.event.service.EventClusteringService")
+        return name.equals("com.disaster.alert.alertapi.domain.event.service.EventClusteringService")
                 || name.equals("com.disaster.alert.alertapi.domain.event.service.EventLLMDecisionService")
                 || name.startsWith("com.disaster.alert.alertapi.domain.auth.");
     }

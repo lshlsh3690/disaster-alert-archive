@@ -10,7 +10,7 @@ import { useTranslation } from "react-i18next";
 import { groupToMetros, Metro } from "@/ui/metros";
 import "./dashboard.css";
 
-// SVG 좌표 데이터 + 집계 로직이 커서 홈 진입 시 초기 JS에서 분리 (AlertRiskMap과 동일 패턴).
+// SVG 좌표 데이터 + 집계 로직이 커서 홈 진입 시 초기 JS에서 분리한다.
 const KoreaMap25D = dynamic(() => import("@/components/map/KoreaMap25D"), {
   ssr: false,
   loading: () => (

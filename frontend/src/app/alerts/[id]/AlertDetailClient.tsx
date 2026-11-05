@@ -9,7 +9,6 @@ import { useAuthStore } from "@/store/authStore";
 import { useLanguageStore } from "@/store/languageStore";
 import { useComments, useCreateComment, useDeleteComment, useInfiniteComments, useUpdateComment } from "@/lib/queries/useComments";
 import { useEffect, useRef, useState } from "react";
-import AlertRiskSection from "@/components/alerts/AlertRiskSection";
 import { disasterTypeChipStyle } from "@/ui/disasterTypeColor";
 
 const LEVEL_BADGE: Record<string, { backgroundColor: string; color: string }> = {
@@ -157,7 +156,6 @@ export default function AlertDetailClient() {
           )}
         </div>
         {/* 위험도 분석 (공식 재난문자만 — 이벤트 클러스터링 기반) */}
-        {!isUser && <AlertRiskSection alertId={id} alertCreatedAt={offData?.createdAt} />}
         </div>
         <section className="space-y-3 rounded-[var(--radius-panel-card)] border border-[var(--line)] bg-[var(--surface)] p-5 shadow-[0_10px_30px_rgba(28,39,60,0.04)]">
           <h2 className="text-lg font-semibold text-[var(--ink)]">{t("alertDetail.comments")}</h2>

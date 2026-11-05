@@ -246,7 +246,10 @@ UNIQUE(`provider`, `provider_user_id`)
 | revoked_at | TIMESTAMP | nullable, null이면 미폐기 |
 | created_at | TIMESTAMP | |
 
-### 1.9 위험도 (risk)
+### 1.9 위험도 (risk) — 2026-11-05 코드 삭제, 테이블 잔존
+
+> 위험도 기능은 검증 불가로 폐기했고 `domain/risk` 코드는 지웠다. **아래 표들은 드롭하지 않았다** — 되돌릴 여지를 남기기 위함이며, 현재 읽고 쓰는 코드가 없다. `region_adjacency` 는 예외로 클러스터링의 인접 병합이 계속 읽는다.
+
 
 **`disaster_risk_profile`** — 재난 유형별 위험도 계산 파라미터
 | 컬럼 | 타입 | 비고 |

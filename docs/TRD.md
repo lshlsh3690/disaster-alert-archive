@@ -49,7 +49,7 @@
 
 모든 임계값·키워드는 `application.yml`의 `clustering.*`에 있으며, 실데이터 튜닝 근거가 주석으로 남아있다. 대부분 기능은 환경변수 플래그로 기본 비활성화되어 있어, 배포 환경별로 on/off 여부를 확인해야 한다.
 
-### 3.2 위험도 계산
+### 3.2 ~~위험도 계산~~ — 2026-11-05 삭제 (검증 불가로 폐기, `CLAUDE.md` 참고)
 `domain/risk/` — 클러스터링된 이벤트를 `AlertClusteredEvent`(Spring 애플리케이션 이벤트)로 구독해, 유형별 가중치 × 강도 × 시간 감쇠를 반영한 지역별 일일 위험도(`RegionRiskDaily`)를 산출한다. `RiskDecayScheduler`가 주기적으로 점수를 감쇠시키고, 기존 프로파일에 없는 신규 재난 유형은 `LlmRiskProfiler`가 LLM으로 보완한다.
 
 ### 3.3 알림(FCM) 발송
