@@ -28,7 +28,7 @@ model: sonnet
 - **라이브러리**: 사소한 이유로 새 의존성을 들이지 않았는지.
 
 ### 이벤트 클러스터링 도메인
-- `clustering.*` 임계값을 바꿨다면, `application.yml`의 한글 주석과 `specs/001-event-clustering-pipeline/`, `specs/002-risk-scoring/`의 근거를 먼저 읽었는지 — 대부분 임의 값이 아니라 실제 사건 데이터로 튜닝됨.
+- `clustering.*` 임계값을 바꿨다면, `application.yml`의 한글 주석과 `specs/001-event-clustering-pipeline/`의 근거를 먼저 읽었는지 — 대부분 임의 값이 아니라 실제 사건 데이터로 튜닝됨.
 - 클러스터링·LLM 폴백·cross-region 은 플래그 없이 항상 동작한다(2026-10-10 플래그 삭제). 수집 루프나 백필에 OpenAI 호출을 늘리는 변경이면 호출 수·비용 증가를 의식했는지.
 
 ### FCM 알림
@@ -44,7 +44,8 @@ model: sonnet
 - DTO 필드명이 백엔드 응답과 정확히 일치하는지 — 백엔드 컨트롤러를 `ApiResponse`로 새로 감쌌다면, 프론트 호출부가 `res.data` 대신 `res.data.data`를 읽도록 같이 바뀌었는지 (감싸기만 하고 프론트를 안 고치면 런타임에서 조용히 깨진다).
 
 ### 테스트
-- 이 레포는 3개 핵심 도메인(클러스터링/FCM/법정동) 모두 자동화 테스트가 없는 상태로 확인된 바 있다 — 새 테스트가 없다고 자동으로 막을 필요는 없지만, 순수 로직(외부 의존성 없는 클래스)을 새로 추가했다면 테스트 부재를 발견사항으로 짚어라.
+- 도메인별 테스트 현황(2026-11-05, `backend/src/test` 의 `@Test`/`@ParameterizedTest` 메서드 수 기준): 클러스터링(`domain/event`) 29개 클래스·238건(`EventClusteringService*Test` 8개 클래스, `DisasterCooldownTest`, `MissingPersonIdentityTest`, 평가 도구 포함), FCM(`domain/notification`) 10개 클래스·50건, 재난문자(`domain/disasteralert`) 10개 클래스·23건, 번역(`global/translation`) 4개 클래스·12건, 인증(`domain/auth`) 1개 클래스·3건. 법정동(`domain/legaldistrict`) 패키지의 테스트는 영문 명칭 시드 마이그레이션 검증 2개 클래스·6건뿐이다(시도 코드 파생 등 지역 매칭 로직은 다른 도메인에 흩어져 있어 별도로 확인하지 않았다). 이 숫자는 시점 스냅샷이므로 필요하면 다시 센다.
+- 새 테스트가 없다고 자동으로 막을 필요는 없지만, 순수 로직(외부 의존성 없는 클래스)을 새로 추가했다면 테스트 부재를 발견사항으로 짚어라.
 
 ## 출력
 
