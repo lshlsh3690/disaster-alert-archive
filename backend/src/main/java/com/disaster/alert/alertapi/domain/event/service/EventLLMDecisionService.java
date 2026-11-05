@@ -16,7 +16,7 @@ import java.util.regex.Pattern;
  * 임베딩만으론 동명이인(0.897) {@literal >} 진짜 같은사람(0.834) 이라 분리 불가.
  * → LLM 이 이름·나이·키·몸무게·개체 특징을 비교해 "동일 인물/개체의 같은 사건"인지 판정한다.
  *
- * <p>공유 {@link ChatModel}(gpt-4o-mini, SSAFY GMS 프록시) 사용 — risk 모듈과 같은 빈.
+ * <p>공유 {@link ChatModel}(gpt-4o-mini, SSAFY GMS 프록시) 사용 — 애플리케이션 공용 빈.
  * 후보 K개를 한 프롬프트에 넣어 <b>알림 1건당 LLM 1콜</b>(비용 최소).
  */
 @Service

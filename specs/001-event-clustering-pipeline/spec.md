@@ -237,10 +237,10 @@
 **병합 기록 / 감사**
 
 - **FR-031**: 시스템은 모든 병합/생성 결과를 `event_alert_mapping`에 `merge_method`(`MergeMethod` enum: `SEED`/`EMBEDDING`/`BROADCAST`/`IDENTITY`/`LLM`/`LLM_FALLBACK`/`GLOBAL_TYPE`/`REGIONAL_TYPE`/`ADVISORY`)로 기록해야 한다(MUST) — 특히 `LLM` 계열은 재구성 불가능한 일회성 판정이라 사후 검수·되돌리기를 위해 반드시 남겨야 한다 (`MergeMethod.java:9-46`).
-- **FR-032**: 시스템은 이벤트가 병합/생성될 때마다 `AlertClusteredEvent`(Spring 애플리케이션 이벤트)를 발행해야 한다(MUST) — 위험도 계산 모듈(`ClusteringEventListener`)이 이를 트랜잭션 커밋 후 구독해 클러스터링과 위험도 계산을 분리한다 (`EventClusteringService.java:589`, `606`; `AlertClusteredEvent.java:9`).
+- ~~**FR-032**: 이벤트가 병합/생성될 때마다 `AlertClusteredEvent` 발행~~ — **2026-11-05 삭제**. 유일한 구독자였던 위험도 계산 모듈을 걷어내면서 발행부도 함께 제거했다(점수를 검증할 수 없어 기능을 폐기, CLAUDE.md "위험도 계산 — 2026-11-05 삭제" 절 참고). 클러스터링은 이제 어떤 애플리케이션 이벤트도 발행하지 않는다.
 - **FR-033**: 시스템은 신규 이벤트 제목을, 유형이 정보성이면 `"{지역명} {유형}"`, "기타"류로 정보 부족이면 `"{지역명} {본문 규칙 기반 라벨}"`(실종 인물/동물/안전안내 키워드 매칭, 그 외는 본문 앞 30자) 형태로 자동 생성해야 한다(MUST) (`DisasterEvent.java:148-181`, `225-256`).
 
-> **참고(FR-031~033 검증 커버리지)**: 이 세 항목은 특정 사용자 스토리 하나에 종속되지 않고 모든 병합/생성 경로(사용자 스토리 1~9 전체)에서 공통으로 발생하는 부수 효과라 별도의 전용 Given/When/Then 시나리오가 없다. 실제로는 이미 서술된 시나리오 안에 암묵적으로 포함돼 있다 — 예: 사용자 스토리 1 시나리오 1의 "`event_alert_mapping`에 유사도 값이 기록된다"가 FR-031(감사 기록), 사용자 스토리 4 시나리오 2의 제목 승급이 FR-033(제목 자동생성)의 한 사례, FR-032(`AlertClusteredEvent` 발행)는 `mergeIntoExisting`/`createNewEvent`를 호출하는 모든 시나리오(사용자 스토리 1~9 전부)에서 매번 발생한다(`EventClusteringService.java:589`, `606`).
+> **참고(FR-031~033 검증 커버리지)**: 이 세 항목은 특정 사용자 스토리 하나에 종속되지 않고 모든 병합/생성 경로(사용자 스토리 1~9 전체)에서 공통으로 발생하는 부수 효과라 별도의 전용 Given/When/Then 시나리오가 없다. 실제로는 이미 서술된 시나리오 안에 암묵적으로 포함돼 있다 — 예: 사용자 스토리 1 시나리오 1의 "`event_alert_mapping`에 유사도 값이 기록된다"가 FR-031(감사 기록), 사용자 스토리 4 시나리오 2의 제목 승급이 FR-033(제목 자동생성)의 한 사례, FR-032(`AlertClusteredEvent` 발행)는 2026-11-05 에 삭제돼 더 이상 해당하지 않는다.
 
 **백필/재클러스터링 도구**
 
@@ -287,6 +287,6 @@
 1. **`EventFragmentMergeService`** — "30분 주기 스케줄러로 동작하는 정합화 패스, 작은 파편 이벤트를 흡수" 라고 설명되지만 해당 클래스/파일이 존재한 적이 없다.
 2. **`FRAGMENT_MERGE_ENABLED`, `INCIDENT_SPECIFIC_CHECK_ENABLED` 환경변수 및 `incident-specific-check` 설정** — `application.yml`, Java 소스 어디에도 없다.
 3. **`ClusteringProperties` 바인딩 클래스** — 존재하지 않으며, 설정은 `EventClusteringService`의 개별 `@Value` 필드로 흩어져 있다.
-4. **"산불/지진 등 인접 시군구 BFS 확산 hop" 설정** — 이 표현이 맞는 곳은 클러스터링이 아니라 **위험도(risk) 모듈**의 `RiskCalculationService`/`RegionAdjacencyRepository`다. 클러스터링 쪽 `region_adjacency` 사용(동물 경로 `clusterAnimal`, 사고성 인접 병합)은 다단계 BFS가 아니라 1-hop 직접 인접 매칭뿐이다.
+4. **"산불/지진 등 인접 시군구 BFS 확산 hop" 설정** — 클러스터링에는 없다. 이 표현이 맞던 곳은 위험도 모듈의 `RiskCalculationService`였으나 그 모듈은 2026-11-05 에 삭제됐으므로, 지금은 저장소 어디에도 다단계 BFS 확산이 없다. 클러스터링 쪽 `region_adjacency` 사용(동물 경로 `clusterAnimal`, 사고성 인접 병합)은 1-hop 직접 인접 매칭뿐이다.
 
 이 항목들은 이번 명세 작성 과정에서 소스 코드 대조를 통해 발견됐으며, 추측이 아니라 실제 부재를 확인한 것이다(`git log --all --diff-filter=A --name-only | grep -i fragment` 결과 없음, `grep -r ClusteringProperties` 결과 없음).

@@ -19,7 +19,7 @@ model: sonnet
 ### 백엔드 (Spring Boot)
 - **계층 구조**: controller → service → repository를 건너뛰는 직접 호출이 없는가.
 - **예외 처리**: 예외는 항상 `CustomException` + `ErrorCode`로만 던지는가. raw `IllegalArgumentException`/`IllegalStateException` 등을 던지고 있다면 지적 — `GlobalExceptionHandler`의 catch-all(`Exception.class`)로 떨어져 4xx여야 할 게 500 + 불필요한 error 로그가 된다 (이 레포에서 실제로 여러 번 발견된 패턴).
-- **응답 포맷**: 컨트롤러가 `ApiResponse<T>`/`ApiErrorResponse`로 감싸지 않고 raw `ResponseEntity<T>`를 반환하지 않는가. 같은 컨트롤러/도메인의 다른 엔드포인트와 비교해서 일관성을 확인한다 (이 레포에서 `RegionRiskController.alertRisk`, `LegalDistrictController.getSigunguBySido` 두 곳이 독립적으로 이 문제였다 — 흔한 실수이니 항상 체크).
+- **응답 포맷**: 컨트롤러가 `ApiResponse<T>`/`ApiErrorResponse`로 감싸지 않고 raw `ResponseEntity<T>`를 반환하지 않는가. 같은 컨트롤러/도메인의 다른 엔드포인트와 비교해서 일관성을 확인한다 (이 레포에서 `LegalDistrictController.getSigunguBySido` 와, 지금은 삭제된 `RegionRiskController.alertRisk` 두 곳이 독립적으로 이 문제였다 — 흔한 실수이니 항상 체크).
 - **DTO**: 응답 DTO가 엔드포인트별 1개 타입인가, 리스트를 별도 타입으로 만들지 않고 내부에 중첩했는가.
 - **엔티티 상태 변경**: 서비스에서 setter가 아니라 엔티티 메서드를 통해서만 상태를 바꾸는가. (참고: 이 원칙을 지키는 엔티티 메서드가 있어도 실제로는 native SQL/QueryDSL로 우회해서 그 메서드가 죽은 코드가 되는 경우가 있었다 — 메서드 존재 여부가 아니라 실제 호출 여부까지 확인.)
 - **인증/인가**: 새 엔드포인트가 `SecurityConfig`의 `permitAll` 목록에 걸리는지, 의도된 것인지 확인. 특히 `/api/v1/admin/**`류 관리자 엔드포인트는 `@PreAuthorize("hasRole('ADMIN')")` 같은 컨트롤러 단 권한 검사도 같이 있는지 (permitAll 제거만으로는 인증만 요구할 뿐 권한까지 검사하지 않음).
@@ -27,8 +27,8 @@ model: sonnet
 - **메서드 길이**: 대략 30~50줄 이내인지, 벗어났다면 이유가 있는지.
 - **라이브러리**: 사소한 이유로 새 의존성을 들이지 않았는지.
 
-### 이벤트 클러스터링 / 위험도 도메인
-- `clustering.*`, 위험도 관련 임계값을 바꿨다면, `application.yml`의 한글 주석과 `specs/001-event-clustering-pipeline/`, `specs/002-risk-scoring/`의 근거를 먼저 읽었는지 — 대부분 임의 값이 아니라 실제 사건 데이터로 튜닝됨.
+### 이벤트 클러스터링 도메인
+- `clustering.*` 임계값을 바꿨다면, `application.yml`의 한글 주석과 `specs/001-event-clustering-pipeline/`의 근거를 먼저 읽었는지 — 대부분 임의 값이 아니라 실제 사건 데이터로 튜닝됨.
 - 클러스터링·LLM 폴백·cross-region 은 플래그 없이 항상 동작한다(2026-10-10 플래그 삭제). 수집 루프나 백필에 OpenAI 호출을 늘리는 변경이면 호출 수·비용 증가를 의식했는지.
 
 ### FCM 알림
@@ -44,7 +44,8 @@ model: sonnet
 - DTO 필드명이 백엔드 응답과 정확히 일치하는지 — 백엔드 컨트롤러를 `ApiResponse`로 새로 감쌌다면, 프론트 호출부가 `res.data` 대신 `res.data.data`를 읽도록 같이 바뀌었는지 (감싸기만 하고 프론트를 안 고치면 런타임에서 조용히 깨진다).
 
 ### 테스트
-- 이 레포는 4개 핵심 도메인(클러스터링/위험도/FCM/법정동) 모두 자동화 테스트가 없는 상태로 확인된 바 있다 — 새 테스트가 없다고 자동으로 막을 필요는 없지만, 순수 로직(외부 의존성 없는 클래스)을 새로 추가했다면 테스트 부재를 발견사항으로 짚어라.
+- 도메인별 테스트 현황(2026-11-05, `backend/src/test` 의 `@Test`/`@ParameterizedTest` 메서드 수 기준): 클러스터링(`domain/event`) 29개 클래스·238건(`EventClusteringService*Test` 8개 클래스, `DisasterCooldownTest`, `MissingPersonIdentityTest`, 평가 도구 포함), FCM(`domain/notification`) 10개 클래스·50건, 재난문자(`domain/disasteralert`) 10개 클래스·23건, 번역(`global/translation`) 4개 클래스·12건, 인증(`domain/auth`) 1개 클래스·3건. 법정동(`domain/legaldistrict`) 패키지의 테스트는 영문 명칭 시드 마이그레이션 검증 2개 클래스·6건뿐이다(시도 코드 파생 등 지역 매칭 로직은 다른 도메인에 흩어져 있어 별도로 확인하지 않았다). 이 숫자는 시점 스냅샷이므로 필요하면 다시 센다.
+- 새 테스트가 없다고 자동으로 막을 필요는 없지만, 순수 로직(외부 의존성 없는 클래스)을 새로 추가했다면 테스트 부재를 발견사항으로 짚어라.
 
 ## 출력
 

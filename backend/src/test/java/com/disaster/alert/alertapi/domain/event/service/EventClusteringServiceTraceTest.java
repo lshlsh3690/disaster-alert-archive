@@ -22,7 +22,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import org.springframework.ai.embedding.EmbeddingModel;
-import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.test.util.ReflectionTestUtils;
 
@@ -62,7 +61,6 @@ class EventClusteringServiceTraceTest {
     @Mock DisasterEventRepository disasterEventRepository;
     @Mock EventAlertMappingRepository eventAlertMappingRepository;
     @Mock AlertEmbeddingRepository alertEmbeddingRepository;
-    @Mock ApplicationEventPublisher eventPublisher;
     @Mock EventLLMDecisionService llmDecisionService;
     @Mock ClusteringTraceRepository clusteringTraceRepository;
 
@@ -72,7 +70,7 @@ class EventClusteringServiceTraceTest {
     @BeforeEach
     void setUp() {
         service = new EventClusteringService(embeddingModel, disasterAlertRepository, disasterEventRepository,
-                eventAlertMappingRepository, alertEmbeddingRepository, eventPublisher, llmDecisionService,
+                eventAlertMappingRepository, alertEmbeddingRepository, llmDecisionService,
                 clusteringTraceRepository);
         // 운영 기본값(application.yml)과 같게 맞춘다 - 경로 분기가 이 값들에 의존한다.
         ReflectionTestUtils.setField(service, "similarityThreshold", 0.85);
@@ -198,12 +196,12 @@ class EventClusteringServiceTraceTest {
         assertThat(trace.getEventId()).isNull();
     }
 
-    // 결정: 기록 저장이 실패해도 수집은 막지 않는다 - 클러스터링 결과(매핑 저장·위험도 이벤트 발행)는 그대로 나가야 한다.
+    // 결정: 기록 저장이 실패해도 수집은 막지 않는다 - 클러스터링 결과(매핑 저장)는 그대로 나가야 한다.
     //       기록을 저장하다 터진 예외가 클러스터링 쪽으로 번지면 알림이 이벤트에 배정되지 못한다.
     // Red: 서비스가 upsert 를 아직 호출하지 않아 마지막 verify(upsert) 에서 "Wanted but not invoked" 로 실패한다
-    //      (앞의 예외 없음·매핑 저장·이벤트 발행 단언은 지금도 통과한다).
+    //      (앞의 예외 없음·매핑 저장 단언은 지금도 통과한다).
     @Test
-    @DisplayName("기록 저장이 예외를 던져도 clusterNewAlert 는 예외 없이 끝나고 매핑 저장·이벤트 발행은 그대로 일어난다")
+    @DisplayName("기록 저장이 예외를 던져도 clusterNewAlert 는 예외 없이 끝나고 매핑 저장은 그대로 일어난다")
     void traceSaveFailure_doesNotAffectClusteringResult() {
         alert("산불", WILDFIRE);
         when(disasterEventRepository.findRegionalTypeMergeTarget(anyString(), any(String[].class), any(LocalDateTime.class)))
@@ -214,7 +212,6 @@ class EventClusteringServiceTraceTest {
         assertDoesNotThrow(() -> service.clusterNewAlert(ALERT_ID));
 
         verify(eventAlertMappingRepository).save(any());
-        verify(eventPublisher).publishEvent(any(Object.class));
         verify(clusteringTraceRepository).upsert(any());
     }
 }

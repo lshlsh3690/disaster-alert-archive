@@ -96,7 +96,7 @@ oauth:
 
 # Spring AI — OpenAI Embedding + Chat
 # 컨테이너 추가 없음. 기존 backend Spring Boot 프로세스 안에서 라이브러리로 동작.
-# base-url 은 embedding/chat 공용 — 팀 risk 모듈과 동일한 OpenAI 계정/키 공유.
+# base-url 은 embedding/chat 공용 — 번역·임베딩·LLM 판정이 공유하는 OpenAI 계정/키 공유.
 spring.ai:
   openai:
     api-key: ${OPENAI_API_KEY}
@@ -108,7 +108,7 @@ spring.ai:
     chat:
       options:
         model: gpt-4o-mini
-        # 0: LLM 폴백(같은 사건 판정)·cross-region·위험도 프로파일러의 응답 흔들림을 줄이기 위함.
+        # 0: LLM 폴백(같은 사건 판정)·cross-region·LLM 판정의 응답 흔들림을 줄이기 위함.
         # 같은 입력으로 재클러스터링해도 판정이 달라져 평가 수치가 재현되지 않던 문제(2026-10) 대응.
         # 번역은 OpenAiTranslationClient 가 호출마다 temperature 0 을 따로 지정한다.
         temperature: 0.0

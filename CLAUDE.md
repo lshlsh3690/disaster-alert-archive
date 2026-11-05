@@ -4,7 +4,7 @@
 
 ## 프로젝트 개요
 
-Disaster Alert Archive(재난 안전 문자 아카이브) — 한국 정부의 재난문자 공공데이터를 수집하고, 관련 알림들을 "이벤트"로 클러스터링하며, 지역 단위 위험도 점수를 계산하고, 관심지역 기반으로 사용자에게 FCM 푸시 알림을 보내는 서비스입니다. 백엔드는 Spring Boot, 프론트엔드는 Next.js를 사용합니다. 대부분의 식별자, 주석, 커밋 메시지는 한국어로 작성되어 있습니다.
+Disaster Alert Archive(재난 안전 문자 아카이브) — 한국 정부의 재난문자 공공데이터를 수집하고, 관련 알림들을 "이벤트"로 클러스터링하고, 관심지역 기반으로 사용자에게 FCM 푸시 알림을 보내는 서비스입니다. 백엔드는 Spring Boot, 프론트엔드는 Next.js를 사용합니다. 대부분의 식별자, 주석, 커밋 메시지는 한국어로 작성되어 있습니다.
 
 ## 커맨드
 
@@ -22,7 +22,7 @@ Disaster Alert Archive(재난 안전 문자 아카이브) — 한국 정부의 �
 
 `@Tag("realApi")` 가 붙은 테스트(현재 `OpenAiTranslationClientRealApiTest`)는 실제 OpenAI API 를 호출하므로 `OPENAI_API_KEY` 가 필요하고 실행마다 요금이 발생하며 응답이 완전히 결정적이지 않습니다. `build.gradle`에서 기본 `test` 태스크는 이 태그를 제외하고, 별도 `realApiTest` 태스크로만 실행하도록 분리되어 있습니다 — 프롬프트 규칙을 바꿨을 때 수동으로 돌려 확인하는 용도입니다.
 
-DB/Spring 컨텍스트에 의존하는 통합 테스트는 `@SpringBootTest` + `@ActiveProfiles("test")` + `backend/.env.test` 로딩을 한 번에 묶은 `@IntegrationTest`(`global/testsupport/IntegrationTest.java`, `DotenvExtension` 포함)를 붙여 작성합니다 — 슬라이스/목킹된 단위 테스트가 아니므로, dev docker-compose와 동일한 구성의 DB에 접속 가능해야 합니다. 반면 외부 의존성이 없는 순수 로직 클래스(`domain/event/model`의 `FireAlertClassifier`·`DisasterCooldown`·`MissingPersonIdentity`·`AnimalIdentity`, `domain/risk/service`의 `IntensityExtractor` 같은 정적 유틸/판정 클래스)는 `@SpringBootTest` 없이 순수 JUnit 단위 테스트로 작성합니다 — DB 연결이나 Spring 컨텍스트 부트스트랩이 필요 없어 훨씬 빠릅니다.
+DB/Spring 컨텍스트에 의존하는 통합 테스트는 `@SpringBootTest` + `@ActiveProfiles("test")` + `backend/.env.test` 로딩을 한 번에 묶은 `@IntegrationTest`(`global/testsupport/IntegrationTest.java`, `DotenvExtension` 포함)를 붙여 작성합니다 — 슬라이스/목킹된 단위 테스트가 아니므로, dev docker-compose와 동일한 구성의 DB에 접속 가능해야 합니다. 반면 외부 의존성이 없는 순수 로직 클래스(`domain/event/model`의 `FireAlertClassifier`·`DisasterCooldown`·`MissingPersonIdentity`·`AnimalIdentity` 같은 정적 유틸/판정 클래스)는 `@SpringBootTest` 없이 순수 JUnit 단위 테스트로 작성합니다 — DB 연결이나 Spring 컨텍스트 부트스트랩이 필요 없어 훨씬 빠릅니다.
 
 QueryDSL Q-클래스는 컴파일 시 `backend/src/main/generated`에 생성됩니다 — 리포지토리 쿼리 메서드가 인식되지 않으면 `./gradlew compileJava`로 재생성하세요.
 
@@ -52,11 +52,11 @@ docker compose -f docker-compose.dev.yml up postgres redis   # Postgres(pgvector
 ### 백엔드 도메인 구조
 
 `backend/src/main/java/com/disaster/alert/alertapi/`
-- `domain/*` — bounded context별 패키지 (`disasteralert`, `event`, `risk`, `weather`, `notification`, `member`, `auth`, `legaldistrict`, `community`, `comment`, `useralert`, `openapi`, `common`). 각각 `controller → service → repository` 구조를 따르며, `model/`(JPA 엔티티)과 `dto/`(엔드포인트별 응답 DTO 1개 타입, 리스트는 별도 타입이 아니라 내부에 중첩)로 구성됩니다. 모든 컨트롤러는 `/api/v1/*` 아래에 매핑됩니다. **실종자 전용 도메인 패키지는 없습니다** — 실종자는 재난문자에서 파생되는 개념이라 `domain/event/model/MissingPersonIdentity`(동일 실종 사건 판정)와 `domain/disasteralert` 조회 필터로 구현되어 있습니다.
+- `domain/*` — bounded context별 패키지 (`disasteralert`, `event`, `weather`, `notification`, `member`, `auth`, `legaldistrict`, `community`, `comment`, `useralert`, `openapi`, `common`). 각각 `controller → service → repository` 구조를 따르며, `model/`(JPA 엔티티)과 `dto/`(엔드포인트별 응답 DTO 1개 타입, 리스트는 별도 타입이 아니라 내부에 중첩)로 구성됩니다. 모든 컨트롤러는 `/api/v1/*` 아래에 매핑됩니다. **실종자 전용 도메인 패키지는 없습니다** — 실종자는 재난문자에서 파생되는 개념이라 `domain/event/model/MissingPersonIdentity`(동일 실종 사건 판정)와 `domain/disasteralert` 조회 필터로 구현되어 있습니다.
 - `global/` — 공통 관심사: `security/jwt`(JWT 인증 필터/프로바이더), `exception`(`GlobalExceptionHandler` + `CustomException`/`ErrorCode` 패턴 — 항상 ErrorCode를 통해 예외를 던지고 임의로 에러 바디를 만들지 말 것), `dto`(모든 컨트롤러가 사용하는 `ApiResponse`/`ApiErrorResponse` 응답 포맷), `translation`(OpenAI 기반 — DeepL Free는 계정당 평생 누적 쿼터라 예비 키까지 소진돼 2026-08-09 교체), `logtrace`(김영한 LogTrace 스타일 AOP 호출 로깅 — controller/service 계층에 트랜잭션 ID + 들여쓰기 로그 자동 부착), `service`(`EmailService`, `LegalDistrictCache`), `controller/AdminController`, `util/CookieUtil`, `redis`, `config`.
-- `scheduler/DisasterFetchScheduler` 및 도메인별 `*/scheduler/` 패키지(`weather/scheduler/WeatherCollectScheduler`·`WeatherDailySummaryScheduler`, `risk/scheduler/RiskDecayScheduler`) — `@Scheduled` 작업들. 백그라운드 파이프라인의 진입점이므로 "왜 X가 실행되지 않았는지" 디버깅할 때 가장 먼저 확인할 곳입니다.
+- `scheduler/DisasterFetchScheduler` 및 도메인별 `*/scheduler/` 패키지(`weather/scheduler/WeatherCollectScheduler`·`WeatherDailySummaryScheduler`) — `@Scheduled` 작업들. 백그라운드 파이프라인의 진입점이므로 "왜 X가 실행되지 않았는지" 디버깅할 때 가장 먼저 확인할 곳입니다.
 - `api/DisasterOpenApiClient.java` — 재난문자 공공데이터포털 API 클라이언트.
-- `*/tool/*BackfillTool` — 과거 데이터를 현재 로직으로 재처리하는 수동 실행 도구 (`EventClusteringBackfillTool`, `RiskBackfillTool`, `DisasterAlertRegionBackfillTool`).
+- `*/tool/*BackfillTool` — 과거 데이터를 현재 로직으로 재처리하는 수동 실행 도구 (`EventClusteringBackfillTool`, `DisasterAlertRegionBackfillTool`).
 
 **외부 에러 트래킹 서비스는 쓰지 않습니다** — 2026-08-12에 Sentry(`sentry-spring-boot-starter-jakarta` + `sentry-logback`)를 제거했습니다. 장애 인지 수단은 로그뿐이며, 자동 알림 경로가 없다는 뜻입니다. 따라서 **로그 레벨이 사실상 유일한 신호 구분자**입니다: 사람이 조치해야 하는 것만 `log.error`로 남기고, 정상 흐름에서 늘 발생하는 것(4xx 비즈니스 예외, 죽은 FCM 토큰 등)은 `warn` 이하로 둡니다. 이 구분이 무너지면 `error`가 노이즈에 묻혀 진짜 장애를 못 찾습니다 — `GlobalExceptionHandler`(5xx만 error), `ThreadLocalLogTrace`(전부 info), `FcmSendService.logDeadToken`(죽은 토큰은 warn)이 그 예입니다.
 
@@ -68,19 +68,32 @@ docker compose -f docker-compose.dev.yml up postgres redis   # Postgres(pgvector
 - `EventClusteringService` — 메인 클러스터링 진입점. 지역(같은 시군구)으로 후보를 하드 필터링하고, 시간 윈도우 내에서 코사인 유사도가 `clustering.similarity-threshold`(0.85) 이상이어야 기존 이벤트에 병합됩니다. 사고성 유형은 같은 시군구 후보에서 병합에 실패하면 `region_adjacency` 인접 시군구 후보(`clustering.adjacent-window-hours` 48h)를 임계값으로만 추가 검사합니다(LLM 폴백 없음).
 - 동물 탈출·출몰은 `EventClusteringService.clusterAnimal`(실종자 `clusterPerson` 바로 다음)이 판정 순간에 처리합니다 — 같은 종(`AnimalIdentity`) 알림이 든 직전 14일 이벤트 중 footprint 가 같거나 인접한 지역(토착종 시군구·이동종 시도)인 후보를 LLM 이 같은 개체인지 판정해 붙입니다. 2026-10-27 까지는 클러스터링 뒤 이벤트끼리 합치던 별도 패스(`EventCrossRegionService`)였으나, 원래 이벤트를 지워 판정 기록과 어긋나고 평가에서 빠져 옮겼습니다(설정 키 `clustering.cross-region.*` 는 그대로).
 - `EventLLMDecisionService` — 위 서비스들이 borderline 병합 판정에 공용으로 사용하는 LLM 판정 호출부 (Spring AI + `gpt-4o-mini`). 호출당 비용이 들지만 on/off 플래그 없이 항상 동작하며, 사고성 유형 화이트리스트(`llm-fallback.accident-types`)·borderline 거리 구간(`llm-fallback.distance-ceil`)·이동 키워드(`mover-keywords`/`animal-keywords`) 게이트로 호출 대상을 좁힙니다.
-- `application.yml`의 `clustering.*` 블록 값들은 별도 `@ConfigurationProperties` 클래스 없이 `EventClusteringService`에 개별 `@Value` 필드로 흩어져 바인딩됩니다. 각 임계값/키워드 목록이 존재하는 이유(blob 방지, 유형별 머지 윈도우 등)가 한국어 주석으로 설명되어 있습니다. **클러스터링 임계값을 변경하기 전에 반드시 그 주석들을 먼저 읽으세요** — 대부분의 값은 임의가 아니라 실제 사건 데이터로 튜닝된 값입니다. (`clustering.relaxed-threshold-types`에 든 에피소드형 유형[폭염·한파·대설·강풍·가축질병]은 시군구 1개 알림이면 `episodic-types` 키 병합을 타고, 다지역(시군구 2개 이상) 알림은 지역 이벤트와 섞이지 않게 광역(broadcast) 경로로 갑니다(사고성 유형은 전파 허용이라 제외). 임베딩 경로에서는 병합 유사도 하한이 0.85가 아니라 `clustering.relaxed-similarity-threshold`(0.65)로 완화되지만, 기본 설정에서는 에피소드형 유형이 이 경로에 오지 않으므로 다른 유형에 적용하거나 `episodic-types`를 바꿀 때만 의미가 있습니다.) (인접 시군구 BFS 확산 전파는 클러스터링이 아니라 `domain/risk`의 `RiskCalculationService.propagateEffective()`에 있습니다 — 아래 위험도 계산 절 참고.)
+- `application.yml`의 `clustering.*` 블록 값들은 별도 `@ConfigurationProperties` 클래스 없이 `EventClusteringService`에 개별 `@Value` 필드로 흩어져 바인딩됩니다. 각 임계값/키워드 목록이 존재하는 이유(blob 방지, 유형별 머지 윈도우 등)가 한국어 주석으로 설명되어 있습니다. **클러스터링 임계값을 변경하기 전에 반드시 그 주석들을 먼저 읽으세요** — 대부분의 값은 임의가 아니라 실제 사건 데이터로 튜닝된 값입니다. (`clustering.relaxed-threshold-types`에 든 에피소드형 유형[폭염·한파·대설·강풍·가축질병]은 시군구 1개 알림이면 `episodic-types` 키 병합을 타고, 다지역(시군구 2개 이상) 알림은 지역 이벤트와 섞이지 않게 광역(broadcast) 경로로 갑니다(사고성 유형은 전파 허용이라 제외). 임베딩 경로에서는 병합 유사도 하한이 0.85가 아니라 `clustering.relaxed-similarity-threshold`(0.65)로 완화되지만, 기본 설정에서는 에피소드형 유형이 이 경로에 오지 않으므로 다른 유형에 적용하거나 `episodic-types`를 바꿀 때만 의미가 있습니다.)
 - `EventClusteringBackfillTool` — 현재 클러스터링 설정으로 과거 알림을 재처리하는 도구. 임계값 튜닝 시 사용.
 - `DisasterCooldown` — 지역/유형별 쿨다운으로, 진행 중인 이벤트에 대한 반복 알림이 중복 알림을 만들지 않도록 함. 계절성 안전안내 문자(예: 봄철 산불 예방 안내) 같은 일반 안내성 메시지는 `clustering.advisory-split-types`(현재 `산불`, `기타` 등록 — `기타`는 물놀이·수상안전 예방 안내문만 `AdvisoryClassifier` 가 안내로 판정하고 `clusterAdvisoryType` 경로, 윈도우 `clustering.advisory-window-hours` 168h)에 해당하면 실제 사건 이벤트와 별도의 "안내성"(advisory) 이벤트로 분리 생성되어, 실제 사건의 쿨다운을 갱신하지 않음 (`EventClusteringService.clusterAdvisory`/`isAdvisorySplitType`). 다지역(시군구 2개 이상) 안내는 산불·`기타` 모두 시도/전국+유형 키의 안내 광역 이벤트(`clusterAdvisoryBroadcast`)로 가며, 일반 광역 조회는 `is_advisory=false` 만 봅니다. 폭염·한파·대설·강풍·가축질병은 안내성 분리 없이 `clustering.episodic-types`로 "유형+시군구" 하나의 이벤트(안내와 특보 포함, 시군구 1개 알림 한정, 끊김 기준 `clustering.episodic-window-hours` 168h)에 이어 붙입니다 (`clusterEpisodicType`). 지역 한정 유형(`clustering.regional-types`)의 산불 사건 알림은 같은 시군구에 이벤트가 없으면 `clustering.regional-adjacent-types`/`regional-adjacent-window-hours`(24h)에 따라 인접 시군구의 진행 중 이벤트에 병합합니다(안내 제외, 시군구 개수 상한 없음, `mergeIntoAdjacentRegionalEvent`).
 
-클러스터링·LLM 폴백·동물 경로는 **항상 켜져 있습니다** — 2026-10-10 에 on/off 환경변수(`CLUSTERING_ENABLED`, `LLM_FALLBACK_ENABLED`, `CROSS_REGION_ENABLED`)를 삭제했습니다. 클러스터링이 꺼지면 이벤트가 생기지 않고, 위험도 계산은 이벤트(`AlertClusteredEvent`) 단위라 새 알림이 위험도에 반영되지 않기 때문입니다. 대신 새 알림마다 임베딩 호출이 들고 수집 루프(`DisasterFetchScheduler`) 안에서 동기로 실행되며, 백필 recluster 모드도 borderline 사고성 건은 LLM 을 호출합니다(완전히 공짜인 튜닝 루프가 아님).
+클러스터링·LLM 폴백·동물 경로는 **항상 켜져 있습니다** — 2026-10-10 에 on/off 환경변수(`CLUSTERING_ENABLED`, `LLM_FALLBACK_ENABLED`, `CROSS_REGION_ENABLED`)를 삭제했습니다. 클러스터링이 꺼지면 이벤트가 생기지 않아 목록·상세·타임라인이 비기 때문입니다. 대신 새 알림마다 임베딩 호출이 들고 수집 루프(`DisasterFetchScheduler`) 안에서 동기로 실행되며, 백필 recluster 모드도 borderline 사고성 건은 LLM 을 호출합니다(완전히 공짜인 튜닝 루프가 아님).
 
 이 서브시스템의 as-built 상세 동작(37개 기능 요구사항, file:line 근거 포함)은 `specs/001-event-clustering-pipeline/spec.md`·`plan.md` 참고.
 
-### 위험도 계산 (Risk scoring)
+### 위험도 계산 — 2026-11-05 삭제
 
-`domain/risk/`는 클러스터링된 이벤트로부터 지역별 일일 위험도(`RegionRiskDaily`)를 계산하며, `RiskDecayScheduler`가 시간에 따라 점수를 감쇠시키고 `LlmRiskProfiler`가 기존 35종 프로파일에 없는 재난 유형을 처리합니다 (클러스터링 쪽 LLM 폴백과 달리 config 플래그로 게이트되어 있지 않아, 미등록 유형을 만나면 항상 호출됩니다). 클러스터링 결과는 Spring 애플리케이션 이벤트인 `AlertClusteredEvent`를 `ClusteringEventListener`가 구독하는 방식으로 전달받습니다 — 위험도 계산은 클러스터링 로직과 분리되어 있습니다. 인접 시군구로의 위험도 확산은 `RiskCalculationService.propagateEffective()`가 `RegionAdjacencyRepository` 인접 그래프를 다중소스 BFS(진원별 홉 감쇠, MAX 결합)로 전파하는 방식으로 구현되어 있습니다.
+`domain/risk/`(지역별 위험도 점수, 인접 전파, 감쇠 스케줄러, LLM 프로파일러)와 프론트엔드 표시
+컴포넌트를 모두 지웠습니다. **점수를 검증할 방법이 없었기 때문입니다** — 35종 프로파일 가중치,
+홉 감쇠 계수, 시간 감쇠 상수가 모두 근거 없이 정해진 값이고, "이 지역 위험도 73"이 맞는지 확인할
+정답이 없었습니다. 안전 관련 서비스에서 검증되지 않은 수치를 숫자와 지도로 보여주는 것은 없는
+것보다 나쁘다고 판단했습니다(사용자가 그 숫자로 판단할 수 있기 때문).
 
-이 서브시스템의 as-built 상세 동작은 `specs/002-risk-scoring/spec.md`·`plan.md` 참고.
+같이 사라진 것: `AlertClusteredEvent` 발행(`EventClusteringService`), `ClusteringEventListener`,
+`/api/v1/regions` 아래 위험도 엔드포인트 6개, 프론트 `AlertRiskSection`·`AlertRiskMap`.
+
+**DB 테이블은 남겨 두었습니다** (`region_risk_index`, `region_risk_daily`, `event_region_impact`,
+`region_risk_history`, `disaster_risk_profile`, `intensity_bracket`). 런타임 코드는 이 표들을 읽거나 쓰지 않지만,
+`EventClusteringBackfillTool` 의 백필 정리 절차는 `event_region_impact`·`region_risk_index` 를 수동 `TRUNCATE` 대상으로
+안내합니다(이벤트를 참조하는 외래 키에 막히지 않게 비우는 용도). 되돌릴 여지를 남기려고 드롭 마이그레이션을 추가하지 않았습니다. **`region_adjacency` 는 예외로
+계속 쓰입니다** — 클러스터링의 인접 시군구 병합이 이 표를 읽습니다.
+
+옛 명세는 `specs/002-risk-scoring/` 에 그대로 두었습니다(as-built 기록).
 
 ### 알림 (FCM)
 

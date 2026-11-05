@@ -34,8 +34,6 @@ public enum ErrorCode {
 
     LEGAL_DISTRICT_NOT_FOUND(404, "LD404", "존재하지 않는 지역 코드입니다."),
 
-    DEFAULT_RISK_PROFILE_MISSING(500, "RK500", "기본('기타') 위험도 프로파일 시드 데이터가 누락되었습니다."),
-
     OPEN_API_TOKEN_NOT_FOUND(404, "OA404", "OpenAPI Token을 찾을 수 없습니다."),
     INVALID_OPEN_API_TOKEN(401, "OA401", "OpenAPI Token이 유효하지 않습니다."),
 

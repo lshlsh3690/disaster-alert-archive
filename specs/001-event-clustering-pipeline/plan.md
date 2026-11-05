@@ -96,9 +96,6 @@ backend/src/main/java/com/disaster/alert/alertapi/
 │   └── tool/
 │       └── EventClusteringBackfillTool.java # backfill 프로파일 전용 재처리 도구
 ├── domain/disasteralert/                    # [스코프 밖, 의존] 원본 재난문자 엔티티/저장
-├── domain/risk/
-│   ├── event/AlertClusteredEvent.java       # [경계] 클러스터링→위험도 연결 도메인 이벤트
-│   └── listener/ClusteringEventListener.java # [스코프 밖] 위험도 계산 트리거 (별도 서브시스템)
 └── domain/legaldistrict/                    # [스코프 밖, 의존] 법정동 코드/인접(region_adjacency) 마스터
 
 backend/src/main/resources/

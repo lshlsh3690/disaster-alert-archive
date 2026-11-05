@@ -17,7 +17,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import org.springframework.ai.embedding.EmbeddingModel;
-import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.LocalDateTime;
@@ -41,7 +40,6 @@ class EventClusteringServiceAlertKindTest {
     @Mock DisasterEventRepository disasterEventRepository;
     @Mock EventAlertMappingRepository eventAlertMappingRepository;
     @Mock AlertEmbeddingRepository alertEmbeddingRepository;
-    @Mock ApplicationEventPublisher eventPublisher;
     @Mock EventLLMDecisionService llmDecisionService;
     @Mock ClusteringTraceRepository clusteringTraceRepository;
 
@@ -50,7 +48,7 @@ class EventClusteringServiceAlertKindTest {
     @BeforeEach
     void setUp() {
         service = new EventClusteringService(embeddingModel, disasterAlertRepository, disasterEventRepository,
-                eventAlertMappingRepository, alertEmbeddingRepository, eventPublisher, llmDecisionService,
+                eventAlertMappingRepository, alertEmbeddingRepository, llmDecisionService,
                 clusteringTraceRepository);
         ReflectionTestUtils.setField(service, "similarityThreshold", 0.85);
         ReflectionTestUtils.setField(service, "candidateWindowHours", 168);
@@ -79,16 +77,16 @@ class EventClusteringServiceAlertKindTest {
         return alert;
     }
 
-    // 결정: LLM 이 비사건(ADVISORY)으로 분류한 알림은 이벤트·위험도 파이프라인에 들어가지 않는다.
+    // 결정: LLM 이 비사건(ADVISORY)으로 분류한 알림은 이벤트 파이프라인에 들어가지 않는다.
     // Red: 현재는 alertKind 를 안 보고 임베딩 -> 신규 이벤트 저장 -> 이벤트 발행까지 해서 never 검증이 실패한다.
     @Test
-    @DisplayName("ADVISORY 알림은 임베딩·이벤트 저장·매핑·발행을 하지 않는다")
+    @DisplayName("ADVISORY 알림은 임베딩·이벤트 저장·매핑을 하지 않는다")
     void advisoryAlertIsNotClustered() {
         rainAlert(AlertKind.ADVISORY);
 
         service.clusterNewAlert(1L);
 
-        verifyNoInteractions(embeddingModel, disasterEventRepository, eventAlertMappingRepository, eventPublisher);
+        verifyNoInteractions(embeddingModel, disasterEventRepository, eventAlertMappingRepository);
     }
 
     // 결정: 사건(INCIDENT)과 분류 실패·기존 알림(null)은 지금처럼 신규 이벤트를 만든다(폴백).

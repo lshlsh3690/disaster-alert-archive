@@ -20,7 +20,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import org.springframework.ai.embedding.EmbeddingModel;
-import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.LocalDateTime;
@@ -59,7 +58,6 @@ class EventClusteringServiceRegionalAdjacentTest {
     @Mock DisasterEventRepository disasterEventRepository;
     @Mock EventAlertMappingRepository eventAlertMappingRepository;
     @Mock AlertEmbeddingRepository alertEmbeddingRepository;
-    @Mock ApplicationEventPublisher eventPublisher;
     @Mock EventLLMDecisionService llmDecisionService;
     @Mock ClusteringTraceRepository clusteringTraceRepository;
 
@@ -69,7 +67,7 @@ class EventClusteringServiceRegionalAdjacentTest {
     @BeforeEach
     void setUp() {
         service = new EventClusteringService(embeddingModel, disasterAlertRepository, disasterEventRepository,
-                eventAlertMappingRepository, alertEmbeddingRepository, eventPublisher, llmDecisionService,
+                eventAlertMappingRepository, alertEmbeddingRepository, llmDecisionService,
                 clusteringTraceRepository);
         ReflectionTestUtils.setField(service, "similarityThreshold", 0.85);
         ReflectionTestUtils.setField(service, "candidateWindowHours", 168);

@@ -17,7 +17,7 @@
 |---|---|---|---|
 | `/alerts` | `app/alerts/page.tsx` | 검색/필터 + 페이지네이션 목록 + 폴리곤 지도 + 통계 요약 | `useSearchCombinedAlerts`, `useSigungu`, `useSidoStats`, `useAlertStats`, `useSigunguStats` |
 | `/alerts/new` | `app/alerts/new/page.tsx` | 사용자 제보 작성 폼 (주소 검색 모달 포함) | `useCreateUserAlert` |
-| `/alerts/:id` | `app/alerts/[id]/page.tsx` | 알림 상세 — 공식/사용자 제보, 위험도 섹션, 무한스크롤 댓글 | `useAlert`/`useUserAlert`, `useComments`, `useInfiniteComments` |
+| `/alerts/:id` | `app/alerts/[id]/page.tsx` | 알림 상세 — 공식/사용자 제보, 무한스크롤 댓글 (위험도 섹션은 2026-11-05 삭제) | `useAlert`/`useUserAlert`, `useComments`, `useInfiniteComments` |
 | `/alerts/:id/edit` | `app/alerts/[id]/edit/page.tsx` | 사용자 제보 수정 폼 | `useUserAlert`, `useUpdateUserAlert` |
 | `/alerts/map` | `app/alerts/map/page.tsx` | **미구현 스텁** — 정적 회색 박스만 존재 | — |
 
@@ -76,7 +76,7 @@
 ### 2.1 alerts/
 | 컴포넌트 | Props | 사용처 |
 |---|---|---|
-| `AlertRiskSection` | `{ alertId, alertCreatedAt? }` | `alerts/[id]` — 위험도 분석 패널, `AlertRiskMap` 동적 임포트(`ssr:false`) |
+| ~~`AlertRiskSection`~~ (2026-11-05 삭제) | `{ alertId, alertCreatedAt? }` | `alerts/[id]` — 위험도 분석 패널, `AlertRiskMap` 동적 임포트(`ssr:false`) |
 | `ReportButton` | 없음 | `alerts` — 미로그인 시 `/login`, 로그인 시 `/alerts/new`로 이동 |
 
 ### 2.2 form/ — react-hook-form 필드 컴포넌트
@@ -99,7 +99,7 @@
 ### 2.4 map/
 | 컴포넌트 | Props | 사용처 | 비고 |
 |---|---|---|---|
-| `AlertRiskMap` | `{ impacts, mapHeight? }` | `AlertRiskSection` | 이벤트 지역 영향도 히트맵 |
+| ~~`AlertRiskMap`~~ (2026-11-05 삭제) | `{ impacts, mapHeight? }` | `AlertRiskSection` | 이벤트 지역 영향도 히트맵 |
 | `KoreaMap25D` | `{ height?, todayOnly?, params?, countLabel?, onRegionSelect?, compact?, onStatusChange? }` | 홈(`/`), `/alerts` | 자체 SVG 2.5D 지도 — 시도/시군구 보기, 시도→시군구→읍면동 드릴다운(법정동 경계 `public/map/**`). `/alerts` 에서는 `params`로 필터 건수를 세고 `onRegionSelect`로 목록 필터를 바꾼다 |
 
 ### 2.5 notification/

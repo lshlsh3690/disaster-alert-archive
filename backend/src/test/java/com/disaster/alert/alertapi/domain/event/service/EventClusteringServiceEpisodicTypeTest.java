@@ -10,7 +10,6 @@ import com.disaster.alert.alertapi.domain.event.repository.AlertEmbeddingReposit
 import com.disaster.alert.alertapi.domain.event.repository.ClusteringTraceRepository;
 import com.disaster.alert.alertapi.domain.event.repository.DisasterEventRepository;
 import com.disaster.alert.alertapi.domain.event.repository.EventAlertMappingRepository;
-import com.disaster.alert.alertapi.domain.risk.event.AlertClusteredEvent;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -24,7 +23,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import org.springframework.ai.embedding.EmbeddingModel;
-import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.LocalDateTime;
@@ -66,7 +64,6 @@ class EventClusteringServiceEpisodicTypeTest {
     @Mock DisasterEventRepository disasterEventRepository;
     @Mock EventAlertMappingRepository eventAlertMappingRepository;
     @Mock AlertEmbeddingRepository alertEmbeddingRepository;
-    @Mock ApplicationEventPublisher eventPublisher;
     @Mock EventLLMDecisionService llmDecisionService;
     @Mock ClusteringTraceRepository clusteringTraceRepository;
 
@@ -76,7 +73,7 @@ class EventClusteringServiceEpisodicTypeTest {
     @BeforeEach
     void setUp() {
         service = new EventClusteringService(embeddingModel, disasterAlertRepository, disasterEventRepository,
-                eventAlertMappingRepository, alertEmbeddingRepository, eventPublisher, llmDecisionService,
+                eventAlertMappingRepository, alertEmbeddingRepository, llmDecisionService,
                 clusteringTraceRepository);
         ReflectionTestUtils.setField(service, "similarityThreshold", 0.85);
         ReflectionTestUtils.setField(service, "candidateWindowHours", 168);
@@ -147,12 +144,11 @@ class EventClusteringServiceEpisodicTypeTest {
         assertThat(mapping.getValue().getMergeMethod()).isEqualTo(MergeMethod.REGIONAL_TYPE);
         assertThat(mapping.getValue().getSequenceNo()).isEqualTo(4);
         verify(disasterEventRepository).incrementOnMerge(eventId, now);
-        verify(eventPublisher).publishEvent(new AlertClusteredEvent(eventId, 1L));
         verify(disasterEventRepository, never()).save(any(DisasterEvent.class));
     }
 
     @Test
-    @DisplayName("1) 폭염 단일 시군구: 같은 유형+시군구 이벤트가 있으면 임베딩 없이 REGIONAL_TYPE 머지 + incrementOnMerge + 이벤트 발행")
+    @DisplayName("1) 폭염 단일 시군구: 같은 유형+시군구 이벤트가 있으면 임베딩 없이 REGIONAL_TYPE 머지 + incrementOnMerge")
     void heat_mergesIntoExistingEvent() {
         alert("폭염", HEAT_WARNING, REGION);
         givenMergeTarget();
@@ -164,7 +160,7 @@ class EventClusteringServiceEpisodicTypeTest {
     }
 
     @Test
-    @DisplayName("2) 대상이 없으면 비안내 신규 이벤트 + SEED 매핑 + AlertClusteredEvent 발행, 임베딩 미호출")
+    @DisplayName("2) 대상이 없으면 비안내 신규 이벤트 + SEED 매핑, 임베딩 미호출")
     void heat_createsNewNonAdvisoryEventWhenNoTarget() {
         alert("폭염", HEAT_WARNING, REGION);
         givenNoMergeTarget();
@@ -181,7 +177,6 @@ class EventClusteringServiceEpisodicTypeTest {
         ArgumentCaptor<EventAlertMapping> mapping = ArgumentCaptor.forClass(EventAlertMapping.class);
         verify(eventAlertMappingRepository).save(mapping.capture());
         assertThat(mapping.getValue().getMergeMethod()).isEqualTo(MergeMethod.SEED);
-        verify(eventPublisher).publishEvent(new AlertClusteredEvent(900L, 1L));
     }
 
     @Test
@@ -299,7 +294,6 @@ class EventClusteringServiceEpisodicTypeTest {
         verify(eventAlertMappingRepository).save(mapping.capture());
         assertThat(mapping.getValue().getMergeMethod()).isEqualTo(MergeMethod.BROADCAST);
         verify(disasterEventRepository).incrementOnMerge(eventId, now);
-        verify(eventPublisher).publishEvent(new AlertClusteredEvent(eventId, 1L));
         verify(disasterEventRepository, never()).save(any(DisasterEvent.class));
     }
 

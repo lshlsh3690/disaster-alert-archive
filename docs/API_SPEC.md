@@ -116,7 +116,10 @@
 | GET | `/notification-preference` | 알림 수신 설정 조회 |
 | PUT | `/notification-preference` | 알림 수신 설정 변경 |
 
-### 2.9 위험도 (`/api/v1/regions`) — 전체 공개
+### 2.9 ~~위험도 (`/api/v1/regions`)~~ — 2026-11-05 삭제
+
+아래 6개 엔드포인트는 제거됐다. 점수를 검증할 수 없어 기능을 폐기했다(`CLAUDE.md` 참고). DB 테이블은 남아 있으며 런타임 코드는 읽거나 쓰지 않지만, `EventClusteringBackfillTool` 의 백필 정리 절차는 `event_region_impact`·`region_risk_index` 를 수동 `TRUNCATE` 대상으로 안내한다.
+
 | Method | Path | 설명 |
 |---|---|---|
 | GET | `/risk-map` | 전체 지역 위험도 지도 |
