@@ -22,7 +22,6 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.time.LocalTime;
@@ -61,10 +60,13 @@ public class EventQueryService {
     /**
      * 이벤트 목록 (유형/지역/기간/키워드 + active 필터). 정렬은 last_alert_at DESC 고정.
      *
+     * <p><b>메서드 레벨 {@code @Transactional}을 붙이지 않는다.</b> 안에서 부르는 lazy 번역의 저장이
+     * 이 트랜잭션에 합류하면 PK 충돌이 HTTP 500으로 터지고 요청 병합도 무력해진다 — 이유와 전례는
+     * {@link EventTranslationService} 클래스 javadoc에 있다. 다시 붙이지 말 것.
+     *
      * @param req  검색 조건 ({@link EventSearchRequest}). 모든 필드 선택적(null=조건 스킵)
      * @param lang ko(기본)/en/ja/zh — 제목 번역
      */
-    @Transactional
     public Page<EventListResponse> list(EventSearchRequest req, Pageable pageable, String lang) {
         LocalDateTime now = LocalDateTime.now(KST);
         Pageable pageOnly = PageRequest.of(pageable.getPageNumber(), pageable.getPageSize());
@@ -98,9 +100,17 @@ public class EventQueryService {
     /**
      * 이벤트 상세 + 타임라인.
      *
+     * <p><b>{@link #list}와 같은 이유로 메서드 레벨 {@code @Transactional}을 붙이지 않는다</b>
+     * ({@link EventTranslationService} 클래스 javadoc). 이 경로가 특히 위험하다 — 제목 번역을 저장한
+     * 뒤 타임라인 알림 N건을 또 번역하므로, 하나의 트랜잭션이면 저장부터 커밋까지가 수 초에서 수십 초로
+     * 벌어지고 그 구간 내내 중복 호출·500 위험이 열려 있다.
+     *
+     * <p>타임라인은 프로젝션 쿼리({@code findTimelineRows})로 읽는다. 여기서 다루는
+     * {@code DisasterAlertTranslation}에는 LAZY {@code disasterAlert}가 있으므로 그 연관 필드에는
+     * 접근하지 말 것 — 트랜잭션이 없어 {@code LazyInitializationException}이 난다.
+     *
      * @param lang ko(기본)/en/ja/zh — 제목 + 타임라인 알림 번역
      */
-    @Transactional
     public EventDetailResponse detail(Long id, String lang) {
         LocalDateTime now = LocalDateTime.now(KST);
         DisasterEvent event = disasterEventRepository.findById(id)

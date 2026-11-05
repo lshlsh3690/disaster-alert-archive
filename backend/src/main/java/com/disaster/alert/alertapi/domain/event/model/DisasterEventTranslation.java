@@ -29,4 +29,13 @@ public class DisasterEventTranslation {
 
     @Column(name = "translated_at", nullable = false)
     private LocalDateTime translatedAt;
+
+    /** 새 번역 캐시 행 — translatedAt 은 저장 시각(now)으로 채운다. */
+    public static DisasterEventTranslation of(Long eventId, String languageCode, String translatedTitle) {
+        return DisasterEventTranslation.builder()
+                .id(new DisasterEventTranslationId(eventId, languageCode))
+                .translatedTitle(translatedTitle)
+                .translatedAt(LocalDateTime.now())
+                .build();
+    }
 }

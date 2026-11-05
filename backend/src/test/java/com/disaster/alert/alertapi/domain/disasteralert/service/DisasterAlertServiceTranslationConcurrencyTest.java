@@ -22,6 +22,8 @@ import java.util.concurrent.TimeUnit;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
@@ -112,6 +114,59 @@ class DisasterAlertServiceTranslationConcurrencyTest {
                 f1.get(10, TimeUnit.SECONDS);
                 f2.get(10, TimeUnit.SECONDS);
             });
+        } finally {
+            pool.shutdown();
+        }
+    }
+
+    /**
+     * 위 테스트는 "500이 안 난다"(저장 충돌 방지)만 본다. 이 테스트는 그보다 한 단계 더 — 저장
+     * 충돌이 없더라도 외부 번역 API(OpenAI) 자체가 같은 (alertId, language) 키로 중복 호출되는
+     * 낭비(비용·지연)가 있는지를 본다. 현재 {@code TranslationService.ensureTranslated} 는
+     * check-then-act 구조라, 두 스레드가 거의 동시에 "번역 없음"을 확인하면 각자
+     * {@code translationClient.translate(...)} 를 호출한다 — 요청 병합(single-flight)이 없는
+     * 상태.
+     */
+    @Test
+    void 같은_알림을_같은_언어로_동시_조회하면_번역_API는_한_번만_호출된다() throws Exception {
+        // given: 번역 캐시가 비어 있고 disasterType 이 없는(null) 새 알림. disasterType 이 없으면
+        // translateAndSaveInternal 내부에서 유형 번역은 스킵되므로, message 번역 호출 횟수만으로
+        // 중복 호출 여부를 명확히 검증할 수 있다(유형까지 섞이면 "몇 번이 정상인지"가 모호해짐).
+        DisasterAlert alert = disasterAlertRepository.saveAndFlush(
+                DisasterAlert.builder()
+                        .sn(System.nanoTime()) // sn UNIQUE 제약 회피용 (테스트마다 유일)
+                        .message("테스트 - 번역 요청 병합 재현용 재난문자 본문")
+                        .build()
+        );
+        alertId = alert.getId();
+
+        // 실제 OpenAI 호출을 목으로 대체 + 지연을 줘서, 두 스레드가 모두 "번역 없음"을 확인한
+        // 뒤 translate 를 부르는 좁은 틈에 실제로 겹치도록 한다(기존 테스트와 동일한 재현 조건).
+        when(translationClient.translate(anyString(), eq("JA"))).thenAnswer(invocation -> {
+            Thread.sleep(300);
+            return "テスト翻訳";
+        });
+
+        ExecutorService pool = Executors.newFixedThreadPool(2);
+        CountDownLatch start = new CountDownLatch(1);
+
+        Callable<DisasterAlertDetailDto> task = () -> {
+            start.await();
+            return disasterAlertService.getAlertDetail(alertId, "ja");
+        };
+
+        Future<DisasterAlertDetailDto> f1 = pool.submit(task);
+        Future<DisasterAlertDetailDto> f2 = pool.submit(task);
+        start.countDown(); // 동시 출발
+
+        try {
+            f1.get(10, TimeUnit.SECONDS);
+            f2.get(10, TimeUnit.SECONDS);
+
+            // then: 두 호출이 같은 (alertId, JA) 키를 동시에 조회했더라도, 외부 번역 API 는
+            // 정확히 한 번만 불려야 한다. 현재 구현(요청 병합 없음)에서는 두 스레드 모두 캐시
+            // 미스를 확인하고 각자 translate 를 호출하므로 2회가 되어 이 단언이 실패한다(Red).
+            verify(translationClient, times(1)).translate(anyString(), eq("JA"));
         } finally {
             pool.shutdown();
         }

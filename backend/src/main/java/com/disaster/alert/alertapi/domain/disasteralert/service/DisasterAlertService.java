@@ -538,8 +538,16 @@ public class DisasterAlertService {
      *   <li>한국어 요청 ("ko"/null): 번역 필드 모두 null</li>
      *   <li>지원 언어 요청 ("en"/"ja"/"zh"): 캐시 없으면 번역 API 호출 → 저장 후 응답</li>
      * </ul>
+     *
+     * <p>메서드 레벨 {@code @Transactional}을 떼어냈다 — 번역 캐시 미스 시 안의
+     * {@code translationService.ensureTranslated(...)}가 OpenAI를 호출하는데(네트워크, 수백
+     * ms~수 초), 이 메서드 전체가 트랜잭션이면 그 호출 내내 DB 커넥션을 쥐고 있게 된다. 여기서
+     * 쓰는 조회들({@code findById}, {@code legalDistrictNamesByAlertId},
+     * {@code findEventIdByAlertId} 등)은 모두 Spring Data가 호출마다 자체 트랜잭션을 열어주므로
+     * 원자성 문제는 없다. DTO({@link DisasterAlertDetailDto})는 {@code alert}의 기본 컬럼
+     * getter만 읽으므로(지연 로딩 연관관계 접근 없음) 트랜잭션 밖에서 변환해도
+     * LazyInitializationException이 나지 않는다.
      */
-    @Transactional
     public DisasterAlertDetailDto getAlertDetail(Long id, String lang) {
         DisasterAlert alert = disasterAlertRepository.findById(id)
                 .orElseThrow(() -> new CustomException(ErrorCode.DISASTER_ALERT_NOT_FOUND, "id=" + id));
@@ -582,9 +590,13 @@ public class DisasterAlertService {
     /**
      * 최신 재난문자 N건을 조회합니다.
      *
+     * <p>{@link #getAlertDetail}과 같은 이유로 메서드 레벨 {@code @Transactional}을 떼어냈다 —
+     * {@code applyTranslationsToLatest}가 부르는 lazy 배치 번역이 OpenAI를 여러 번 호출할 수
+     * 있는데, 그 전부를 하나의 DB 트랜잭션 안에 묶어 두면 호출 수만큼 커넥션을 더 오래 쥐게
+     * 된다. {@code latestAlerts}는 DTO 프로젝션 쿼리라 지연 로딩 연관관계가 없다.
+     *
      * @param lang 응답 언어 ("ko"/null = 한국어, "en"/"ja"/"zh" = 번역본)
      */
-    @Transactional
     public List<LatestAlertResponse> getLatestAlert(int limit, String lang) {
         List<LatestAlertResponse> alerts = disasterAlertRepository.latestAlerts(PageRequest.of(0, limit));
 
