@@ -27,7 +27,7 @@
 //
 // 실행
 //   k6 run backend/loadtest/k6/translation-coalescing.js
-//   k6 run --env ALERT_ID=123 --env VUS=10 --env LANG=en backend/loadtest/k6/translation-coalescing.js
+//   k6 run --env ALERT_ID=123 --env VUS=10 --env TARGET_LANG=en backend/loadtest/k6/translation-coalescing.js
 
 import http from 'k6/http';
 import { check } from 'k6';
@@ -36,7 +36,11 @@ import { check } from 'k6';
 const BASE = __ENV.BASE || 'http://localhost:8080';
 const MOCK = __ENV.MOCK || 'http://localhost:4000';
 const ALERT_ID = __ENV.ALERT_ID || '700000001';
-const LANG = __ENV.LANG || 'ja';
+// 이름이 TARGET_LANG 인 이유: k6 의 __ENV 는 셸 환경을 그대로 물려받는데, 많은 환경에서 `LANG` 은
+// 로케일(ko_KR.UTF-8 등)로 이미 설정돼 있다. `__ENV.LANG` 을 쓰면 그 값이 lang 파라미터로 들어가
+// 지원 언어가 아니게 되고, 번역 경로를 아예 타지 않아 **호출 0회**가 나온다. 병합이 완벽히
+// 동작한 것처럼 보이는 조용한 오측정이라 이름을 분리했다.
+const LANG = __ENV.TARGET_LANG || 'ja';
 const VUS = Number(__ENV.VUS || 10);
 
 // "동시에 출발하는 N개 요청"을 만들기 위해 per-vu-iterations 로 VU 마다 정확히 1번만 돌게 한다.
