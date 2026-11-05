@@ -78,7 +78,6 @@ docker-compose와 동일한 구성의 DB가 떠 있어야 한다.
 domain/                 # bounded context 별 패키지, 각각 controller → service → repository
   disasteralert/        # 재난문자 수집·조회·통계 (+ tool/DisasterAlertRegionBackfillTool)
   event/                # 이벤트 클러스터링 (model/ 에 순수 판정 로직, service/ 에 클러스터링·LLM)
-  risk/                 # 지역 위험도 계산·감쇠·인접 확산
   weather/              # 기상 관측 수집 및 일별 집계
   notification/         # FCM 발송 대상 산출 및 전송
   member/ auth/         # 회원, JWT + OAuth2(Google·Kakao·Naver 자체 구현)
@@ -99,11 +98,11 @@ api/                    # DisasterOpenApiClient (공공데이터포털)
 ```
 
 도메인별 스케줄러는 각 도메인 아래에 있다 — `weather/scheduler/WeatherCollectScheduler`,
-`WeatherDailySummaryScheduler`, `risk/scheduler/RiskDecayScheduler`. "왜 X가 실행되지 않았는지"
+`WeatherDailySummaryScheduler`. "왜 X가 실행되지 않았는지"
 디버깅할 때 가장 먼저 볼 곳이다.
 
 과거 데이터를 현재 로직으로 재처리하는 수동 도구는 `*/tool/*BackfillTool` 에 있다
-(`EventClusteringBackfillTool`, `RiskBackfillTool`, `DisasterAlertRegionBackfillTool`).
+(`EventClusteringBackfillTool`, `DisasterAlertRegionBackfillTool`).
 
 ---
 
@@ -161,7 +160,7 @@ as-built 상세 동작(파일:라인 근거 포함)은 레포 루트 `specs/` �
 | 명세 | 대상 |
 |------|------|
 | `specs/001-event-clustering-pipeline/` | 이벤트 클러스터링 (37개 기능 요구사항) |
-| `specs/002-risk-scoring/` | 위험도 계산·감쇠·확산 |
+| `specs/002-risk-scoring/` | ~~위험도 계산·감쇠·확산~~ — 2026-11-05 기능 삭제, 기록용 |
 | `specs/003-fcm-notification/` | FCM 알림 |
 | `specs/004-legal-district-matching/` | 법정동 기반 지역 매칭 |
 | `specs/005-translation-pipeline/` | 번역 파이프라인 |

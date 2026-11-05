@@ -29,7 +29,7 @@ AI 기반 이벤트 클러스터링으로 중복 알림을 제거하고, 기상 
 | 맞춤 푸시 알림 | 관심 지역 설정 → Firebase FCM 실시간 알림 (게스트 포함) |
 | 이벤트 클러스터링 | 임베딩(text-embedding-3-small) + GPT-4o-mini로 중복 알림 병합 |
 | 재난 통계 대시보드 | 지역별·유형별·기간별 통계 및 기상 상관 분석 시각화 |
-| 위험도 분석 | 지역별 위험도 지수 산출 (유형 가중치 × 강도 × 시간 감쇠) 및 지도 표시 |
+| ~~위험도 분석~~ | **2026-11-05 삭제** — 점수를 검증할 방법이 없어 폐기했다(가중치·감쇠 상수가 근거 없는 값이고 정답이 없음). 안전 서비스에서 검증되지 않은 수치를 보여주는 것이 없는 것보다 나쁘다고 판단. |
 | 날씨 연계 | 기상청 관측 데이터 수집 및 재난 발령 시점 날씨 조회 |
 | 다국어 지원 | OpenAI 기반 재난 문자·이벤트 제목 번역 (원본 KO → EN/JA/ZH). 법정동 명칭은 별도 시드 테이블 조회(EN/JA/ZH) |
 | 소셜 로그인 | Google / Naver / Kakao OAuth2 |
@@ -67,7 +67,7 @@ AI 기반 이벤트 클러스터링으로 중복 알림을 제거하고, 기상 
 | DB 마이그레이션 | Flyway |
 | 인증/인가 | Spring Security + JWT + OAuth2 (Google·Naver·Kakao) |
 | 캐시 | Redis |
-| AI | Spring AI 1.0.0 — `gpt-4o-mini` (이벤트/위험도 판정), `text-embedding-3-small` 1536차원 (클러스터링) |
+| AI | Spring AI 1.0.0 — `gpt-4o-mini` (이벤트 병합 판정), `text-embedding-3-small` 1536차원 (클러스터링) |
 | 번역 | OpenAI `gpt-4o` (KO → EN/JA/ZH) — 번역만 상위 모델을 per-call 오버라이드. 대상 언어는 법정동 시드 언어와 일치 |
 | 푸시 알림 | Firebase Admin SDK (FCM) |
 | 로깅 | LogTrace 스타일 AOP 호출 추적 (`global/logtrace`) |
@@ -89,7 +89,7 @@ AI 기반 이벤트 클러스터링으로 중복 알림을 제거하고, 기상 
 |-----|------|
 | 행정안전부 재난문자 API | 재난 안전 문자 수집 |
 | 기상청 기상 API | 관측·요약 데이터 수집 |
-| OpenAI API | 임베딩(이벤트 클러스터링), LLM 판정(이벤트 병합·cross-region·위험도 프로파일), 재난 문자 다국어 번역 |
+| OpenAI API | 임베딩(이벤트 클러스터링), LLM 판정(이벤트 병합·동물 경로), 재난 문자 다국어 번역 |
 | Firebase Cloud Messaging | 웹 푸시 알림 |
 | OAuth (Google·Naver·Kakao) | 소셜 로그인 |
 
@@ -189,7 +189,6 @@ disaster-alert-archive/
 │       │   ├── member/       # 회원, 관심 지역
 │       │   ├── disasteralert/# 재난 문자 수집·조회·통계
 │       │   ├── event/        # 이벤트 클러스터링 (AI)
-│       │   ├── risk/         # 위험도 분석·감쇠·인접 지역 확산
 │       │   ├── weather/      # 기상 데이터 수집·일별 집계
 │       │   ├── notification/ # FCM 알림
 │       │   ├── community/    # 커뮤니티 게시판 (공지·자유)
@@ -312,7 +311,7 @@ DB에 붙는 통합 테스트는 `@IntegrationTest`(= `@SpringBootTest` + `test`
 | 문서 | 내용 |
 |------|------|
 | [`specs/001-event-clustering-pipeline/`](specs/001-event-clustering-pipeline/) | 이벤트 클러스터링 파이프라인 as-built 명세 |
-| [`specs/002-risk-scoring/`](specs/002-risk-scoring/) | 지역 위험도 계산·감쇠·확산 |
+| [`specs/002-risk-scoring/`](specs/002-risk-scoring/) | ~~지역 위험도 계산·감쇠·확산~~ — 2026-11-05 기능 삭제. 당시 동작의 기록으로만 남김 |
 | [`specs/003-fcm-notification/`](specs/003-fcm-notification/) | FCM 푸시 알림 |
 | [`specs/004-legal-district-matching/`](specs/004-legal-district-matching/) | 법정동 코드 기반 지역 매칭 |
 | [`specs/005-translation-pipeline/`](specs/005-translation-pipeline/) | 다국어 번역 파이프라인 |

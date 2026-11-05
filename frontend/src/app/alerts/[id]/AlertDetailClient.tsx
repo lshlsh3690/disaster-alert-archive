@@ -82,8 +82,8 @@ export default function AlertDetailClient() {
     <main className="bg-[var(--canvas)] min-h-[calc(100vh-48px)]">
       <div className="mx-auto max-w-6xl space-y-4 px-4 py-8 sm:px-6">
         <h1 className="text-xl font-bold tracking-tight text-[var(--ink)]">📨 {t("alertDetail.title")}</h1>
-        {/* 좌측 문자 상세(가변) / 우측 위험도 분석(340px 고정) — /alerts 목록 페이지와 동일 비율 */}
-        <div className={`grid grid-cols-1 gap-4 sm:gap-6 items-start ${!isUser ? "xl:grid-cols-[minmax(0,1fr)_340px]" : ""}`}>
+        {/* 단일 열 — 우측 340px 위험도 분석 칸은 2026-11-05 기능 삭제와 함께 없앴다 */}
+        <div className="grid grid-cols-1 gap-4 sm:gap-6 items-start">
         <div className="space-y-3 rounded-[var(--radius-panel-card)] border border-[var(--line)] bg-[var(--surface)] p-5 shadow-[0_10px_30px_rgba(28,39,60,0.04)]">
           <div className="flex flex-wrap items-center gap-2">
             {data.disasterType && (
@@ -155,7 +155,6 @@ export default function AlertDetailClient() {
             </div>
           )}
         </div>
-        {/* 위험도 분석 (공식 재난문자만 — 이벤트 클러스터링 기반) */}
         </div>
         <section className="space-y-3 rounded-[var(--radius-panel-card)] border border-[var(--line)] bg-[var(--surface)] p-5 shadow-[0_10px_30px_rgba(28,39,60,0.04)]">
           <h2 className="text-lg font-semibold text-[var(--ink)]">{t("alertDetail.comments")}</h2>

@@ -20,7 +20,7 @@ import java.util.Map;
  * ({@code disaster_alert.message})만 임베딩하므로, 번역 엔진 교체가 벡터·코사인 유사도·이벤트
  * 클러스터링·위험도 점수에 영향을 주지 않는다.
  *
- * <p>{@code ChatClient.Builder} 를 주입받아 빌드하는 방식은 {@code LlmRiskProfiler} 와 동일하다
+ * <p>{@code ChatClient.Builder} 를 주입받아 빌드하는 방식은 {@code LlmRiskProfiler(2026-11-05 삭제됨)} 와 동일하다
  * (Spring AI 1.0 은 {@code ChatClient} 빈을 자동 생성하지 않는다).
  */
 @Slf4j

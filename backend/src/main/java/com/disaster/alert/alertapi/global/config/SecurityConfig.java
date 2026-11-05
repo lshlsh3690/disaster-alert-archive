@@ -52,7 +52,6 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/api/v1/community/**").permitAll()
                         .requestMatchers("/api/v1/alerts/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/v1/events/**").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/api/v1/regions/**").permitAll()
                         .requestMatchers("/api/v1/districts/**").permitAll()
                         // /api/v1/admin/** 은 인증만 여기서 요구하고(anyRequest().authenticated()),
                         // ADMIN 권한 검증은 각 컨트롤러의 @PreAuthorize("hasRole('ADMIN')")에서 수행.

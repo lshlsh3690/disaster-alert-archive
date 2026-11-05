@@ -148,7 +148,7 @@ class EventClusteringServiceEpisodicTypeTest {
     }
 
     @Test
-    @DisplayName("1) 폭염 단일 시군구: 같은 유형+시군구 이벤트가 있으면 임베딩 없이 REGIONAL_TYPE 머지 + incrementOnMerge + 이벤트 발행")
+    @DisplayName("1) 폭염 단일 시군구: 같은 유형+시군구 이벤트가 있으면 임베딩 없이 REGIONAL_TYPE 머지 + incrementOnMerge")
     void heat_mergesIntoExistingEvent() {
         alert("폭염", HEAT_WARNING, REGION);
         givenMergeTarget();

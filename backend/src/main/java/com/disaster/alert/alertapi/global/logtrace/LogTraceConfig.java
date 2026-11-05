@@ -11,7 +11,7 @@ import org.springframework.context.annotation.Configuration;
 // 프록시라도 execution이 인터페이스 선언 메서드 기준으로 정상 매칭된다.
 //
 // 포인트컷 자체엔 도메인 제외를 안 건다 — 처음엔 !within(...), 그다음 !cflow(...)로
-// risk/클러스터링/auth 도메인을 걸러보려 했는데:
+// 클러스터링/auth 도메인을 걸러보려 했는데:
 //   1) !within(SomeService)는 "그 메서드 자신이 그 클래스에 선언돼 있는지"만 보기 때문에,
 //      그 안에서 다른 패키지의 Repository를 호출하면(예: AuthService.reissue()가
 //      memberRepository.findByEmail() 호출) 그 Repository 호출은 별도 join point라

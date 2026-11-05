@@ -77,10 +77,10 @@ class EventClusteringServiceAlertKindTest {
         return alert;
     }
 
-    // 결정: LLM 이 비사건(ADVISORY)으로 분류한 알림은 이벤트·위험도 파이프라인에 들어가지 않는다.
+    // 결정: LLM 이 비사건(ADVISORY)으로 분류한 알림은 이벤트 파이프라인에 들어가지 않는다.
     // Red: 현재는 alertKind 를 안 보고 임베딩 -> 신규 이벤트 저장 -> 이벤트 발행까지 해서 never 검증이 실패한다.
     @Test
-    @DisplayName("ADVISORY 알림은 임베딩·이벤트 저장·매핑·발행을 하지 않는다")
+    @DisplayName("ADVISORY 알림은 임베딩·이벤트 저장·매핑을 하지 않는다")
     void advisoryAlertIsNotClustered() {
         rainAlert(AlertKind.ADVISORY);
 

@@ -196,12 +196,12 @@ class EventClusteringServiceTraceTest {
         assertThat(trace.getEventId()).isNull();
     }
 
-    // 결정: 기록 저장이 실패해도 수집은 막지 않는다 - 클러스터링 결과(매핑 저장·위험도 이벤트 발행)는 그대로 나가야 한다.
+    // 결정: 기록 저장이 실패해도 수집은 막지 않는다 - 클러스터링 결과(매핑 저장)는 그대로 나가야 한다.
     //       기록을 저장하다 터진 예외가 클러스터링 쪽으로 번지면 알림이 이벤트에 배정되지 못한다.
     // Red: 서비스가 upsert 를 아직 호출하지 않아 마지막 verify(upsert) 에서 "Wanted but not invoked" 로 실패한다
-    //      (앞의 예외 없음·매핑 저장·이벤트 발행 단언은 지금도 통과한다).
+    //      (앞의 예외 없음·매핑 저장 단언은 지금도 통과한다).
     @Test
-    @DisplayName("기록 저장이 예외를 던져도 clusterNewAlert 는 예외 없이 끝나고 매핑 저장·이벤트 발행은 그대로 일어난다")
+    @DisplayName("기록 저장이 예외를 던져도 clusterNewAlert 는 예외 없이 끝나고 매핑 저장은 그대로 일어난다")
     void traceSaveFailure_doesNotAffectClusteringResult() {
         alert("산불", WILDFIRE);
         when(disasterEventRepository.findRegionalTypeMergeTarget(anyString(), any(String[].class), any(LocalDateTime.class)))

@@ -56,7 +56,7 @@ docker compose -f docker-compose.dev.yml up postgres redis   # Postgres(pgvector
 - `global/` — 공통 관심사: `security/jwt`(JWT 인증 필터/프로바이더), `exception`(`GlobalExceptionHandler` + `CustomException`/`ErrorCode` 패턴 — 항상 ErrorCode를 통해 예외를 던지고 임의로 에러 바디를 만들지 말 것), `dto`(모든 컨트롤러가 사용하는 `ApiResponse`/`ApiErrorResponse` 응답 포맷), `translation`(OpenAI 기반 — DeepL Free는 계정당 평생 누적 쿼터라 예비 키까지 소진돼 2026-08-09 교체), `logtrace`(김영한 LogTrace 스타일 AOP 호출 로깅 — controller/service 계층에 트랜잭션 ID + 들여쓰기 로그 자동 부착), `service`(`EmailService`, `LegalDistrictCache`), `controller/AdminController`, `util/CookieUtil`, `redis`, `config`.
 - `scheduler/DisasterFetchScheduler` 및 도메인별 `*/scheduler/` 패키지(`weather/scheduler/WeatherCollectScheduler`·`WeatherDailySummaryScheduler`) — `@Scheduled` 작업들. 백그라운드 파이프라인의 진입점이므로 "왜 X가 실행되지 않았는지" 디버깅할 때 가장 먼저 확인할 곳입니다.
 - `api/DisasterOpenApiClient.java` — 재난문자 공공데이터포털 API 클라이언트.
-- `*/tool/*BackfillTool` — 과거 데이터를 현재 로직으로 재처리하는 수동 실행 도구 (`EventClusteringBackfillTool`, `RiskBackfillTool`, `DisasterAlertRegionBackfillTool`).
+- `*/tool/*BackfillTool` — 과거 데이터를 현재 로직으로 재처리하는 수동 실행 도구 (`EventClusteringBackfillTool`, `DisasterAlertRegionBackfillTool`).
 
 **외부 에러 트래킹 서비스는 쓰지 않습니다** — 2026-08-12에 Sentry(`sentry-spring-boot-starter-jakarta` + `sentry-logback`)를 제거했습니다. 장애 인지 수단은 로그뿐이며, 자동 알림 경로가 없다는 뜻입니다. 따라서 **로그 레벨이 사실상 유일한 신호 구분자**입니다: 사람이 조치해야 하는 것만 `log.error`로 남기고, 정상 흐름에서 늘 발생하는 것(4xx 비즈니스 예외, 죽은 FCM 토큰 등)은 `warn` 이하로 둡니다. 이 구분이 무너지면 `error`가 노이즈에 묻혀 진짜 장애를 못 찾습니다 — `GlobalExceptionHandler`(5xx만 error), `ThreadLocalLogTrace`(전부 info), `FcmSendService.logDeadToken`(죽은 토큰은 warn)이 그 예입니다.
 
@@ -85,7 +85,7 @@ docker compose -f docker-compose.dev.yml up postgres redis   # Postgres(pgvector
 것보다 나쁘다고 판단했습니다(사용자가 그 숫자로 판단할 수 있기 때문).
 
 같이 사라진 것: `AlertClusteredEvent` 발행(`EventClusteringService`), `ClusteringEventListener`,
-`/api/v1/regions` 아래 위험도 엔드포인트 7개, 프론트 `AlertRiskSection`·`AlertRiskMap`.
+`/api/v1/regions` 아래 위험도 엔드포인트 6개, 프론트 `AlertRiskSection`·`AlertRiskMap`.
 
 **DB 테이블은 남겨 두었습니다** (`region_risk_index`, `region_risk_daily`, `event_region_impact`,
 `region_risk_history`, `disaster_risk_profile`, `intensity_bracket`). 읽고 쓰는 코드가 없는 상태이며,
