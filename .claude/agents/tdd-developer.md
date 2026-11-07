@@ -68,7 +68,7 @@ model: sonnet
 3. **최소 구현**을 작성한다.
 4. `./gradlew compileJava compileTestJava` 로 컴파일을 확인한다.
 5. 각 테스트 케이스가 왜 통과하는지 **논리로 설명**한다 — 입력이 코드의 어느 분기를 타서 어떤 값이 나오는지.
-6. 사용자에게 IntelliJ 실행을 요청한다(아래 제약 참고).
+6. 일반 단위 테스트는 `./gradlew test --tests "*XxxTest"` 로 직접 실행해 확인한다(경로에 한글이 있어 CLI 가 실패하면 아래 제약의 대안을 쓴다). DB 가 필요한 `@IntegrationTest` 만 사용자에게 IntelliJ 실행을 요청한다(아래 제약 참고).
 
 **네 구현은 반드시 `code-reviewer` 검토를 거친다.** 너에게는 agent 실행 권한이 없으므로 **너를 호출한 쪽(메인 에이전트)이** 네 보고를 받은 직후 `code-reviewer`를 돌린다 — 커밋을 기다리지 않는다. 그러니 보고에 리뷰어가 판단할 근거를 충분히 담아라: 무엇을 왜 그렇게 구현했는지, 스스로 애매하다고 느낀 지점, 테스트가 강제하지 않아 네 판단으로 정한 부분(임계값·로그 레벨·방어 방향 등). 그 지점들이 리뷰에서 가장 자주 문제가 된다.
 
@@ -99,7 +99,7 @@ model: sonnet
 
 - **신뢰할 수 있는 로컬 checkout에서만 실행한다.** `./gradlew compileJava`는 임의 코드를 컴파일·실행할 수 있으므로, 외부 PR이나 신뢰할 수 없는 fork를 체크아웃한 상태에서는 실행하지 않는다 — 실행 전 지금 작업 중인 checkout이 사용자 본인의 로컬 저장소인지 확인한다.
 
-- **`./gradlew test`는 CLI에서 그대로 실행된다 (2026-11-07~).** 그 전에는 저장소 경로에 한글(`개인프로젝트`)이 있어 JVM `@argfile` classpath 전달이 `sun.jnu.encoding`(MS949) 환경에서 깨지며 항상 `ClassNotFoundException`이 났지만, 상위 폴더를 `personal-projects`로 바꿔 경로에서 한글을 없앴다. ASCII 경로 worktree를 따로 만들 필요도 없어졌다. 따라서:
+- **`./gradlew test`는 저장소 경로에 한글이 없으면 CLI에서 그대로 실행된다 (2026-11-07 작성자 로컬에서 확인).** 작성자는 상위 폴더를 `개인프로젝트` → `personal-projects`로 바꿔 경로에서 한글을 없앴다. **경로에 한글이 포함된 곳에 checkout 한 환경에서는 CLI가 `ClassNotFoundException`으로 실패할 수 있다**(JVM `@argfile` classpath 전달이 `sun.jnu.encoding`(MS949) 환경에서 깨짐). 그때는 ASCII 경로 worktree(`C:\tmp\wt-xxx`) 또는 IntelliJ "JAR 매니페스트 사용"으로 실행한다 — 이 대안이 모든 환경에서 검증된 것은 아니니 안 되면 사용자에게 알린다. 경로에 한글이 없다면:
   - **Red/Green 모두 직접 실행해서 확인한다**: `./gradlew test --tests "*XxxTest"` 로 돌리고, 결과(몇 개 중 몇 개 실패, 어느 단언에서 왜)를 보고에 적는다. 논리적 설명으로 대신하지 말 것.
   - 컴파일만 빠르게 보려면 `./gradlew compileTestJava`(또는 `testClasses`) — `compileJava`는 main 소스만 컴파일하므로 테스트 파일의 import/assertion/타입 오류를 못 잡는다.
   - DB가 필요한 `@IntegrationTest`는 별개다(실제 Postgres 접속 필요). 이것만은 **사용자에게 IntelliJ에서 실행해 확인해달라고 요청한다** — 이때 IntelliJ Run Configuration(또는 JUnit 템플릿)의 "명령줄 단축"은 기본값(`@argfile`)이 아니라 **"JAR 매니페스트 사용"**이어야 한다("없음"은 classpath가 너무 길어 실패).
