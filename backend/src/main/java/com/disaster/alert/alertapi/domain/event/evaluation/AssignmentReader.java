@@ -34,9 +34,13 @@ public class AssignmentReader {
         }
     }
 
-    // 한 알림은 하나의 이벤트에만 속한다(uq_event_alert_mapping_alert) - 행이 없으면 미배정
+    // 한 알림은 하나의 이벤트에만 속한다(uq_event_alert_mapping_alert).
+    // disaster_alert 를 기준으로 LEFT JOIN 해 두 경우를 가른다: 알림 행이 없으면 0행(라벨 CSV 오류),
+    // 알림은 있고 매핑이 없으면 1행에 event_id=NULL(미배정).
     private static final String EVENT_ID_SQL =
-            "SELECT event_id FROM event_alert_mapping WHERE alert_id = ?";
+            "SELECT m.event_id FROM disaster_alert d "
+                    + "LEFT JOIN event_alert_mapping m ON m.alert_id = d.disaster_alert_id "
+                    + "WHERE d.disaster_alert_id = ?";
 
     // 거리는 DB 의 <=> (코사인 거리)로 계산해 1536차원 벡터를 앱으로 가져오지 않는다.
     // 어느 한쪽 embedding 이 NULL 이면 <=> 도 NULL 이다. 시군구는 법정동 코드 앞 5자리 일치 여부.
@@ -53,10 +57,18 @@ public class AssignmentReader {
 
     private final JdbcTemplate jdbcTemplate;
 
-    /** 알림이 속한 이벤트 id. 이벤트에 없으면 empty. */
+    /**
+     * 알림이 속한 이벤트 id. 알림은 있지만 이벤트에 배정되지 않았으면 empty.
+     * 알림 id 가 DB 에 없으면 라벨 CSV 와 DB 가 어긋난 것이므로 예외 - "미배정" 으로 오인해
+     * 두 비율의 분모에서 조용히 빠지면 과소병합율이 실제보다 낮게 나온다.
+     */
     public Optional<Long> findEventId(long alertId) {
-        List<Long> ids = jdbcTemplate.queryForList(EVENT_ID_SQL, Long.class, alertId);
-        return ids.stream().findFirst();
+        // 행이 있고 event_id 가 NULL 이면 리스트에 null 요소가 들어오므로 stream 대신 get(0) 으로 꺼낸다
+        List<Long> rows = jdbcTemplate.queryForList(EVENT_ID_SQL, Long.class, alertId);
+        if (rows.isEmpty()) {
+            throw new IllegalStateException("DB 에 없는 알림이 라벨에 있습니다: " + alertId);
+        }
+        return Optional.ofNullable(rows.get(0));
     }
 
     /** 쌍의 사실. 알림 id 가 DB 에 없으면 라벨 CSV 와 DB 가 어긋난 것이므로 예외. */

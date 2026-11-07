@@ -9,6 +9,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.annotation.Transactional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.within;
 
 /**
@@ -55,6 +56,16 @@ class AssignmentReaderTest {
         // 검증: A1 은 시드한 이벤트에 배정, A2 는 매핑이 없어 empty
         assertThat(reader.findEventId(A1)).contains(9_000_000_001L);
         assertThat(reader.findEventId(A2)).isEmpty();
+    }
+
+    // DB 에 없는 알림 id 는 "미배정" 이 아니라 라벨 CSV 오류다. empty 로 돌려주면 호출부가 그 쌍을
+    // 미배정으로 세어 두 비율의 분모에서 빼므로, 과소병합율이 실제보다 낮게 나오는 조용한 왜곡이 된다.
+    @Test
+    void DB에_없는_알림_id는_미배정이_아니라_예외() {
+        // 검증: 존재하지 않는 id 는 findEventId 가 예외로 막는다 (A2 처럼 알림은 있고 매핑만 없으면 empty)
+        assertThatThrownBy(() -> reader.findEventId(9_000_000_999L))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("9000000999");
     }
 
     // 쌍의 사실 4개(유형, 같은 시군구, 간격, 본문 거리)를 DB 값으로 계산한다. 거리는 pgvector 의 <=> 로 DB 에서 구한다.
