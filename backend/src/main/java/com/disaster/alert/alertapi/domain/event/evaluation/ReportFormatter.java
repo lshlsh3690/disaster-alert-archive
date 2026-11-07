@@ -23,6 +23,13 @@ public final class ReportFormatter {
     public record Row(long alertA, long alertB, WrongKind kind, PairFacts facts) {
     }
 
+    /**
+     * 틀린 쌍 표 위에 쓰는 절 제목. {@link BaselineReportParser} 가 이 제목으로 표를 찾으므로 같은 상수를 공유한다.
+     * 쓰는 쪽(여기)이 원본이라 읽는 쪽이 참조한다 — 문자열이 두 곳에 따로 있으면 한쪽만 고쳐졌을 때
+     * 파서가 아무것도 못 읽는 것이 조용히 "틀린 쌍 0개" 로 보이기 때문이다.
+     */
+    static final String WRONG_PAIRS_HEADING = "## 놓친 쌍 / 잘못 묶은 쌍";
+
     private static final DateTimeFormatter RUN_AT_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
 
     public static String format(String datasetName, LocalDateTime runAt,
@@ -54,7 +61,7 @@ public final class ReportFormatter {
                 .append(result.excludedUnassigned()).append("쌍\n");
 
         // 3) 틀린 쌍 표: 이유는 계산하지 않고 사실만 적는다
-        sb.append("## 놓친 쌍 / 잘못 묶은 쌍\n");
+        sb.append(WRONG_PAIRS_HEADING).append('\n');
         // "종류" 칸은 맨 끝: 앞 6칸 구성을 그대로 두어 옛 6칸 표와 같은 방식으로 읽히게 한다
         appendTableHeader(sb);
         for (Row r : wrongRows) {
@@ -78,6 +85,9 @@ public final class ReportFormatter {
         sb.append("\n## 이전 대비\n");
         sb.append("- 고쳐짐 ").append(diff.fixed().size()).append("쌍, 새로 틀림 ").append(diff.newlyWrong().size())
                 .append("쌍, 종류 바뀜 ").append(diff.kindChanged().size()).append("쌍\n");
+        // "고쳐짐" 은 "이전에 틀렸고 이번 목록에 없음" 으로만 센다. 라벨 변경·라벨 삭제·알림 부재로 평가에서 빠진 쌍도
+        // 섞여 개선 건수가 부풀 수 있다. "새로 틀림" 은 영향이 없어 퇴행 확인 기준으로 안내한다
+        sb.append("- 주의: \"고쳐짐\" 에는 라벨이 바뀌었거나 평가에서 빠진 쌍도 섞인다. 퇴행 확인은 \"새로 틀림\" 을 본다.\n");
 
         // 사실(유형·간격·거리)은 diff 가 아니라 이번 실행의 행에서 가져온다. (a,b) 순서가 다를 수 있어 쌍 키로 찾는다
         Map<ReportDiff.PairKey, Row> rowsByPair = new HashMap<>();
