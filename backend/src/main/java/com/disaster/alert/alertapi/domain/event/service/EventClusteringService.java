@@ -367,7 +367,8 @@ public class EventClusteringService {
      * <p>임계값(mergeMaxDistance)만 쓰고 LLM 폴백은 태우지 않는다 — 지역 제약이 느슨해진 만큼 borderline 까지
      * 넓히면 별개 사고를 합칠 위험이 커서다. 윈도우도 같은 시군구보다 짧은 adjacent-window-hours 를 쓴다.
      * 비사고성(폭염·호우 등 템플릿형)은 시군구 간 다리(blob)가 생기므로 대상이 아니다.
-     * 후보 이벤트에도 LLM 폴백과 같은 두 가드(사고성 유형, 화재 72h)를 적용한다 — 별개 화재 오병합 방지와 같은 이유.
+     * 후보 이벤트에도 LLM 폴백과 같은 가드(후보도 사고성 유형)를 적용하고, 거기에 더해 이 경로 전용 이벤트 나이 상한
+     * ({@link #withinAdjacentEventAge}, 후보 첫 알림 기준 adjacent-max-event-age-hours)을 건다.
      *
      * @return 인접 이벤트에 병합했으면 true
      */
@@ -394,7 +395,7 @@ public class EventClusteringService {
             }
             // 가드 실패 후보는 건너뛰고 다음(더 먼) 후보를 본다.
             DisasterEvent ev = disasterEventRepository.findById(eventId).orElse(null);
-            if (allowsAccidentMerge(alert, ev) && withinAdjacentEventAge(alert, ev)) {
+            if (allowsAccidentMerge(ev) && withinAdjacentEventAge(alert, ev)) {
                 mergeIntoExisting(eventId, alert, 1.0 - dist, MergeMethod.EMBEDDING, trace);
                 return true;
             }
@@ -447,7 +448,7 @@ public class EventClusteringService {
         Map<Long, String> repMessages = representativeMessages(borderlineIds);
         List<EventLLMDecisionService.Candidate> cands = new ArrayList<>(borderlineIds.size());
         for (Long id : borderlineIds) {
-            if (!allowsAccidentMerge(alert, disasterEventRepository.findById(id).orElse(null))) {
+            if (!allowsAccidentMerge(disasterEventRepository.findById(id).orElse(null))) {
                 continue;
             }
             cands.add(new EventLLMDecisionService.Candidate(id, repMessages.getOrDefault(id, "")));
@@ -470,15 +471,15 @@ public class EventClusteringService {
     }
 
     /**
-     * 후보 이벤트가 사고성 유형 병합 대상인지 — LLM 폴백과 인접 병합이 공유하는 두 가드.
-     * (1) 후보 이벤트도 사고성 유형이어야 한다(기상특보 이벤트에 화재 알림이 흡수되는 과병합 차단).
-     * (2) 화재는 별개 화재를 합치는 오병합이 많아 이벤트 마지막 알림 72h 초과 시 제외(운영 데이터 분석 2026-10).
+     * 후보 이벤트가 사고성 유형 병합 대상인지 — LLM 폴백과 인접 병합이 공유하는 가드 하나.
+     * 후보 이벤트도 사고성 유형이어야 한다(기상특보 이벤트에 화재 알림이 흡수되는 과병합 차단).
+     *
+     * <p>예전에는 화재에만 "이벤트 마지막 알림 72h 초과면 제외" 가드를 더 걸었으나 제거했다. 후보 검색 쿼리가 이미
+     * {@code last_alert_at > createdAt - 168h} 로 후보를 거르므로, 한도를 그 윈도우에 맞추면 쿼리 조건에 완전히 포함돼
+     * 절대 발동하지 않는 가드가 되기 때문이다. (인접 경로의 이벤트 나이 상한은 별개이며 {@link #withinAdjacentEventAge} 가 맡는다.)
      */
-    private boolean allowsAccidentMerge(DisasterAlert alert, DisasterEvent ev) {
-        return ev != null
-                && isAccidentType(ev.getPrimaryDisasterType())
-                && DisasterCooldown.allowsLlmFallbackMerge(alert.getDisasterType(),
-                        ev.getFirstAlertAt(), ev.getLastAlertAt(), alert.getCreatedAt());
+    private boolean allowsAccidentMerge(DisasterEvent ev) {
+        return ev != null && isAccidentType(ev.getPrimaryDisasterType());
     }
 
     /** 사고성 유형 화이트리스트 매칭 (LLM 폴백 적용 대상). */

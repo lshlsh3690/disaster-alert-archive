@@ -1,6 +1,5 @@
 package com.disaster.alert.alertapi.domain.event.model;
 
-import java.time.LocalDateTime;
 import java.util.Map;
 import java.util.Set;
 
@@ -52,26 +51,6 @@ public final class DisasterCooldown {
             return DEFAULT_HOURS;
         }
         return TYPE_TO_HOURS.getOrDefault(disasterType.trim(), DEFAULT_HOURS);
-    }
-
-    /**
-     * LLM 폴백 병합 후보로 이 이벤트를 허용할지. 화재만 제한한다 — 별개 화재를 한 사건으로 합치는 오병합 방지.
-     *
-     * <p>기준을 첫 알림이 아니라 "마지막 알림"으로 잡아, 며칠 이어지는 대형 화재도 후속 알림이
-     * 계속 오는 한 잘리지 않는다. 한도는 화재 cooldown({@code hoursFor("화재")})을 재사용하며
-     * 정확히 그 시간 차이는 허용한다. 화재 외 유형과 null 입력은 항상 true.
-     */
-    public static boolean allowsLlmFallbackMerge(String alertType,
-            LocalDateTime eventFirstAlertAt, LocalDateTime eventLastAlertAt,
-            LocalDateTime alertCreatedAt) {
-        if (alertType == null || !"화재".equals(alertType.trim())
-                || eventFirstAlertAt == null || eventLastAlertAt == null || alertCreatedAt == null) {
-            return true;
-        }
-        if (alertCreatedAt.isBefore(eventFirstAlertAt)) {
-            return false;
-        }
-        return !eventLastAlertAt.isBefore(alertCreatedAt.minusHours(hoursFor("화재")));
     }
 
     private static Map<String, Integer> build() {

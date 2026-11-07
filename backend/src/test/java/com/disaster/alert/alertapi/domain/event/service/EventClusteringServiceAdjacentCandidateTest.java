@@ -277,7 +277,7 @@ class EventClusteringServiceAdjacentCandidateTest {
     }
 
     @Test
-    @DisplayName("i) 화재 알림 + 후보 이벤트 마지막 알림이 72h 초과 과거: 쿨다운 가드로 병합하지 않고 신규 이벤트")
+    @DisplayName("i) 화재 알림 + 후보 이벤트 마지막 알림 73h 전(첫 알림은 78h 전): 이벤트 나이 상한(첫 알림 기준 72h) 초과로 병합하지 않고 신규 이벤트")
     void adjacentFireCandidateOlderThanCooldown_createsNewEvent() {
         alert("화재", FIRE);
         sameRegionCandidates();
