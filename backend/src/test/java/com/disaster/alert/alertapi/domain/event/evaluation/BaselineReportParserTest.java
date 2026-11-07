@@ -1,11 +1,17 @@
 package com.disaster.alert.alertapi.domain.event.evaluation;
 
+import com.disaster.alert.alertapi.domain.event.evaluation.AssignmentReader.PairFacts;
+import com.disaster.alert.alertapi.domain.event.evaluation.PairCountResult.WrongKind;
+import com.disaster.alert.alertapi.domain.event.evaluation.ReportFormatter.Row;
 import com.disaster.alert.alertapi.domain.event.evaluation.ReportedPair.Kind;
 import org.junit.jupiter.api.Test;
 
+import java.time.LocalDateTime;
 import java.util.List;
+import java.util.OptionalDouble;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class BaselineReportParserTest {
 
@@ -65,5 +71,47 @@ class BaselineReportParserTest {
         assertThat(pairs).containsExactly(
                 new ReportedPair(43443, 44576, Kind.UNKNOWN),
                 new ReportedPair(201, 202, Kind.UNKNOWN));
+    }
+
+    // 틀린 쌍 절 제목이 없는 마크다운(형식이 다른 옛 리포트나 엉뚱한 파일)을 기준선으로 주면, 빈 목록을 돌려주는 순간
+    // 이번 실행의 틀린 쌍이 전부 "새로 틀림" 으로 집계된다 — 퇴행을 찾는 도구가 전부 퇴행이라고 말하게 된다.
+    // 그래서 조용히 비우지 않고 예외로 알려야 한다. 틀린 쌍이 0개인 정상 기준선은 제목은 써지므로 이 경로에 걸리지 않는다.
+    // Red 단계: 현재 구현은 제목을 못 찾으면 빈 목록을 돌려줘 예외가 안 나므로 assertThatThrownBy 가 실패한다.
+    @Test
+    void 틀린_쌍_절_제목이_없으면_빈_목록_대신_예외를_던진다() {
+        // 준비: backend/evaluation/reports/before.md 처럼 "## 오류 사례" 4칸 표만 있는 형식이 다른 옛 리포트
+        String otherFormat = """
+                # 클러스터링 평가 - before
+                ## 요약
+                - 같은 사건 110쌍 중 69쌍 묶음
+                ## 오류 사례
+                | alertA | alertB | 유형 | 비고 |
+                |---|---|---|---|
+                | 43443 | 44576 | 화재 | 놓침 |
+                """;
+
+        // 실행 + 검증: 틀린 쌍 절이 아예 없으므로 기준선으로 쓸 수 없다고 예외로 알린다
+        assertThatThrownBy(() -> BaselineReportParser.parse(otherFormat))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    // 포매터가 쓴 제목과 파서가 찾는 제목은 지금 각자 문자열로 박혀 있어 우연히 같을 뿐이다. 한쪽만 고치면 파서가 조용히
+    // 틀린 쌍을 못 읽게 되므로, 포매터 출력을 파서로 다시 읽어 같은 쌍이 나오는지로 두 문자열이 계속 맞는지 지킨다.
+    // 참고: 이 테스트는 Red 단계에서도 통과하는 회귀 방지용이다(실제 Red 는 위 예외 테스트).
+    @Test
+    void 포매터가_만든_리포트를_파서가_그대로_다시_읽는다() {
+        // 준비: 놓침 1건과 잘못 묶음 1건. 두 종류가 모두 되돌아오는지 보려고 각각 하나씩 넣는다
+        Row missed = new Row(301, 302, WrongKind.MISSED, new PairFacts("산불", "산불", true, 5, 0.2));
+        Row overMerged = new Row(401, 402, WrongKind.OVER_MERGED, new PairFacts("산불", "호우", false, 30, null));
+        PairCountResult result = new PairCountResult(2, 1, 1, 0, 0, OptionalDouble.of(33.3), OptionalDouble.of(33.3), List.of());
+
+        // 실행: 리포트를 만들어 문자열로 받은 것을 그대로 파서에 다시 먹인다
+        String report = ReportFormatter.format("ds", LocalDateTime.of(2026, 11, 7, 10, 0), result, List.of(missed, overMerged));
+        List<ReportedPair> pairs = BaselineReportParser.parse(report);
+
+        // 검증: 넣은 id 쌍과 종류가 순서대로 그대로 나온다
+        assertThat(pairs).containsExactly(
+                new ReportedPair(301, 302, Kind.MISSED),
+                new ReportedPair(401, 402, Kind.OVER_MERGED));
     }
 }
