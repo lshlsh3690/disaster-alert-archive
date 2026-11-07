@@ -65,7 +65,7 @@
 | event_id | 최종 배정 이벤트 id (SKIPPED 면 null) |
 | created_at | 기록 시각 |
 
-- 평가 사본에서 재클러스터링(백필)할 때는 `event_alert_mapping`, `disaster_events`, `clustering_trace` 를 함께 비운 뒤 돌려야 옛 기록이 섞이지 않는다. 자동으로 지우지 않는다.
+- 평가 사본에서 재클러스터링(백필)할 때는 `event_alert_mapping`, `disaster_event_translation`, `event_region_impact`, `region_risk_index`, `disaster_events`, `clustering_trace` 를 **한 번의 `TRUNCATE` 명령**으로 함께 비운 뒤 돌려야 옛 기록이 섞이지 않는다. `disaster_event_translation`·`event_region_impact`·`region_risk_index` 는 `disaster_events` 를 참조하는 외래 키가 있어 같은 명령에 넣지 않으면 `TRUNCATE` 가 실패한다. 위험도 기능은 2026-11-05 에 삭제됐지만 `event_region_impact`·`region_risk_index` 테이블과 외래 키는 남아 있어 지금도 비워야 한다. 자동으로 지우지 않는다. 명령은 `EventClusteringBackfillTool` javadoc 의 권장 절차와 같다: `TRUNCATE event_alert_mapping, disaster_event_translation, event_region_impact, region_risk_index, disaster_events, clustering_trace RESTART IDENTITY;`
 
 ### 놓친 쌍 하나를 들여다보는 법
 두 알림 중 **나중에 들어온 알림**의 기록을 본다. 먼저 들어온 알림의 이벤트가 후보에 있었는지가 핵심이다.
