@@ -1,0 +1,106 @@
+# 클러스터링 평가 읽는 법
+
+이벤트 클러스터링이 잘 묶었는지를 사람이 라벨한 알림 쌍으로 재는 도구의 설명서다. 계산은 일부러 단순하게 두었다.
+
+## 하는 일 한 줄
+사람이 라벨한 **알림 쌍**마다 "두 알림이 **같은 이벤트**에 들어 있는가"만 본다.
+
+## 쌍 하나가 어떻게 세어지나
+| 사람의 라벨 | 시스템 | 세는 이름 |
+|---|---|---|
+| 같은 사건 | 같은 이벤트 | **맞게 묶음** |
+| 같은 사건 | 다른 이벤트 | **놓침** |
+| 다른 사건 | 같은 이벤트 | **잘못 묶음** |
+| 다른 사건 | 다른 이벤트 | 세지 않는다 |
+
+## 지표 두 개
+- **과소병합율** = 놓침 ÷ (맞게 묶음 + 놓침). 사람이 같은 사건이라 한 쌍 중 못 묶은 비율. 낮을수록 좋다.
+- **과병합율** = 잘못 묶음 ÷ (맞게 묶음 + 잘못 묶음). 시스템이 묶은 쌍 중 사람이 다른 사건이라 한 비율. 낮을수록 좋다.
+
+### 예시 (쌍 6개)
+| 쌍 | 사람 | 시스템 | 세는 이름 |
+|---|---|---|---|
+| 1 | 같은 사건 | 같은 이벤트 | 맞게 묶음 |
+| 2 | 같은 사건 | 같은 이벤트 | 맞게 묶음 |
+| 3 | 같은 사건 | 다른 이벤트 | 놓침 |
+| 4 | 같은 사건 | 다른 이벤트 | 놓침 |
+| 5 | 다른 사건 | 같은 이벤트 | 잘못 묶음 |
+| 6 | 다른 사건 | 다른 이벤트 | (세지 않음) |
+
+- 과소병합율 = 2 ÷ (2 + 2) = 50%. 같은 사건 4쌍 중 2쌍을 놓쳤다.
+- 과병합율 = 1 ÷ (2 + 1) = 33.3%. 묶은 3쌍 중 1쌍이 잘못됐다.
+
+## 평가에서 빠지는 쌍
+- **모르겠음**: 라벨이 "모르겠음"인 쌍.
+- **이벤트 미배정**: 두 알림 중 하나라도 이벤트에 들어 있지 않은 쌍(비사건으로 분류되어 클러스터링에서 빠졌거나 처리되지 않은 알림). 정답을 가릴 수 없어서 빼고 건수만 센다.
+- 두 건수는 리포트에 따로 적힌다. 둘 다 해당하면 모르겠음으로 센다.
+
+## 리포트
+```
+## 요약
+- 같은 사건 60쌍 중 38쌍 묶음, 22쌍 놓침 → 과소병합율 36.7%
+- 묶은 40쌍 중 38쌍 맞음, 2쌍 잘못 묶음 → 과병합율 5.0%
+- 제외: 모르겠음 6쌍, 이벤트 미배정 0쌍
+## 놓친 쌍 / 잘못 묶은 쌍
+| alertA | alertB | 유형 | 같은 시군구 | 간격(시간) | 본문 거리 |
+```
+(위 숫자는 설명용 예시다.) 놓친 쌍과 잘못 묶은 쌍에는 **이유를 계산하지 않고 사실만** 적는다.
+- 유형: 두 알림의 재난 유형(다르면 "A/B").
+- 같은 시군구: 두 알림이 시군구(법정동 코드 앞 5자리)를 하나라도 공유하면 "예".
+- 간격(시간): 두 알림 발송 시각의 차.
+- 본문 거리: 두 알림 본문 임베딩의 코사인 거리(작을수록 비슷, 병합 기준은 0.15 이하). 임베딩이 없으면 "-".
+
+## 판정 기록(clustering_trace)
+놓친 쌍을 진단할 때 과거 상황을 짐작하지 않도록, 클러스터링은 알림마다 판정 순간에 실제로 본 것을 `clustering_trace` 테이블에 한 줄 남긴다(운영 수집과 백필 재클러스터링 모두, PR #312). 기록은 판정 코드가 이미 가진 값을 그대로 옮긴 것이라 원인 추정은 들어 있지 않다. **이 도구는 이 표를 읽지 않는다** — 리포트의 틀린 쌍을 보고 사람이 아래 SQL 로 찾아본다. 컬럼 정의의 원본은 `ADMIN_EVAL_DASHBOARD_DESIGN.md` 4절 ① 이다.
+
+| 컬럼 | 내용 |
+|---|---|
+| alert_id | 알림 id (PK). 같은 알림을 다시 클러스터링하면 덮어쓴다 |
+| path | 탄 경로: EMBEDDING, REGIONAL, EPISODIC, PERSON, ANIMAL, GLOBAL_TYPE, BROADCAST, NO_REGION, SKIPPED |
+| candidates | 같은 시군구 후보 JSON `[{"event":15918,"dist":0.387}]`. 검색했는데 0건이면 `[]`, 검색하지 않는 경로면 null |
+| adjacent_candidates | 인접 시군구 후보(같은 형식). 실제로 조회했을 때만 채우고 그 외 null |
+| threshold | 그 알림에 적용된 병합 기준 거리. 임베딩 경로가 아니면 null |
+| llm_called / llm_result | LLM 폴백을 실제로 호출했는지, 고른 이벤트 id(없음이면 null) |
+| result | MERGED / NEW / SKIPPED(비사건·본문 없음) |
+| event_id | 최종 배정 이벤트 id (SKIPPED 면 null) |
+| created_at | 기록 시각 |
+
+- 평가 사본에서 재클러스터링(백필)할 때는 `event_alert_mapping`, `disaster_event_translation`, `event_region_impact`, `region_risk_index`, `disaster_events`, `clustering_trace` 를 **한 번의 `TRUNCATE` 명령**으로 함께 비운 뒤 돌려야 옛 기록이 섞이지 않는다. `disaster_event_translation`·`event_region_impact`·`region_risk_index` 는 `disaster_events` 를 참조하는 외래 키가 있어 같은 명령에 넣지 않으면 `TRUNCATE` 가 실패한다. 위험도 기능은 2026-11-05 에 삭제됐지만 `event_region_impact`·`region_risk_index` 테이블과 외래 키는 남아 있어 지금도 비워야 한다. 자동으로 지우지 않는다. 명령은 `EventClusteringBackfillTool` javadoc 의 권장 절차와 같다: `TRUNCATE event_alert_mapping, disaster_event_translation, event_region_impact, region_risk_index, disaster_events, clustering_trace RESTART IDENTITY;`
+
+### 놓친 쌍 하나를 들여다보는 법
+두 알림 중 **나중에 들어온 알림**의 기록을 본다. 먼저 들어온 알림의 이벤트가 후보에 있었는지가 핵심이다.
+```sql
+SELECT event_id FROM event_alert_mapping WHERE alert_id = <먼저 알림 id>;        -- 정답 이벤트
+SELECT path, candidates, adjacent_candidates, threshold, llm_called, llm_result, result, event_id
+  FROM clustering_trace WHERE alert_id = <나중 알림 id>;
+```
+
+**예시 1 — 후보에 없음.** 경로 EMBEDDING, `candidates` 에 정답 이벤트가 없다(`[]` 포함). 늦게 들어온 알림이 처리되던 순간 클러스터링은 먼저 들어온 알림의 이벤트를 후보로 보지 못했다. 왜 후보가 안 됐는지(시군구가 달랐는지, 시간 범위 밖이었는지 등)는 이 칸이 말해 주지 않으므로 리포트의 "같은 시군구", "간격(시간)" 사실과 함께 본다.
+
+**예시 2 — 후보에 있었음.** 경로 EMBEDDING, `candidates` 에 정답 이벤트가 거리 0.21 로 있고 `threshold` 0.15, `llm_called` false, `result` NEW. 후보로는 올랐지만 거리가 기준을 넘었고 LLM 판정도 거치지 않아 새 이벤트가 됐다. 그 거리가 사람이 같다고 본 쌍에 비해 큰지는 사람이 판단한다.
+
+**키 경로.** 경로가 PERSON, ANIMAL, GLOBAL_TYPE, REGIONAL, EPISODIC, BROADCAST 이면 본문 거리가 아니라 키(신원·종·유형+시군구 등)로 이벤트가 정해져 `candidates` 는 null 이다(ANIMAL 은 종 후보를 담는다).
+
+## 이 도구가 하지 않는 것
+- **왜 놓쳤는지(검색 단계인지 판정 단계인지) 계산하지 않는다.** 어느 단계가 막혔는지는 필요할 때 별도로 조사한다.
+- **클러스터링을 다시 하지 않는다.** DB 에 저장된 이벤트 배정을 읽을 뿐이다. 클러스터링 코드를 바꿨다면 먼저 재클러스터링(백필)으로 새 스냅샷을 만든 뒤 그 DB 를 평가해야 바뀐 결과가 나온다. 평가와 재클러스터링은 일부러 분리했다.
+
+## 데이터셋
+`backend/evaluation/datasets/`의 CSV(`alert_a_id,alert_b_id,label,stratum,sub_type`). `label`은 SAME·DIFF·UNSURE 이고 `stratum`·`sub_type`은 형식 호환용이라 읽고 버린다(평가 계산에 쓰지 않는다). 데이터셋 이름은 CSV 파일명에서 확장자를 뗀 것이다.
+- `cluster-eval-2026-10-incident.csv`: 사건 셋(두 알림 모두 사건으로 분류된 쌍, 96쌍). 튜닝 전후 비교의 기준 셋
+- `cluster-eval-2026-10-test.csv`: 홀드아웃 셋(규칙 튜닝에 쓰지 않은 셋, 요청할 때만 돌린다). 비사건 제외 후 100쌍 중 80쌍이 미배정으로 빠져 19쌍만 계산된다
+- 개발용 셋 `cluster-eval-2026-10.csv` 는 2026-10-24 삭제했다(경위는 `CLUSTERING_EVALUATION.md` 4절)
+
+리포트를 볼 때는 전체 쌍 수 대비 계산에 쓰인 쌍 수("제외" 줄)를 함께 본다.
+
+리포트는 `backend/evaluation/reports/` 에 둔다. `*_2026-10-19.md` 세 개가 이 도구로 잰 기준점이고, 그 전 리포트(`before.md`, `after_v0.md` 등)는 옛 형식이라 직접 비교하지 않는다.
+
+## 실행
+라벨은 CSV 에서 바로 읽는다(DB 적재 없음, `evaluation_label` 테이블도 쓰지 않는다). 평가용 DB 사본에서 `eval` 프로필로 실행한다(OpenAI 호출 없음, 운영 DB 에는 실행하지 않는다).
+```
+./gradlew bootRun --args='--spring.profiles.active=eval --eval.labels=<CSV 경로> --eval.report=<리포트 경로>'
+```
+- `--eval.labels`(필수): 라벨 CSV 경로.
+- `--eval.report`(선택): 마크다운 리포트 경로. 없으면 로그로만 출력한다.
+- 리포트 머리에는 데이터셋 이름과 실행 시각만 적고, 끝나면 애플리케이션이 종료된다.
+- CSV 형식 오류(헤더 불일치, 컬럼 수, 숫자 아님, 같은 id, 알 수 없는 label, (a,b)/(b,a) 중복)는 줄 번호와 함께 즉시 실패한다.
