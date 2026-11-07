@@ -54,7 +54,7 @@ public class EvaluationRunTool implements ApplicationRunner {
         //    WrongPair(25154, 28106, MISSED) → Row(25154, 28106, PairFacts("산불", "산불", true, 5, 0.2))
         List<Row> rows = result.wrongPairs().stream().map(w -> {
             PairFacts facts = assignmentReader.findFacts(w.alertA(), w.alertB());
-            return new Row(w.alertA(), w.alertB(), facts);
+            return new Row(w.alertA(), w.alertB(), w.kind(), facts);
         }).toList();
 
         // 4) 리포트는 항상 로그로, --eval.report 가 있으면 파일로도 쓴다

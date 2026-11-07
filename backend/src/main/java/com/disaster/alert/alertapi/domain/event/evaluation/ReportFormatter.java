@@ -1,6 +1,7 @@
 package com.disaster.alert.alertapi.domain.event.evaluation;
 
 import com.disaster.alert.alertapi.domain.event.evaluation.AssignmentReader.PairFacts;
+import com.disaster.alert.alertapi.domain.event.evaluation.PairCountResult.WrongKind;
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
 
@@ -16,14 +17,23 @@ import java.util.OptionalDouble;
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
 public final class ReportFormatter {
 
-    /** 틀린 쌍(놓침·잘못 묶음) 한 줄: 알림 id 둘과 사실. */
-    public record Row(long alertA, long alertB, PairFacts facts) {
+    /** 틀린 쌍(놓침·잘못 묶음) 한 줄: 알림 id 둘, 종류, 사실. */
+    public record Row(long alertA, long alertB, WrongKind kind, PairFacts facts) {
     }
 
     private static final DateTimeFormatter RUN_AT_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
 
     public static String format(String datasetName, LocalDateTime runAt,
                                 PairCountResult result, List<Row> wrongRows) {
+        return format(datasetName, runAt, result, wrongRows, null);
+    }
+
+    /**
+     * @param diff 이전 리포트와의 비교 결과. null 이면 "이전 대비" 절을 쓰지 않는다.
+     */
+    // Red 단계 뼈대: diff 를 아직 쓰지 않는다 — 구현은 Green 에서
+    public static String format(String datasetName, LocalDateTime runAt,
+                                PairCountResult result, List<Row> wrongRows, ReportDiff.Result diff) {
         StringBuilder sb = new StringBuilder();
         // 1) 머리: 데이터셋 이름과 실행 시각만
         sb.append("# 클러스터링 평가 - ").append(datasetName).append('\n');
