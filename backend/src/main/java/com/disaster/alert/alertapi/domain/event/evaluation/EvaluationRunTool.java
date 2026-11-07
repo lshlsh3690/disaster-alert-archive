@@ -25,7 +25,8 @@ import java.util.Optional;
  * 클러스터링 평가 실행 진입점. 사용법은 docs/CLUSTERING_EVAL_GUIDE.md "실행" 절.
  *
  * <p>{@code --eval.labels}(필수) CSV 를 읽어 DB 의 이벤트 배정과 비교하고,
- * {@code --eval.report}(선택) 경로에 마크다운 리포트를 쓴다.
+ * {@code --eval.report}(선택) 경로에 마크다운 리포트를 쓴다. {@code --eval.baseline}(선택)에 이전 리포트를
+ * 주면 틀린 쌍을 비교한 "이전 대비" 절이 리포트에 붙는다.
  */
 @Slf4j
 @Component
@@ -43,6 +44,8 @@ public class EvaluationRunTool implements ApplicationRunner {
         //    → pairs   : [LabeledPair(25154, 28106, SAME), LabeledPair(24037, 28111, DIFF), ...]  (stratum·sub_type 은 버림)
         Path labels = requiredLabelsPath(args);
         List<LabeledPair> pairs = LabelCsv.parse(Files.readString(labels, StandardCharsets.UTF_8));
+        //    이전 리포트(--eval.baseline)도 같은 이유로 여기서 읽는다 - 경로가 틀렸는데 DB 조회가 끝난 뒤에야 알게 되지 않도록. 없으면 null
+        List<ReportedPair> baseline = readBaseline(args);
 
         // 2) 쌍마다 두 알림의 이벤트 배정을 DB 에서 읽어 관측으로 만들고 센다
         //    pairs → 관측: [Observation(25154, 28106, SAME, assigned=true, sameEvent=false), ...]
@@ -59,7 +62,9 @@ public class EvaluationRunTool implements ApplicationRunner {
 
         // 4) 리포트는 항상 로그로, --eval.report 가 있으면 파일로도 쓴다
         //    마크다운(줄 단위): '# 클러스터링 평가 - cluster-eval-2026-10-incident' → '## 요약' → '- 같은 사건 4쌍 중 2쌍 묶음, 2쌍 놓침 → 과소병합율 50.0%' → 틀린 쌍 표
-        String report = ReportFormatter.format(datasetName(labels), LocalDateTime.now(), result, rows);
+        //    --eval.baseline 이 있으면 이전 리포트의 틀린 쌍과 비교한 "이전 대비" 절이 붙는다(없으면 diff=null → 절 없음)
+        ReportDiff.Result diff = baseline == null ? null : ReportDiff.compare(baseline, toReportedPairs(result));
+        String report = ReportFormatter.format(datasetName(labels), LocalDateTime.now(), result, rows, diff);
         log.info("\n{}", report);
         if (args.containsOption("eval.report")) {
             Files.writeString(Path.of(args.getOptionValues("eval.report").get(0)), report, StandardCharsets.UTF_8);
@@ -87,6 +92,37 @@ public class EvaluationRunTool implements ApplicationRunner {
         Path path = Path.of(values.get(0));
         if (!Files.isRegularFile(path)) {
             throw new IllegalArgumentException("라벨 CSV 파일이 없습니다: " + path);
+        }
+        return path;
+    }
+
+    // --eval.baseline 이 없으면 null(비교 안 함). 있으면 이전 리포트의 틀린 쌍(마크다운 표)을 읽는다
+    private static List<ReportedPair> readBaseline(ApplicationArguments args) throws IOException {
+        if (!args.containsOption("eval.baseline")) {
+            return null;
+        }
+        return BaselineReportParser.parse(Files.readString(baselinePath(args), StandardCharsets.UTF_8));
+    }
+
+    // WrongPair(놓침/잘못 묶음) → ReportedPair: 비교는 id 쌍과 종류만 쓴다
+    private static List<ReportedPair> toReportedPairs(PairCountResult result) {
+        return result.wrongPairs().stream()
+                .map(w -> new ReportedPair(w.alertA(), w.alertB(), toKind(w.kind())))
+                .toList();
+    }
+
+    private static ReportedPair.Kind toKind(PairCountResult.WrongKind kind) {
+        return kind == PairCountResult.WrongKind.MISSED ? ReportedPair.Kind.MISSED : ReportedPair.Kind.OVER_MERGED;
+    }
+
+    private static Path baselinePath(ApplicationArguments args) {
+        List<String> values = args.getOptionValues("eval.baseline");
+        if (values == null || values.isEmpty()) {
+            throw new IllegalArgumentException("--eval.baseline=<이전 리포트 경로> 값이 비어 있습니다");
+        }
+        Path path = Path.of(values.get(0));
+        if (!Files.isRegularFile(path)) {
+            throw new IllegalArgumentException("이전 리포트 파일이 없습니다: " + path);
         }
         return path;
     }

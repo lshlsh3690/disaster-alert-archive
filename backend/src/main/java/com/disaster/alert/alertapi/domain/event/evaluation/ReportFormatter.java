@@ -7,8 +7,10 @@ import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.OptionalDouble;
 
 /**
@@ -31,7 +33,6 @@ public final class ReportFormatter {
     /**
      * @param diff 이전 리포트와의 비교 결과. null 이면 "이전 대비" 절을 쓰지 않는다.
      */
-    // Red 단계 뼈대: diff 를 아직 쓰지 않는다 — 구현은 Green 에서
     public static String format(String datasetName, LocalDateTime runAt,
                                 PairCountResult result, List<Row> wrongRows, ReportDiff.Result diff) {
         StringBuilder sb = new StringBuilder();
@@ -54,24 +55,83 @@ public final class ReportFormatter {
 
         // 3) 틀린 쌍 표: 이유는 계산하지 않고 사실만 적는다
         sb.append("## 놓친 쌍 / 잘못 묶은 쌍\n");
-        sb.append("| alertA | alertB | 유형 | 같은 시군구 | 간격(시간) | 본문 거리 |\n");
-        sb.append("|---|---|---|---|---|---|\n");
+        // "종류" 칸은 맨 끝: 앞 6칸 구성을 그대로 두어 옛 6칸 표와 같은 방식으로 읽히게 한다
+        appendTableHeader(sb);
         for (Row r : wrongRows) {
-            appendRow(sb, r);
+            appendRow(sb, r.alertA(), r.alertB(), kindLabel(r.kind()), r.facts());
+        }
+
+        // 4) 이전 리포트를 받았을 때만 비교 절을 쓴다 — 안 받았는데 빈 절을 쓰면 "퇴행 없음" 으로 읽힌다
+        if (diff != null) {
+            appendDiff(sb, diff, wrongRows);
         }
         return sb.toString();
     }
 
-    private static void appendRow(StringBuilder sb, Row r) {
-        PairFacts f = r.facts();
+    private static void appendTableHeader(StringBuilder sb) {
+        sb.append("| alertA | alertB | 유형 | 같은 시군구 | 간격(시간) | 본문 거리 | 종류 |\n");
+        sb.append("|---|---|---|---|---|---|---|\n");
+    }
+
+    // 요약 줄 → 새로 틀린 쌍(가장 중요: 튜닝이 망가뜨린 것) → 고쳐진 쌍 → 종류 바뀐 쌍
+    private static void appendDiff(StringBuilder sb, ReportDiff.Result diff, List<Row> wrongRows) {
+        sb.append("\n## 이전 대비\n");
+        sb.append("- 고쳐짐 ").append(diff.fixed().size()).append("쌍, 새로 틀림 ").append(diff.newlyWrong().size())
+                .append("쌍, 종류 바뀜 ").append(diff.kindChanged().size()).append("쌍\n");
+
+        // 사실(유형·간격·거리)은 diff 가 아니라 이번 실행의 행에서 가져온다. (a,b) 순서가 다를 수 있어 쌍 키로 찾는다
+        Map<ReportDiff.PairKey, Row> rowsByPair = new HashMap<>();
+        for (Row r : wrongRows) {
+            rowsByPair.put(ReportDiff.PairKey.of(r.alertA(), r.alertB()), r);
+        }
+        sb.append("\n### 새로 틀린 쌍\n");
+        appendTableHeader(sb);
+        for (ReportedPair p : diff.newlyWrong()) {
+            Row row = rowsByPair.get(ReportDiff.PairKey.of(p.alertA(), p.alertB()));
+            // newlyWrong 은 이번 틀린 쌍에서 나오므로 행이 항상 있다. 없으면 사실 칸만 비워 두고 id 와 종류는 남긴다
+            if (row == null) {
+                sb.append("| ").append(p.alertA()).append(" | ").append(p.alertB())
+                        .append(" | - | - | - | - | ").append(kindLabel(p.kind())).append(" |\n");
+            } else {
+                appendRow(sb, p.alertA(), p.alertB(), kindLabel(p.kind()), row.facts());
+            }
+        }
+        sb.append("\n### 고쳐진 쌍\n");
+        for (ReportedPair p : diff.fixed()) {
+            sb.append("- ").append(p.alertA()).append(" ↔ ").append(p.alertB()).append('\n');
+        }
+        if (!diff.kindChanged().isEmpty()) {
+            sb.append("\n### 종류 바뀐 쌍\n");
+            for (ReportDiff.KindChange c : diff.kindChanged()) {
+                sb.append("- ").append(c.alertA()).append(" ↔ ").append(c.alertB()).append(": ")
+                        .append(kindLabel(c.before())).append(" → ").append(kindLabel(c.after())).append('\n');
+            }
+        }
+    }
+
+    private static String kindLabel(WrongKind kind) {
+        return kind == WrongKind.MISSED ? "놓침" : "잘못 묶음";
+    }
+
+    // UNKNOWN(옛 6칸 리포트에서만 나옴)은 "-" 로 쓴다. 놓침/잘못 묶음으로 추측해 쓰지 않는다
+    private static String kindLabel(ReportedPair.Kind kind) {
+        return switch (kind) {
+            case MISSED -> "놓침";
+            case OVER_MERGED -> "잘못 묶음";
+            case UNKNOWN -> "-";
+        };
+    }
+
+    private static void appendRow(StringBuilder sb, long alertA, long alertB, String kind, PairFacts f) {
         // 임베딩 없음은 0 이 아니라 "-" — 0 은 "아주 비슷" 으로 오해된다
         String distance = f.embeddingDistance() == null
                 ? "-" : String.format(Locale.ROOT, "%.3f", f.embeddingDistance());
-        sb.append("| ").append(r.alertA()).append(" | ").append(r.alertB())
+        sb.append("| ").append(alertA).append(" | ").append(alertB)
                 .append(" | ").append(f.type())
                 .append(" | ").append(f.sameSigungu() ? "예" : "아니오")
                 .append(" | ").append(f.gapHours())
-                .append(" | ").append(distance).append(" |\n");
+                .append(" | ").append(distance)
+                .append(" | ").append(kind).append(" |\n");
     }
 
     // Locale.ROOT: 실행 PC 가 콤마 소수점 Locale 이어도 점으로 쓴다. 분모 0 이면 "-"
