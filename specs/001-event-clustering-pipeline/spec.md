@@ -14,6 +14,7 @@
 > - **안내성(advisory) 분리 경로** — 2026-10-17 `d314cb3d` 에서 삭제. 비사건(`alert_kind=ADVISORY`)을 클러스터링에서 아예 제외하면서 쓸모없어졌다. `FireAlertClassifier`·`AdvisoryClassifier` 클래스와 `clustering.advisory-split-types`·`advisory-window-hours` 설정이 함께 사라졌다. 이 문서의 관련 FR·서술은 **현재 코드에 대응물이 없다**.
 > - **`EventCrossRegionService`(사후 cross-region 병합 패스)** — 2026-10-27 삭제. 동물 탈출·출몰은 클러스터링 안의 `EventClusteringService.clusterAnimal` 경로가 판정 순간에 처리한다.
 > - **위험도 연동** — 2026-11-05 `domain/risk` 전체와 `AlertClusteredEvent` 발행 삭제. 테이블은 남아 있으나 런타임 코드가 읽거나 쓰지 않는다.
+> - **판정 기록(`clustering_trace`)** — 2026-11-08 삭제. 모델·리포지토리·`EventClusteringService` 의 기록 배선이 모두 사라졌다(테이블과 V133 은 남김). 이 문서의 "판정 기록 경로는 `ANIMAL`" 같은 서술은 대응물이 없다. 경위는 `docs/event-clustering/CLUSTERING_EVALUATION.md` 9절.
 >
 > 그 밖의 서술은 2026-11-07 에 개별 확인하지 않았다. 현재 기준은 항상 `docs/event-clustering/CLUSTERING_CRITERIA.md` 와 실제 코드다.
 
