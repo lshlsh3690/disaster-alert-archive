@@ -10,6 +10,13 @@
 
 > **기준 문서**: 유형별 병합·분리 기준(키, 윈도우, 임계값, 비사건 제외)은 [`docs/event-clustering/CLUSTERING_CRITERIA.md`](../../docs/event-clustering/CLUSTERING_CRITERIA.md)가 기준 문서다. 이 명세는 2026-08 시점의 as-built 서술이므로 기준이 다르면 그 문서를 따른다.
 
+> **2026-08 이후 삭제됐는데 이 문서에는 남아 있는 것** (2026-11-07 확인):
+> - **안내성(advisory) 분리 경로** — 2026-10-17 `d314cb3d` 에서 삭제. 비사건(`alert_kind=ADVISORY`)을 클러스터링에서 아예 제외하면서 쓸모없어졌다. `FireAlertClassifier`·`AdvisoryClassifier` 클래스와 `clustering.advisory-split-types`·`advisory-window-hours` 설정이 함께 사라졌다. 이 문서의 관련 FR·서술은 **현재 코드에 대응물이 없다**.
+> - **`EventCrossRegionService`(사후 cross-region 병합 패스)** — 2026-10-27 삭제. 동물 탈출·출몰은 클러스터링 안의 `EventClusteringService.clusterAnimal` 경로가 판정 순간에 처리한다.
+> - **위험도 연동** — 2026-11-05 `domain/risk` 전체와 `AlertClusteredEvent` 발행 삭제. 테이블은 남아 있으나 런타임 코드가 읽거나 쓰지 않는다.
+>
+> 그 밖의 서술은 2026-11-07 에 개별 확인하지 않았다. 현재 기준은 항상 `docs/event-clustering/CLUSTERING_CRITERIA.md` 와 실제 코드다.
+
 > **문서 성격**: 이 명세는 신규 기능 요청이 아니라 **이미 운영 중인(as-built) 시스템의 사후 명세**다. "사용자 스토리"는 향후 구현할 요구사항이 아니라 현재 코드가 실제로 수행하는 동작을 서술한다. 모든 FR/시나리오는 실제 소스 코드(`backend/src/main/java/.../domain/event/`)와 `backend/src/main/resources/application.yml`의 `clustering.*` 블록을 근거로 작성했으며, 파일 경로:줄번호를 함께 표기한다.
 
 ## 사용자 시나리오 및 테스트 *(필수)*

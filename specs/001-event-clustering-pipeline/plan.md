@@ -1,5 +1,12 @@
 # 구현 계획: 이벤트 클러스터링 파이프라인 (as-built)
 
+> **2026-08 이후 삭제됐는데 이 문서에는 남아 있는 것** (2026-11-07 확인):
+> - **안내성(advisory) 분리 경로** — 2026-10-17 `d314cb3d` 에서 삭제. 비사건(`alert_kind=ADVISORY`)을 클러스터링에서 아예 제외하면서 쓸모없어졌다. `FireAlertClassifier`·`AdvisoryClassifier` 클래스와 `clustering.advisory-split-types`·`advisory-window-hours` 설정이 함께 사라졌다. 이 문서의 관련 FR·서술은 **현재 코드에 대응물이 없다**.
+> - **`EventCrossRegionService`(사후 cross-region 병합 패스)** — 2026-10-27 삭제. 동물 탈출·출몰은 클러스터링 안의 `EventClusteringService.clusterAnimal` 경로가 판정 순간에 처리한다.
+> - **위험도 연동** — 2026-11-05 `domain/risk` 전체와 `AlertClusteredEvent` 발행 삭제. 테이블은 남아 있으나 런타임 코드가 읽거나 쓰지 않는다.
+>
+> 그 밖의 서술은 2026-11-07 에 개별 확인하지 않았다. 현재 기준은 항상 `docs/event-clustering/CLUSTERING_CRITERIA.md` 와 실제 코드다.
+
 **브랜치**: `001-event-clustering-pipeline` | **날짜**: 2026-08-05 | **명세**: [spec.md](./spec.md)
 
 **입력**: `specs/001-event-clustering-pipeline/spec.md`의 기능 명세
