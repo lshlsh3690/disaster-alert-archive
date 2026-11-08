@@ -7,7 +7,6 @@ import com.disaster.alert.alertapi.domain.event.model.DisasterEvent;
 import com.disaster.alert.alertapi.domain.event.model.EventAlertMapping;
 import com.disaster.alert.alertapi.domain.event.model.MergeMethod;
 import com.disaster.alert.alertapi.domain.event.repository.AlertEmbeddingRepository;
-import com.disaster.alert.alertapi.domain.event.repository.ClusteringTraceRepository;
 import com.disaster.alert.alertapi.domain.event.repository.DisasterEventRepository;
 import com.disaster.alert.alertapi.domain.event.repository.EventAlertMappingRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -56,15 +55,13 @@ class EventClusteringServiceFireLlmFallbackTest {
     @Mock EventAlertMappingRepository eventAlertMappingRepository;
     @Mock AlertEmbeddingRepository alertEmbeddingRepository;
     @Mock EventLLMDecisionService llmDecisionService;
-    @Mock ClusteringTraceRepository clusteringTraceRepository;
 
     EventClusteringService service;
 
     @BeforeEach
     void setUp() {
         service = new EventClusteringService(embeddingModel, disasterAlertRepository, disasterEventRepository,
-                eventAlertMappingRepository, alertEmbeddingRepository, llmDecisionService,
-                clusteringTraceRepository);
+                eventAlertMappingRepository, alertEmbeddingRepository, llmDecisionService);
         ReflectionTestUtils.setField(service, "similarityThreshold", 0.85);
         ReflectionTestUtils.setField(service, "candidateWindowHours", 168);
         ReflectionTestUtils.setField(service, "maxRegionSpan", 10);
