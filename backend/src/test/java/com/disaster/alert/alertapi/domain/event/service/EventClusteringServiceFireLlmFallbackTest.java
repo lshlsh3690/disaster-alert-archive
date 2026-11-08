@@ -92,8 +92,8 @@ class EventClusteringServiceFireLlmFallbackTest {
      * 거제 폐차장 화재 사례(평가 사본 알림 47189 → 47479) — 같은 시군구 후보 1개가 거리 0.3796 으로 폴백 구간
      * (임계 0.15 초과, 상한 0.40 이내)에 있고, 그 이벤트의 마지막 알림이 79.7h 전(72h 초과, 후보 검색 윈도우 168h 이내)이다.
      *
-     * <p>현재는 화재 한정 72h 가드가 후보를 비워 LLM 이 한 번도 호출되지 않고 단발 이벤트가 새로 만들어진다.
-     * Red 에서는 pickSameGeneralIncident 호출 검증과 LLM_FALLBACK 병합 검증에서 실패한다(SEED 로 신규 생성됨).
+     * <p>예전에는 화재 한정 72h 가드가 이 후보를 비워 LLM 이 한 번도 호출되지 않고 단발 이벤트가 새로 만들어졌다.
+     * 이 테스트는 그 가드를 제거한 뒤의 동작(후보가 살아남아 LLM 폴백을 타고 병합됨)을 고정한다.
      */
     @Test
     @DisplayName("화재 + 같은 시군구 후보의 마지막 알림이 79.7h 전(0.3796): LLM 폴백이 호출되어 같은 사건이면 병합")
@@ -124,7 +124,7 @@ class EventClusteringServiceFireLlmFallbackTest {
         // 실행: 임베딩 → 같은 시군구 임계 병합 실패 → 인접 후보 없음 → LLM 폴백 순으로 지난다
         service.clusterNewAlert(1L);
 
-        // 검증: 72h 가드가 후보를 비우지 않았으니 LLM 이 실제로 호출되어야 한다
+        // 검증: 후보가 비워지지 않으므로 LLM 이 실제로 호출되어야 한다(옛 72h 가드가 있었다면 여기서 실패한다)
         verify(llmDecisionService).pickSameGeneralIncident(anyString(), anyList());
         // 검증: LLM 이 고른 이벤트에 LLM_FALLBACK 으로 붙고, 단발 신규 이벤트(save)는 만들어지지 않는다
         ArgumentCaptor<EventAlertMapping> mapping = ArgumentCaptor.forClass(EventAlertMapping.class);
