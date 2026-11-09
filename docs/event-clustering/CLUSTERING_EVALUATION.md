@@ -149,7 +149,7 @@
 관리자 대시보드에서 운영 표본의 정답을 매길 LLM 판사가 사람 라벨과 얼마나 맞는지 잰 결과다. 판사 설계(모델, 프롬프트, 답 해석)는 `ADMIN_EVAL_DASHBOARD_DESIGN.md` ③.
 
 - 측정: `JudgeReliabilityTool`, 평가 사본 `disaster_alert_eval_kind`, 판사 `gpt-4o`(응답 모델 `gpt-4o-2024-08-06`), 온도 0, 호출 281회, 판정 불가 0건.
-- 판사 프롬프트: `backend/src/main/resources/judge/` (커밋 86b399b 기준). 프롬프트나 모델을 바꾸면 다시 잰다.
+- 판사 프롬프트: `backend/src/main/resources/judge/` (커밋 86b399b 시점, 2026-11-09 삭제).
 
 | 판정 | 셋 | 결과 |
 |---|---|---|
