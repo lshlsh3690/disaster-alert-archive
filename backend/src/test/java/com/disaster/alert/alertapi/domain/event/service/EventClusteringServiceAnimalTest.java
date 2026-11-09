@@ -3,14 +3,10 @@ package com.disaster.alert.alertapi.domain.event.service;
 import com.disaster.alert.alertapi.domain.disasteralert.model.DisasterAlert;
 import com.disaster.alert.alertapi.domain.disasteralert.model.DisasterLevel;
 import com.disaster.alert.alertapi.domain.disasteralert.repository.DisasterAlertRepository;
-import com.disaster.alert.alertapi.domain.event.model.ClusteringTrace;
-import com.disaster.alert.alertapi.domain.event.model.ClusteringTracePath;
-import com.disaster.alert.alertapi.domain.event.model.ClusteringTraceResult;
 import com.disaster.alert.alertapi.domain.event.model.DisasterEvent;
 import com.disaster.alert.alertapi.domain.event.model.EventAlertMapping;
 import com.disaster.alert.alertapi.domain.event.model.MergeMethod;
 import com.disaster.alert.alertapi.domain.event.repository.AlertEmbeddingRepository;
-import com.disaster.alert.alertapi.domain.event.repository.ClusteringTraceRepository;
 import com.disaster.alert.alertapi.domain.event.repository.DisasterEventRepository;
 import com.disaster.alert.alertapi.domain.event.repository.EventAlertMappingRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -65,7 +61,6 @@ class EventClusteringServiceAnimalTest {
     @Mock EventAlertMappingRepository eventAlertMappingRepository;
     @Mock AlertEmbeddingRepository alertEmbeddingRepository;
     @Mock EventLLMDecisionService llmDecisionService;
-    @Mock ClusteringTraceRepository clusteringTraceRepository;
 
     EventClusteringService service;
     LocalDateTime now = LocalDateTime.of(2026, 7, 20, 12, 0);
@@ -73,8 +68,7 @@ class EventClusteringServiceAnimalTest {
     @BeforeEach
     void setUp() {
         service = new EventClusteringService(embeddingModel, disasterAlertRepository, disasterEventRepository,
-                eventAlertMappingRepository, alertEmbeddingRepository, llmDecisionService,
-                clusteringTraceRepository);
+                eventAlertMappingRepository, alertEmbeddingRepository, llmDecisionService);
         // 운영 기본값(application.yml)과 같게 맞춘다 - 동물 경로의 윈도우·후보 수·거리·병합 상한이 이 값들에 의존한다.
         ReflectionTestUtils.setField(service, "similarityThreshold", 0.85);
         ReflectionTestUtils.setField(service, "candidateWindowHours", 168);
@@ -132,11 +126,6 @@ class EventClusteringServiceAnimalTest {
         when(eventAlertMappingRepository.countDistinctSidoByEventId(id)).thenReturn(sidoCount);
     }
 
-    private ClusteringTrace capturedTrace() {
-        ArgumentCaptor<ClusteringTrace> captor = ArgumentCaptor.forClass(ClusteringTrace.class);
-        verify(clusteringTraceRepository).upsert(captor.capture());
-        return captor.getValue();
-    }
 
     // 결정: 이동종(늑대 등)은 시도 단위 후보 쿼리로 찾는다. 인자는 하나라도 어긋나면 사고가 난다 -
     //       until 이 알림 시각이어야 판정 순간에 없던 미래 이벤트가 후보에 안 들어오고, selfEventId=-1 은 "제외할 자기 이벤트 없음",
@@ -178,10 +167,6 @@ class EventClusteringServiceAnimalTest {
         assertThat(mapping.getValue().getMergeMethod()).isEqualTo(MergeMethod.LLM);
         verify(disasterEventRepository).incrementOnMerge(11L, alert.getCreatedAt());
 
-        ClusteringTrace trace = capturedTrace();
-        assertThat(trace.getPath()).isEqualTo(ClusteringTracePath.ANIMAL);
-        assertThat(trace.getResult()).isEqualTo(ClusteringTraceResult.MERGED);
-        assertThat(trace.getEventId()).isEqualTo(11L);
     }
 
     // 결정: 토착종(멧돼지·들개·뱀)은 국지적으로만 움직이므로 시도가 아니라 시군구 단위 쿼리를 쓴다.
@@ -214,9 +199,6 @@ class EventClusteringServiceAnimalTest {
 
         service.clusterNewAlert(ALERT_ID);
 
-        ClusteringTrace trace = capturedTrace();
-        assertThat(trace.getPath()).isEqualTo(ClusteringTracePath.ANIMAL);
-        assertThat(trace.getResult()).isEqualTo(ClusteringTraceResult.NEW);
         verify(llmDecisionService, never()).pickSameIncident(any(), any());
     }
 }

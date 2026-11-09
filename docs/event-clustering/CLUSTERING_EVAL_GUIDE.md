@@ -78,36 +78,42 @@
 
 주의: 기준선 파일에 `## 놓친 쌍 / 잘못 묶은 쌍` 절 제목이 없으면(평가 리포트가 아닌 파일) `BaselineReportParser.parse` 가 `IllegalArgumentException` 을 던져 **즉시 실패한다.** 조용히 "이전에 틀린 쌍 0개"로 읽혀 이번 틀린 쌍 전부가 "새로 틀림"으로 나오는 경우는 둘뿐이다: (a) 제목은 있고 표가 빈 정상 기준선, (b) 현재 평가와 **다른 데이터셋**의 기준선(이번 범위에서는 막지 않는다). 고쳐짐 0 / 새로 틀림이 이번 틀린 쌍 수와 같으면 (b) 를 의심해 기준선 경로·데이터셋부터 확인하라.
 
-## 판정 기록(clustering_trace)
-놓친 쌍을 진단할 때 과거 상황을 짐작하지 않도록, 클러스터링은 알림마다 판정 순간에 실제로 본 것을 `clustering_trace` 테이블에 한 줄 남긴다(운영 수집과 백필 재클러스터링 모두, PR #312). 기록은 판정 코드가 이미 가진 값을 그대로 옮긴 것이라 원인 추정은 들어 있지 않다. **이 도구는 이 표를 읽지 않는다** — 리포트의 틀린 쌍을 보고 사람이 아래 SQL 로 찾아본다. 컬럼 정의의 원본은 `ADMIN_EVAL_DASHBOARD_DESIGN.md` 4절 ① 이다.
+## 틀린 쌍을 들여다보는 법
+리포트의 틀린 쌍은 사실만 적혀 있고 **왜 그렇게 됐는지는 적히지 않는다.** 원인은 사람이 따로 찾는다.
 
-| 컬럼 | 내용 |
-|---|---|
-| alert_id | 알림 id (PK). 같은 알림을 다시 클러스터링하면 덮어쓴다 |
-| path | 탄 경로: EMBEDDING, REGIONAL, EPISODIC, PERSON, ANIMAL, GLOBAL_TYPE, BROADCAST, NO_REGION, SKIPPED |
-| candidates | 같은 시군구 후보 JSON `[{"event":15918,"dist":0.387}]`. 검색했는데 0건이면 `[]`, 검색하지 않는 경로면 null |
-| adjacent_candidates | 인접 시군구 후보(같은 형식). 실제로 조회했을 때만 채우고 그 외 null |
-| threshold | 그 알림에 적용된 병합 기준 거리. 임베딩 경로가 아니면 null |
-| llm_called / llm_result | LLM 폴백을 실제로 호출했는지, 고른 이벤트 id(없음이면 null) |
-| result | MERGED / NEW / SKIPPED(비사건·본문 없음) |
-| event_id | 최종 배정 이벤트 id (SKIPPED 면 null) |
-| created_at | 기록 시각 |
+판정 순간을 기록하던 `clustering_trace` 테이블은 **2026-11-08 에 들어냈다**(경위는 `CLUSTERING_EVALUATION.md` 9절). 그래서 지금 쓸 수 있는 수단은 둘뿐이다.
 
-- 평가 사본에서 재클러스터링(백필)할 때는 `event_alert_mapping`, `disaster_event_translation`, `event_region_impact`, `region_risk_index`, `disaster_events`, `clustering_trace` 를 **한 번의 `TRUNCATE` 명령**으로 함께 비운 뒤 돌려야 옛 기록이 섞이지 않는다. `disaster_event_translation`·`event_region_impact`·`region_risk_index` 는 `disaster_events` 를 참조하는 외래 키가 있어 같은 명령에 넣지 않으면 `TRUNCATE` 가 실패한다. 위험도 기능은 2026-11-05 에 삭제됐지만 `event_region_impact`·`region_risk_index` 테이블과 외래 키는 남아 있어 지금도 비워야 한다. 자동으로 지우지 않는다. 명령은 `EventClusteringBackfillTool` javadoc 의 권장 절차와 같다: `TRUNCATE event_alert_mapping, disaster_event_translation, event_region_impact, region_risk_index, disaster_events, clustering_trace RESTART IDENTITY;`
+1. **재클러스터링 로그** — 알림마다 탄 경로와 병합 결과가 찍힌다. 후보 이벤트와 거리(`event=… dist=…`)는 **임베딩 경로(일반 후보 검색)에서만** 찍힌다. 동물 경로(`clusterAnimal`)는 후보 수와 선택된 이벤트만 남기고 후보 목록·거리는 남기지 않으므로 로그를 보존해도 동물 후보는 확인할 수 없다. 재클러스터링할 때 로그를 파일로 남겨 두면 그 실행에 한해 판정을 되짚을 수 있다.
+2. **후보 검색을 SQL 로 재현** — 나중에 들어온 알림 기준으로 "같은 시군구 + 후보 윈도우(168h) 안 이벤트"를 거리순으로 다시 뽑아 본다. `findTopCandidates` 처럼 윈도우는 **이벤트의 마지막 알림 시각**(판정 시점 이전)으로 검사하고 broadcast·advisory 이벤트는 뺀다. 그래도 그 순간 실제로 본 후보가 아니라 **지금 이벤트 배정으로 다시 계산한 값**이라는 한계가 있다.
 
-### 놓친 쌍 하나를 들여다보는 법
-두 알림 중 **나중에 들어온 알림**의 기록을 본다. 먼저 들어온 알림의 이벤트가 후보에 있었는지가 핵심이다.
 ```sql
-SELECT event_id FROM event_alert_mapping WHERE alert_id = <먼저 알림 id>;        -- 정답 이벤트
-SELECT path, candidates, adjacent_candidates, threshold, llm_called, llm_result, result, event_id
-  FROM clustering_trace WHERE alert_id = <나중 알림 id>;
+-- 먼저 들어온 알림이 속한 정답 이벤트
+SELECT event_id FROM event_alert_mapping WHERE alert_id = <먼저 알림 id>;
+
+-- 나중 알림 기준으로 같은 시군구·168h 안 후보를 거리순으로 재현
+WITH t AS (SELECT embedding, created_at FROM disaster_alert WHERE disaster_alert_id = <나중 알림 id>),
+     s AS (SELECT DISTINCT left(legal_district_code,5) c FROM disaster_alert_region WHERE disaster_alert_id = <나중 알림 id>)
+SELECT m.event_id, round(min(a.embedding <=> (SELECT embedding FROM t))::numeric,4) AS dist
+FROM event_alert_mapping m
+JOIN disaster_alert a ON a.disaster_alert_id = m.alert_id
+JOIN disaster_alert_region r ON r.disaster_alert_id = a.disaster_alert_id
+JOIN disaster_events e ON e.id = m.event_id
+WHERE e.is_broadcast = false AND e.is_advisory = false
+  AND left(r.legal_district_code,5) IN (SELECT c FROM s)
+  AND a.created_at < (SELECT created_at FROM t)
+  AND a.embedding IS NOT NULL
+  -- 이벤트의 마지막 알림(판정 시점 이전)이 168h 안인가 = 168h 안에 알림이 하나라도 있는가
+  AND EXISTS (SELECT 1 FROM event_alert_mapping m2
+              JOIN disaster_alert a2 ON a2.disaster_alert_id = m2.alert_id
+              WHERE m2.event_id = m.event_id
+                AND a2.created_at < (SELECT created_at FROM t)
+                AND a2.created_at > (SELECT created_at FROM t) - interval '168 hours')
+GROUP BY m.event_id ORDER BY dist LIMIT 3;
 ```
 
-**예시 1 — 후보에 없음.** 경로 EMBEDDING, `candidates` 에 정답 이벤트가 없다(`[]` 포함). 늦게 들어온 알림이 처리되던 순간 클러스터링은 먼저 들어온 알림의 이벤트를 후보로 보지 못했다. 왜 후보가 안 됐는지(시군구가 달랐는지, 시간 범위 밖이었는지 등)는 이 칸이 말해 주지 않으므로 리포트의 "같은 시군구", "간격(시간)" 사실과 함께 본다.
+정답 이벤트가 이 SQL 의 상위 3개(실제 검색의 상위 3개와 같은 범위)에 있어도 **이것만으로 판정 단계 실패를 확정하지 마라** — 이 결과는 판정 당시의 후보를 증명하지 못한다. 재클러스터링 로그로 정답 이벤트가 실제 검색 후보였음을 확인한 경우에만 검색이 아니라 판정(임계값·LLM 폴백·가드)에서 막힌 것으로 본다. 그 다음은 코드를 읽어야 한다 — 기록이 있어도 "무엇을 봤는가"까지만 알 수 있고 "왜 그 가드에 걸렸는가"는 코드에만 있다(2026-11-07 거제 화재 사례에서 실제로 그랬다).
 
-**예시 2 — 후보에 있었음.** 경로 EMBEDDING, `candidates` 에 정답 이벤트가 거리 0.21 로 있고 `threshold` 0.15, `llm_called` false, `result` NEW. 후보로는 올랐지만 거리가 기준을 넘었고 LLM 판정도 거치지 않아 새 이벤트가 됐다. 그 거리가 사람이 같다고 본 쌍에 비해 큰지는 사람이 판단한다.
-
-**키 경로.** 경로가 PERSON, ANIMAL, GLOBAL_TYPE, REGIONAL, EPISODIC, BROADCAST 이면 본문 거리가 아니라 키(신원·종·유형+시군구 등)로 이벤트가 정해져 `candidates` 는 null 이다(ANIMAL 은 종 후보를 담는다).
+- 평가 사본에서 재클러스터링(백필)할 때는 `event_alert_mapping`, `disaster_event_translation`, `event_region_impact`, `region_risk_index`, `disaster_events` 를 **한 번의 `TRUNCATE` 명령**으로 함께 비운 뒤 돌려야 한다. 앞의 세 표는 `disaster_events` 를 참조하는 외래 키가 있어 같은 명령에 넣지 않으면 `TRUNCATE` 가 실패한다. 위험도 기능은 2026-11-05 에 삭제됐지만 `event_region_impact`·`region_risk_index` 테이블과 외래 키는 남아 있어 지금도 비워야 한다. 자동으로 지우지 않는다. 명령은 `EventClusteringBackfillTool` javadoc 의 권장 절차와 같다: `TRUNCATE event_alert_mapping, disaster_event_translation, event_region_impact, region_risk_index, disaster_events RESTART IDENTITY;`
 
 ## 이 도구가 하지 않는 것
 - **왜 놓쳤는지(검색 단계인지 판정 단계인지) 계산하지 않는다.** 어느 단계가 막혔는지는 필요할 때 별도로 조사한다.

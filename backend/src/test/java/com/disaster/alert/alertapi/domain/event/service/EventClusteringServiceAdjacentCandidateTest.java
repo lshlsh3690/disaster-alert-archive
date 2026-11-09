@@ -7,7 +7,6 @@ import com.disaster.alert.alertapi.domain.event.model.DisasterEvent;
 import com.disaster.alert.alertapi.domain.event.model.EventAlertMapping;
 import com.disaster.alert.alertapi.domain.event.model.MergeMethod;
 import com.disaster.alert.alertapi.domain.event.repository.AlertEmbeddingRepository;
-import com.disaster.alert.alertapi.domain.event.repository.ClusteringTraceRepository;
 import com.disaster.alert.alertapi.domain.event.repository.DisasterEventRepository;
 import com.disaster.alert.alertapi.domain.event.repository.EventAlertMappingRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -62,7 +61,6 @@ class EventClusteringServiceAdjacentCandidateTest {
     @Mock EventAlertMappingRepository eventAlertMappingRepository;
     @Mock AlertEmbeddingRepository alertEmbeddingRepository;
     @Mock EventLLMDecisionService llmDecisionService;
-    @Mock ClusteringTraceRepository clusteringTraceRepository;
 
     EventClusteringService service;
     LocalDateTime now = LocalDateTime.of(2026, 7, 20, 12, 0);
@@ -70,8 +68,7 @@ class EventClusteringServiceAdjacentCandidateTest {
     @BeforeEach
     void setUp() {
         service = new EventClusteringService(embeddingModel, disasterAlertRepository, disasterEventRepository,
-                eventAlertMappingRepository, alertEmbeddingRepository, llmDecisionService,
-                clusteringTraceRepository);
+                eventAlertMappingRepository, alertEmbeddingRepository, llmDecisionService);
         ReflectionTestUtils.setField(service, "similarityThreshold", 0.85);
         ReflectionTestUtils.setField(service, "candidateWindowHours", 168);
         ReflectionTestUtils.setField(service, "maxRegionSpan", 10);
@@ -277,7 +274,7 @@ class EventClusteringServiceAdjacentCandidateTest {
     }
 
     @Test
-    @DisplayName("i) 화재 알림 + 후보 이벤트 마지막 알림이 72h 초과 과거: 쿨다운 가드로 병합하지 않고 신규 이벤트")
+    @DisplayName("i) 화재 알림 + 후보 이벤트 마지막 알림 73h 전(첫 알림은 78h 전): 이벤트 나이 상한(첫 알림 기준 72h) 초과로 병합하지 않고 신규 이벤트")
     void adjacentFireCandidateOlderThanCooldown_createsNewEvent() {
         alert("화재", FIRE);
         sameRegionCandidates();
