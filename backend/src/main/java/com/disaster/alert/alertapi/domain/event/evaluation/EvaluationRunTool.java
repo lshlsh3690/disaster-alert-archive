@@ -61,7 +61,7 @@ public class EvaluationRunTool implements ApplicationRunner {
         }).toList();
 
         // 4) 리포트는 항상 로그로, --eval.report 가 있으면 파일로도 쓴다
-        //    마크다운(줄 단위): '# 클러스터링 평가 - cluster-eval-2026-10-incident' → '## 요약' → '- 점수 …점' → '- 순도 …%' → '- 완성도 …%' → 틀린 쌍 표
+        //    마크다운(줄 단위): '# 클러스터링 평가 - cluster-eval-2026-10-incident' → '## 요약' → '- 점수 …점' → '- 맞게 묶은 비율 …%' → '- 빠짐없이 묶은 비율 …%' → 틀린 쌍 표
         //    --eval.baseline 이 있으면 이전 리포트의 틀린 쌍과 비교한 "이전 대비" 절이 붙는다(없으면 diff=null → 절 없음)
         ReportDiff.Result diff = baseline == null ? null : ReportDiff.compare(baseline, toReportedPairs(result));
         String report = ReportFormatter.format(datasetName(labels), LocalDateTime.now(), result, rows, diff);
