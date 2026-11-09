@@ -12,8 +12,8 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * 사건/비사건 사람 라벨 파일 읽기. 분류기 평가({@link AlertKindEvalTool})와 판사 신뢰도 측정
- * (JudgeReliabilityTool)이 같은 라벨 규칙을 쓰도록 한 곳에 둔다 — 따로 두면 한쪽 규칙만 바뀌어 두 측정이 조용히 어긋난다.
+ * 사건/비사건 사람 라벨 파일 읽기. 분류기 평가({@link AlertKindEvalTool})가 쓴다.
+ * (예전에는 LLM 판사 신뢰도 측정도 같은 규칙을 공유했으나 판사 기능은 2026-11-09 에 삭제했다.)
  *
  * <p>형식은 {@code [{"id":..,"label":"사건|특보|안내|비사건|UNSURE|모르겠음"}]}. 특보·안내는 비사건으로 합치고 모르겠음은 뺀다.
  */
