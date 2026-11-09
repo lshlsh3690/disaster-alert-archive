@@ -22,23 +22,45 @@ class ReportFormatterTest {
                 List.of());
     }
 
-    // 리포트 요약은 사람이 숫자 두 개만 보고 상태를 파악하게 하는 것이 목적이라 문장형 형식이 고정돼 있다.
-    // Red 단계: 뼈대는 빈 문자열을 돌려줘 문장이 하나도 들어 있지 않으므로 실패한다.
+    // 요약은 점수 한 줄로 전체 품질을 먼저 보여 주고, 그 아래에 점수의 두 재료(순도·완성도)를 근거 개수와 함께 적는다.
+    // 옛 과소병합율·과병합율은 괄호 안에 남겨 이전 리포트와 이어 읽게 한다.
+    // Red 단계: 포매터는 아직 옛 두 줄("→ 과소병합율 ...")만 쓰므로 점수·순도·완성도 줄이 없어 실패한다.
     @Test
-    void 가이드_예시가_문장형_요약으로_그대로_나온다() {
-        // 준비: 모르겠음 3쌍, 미배정 4쌍이 따로 제외된 결과
-        PairCountResult result = new PairCountResult(2, 2, 1, 3, 4, OptionalDouble.of(50.0), OptionalDouble.of(100.0 / 3),
-                List.of());
+    void 요약에_점수_순도_완성도_줄이_나온다() {
+        // 준비: 맞게 묶음 39, 놓침 21, 잘못 묶음 3(현재 develop 측정값), 모르겠음 6쌍 제외
+        // 과소병합율 = 21/60 = 35.0%, 과병합율 = 3/42 = 7.1% (PairCounter 가 이미 계산해 넘기는 값)
+        PairCountResult result = new PairCountResult(39, 21, 3, 6, 0,
+                OptionalDouble.of(21 * 100.0 / 60), OptionalDouble.of(3 * 100.0 / 42), List.of());
 
         // 실행
         String report = ReportFormatter.format("cluster-eval-2026-10", RUN_AT, result, List.of());
 
-        // 검증: 같은 사건 = 맞게 묶음+놓침 = 4, 묶은 쌍 = 맞게 묶음+잘못 묶음 = 3
+        // 검증: 순도 = 39/42 = 92.9%, 완성도 = 39/60 = 65.0%
+        // 점수 = 2*39 / (2*39 + 21 + 3) = 78/102 = 76.5 (반올림된 비율이 아니라 개수로 계산한 값)
         assertThat(report)
                 .contains("## 요약")
-                .contains("- 같은 사건 4쌍 중 2쌍 묶음, 2쌍 놓침 → 과소병합율 50.0%")
-                .contains("- 묶은 3쌍 중 2쌍 맞음, 1쌍 잘못 묶음 → 과병합율 33.3%")
-                .contains("- 제외: 모르겠음 3쌍, 이벤트 미배정 4쌍");
+                .contains("- 점수 76.5점 — 순도와 완성도의 조화평균")
+                .contains("- 순도 92.9% — 묶은 42쌍 중 39쌍 맞음, 3쌍 잘못 묶음 (과병합율 7.1%)")
+                .contains("- 완성도 65.0% — 같은 사건 60쌍 중 39쌍 묶음, 21쌍 놓침 (과소병합율 35.0%)")
+                .contains("- 제외: 모르겠음 6쌍, 이벤트 미배정 0쌍");
+    }
+
+    // 점수를 조화평균으로 고른 이유는 한쪽이 낮으면 점수도 끌려 내려가게 하려는 것이다(산술평균은 한쪽이 100% 면 가려진다).
+    // 전부 묶어 순도만 100% 로 만들어도 완성도가 낮으면 점수가 높게 나오면 안 된다.
+    // Red 단계: 포매터가 점수 줄을 아직 쓰지 않아 실패한다.
+    @Test
+    void 점수는_산술평균이_아니라_조화평균이다() {
+        // 준비: 맞게 묶음 10, 놓침 10, 잘못 묶음 0 → 순도 100%, 완성도 50% (과소병합율 50.0, 과병합율 0.0)
+        PairCountResult result = new PairCountResult(10, 10, 0, 0, 0,
+                OptionalDouble.of(50.0), OptionalDouble.of(0.0), List.of());
+
+        // 실행
+        String report = ReportFormatter.format("ds", RUN_AT, result, List.of());
+
+        // 검증: 산술평균이면 (100+50)/2 = 75.0 이지만 조화평균은 2*10 / (2*10 + 10 + 0) = 66.7
+        assertThat(report)
+                .contains("- 점수 66.7점")
+                .doesNotContain("75.0점");
     }
 
     // 머리에는 어떤 데이터셋을 언제 돌렸는지만 적는다(옛 리포트와 직접 비교하지 않도록 이름과 시각이 필요).
@@ -53,7 +75,7 @@ class ReportFormatterTest {
     }
 
     // 분모가 0 이면 0% 로 쓰면 "완벽" 으로 오해되므로 "-" 로 쓴다.
-    // Red 단계: 뼈대는 빈 문자열이라 "과소병합율 -" 가 없어 실패한다.
+    // 요약 개편으로 옛 비율은 괄호 안("(과소병합율 -)")에 남는다. 이 테스트는 새 형식에서도 대시 규칙이 유지되는지 고정한다.
     @Test
     void 분모가_0이면_비율_자리에_대시() {
         // 준비: 비율이 둘 다 없는(empty) 결과
@@ -63,7 +85,7 @@ class ReportFormatterTest {
         String report = ReportFormatter.format("ds", RUN_AT, result, List.of());
 
         // 검증: 퍼센트 기호 없이 "-" 만 적힌다
-        assertThat(report).contains("→ 과소병합율 -").contains("→ 과병합율 -");
+        assertThat(report).contains("(과소병합율 -)").contains("(과병합율 -)");
     }
 
     // 실행 PC 의 기본 Locale 이 한국어/유럽형이면 String.format 이 소수점을 콤마로 쓸 수 있다.
