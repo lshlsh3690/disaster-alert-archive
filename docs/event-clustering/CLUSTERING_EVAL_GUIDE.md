@@ -146,12 +146,14 @@ GROUP BY m.event_id ORDER BY dist LIMIT 3;
 리포트는 `backend/evaluation/reports/` 에 둔다. 지금 기준점은 `2026-11_2026-11-09.md` 다. 그 전 리포트는 지운 예전 셋으로 잰 기록이라 이 셋과 직접 비교하지 않는다. 그중 `*_2026-10-19.md` 세 개가 이 도구로 잰 첫 기준점이었고, 그 전 리포트(`before.md`, `after_v0.md` 등)는 옛 형식이라 직접 비교하지 않는다.
 
 ## 실행
-라벨은 CSV 에서 바로 읽는다(DB 적재 없음, `evaluation_label` 테이블도 쓰지 않는다). 평가용 DB 사본에서 `eval` 프로필로 실행한다(OpenAI 호출 없음, 운영 DB 에는 실행하지 않는다).
+라벨은 CSV 에서 바로 읽는다(DB 적재 없음, `evaluation_label` 테이블도 쓰지 않는다). 평가용 DB 사본에서 `eval` 프로필로 실행한다(OpenAI 호출 없음, 운영 DB 에는 실행하지 않는다). `backend/` 에서 루트 `.env.dev` 를 불러온 뒤 실행한다.
 ```
-./gradlew bootRun --args='--spring.profiles.active=eval --eval.labels=<CSV 경로> --eval.report=<리포트 경로> --eval.baseline=<이전 리포트 경로>'
+set -a; . ../.env.dev; set +a
+./gradlew bootRun --args='--spring.profiles.active=eval --spring.datasource.url=jdbc:postgresql://localhost:5432/disaster_alert_eval_v5 --server.port=0 --eval.labels=<CSV 경로> --eval.report=<리포트 경로> --eval.baseline=<이전 리포트 경로>'
 ```
+- `--spring.datasource.url`(사실상 필수): 평가 사본. 빼면 `.env.dev` 의 개발 DB 에 붙어 엉뚱한 배정을 읽는다. `--server.port=0` 은 실행 중인 다른 서버와 포트가 겹치지 않게 한다.
 - `--eval.labels`(필수): 라벨 CSV 경로.
 - `--eval.report`(선택): 마크다운 리포트 경로. 없으면 로그로만 출력한다.
-- `--eval.baseline`(선택): 비교할 **이전 리포트** 경로(예: `backend/evaluation/reports/incident_2026-11-07.md`). 주면 `## 이전 대비` 절이 붙고, 안 주면 그 절이 없다. 파일이 없거나 `## 놓친 쌍 / 잘못 묶은 쌍` 절 제목이 없으면(`IllegalArgumentException`) DB 를 건드리기 전에 즉시 실패한다. 읽는 법은 위 "이전 대비" 절.
+- `--eval.baseline`(선택): 비교할 **이전 리포트** 경로(예: 지금 기준선 `backend/evaluation/reports/2026-11_2026-11-09.md`). 주면 `## 이전 대비` 절이 붙고, 안 주면 그 절이 없다. 파일이 없거나 `## 놓친 쌍 / 잘못 묶은 쌍` 절 제목이 없으면(`IllegalArgumentException`) DB 를 건드리기 전에 즉시 실패한다. 읽는 법은 위 "이전 대비" 절.
 - 리포트 머리에는 데이터셋 이름과 실행 시각만 적고, 끝나면 애플리케이션이 종료된다.
 - CSV 형식 오류(헤더 불일치, 컬럼 수, 숫자 아님, 같은 id, 알 수 없는 label, (a,b)/(b,a) 중복)는 줄 번호와 함께 즉시 실패한다.
