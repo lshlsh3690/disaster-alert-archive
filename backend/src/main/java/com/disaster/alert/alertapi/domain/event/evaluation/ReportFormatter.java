@@ -47,16 +47,19 @@ public final class ReportFormatter {
         sb.append("# 클러스터링 평가 - ").append(datasetName).append('\n');
         sb.append("- 실행 시각: ").append(runAt.format(RUN_AT_FORMAT)).append("\n\n");
 
-        // 2) 요약: 분모는 같은 사건=맞게 묶음+놓침, 묶은 쌍=맞게 묶음+잘못 묶음
+        // 2) 요약: 점수 한 줄로 전체 품질을 먼저 보이고, 그 재료인 순도·완성도를 근거 개수와 함께 적는다
+        //    분모는 묶은 쌍 = 맞게 묶음+잘못 묶음, 같은 사건 쌍 = 맞게 묶음+놓침. 옛 과병합율·과소병합율은
+        //    괄호에 남겨 이전 리포트와 이어 읽게 한다(PairCounter 가 계산해 넘긴 값을 그대로 쓴다)
         int same = result.correctlyMerged() + result.missed();
         int merged = result.correctlyMerged() + result.overMerged();
         sb.append("## 요약\n");
-        sb.append("- 같은 사건 ").append(same).append("쌍 중 ").append(result.correctlyMerged())
-                .append("쌍 묶음, ").append(result.missed()).append("쌍 놓침 → 과소병합율 ")
-                .append(percent(result.underMergeRate())).append('\n');
-        sb.append("- 묶은 ").append(merged).append("쌍 중 ").append(result.correctlyMerged())
-                .append("쌍 맞음, ").append(result.overMerged()).append("쌍 잘못 묶음 → 과병합율 ")
-                .append(percent(result.overMergeRate())).append('\n');
+        sb.append("- 점수 ").append(score(result.score())).append(" — 순도와 완성도의 조화평균\n");
+        sb.append("- 순도 ").append(percent(result.purity())).append(" — 묶은 ").append(merged).append("쌍 중 ")
+                .append(result.correctlyMerged()).append("쌍 맞음, ").append(result.overMerged())
+                .append("쌍 잘못 묶음 (과병합율 ").append(percent(result.overMergeRate())).append(")\n");
+        sb.append("- 완성도 ").append(percent(result.completeness())).append(" — 같은 사건 ").append(same)
+                .append("쌍 중 ").append(result.correctlyMerged()).append("쌍 묶음, ").append(result.missed())
+                .append("쌍 놓침 (과소병합율 ").append(percent(result.underMergeRate())).append(")\n");
         sb.append("- 제외: 모르겠음 ").append(result.excludedUnsure()).append("쌍, 이벤트 미배정 ")
                 .append(result.excludedUnassigned()).append("쌍\n");
 
@@ -142,6 +145,11 @@ public final class ReportFormatter {
                 .append(" | ").append(f.gapHours())
                 .append(" | ").append(distance)
                 .append(" | ").append(kind).append(" |\n");
+    }
+
+    // 점수는 퍼센트 기호 대신 "점" 을 붙인다. 분모 0 이면 "-" 라 "-점" 이 되지 않게 단위는 값이 있을 때만 붙인다
+    private static String score(OptionalDouble score) {
+        return score.isPresent() ? String.format(Locale.ROOT, "%.1f점", score.getAsDouble()) : "-";
     }
 
     // Locale.ROOT: 실행 PC 가 콤마 소수점 Locale 이어도 점으로 쓴다. 분모 0 이면 "-"
