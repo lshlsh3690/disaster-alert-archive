@@ -207,7 +207,7 @@
 
 이 저장소에서 **처음으로 한 가지 변경에만 귀속되는 비교**다. 같은 사본에서 가드 유무만 바꿔 두 번 재클러스터링했다.
 
-- 사본: `disaster_alert_eval_kind`(분류 완비 — INCIDENT 50,714 / ADVISORY 11,840). 매 회차 이벤트 테이블을 비우고 `--backfill.recluster=true`.
+- 사본: `disaster_alert_eval_kind`(INCIDENT 50,714 / ADVISORY 11,840). **분류 완비가 아니다** — 2절 절차대로 라벨 쌍 주변 약 1.4만 건만 분류하고 나머지는 INCIDENT 로 채운 사본이다(2026-11-09 정정). 라벨 쌍 주변은 분류돼 있어 아래 쌍 비교는 유효하지만, 말뭉치 전체 집계(이벤트 수, 새로 연 병합 35건 등)에는 분류되지 않은 안내 문자가 섞여 있다. 매 회차 이벤트 테이블을 비우고 `--backfill.recluster=true`.
 - 1회차 `origin/develop`(가드 있음) → `backend/evaluation/reports/incident_before_2026-11-08.md`
 - 2회차 가드 제거본 → `incident_after_2026-11-08.md` (`--eval.baseline` 으로 1회차와 비교)
 - 소요 36.9분 + 32.4분, 비용 합계 약 $0.4.
