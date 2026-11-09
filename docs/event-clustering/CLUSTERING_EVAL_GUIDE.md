@@ -83,8 +83,8 @@
 
 판정 순간을 기록하던 `clustering_trace` 테이블은 **2026-11-08 에 들어냈다**(경위는 `CLUSTERING_EVALUATION.md` 9절). 그래서 지금 쓸 수 있는 수단은 둘뿐이다.
 
-1. **재클러스터링 로그** — 알림마다 탄 경로, 후보 이벤트와 거리(`event=… dist=…`), 병합 결과가 찍힌다. 재클러스터링할 때 로그를 파일로 남겨 두면 그 실행에 한해 판정을 되짚을 수 있다.
-2. **후보 검색을 SQL 로 재현** — 나중에 들어온 알림 기준으로 "같은 시군구 + 후보 윈도우(168h) 안 이벤트"를 거리순으로 다시 뽑아 본다. 그 순간 실제로 본 후보가 아니라 **지금 데이터로 다시 계산한 값**이라는 한계가 있다.
+1. **재클러스터링 로그** — 알림마다 탄 경로와 병합 결과가 찍힌다. 후보 이벤트와 거리(`event=… dist=…`)는 **임베딩 경로(일반 후보 검색)에서만** 찍힌다. 동물 경로(`clusterAnimal`)는 후보 수와 선택된 이벤트만 남기고 후보 목록·거리는 남기지 않으므로 로그를 보존해도 동물 후보는 확인할 수 없다. 재클러스터링할 때 로그를 파일로 남겨 두면 그 실행에 한해 판정을 되짚을 수 있다.
+2. **후보 검색을 SQL 로 재현** — 나중에 들어온 알림 기준으로 "같은 시군구 + 후보 윈도우(168h) 안 이벤트"를 거리순으로 다시 뽑아 본다. `findTopCandidates` 처럼 윈도우는 **이벤트의 마지막 알림 시각**(판정 시점 이전)으로 검사하고 broadcast·advisory 이벤트는 뺀다. 그래도 그 순간 실제로 본 후보가 아니라 **지금 이벤트 배정으로 다시 계산한 값**이라는 한계가 있다.
 
 ```sql
 -- 먼저 들어온 알림이 속한 정답 이벤트
@@ -97,14 +97,21 @@ SELECT m.event_id, round(min(a.embedding <=> (SELECT embedding FROM t))::numeric
 FROM event_alert_mapping m
 JOIN disaster_alert a ON a.disaster_alert_id = m.alert_id
 JOIN disaster_alert_region r ON r.disaster_alert_id = a.disaster_alert_id
-WHERE left(r.legal_district_code,5) IN (SELECT c FROM s)
+JOIN disaster_events e ON e.id = m.event_id
+WHERE e.is_broadcast = false AND e.is_advisory = false
+  AND left(r.legal_district_code,5) IN (SELECT c FROM s)
   AND a.created_at < (SELECT created_at FROM t)
-  AND a.created_at >= (SELECT created_at FROM t) - interval '168 hours'
   AND a.embedding IS NOT NULL
-GROUP BY m.event_id ORDER BY dist LIMIT 5;
+  -- 이벤트의 마지막 알림(판정 시점 이전)이 168h 안인가 = 168h 안에 알림이 하나라도 있는가
+  AND EXISTS (SELECT 1 FROM event_alert_mapping m2
+              JOIN disaster_alert a2 ON a2.disaster_alert_id = m2.alert_id
+              WHERE m2.event_id = m.event_id
+                AND a2.created_at < (SELECT created_at FROM t)
+                AND a2.created_at > (SELECT created_at FROM t) - interval '168 hours')
+GROUP BY m.event_id ORDER BY dist LIMIT 3;
 ```
 
-정답 이벤트가 **거리 상위에 있는데도 안 묶였다면** 검색이 아니라 판정(임계값·LLM 폴백·가드)에서 막힌 것이다. 그 다음은 코드를 읽어야 한다 — 기록이 있어도 "무엇을 봤는가"까지만 알 수 있고 "왜 그 가드에 걸렸는가"는 코드에만 있다(2026-11-07 거제 화재 사례에서 실제로 그랬다).
+정답 이벤트가 이 SQL 의 상위 3개(실제 검색의 상위 3개와 같은 범위)에 있어도 **이것만으로 판정 단계 실패를 확정하지 마라** — 이 결과는 판정 당시의 후보를 증명하지 못한다. 재클러스터링 로그로 정답 이벤트가 실제 검색 후보였음을 확인한 경우에만 검색이 아니라 판정(임계값·LLM 폴백·가드)에서 막힌 것으로 본다. 그 다음은 코드를 읽어야 한다 — 기록이 있어도 "무엇을 봤는가"까지만 알 수 있고 "왜 그 가드에 걸렸는가"는 코드에만 있다(2026-11-07 거제 화재 사례에서 실제로 그랬다).
 
 - 평가 사본에서 재클러스터링(백필)할 때는 `event_alert_mapping`, `disaster_event_translation`, `event_region_impact`, `region_risk_index`, `disaster_events` 를 **한 번의 `TRUNCATE` 명령**으로 함께 비운 뒤 돌려야 한다. 앞의 세 표는 `disaster_events` 를 참조하는 외래 키가 있어 같은 명령에 넣지 않으면 `TRUNCATE` 가 실패한다. 위험도 기능은 2026-11-05 에 삭제됐지만 `event_region_impact`·`region_risk_index` 테이블과 외래 키는 남아 있어 지금도 비워야 한다. 자동으로 지우지 않는다. 명령은 `EventClusteringBackfillTool` javadoc 의 권장 절차와 같다: `TRUNCATE event_alert_mapping, disaster_event_translation, event_region_impact, region_risk_index, disaster_events RESTART IDENTITY;`
 

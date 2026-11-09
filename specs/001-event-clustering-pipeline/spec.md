@@ -233,7 +233,7 @@
 **사고성 사건 LLM 폴백**
 
 - **FR-025**: 시스템은 알림 유형이 `llm-fallback.accident-types`(기본 `"기타,화재,산불,붕괴,교통사고,교통통제,교통,환경오염사고,정전,통신,테러,지진,지진해일,수도"`)에 속하며 동물 키워드(`탈출|출몰|멧돼지|들개|늑대`)에 매칭되지 않을 때만 LLM 폴백을 시도해야 한다(MUST) (`EventClusteringService.java:84-85`, `254-257`).
-- **FR-026**: 시스템은 코사인 거리가 `(mergeMaxDistance, llm-fallback.distance-ceil]`(기본 `(0.15, 0.40]`) 구간인 같은 지역 후보만 LLM 질의 대상으로 삼아야 한다(MUST). 후보 이벤트의 대표(seed) 유형도 사고성 화이트리스트에 속해야 한다(MUST) (`EventClusteringService.java:88-90`, `272-303`). 또한 알림 유형이 "화재"이면 후보 이벤트의 마지막 알림이 알림 시각보다 72시간(`DisasterCooldown.hoursFor("화재")`) 넘게 이전이거나 알림이 이벤트 시작보다 이른 경우 후보에서 제외해야 한다(MUST) — 같은 시군구의 별개 화재를 한 사건으로 합치는 오병합 방지(운영 데이터 분석 2026-10, 화재 폴백 오병합 약 30%); 마지막 알림 기준이라 후속 알림이 계속 오는 대형 화재는 잘리지 않는다 (`DisasterCooldown.java:57-75`, `EventClusteringService.java:294-298`).
+- **FR-026**: 시스템은 코사인 거리가 `(mergeMaxDistance, llm-fallback.distance-ceil]`(기본 `(0.15, 0.40]`) 구간인 같은 지역 후보만 LLM 질의 대상으로 삼아야 한다(MUST). 후보 이벤트의 대표(seed) 유형도 사고성 화이트리스트에 속해야 한다(MUST) (`EventClusteringService.java:88-90`, `272-303`). 화재에만 걸던 "후보 이벤트의 마지막 알림이 72시간 넘게 이전이면 제외" 가드는 2026-11-07 제거했다 — `allowsAccidentMerge` 는 후보의 사고성 유형만 확인한다. 제거 경위와 대가(과소병합·과병합 맞바꿈)는 `docs/event-clustering/CLUSTERING_EVALUATION.md` 10절. 인접 병합 경로의 첫 알림 72시간 조건(`withinAdjacentEventAge`)은 별개로 유지된다.
 - **FR-027**: 시스템은 LLM이 후보를 "동일 사건"으로 지목하면 `MergeMethod.LLM_FALLBACK`으로 병합해야 한다(MUST). LLM 호출 실패, 응답에 "NONE" 포함, 응답에서 숫자를 못 찾음, 또는 응답 번호가 후보 범위를 벗어나면 모두 매칭 없음(null)으로 처리해 병합하지 않아야 한다(MUST) — 모호할 때는 병합하지 않는 보수적 정책 (`EventClusteringService.java:305-313`; `EventLLMDecisionService.java:115-140`).
 
 **쿨다운 / 진행 중 상태**
