@@ -8,6 +8,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * 이전 리포트의 틀린 쌍과 이번 틀린 쌍을 비교한다. 쌍은 순서 무관으로 같다고 본다.
@@ -19,7 +20,13 @@ import java.util.Map;
 public final class ReportDiff {
 
     /** 고쳐진 쌍(이전에만 있음), 새로 틀린 쌍(이번에만 있음), 둘 다 틀렸지만 종류가 바뀐 쌍. */
-    public record Result(List<ReportedPair> fixed, List<ReportedPair> newlyWrong, List<KindChange> kindChanged) {
+    public record Result(List<ReportedPair> fixed, List<ReportedPair> newlyWrong, List<KindChange> kindChanged,
+                         List<ReportedPair> droppedOut) {
+
+        // Red 단계 뼈대 — 기존 호출부(3인자)가 그대로 컴파일되도록 둔 보조 생성자. droppedOut 은 빈 목록
+        public Result(List<ReportedPair> fixed, List<ReportedPair> newlyWrong, List<KindChange> kindChanged) {
+            this(fixed, newlyWrong, kindChanged, List.of());
+        }
     }
 
     public record KindChange(long alertA, long alertB, Kind before, Kind after) {
@@ -54,6 +61,14 @@ public final class ReportDiff {
             }
         });
         return new Result(fixed, newlyWrong, kindChanged);
+    }
+
+    /**
+     * 이번 실행에서 평가 대상에서 빠진 쌍(excludedNow)을 "고쳐짐" 에서 가려 내는 비교.
+     */
+    // Red 단계 뼈대 — excludedNow 를 무시하고 2인자 결과를 그대로 돌려준다. 구현은 Green 에서
+    public static Result compare(List<ReportedPair> previous, List<ReportedPair> current, Set<PairKey> excludedNow) {
+        return compare(previous, current);
     }
 
     private static Map<PairKey, ReportedPair> index(List<ReportedPair> pairs) {

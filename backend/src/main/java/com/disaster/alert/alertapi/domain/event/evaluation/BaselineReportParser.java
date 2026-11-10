@@ -7,6 +7,7 @@ import lombok.NoArgsConstructor;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.OptionalInt;
 
 /**
  * 이전에 만든 평가 리포트(마크다운)에서 틀린 쌍 목록을 다시 읽는다.
@@ -51,6 +52,14 @@ public final class BaselineReportParser {
                             + "' 절을 찾지 못했다. 평가 리포트 마크다운이 맞는지, 제목이 바뀌지 않았는지 확인할 것");
         }
         return pairs;
+    }
+
+    /**
+     * 기준선 리포트의 제외 줄("- 제외: 모르겠음 N쌍, 이벤트 미배정 M쌍")에서 M 을 읽는다.
+     */
+    // Red 단계 뼈대 — 구현은 Green 에서
+    public static OptionalInt parseExcludedUnassigned(String reportMarkdown) {
+        return OptionalInt.empty();
     }
 
     // 3) 표 한 줄을 읽는다. 머리글·구분선(|---|)은 앞 두 칸이 숫자가 아니라 여기서 걸러진다

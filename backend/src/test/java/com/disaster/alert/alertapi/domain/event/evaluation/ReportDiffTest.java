@@ -5,6 +5,7 @@ import com.disaster.alert.alertapi.domain.event.evaluation.ReportedPair.Kind;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -36,5 +37,26 @@ class ReportDiffTest {
         assertThat(diff.fixed()).containsExactly(new ReportedPair(1, 2, Kind.MISSED));
         assertThat(diff.newlyWrong()).containsExactly(new ReportedPair(3, 4, Kind.OVER_MERGED));
         assertThat(diff.kindChanged()).containsExactly(new KindChange(6, 5, Kind.MISSED, Kind.OVER_MERGED));
+    }
+
+    // 이번 실행에서 평가 대상에서 빠진 쌍(모르겠음으로 바뀜, 이벤트 미배정)은 틀린 목록에서도 사라진다.
+    // 이것을 "고쳐짐" 으로 세면 데이터가 빠져서 좋아 보이는 일이 생기므로 따로 "빠짐(droppedOut)" 으로 분리해야 한다.
+    // Red 단계: 뼈대는 excludedNow 를 무시해 A 도 fixed 에 넣고 droppedOut 은 비워 두므로 둘 다 기대와 달라 실패한다.
+    @Test
+    void 이번_실행에서_평가_대상에서_빠진_쌍은_고쳐짐이_아니라_빠짐으로_센다() {
+        // 준비: 이전에 틀렸던 두 쌍. 이번 틀린 목록에는 둘 다 없다
+        ReportedPair a = new ReportedPair(1, 2, Kind.MISSED);    // 이번엔 이벤트 미배정이라 평가에서 빠진 쌍
+        ReportedPair b = new ReportedPair(3, 4, Kind.MISSED);    // 평가 대상에 남아 있는데 맞게 됨 → 진짜 고쳐짐
+        List<ReportedPair> previous = List.of(a, b);
+        List<ReportedPair> current = List.of();
+        // 준비: A 만 이번 실행의 제외 대상. 순서를 뒤집은 (2,1) 로 넣어 키가 순서 무관인지도 함께 본다
+        Set<ReportDiff.PairKey> excludedNow = Set.of(ReportDiff.PairKey.of(2, 1));
+
+        // 실행
+        ReportDiff.Result diff = ReportDiff.compare(previous, current, excludedNow);
+
+        // 검증: B 만 고쳐짐, A 는 빠짐으로 갈린다
+        assertThat(diff.fixed()).containsExactly(b);
+        assertThat(diff.droppedOut()).containsExactly(a);
     }
 }

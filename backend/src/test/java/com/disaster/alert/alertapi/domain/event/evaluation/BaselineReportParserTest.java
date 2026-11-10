@@ -9,6 +9,7 @@ import org.junit.jupiter.api.Test;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.OptionalDouble;
+import java.util.OptionalInt;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -93,6 +94,26 @@ class BaselineReportParserTest {
         // 실행 + 검증: 틀린 쌍 절이 아예 없으므로 기준선으로 쓸 수 없다고 예외로 알린다
         assertThatThrownBy(() -> BaselineReportParser.parse(otherFormat))
                 .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    // 튜닝 전후 비교에서 이벤트 미배정이 늘었는지 보려면 기준선의 미배정 수가 필요하다. 그 값은 리포트 요약의
+    // "제외" 줄에만 있으므로, 같은 줄의 모르겠음 수와 헷갈리지 않고 미배정 쪽 숫자를 읽어야 한다.
+    // Red 단계: 뼈대는 OptionalInt.empty() 를 돌려줘 기대한 3이 없으므로 실패한다.
+    @Test
+    void 제외_줄에서_이벤트_미배정_쌍_수를_읽는다() {
+        // 준비: 모르겠음 42, 미배정 3 — 두 숫자가 달라야 엉뚱한 쪽을 읽었을 때 잡힌다
+        String report = """
+                # 클러스터링 평가 - cluster-eval-2026-10
+                ## 요약
+                - 제외: 모르겠음 42쌍, 이벤트 미배정 3쌍
+                ## 놓친 쌍 / 잘못 묶은 쌍
+                """;
+
+        // 실행
+        OptionalInt unassigned = BaselineReportParser.parseExcludedUnassigned(report);
+
+        // 검증: 미배정 수 3
+        assertThat(unassigned).hasValue(3);
     }
 
     // 포매터가 쓴 제목과 파서가 찾는 제목은 지금 각자 문자열로 박혀 있어 우연히 같을 뿐이다. 한쪽만 고치면 파서가 조용히
