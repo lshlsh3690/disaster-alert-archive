@@ -1,7 +1,7 @@
 package com.disaster.alert.alertapi.domain.event.evaluation;
 
 import com.disaster.alert.alertapi.domain.event.evaluation.AssignmentReader.PairFacts;
-import com.disaster.alert.alertapi.domain.event.evaluation.LabelCsv.LabeledPair;
+import com.disaster.alert.alertapi.domain.event.evaluation.LabelJson.LabeledPair;
 import com.disaster.alert.alertapi.domain.event.evaluation.PairCounter.Observation;
 import com.disaster.alert.alertapi.domain.event.evaluation.ReportFormatter.Row;
 import lombok.RequiredArgsConstructor;
@@ -24,7 +24,7 @@ import java.util.Optional;
 /**
  * 클러스터링 평가 실행 진입점. 사용법은 docs/CLUSTERING_EVAL_GUIDE.md "실행" 절.
  *
- * <p>{@code --eval.labels}(필수) CSV 를 읽어 DB 의 이벤트 배정과 비교하고,
+ * <p>{@code --eval.labels}(필수) 라벨 JSON 을 읽어 DB 의 이벤트 배정과 비교하고,
  * {@code --eval.report}(선택) 경로에 마크다운 리포트를 쓴다. {@code --eval.baseline}(선택)에 이전 리포트를
  * 주면 틀린 쌍을 비교한 "이전 대비" 절이 리포트에 붙는다.
  */
@@ -39,11 +39,11 @@ public class EvaluationRunTool implements ApplicationRunner {
 
     @Override
     public void run(ApplicationArguments args) throws IOException {
-        // 1) CSV 를 먼저 끝까지 읽는다 - 형식 오류면 DB 를 건드리기 전에 실패한다
-        //    CSV 텍스트(줄 단위): 헤더 alert_a_id,alert_b_id,label,stratum,sub_type 다음 줄부터 25154,28106,SAME,GENERAL,incident_fire_same ...
-        //    → pairs   : [LabeledPair(25154, 28106, SAME), LabeledPair(24037, 28111, DIFF), ...]  (stratum·sub_type 은 버림)
+        // 1) 라벨 JSON 을 먼저 끝까지 읽는다 - 형식 오류면 DB 를 건드리기 전에 실패한다
+        //    JSON 배열: [{"q":1,"label":"SAME","a":{"id":25154,"message":"..."},"b":{"id":28106,"message":"..."}}, ...]
+        //    → pairs   : [LabeledPair(25154, 28106, SAME), LabeledPair(24037, 28111, DIFF), ...]  (원문 등 사람이 보는 필드는 버림)
         Path labels = requiredLabelsPath(args);
-        List<LabeledPair> pairs = LabelCsv.parse(Files.readString(labels, StandardCharsets.UTF_8));
+        List<LabeledPair> pairs = LabelJson.parse(Files.readString(labels, StandardCharsets.UTF_8));
         //    이전 리포트(--eval.baseline)도 같은 이유로 여기서 읽는다 - 경로가 틀렸는데 DB 조회가 끝난 뒤에야 알게 되지 않도록. 없으면 null
         List<ReportedPair> baseline = readBaseline(args);
 
@@ -61,7 +61,7 @@ public class EvaluationRunTool implements ApplicationRunner {
         }).toList();
 
         // 4) 리포트는 항상 로그로, --eval.report 가 있으면 파일로도 쓴다
-        //    마크다운(줄 단위): '# 클러스터링 평가 - cluster-eval-2026-10-incident' → '## 요약' → '- 점수 …점' → '- 맞게 묶은 비율 …%' → '- 빠짐없이 묶은 비율 …%' → 틀린 쌍 표
+        //    마크다운(줄 단위): '# 클러스터링 평가 - cluster-eval-2026-11' → '## 요약' → '- 점수 …점' → '- 맞게 묶은 비율 …%' → '- 빠짐없이 묶은 비율 …%' → 틀린 쌍 표
         //    --eval.baseline 이 있으면 이전 리포트의 틀린 쌍과 비교한 "이전 대비" 절이 붙는다(없으면 diff=null → 절 없음)
         ReportDiff.Result diff = baseline == null ? null : ReportDiff.compare(baseline, toReportedPairs(result));
         String report = ReportFormatter.format(datasetName(labels), LocalDateTime.now(), result, rows, diff);
@@ -87,11 +87,11 @@ public class EvaluationRunTool implements ApplicationRunner {
     private static Path requiredLabelsPath(ApplicationArguments args) {
         List<String> values = args.getOptionValues("eval.labels");
         if (values == null || values.isEmpty()) {
-            throw new IllegalArgumentException("--eval.labels=<라벨 CSV 경로> 가 필요합니다");
+            throw new IllegalArgumentException("--eval.labels=<라벨 JSON 경로> 가 필요합니다");
         }
         Path path = Path.of(values.get(0));
         if (!Files.isRegularFile(path)) {
-            throw new IllegalArgumentException("라벨 CSV 파일이 없습니다: " + path);
+            throw new IllegalArgumentException("라벨 JSON 파일이 없습니다: " + path);
         }
         return path;
     }

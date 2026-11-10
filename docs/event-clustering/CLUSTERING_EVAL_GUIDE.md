@@ -137,8 +137,8 @@ GROUP BY m.event_id ORDER BY dist LIMIT 3;
 - **클러스터링을 다시 하지 않는다.** DB 에 저장된 이벤트 배정을 읽을 뿐이다. 클러스터링 코드를 바꿨다면 먼저 재클러스터링(백필)으로 새 스냅샷을 만든 뒤 그 DB 를 평가해야 바뀐 결과가 나온다. 평가와 재클러스터링은 일부러 분리했다.
 
 ## 데이터셋
-`backend/evaluation/datasets/`의 CSV(`alert_a_id,alert_b_id,label,stratum,sub_type`). `label`은 SAME·DIFF·UNSURE 이고 `stratum`·`sub_type`은 형식 호환용이라 읽고 버린다(평가 계산에 쓰지 않는다). 데이터셋 이름은 CSV 파일명에서 확장자를 뗀 것이다.
-- `cluster-eval-2026-11.csv`: **유일한 평가 셋**(272쌍, 같은 사건 126 / 다른 사건 104 / 모르겠음 42). 2026-11-09 한 번의 라벨링으로 매긴 쌍만 담는다. 사본 `disaster_alert_eval_v5`(운영 분류값) 에서 잰다. 구성·기준은 `.rubric.md`
+`backend/evaluation/datasets/`의 JSON 배열. 항목마다 `q`(문항 번호), `label`(SAME·DIFF·UNSURE), `relation`, `gap`, `a`·`b`(각각 `id`, `at`, `type`, `region`, `message`)가 있다. 평가 계산에는 `a.id`·`b.id`·`label` 만 쓰고 나머지는 사람이 판정을 대조하려고 둔 필드다. 데이터셋 이름은 파일명에서 확장자를 뗀 것이다.
+- `cluster-eval-2026-11.json`: **유일한 평가 셋**(272쌍, 같은 사건 126 / 다른 사건 104 / 모르겠음 42). 2026-11-09 한 번의 라벨링으로 매긴 쌍만 담는다. 사본 `disaster_alert_eval_v5`(운영 분류값) 에서 잰다. 구성·기준은 `.rubric.md`
 - 예전 셋(`cluster-eval-2026-10-incident`·`-test`, 개발용 `cluster-eval-2026-10`)은 모두 지웠다 — 기준이 바뀌기 전 라벨이라 섞이면 헷갈린다(경위는 `CLUSTERING_EVALUATION.md` 4절, 파일은 git 이력)
 
 리포트를 볼 때는 전체 쌍 수 대비 계산에 쓰인 쌍 수("제외" 줄)를 함께 본다.
@@ -146,14 +146,14 @@ GROUP BY m.event_id ORDER BY dist LIMIT 3;
 리포트는 `backend/evaluation/reports/` 에 둔다. 지금 기준점은 `2026-11_2026-11-09.md` 다. 그 전 리포트는 지운 예전 셋으로 잰 기록이라 이 셋과 직접 비교하지 않는다. 그중 `*_2026-10-19.md` 세 개가 이 도구로 잰 첫 기준점이었고, 그 전 리포트(`before.md`, `after_v0.md` 등)는 옛 형식이라 직접 비교하지 않는다.
 
 ## 실행
-라벨은 CSV 에서 바로 읽는다(DB 적재 없음, `evaluation_label` 테이블도 쓰지 않는다). 평가용 DB 사본에서 `eval` 프로필로 실행한다(OpenAI 호출 없음, 운영 DB 에는 실행하지 않는다). `backend/` 에서 루트 `.env.dev` 를 불러온 뒤 실행한다.
+라벨은 JSON 파일에서 바로 읽는다(DB 적재 없음, `evaluation_label` 테이블도 쓰지 않는다). 평가용 DB 사본에서 `eval` 프로필로 실행한다(OpenAI 호출 없음, 운영 DB 에는 실행하지 않는다). `backend/` 에서 루트 `.env.dev` 를 불러온 뒤 실행한다.
 ```
 set -a; . ../.env.dev; set +a
-./gradlew bootRun --args='--spring.profiles.active=eval --spring.datasource.url=jdbc:postgresql://localhost:5432/disaster_alert_eval_v5 --server.port=0 --eval.labels=<CSV 경로> --eval.report=<리포트 경로> --eval.baseline=<이전 리포트 경로>'
+./gradlew bootRun --args='--spring.profiles.active=eval --spring.datasource.url=jdbc:postgresql://localhost:5432/disaster_alert_eval_v5 --server.port=0 --eval.labels=<라벨 JSON 경로> --eval.report=<리포트 경로> --eval.baseline=<이전 리포트 경로>'
 ```
 - `--spring.datasource.url`(사실상 필수): 평가 사본. 빼면 `.env.dev` 의 개발 DB 에 붙어 엉뚱한 배정을 읽는다. `--server.port=0` 은 실행 중인 다른 서버와 포트가 겹치지 않게 한다.
-- `--eval.labels`(필수): 라벨 CSV 경로.
+- `--eval.labels`(필수): 라벨 JSON 경로.
 - `--eval.report`(선택): 마크다운 리포트 경로. 없으면 로그로만 출력한다.
 - `--eval.baseline`(선택): 비교할 **이전 리포트** 경로(예: 지금 기준선 `backend/evaluation/reports/2026-11_2026-11-09.md`). 주면 `## 이전 대비` 절이 붙고, 안 주면 그 절이 없다. 파일이 없거나 `## 놓친 쌍 / 잘못 묶은 쌍` 절 제목이 없으면(`IllegalArgumentException`) DB 를 건드리기 전에 즉시 실패한다. 읽는 법은 위 "이전 대비" 절.
 - 리포트 머리에는 데이터셋 이름과 실행 시각만 적고, 끝나면 애플리케이션이 종료된다.
-- CSV 형식 오류(헤더 불일치, 컬럼 수, 숫자 아님, 같은 id, 알 수 없는 label, (a,b)/(b,a) 중복)는 줄 번호와 함께 즉시 실패한다.
+- 라벨 파일 형식 오류(깨진 JSON, 숫자가 아니거나 없는 id, 같은 id, 알 수 없는 label, (a,b)/(b,a) 중복)는 "N번째 항목"과 함께 즉시 실패한다.

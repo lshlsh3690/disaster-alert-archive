@@ -35,7 +35,7 @@ public class AssignmentReader {
     }
 
     // 한 알림은 하나의 이벤트에만 속한다(uq_event_alert_mapping_alert).
-    // disaster_alert 를 기준으로 LEFT JOIN 해 두 경우를 가른다: 알림 행이 없으면 0행(라벨 CSV 오류),
+    // disaster_alert 를 기준으로 LEFT JOIN 해 두 경우를 가른다: 알림 행이 없으면 0행(라벨 파일 오류),
     // 알림은 있고 매핑이 없으면 1행에 event_id=NULL(미배정).
     private static final String EVENT_ID_SQL =
             "SELECT m.event_id FROM disaster_alert d "
@@ -59,7 +59,7 @@ public class AssignmentReader {
 
     /**
      * 알림이 속한 이벤트 id. 알림은 있지만 이벤트에 배정되지 않았으면 empty.
-     * 알림 id 가 DB 에 없으면 라벨 CSV 와 DB 가 어긋난 것이므로 예외 - "미배정" 으로 오인해
+     * 알림 id 가 DB 에 없으면 라벨 파일 와 DB 가 어긋난 것이므로 예외 - "미배정" 으로 오인해
      * 두 비율의 분모에서 조용히 빠지면 과소병합율이 실제보다 낮게 나온다.
      */
     public Optional<Long> findEventId(long alertId) {
@@ -71,7 +71,7 @@ public class AssignmentReader {
         return Optional.ofNullable(rows.get(0));
     }
 
-    /** 쌍의 사실. 알림 id 가 DB 에 없으면 라벨 CSV 와 DB 가 어긋난 것이므로 예외. */
+    /** 쌍의 사실. 알림 id 가 DB 에 없으면 라벨 파일 와 DB 가 어긋난 것이므로 예외. */
     public PairFacts findFacts(long alertA, long alertB) {
         try {
             return jdbcTemplate.queryForObject(FACTS_SQL, (rs, i) -> {

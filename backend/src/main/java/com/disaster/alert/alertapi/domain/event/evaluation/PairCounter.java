@@ -1,6 +1,6 @@
 package com.disaster.alert.alertapi.domain.event.evaluation;
 
-import com.disaster.alert.alertapi.domain.event.evaluation.LabelCsv.Label;
+import com.disaster.alert.alertapi.domain.event.evaluation.LabelJson.Label;
 import com.disaster.alert.alertapi.domain.event.evaluation.PairCountResult.WrongKind;
 import com.disaster.alert.alertapi.domain.event.evaluation.PairCountResult.WrongPair;
 import lombok.AccessLevel;
