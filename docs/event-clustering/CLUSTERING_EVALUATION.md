@@ -139,7 +139,7 @@
 | 도구 | 역할 |
 |---|---|
 | `AlertKindEvalTool` (backend, 프로필 `alert-kind-eval`) | 사건/비사건 분류기를 사람 라벨과 대조해 로그로 보고 |
-| `EvaluationRunTool` (backend, 프로필 `eval`) | 라벨 CSV 쌍마다 "같은 이벤트에 있는가"를 DB 에서 읽어 과소병합율·과병합율 두 비율과 틀린 쌍 목록을 리포트로 쓴다. 읽는 법은 `CLUSTERING_EVAL_GUIDE.md`. 튜닝 전후를 같은 셋으로 비교하는 기준 도구 |
+| `EvaluationRunTool` (backend, 프로필 `eval`) | 라벨 JSON 쌍마다 "같은 이벤트에 있는가"를 DB 에서 읽어 과소병합율·과병합율 두 비율과 틀린 쌍 목록을 리포트로 쓴다. 읽는 법은 `CLUSTERING_EVAL_GUIDE.md`. 튜닝 전후를 같은 셋으로 비교하는 기준 도구 |
 
 `backend/evaluation/reports/` 의 `*_2026-10-19.md` 는 `EvaluationRunTool` 로 잰 기준점이고, 그 전 리포트는 이전 방식(개발용 150쌍, 정밀도·재현율)의 것이다.
 
