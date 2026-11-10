@@ -18,15 +18,19 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.LocalDateTime;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
 import java.util.Optional;
+import java.util.OptionalDouble;
 
 /**
- * 클러스터링 평가 실행 진입점. 사용법은 docs/CLUSTERING_EVAL_GUIDE.md "실행" 절.
+ * 클러스터링 평가 실행 진입점. 사용법은 docs/event-clustering/CLUSTERING_EVAL_GUIDE.md "실행" 절.
  *
  * <p>{@code --eval.labels}(필수) 라벨 JSON 을 읽어 DB 의 이벤트 배정과 비교하고,
- * {@code --eval.report}(선택) 경로에 마크다운 리포트를 쓴다. {@code --eval.baseline}(선택)에 이전 리포트를
- * 주면 틀린 쌍을 비교한 "이전 대비" 절이 리포트에 붙는다.
+ * {@code --eval.report}(선택) 경로에 마크다운 리포트를 쓴다. {@code --eval.bcubed}(선택)에 B-cubed 정답 JSON 을
+ * 주면 알림 단위 점수 절이 리포트 맨 끝에 붙는다.
  */
 @Slf4j
 @Component
@@ -43,9 +47,12 @@ public class EvaluationRunTool implements ApplicationRunner {
         //    JSON 배열: [{"q":1,"label":"SAME","a":{"id":25154,"message":"..."},"b":{"id":28106,"message":"..."}}, ...]
         //    → pairs   : [LabeledPair(25154, 28106, SAME), LabeledPair(24037, 28111, DIFF), ...]  (원문 등 사람이 보는 필드는 버림)
         Path labels = requiredLabelsPath(args);
+        //    저장 경로도 여기서 확인한다 - 옵션이 잘못됐는데 채점이 다 끝난 뒤에야 실패하지 않도록
+        Path reportPath = args.containsOption("eval.report")
+                ? Path.of(singleValue(args, "eval.report", "--eval.report=<리포트 경로> 값이 비어 있습니다")) : null;
         List<LabeledPair> pairs = LabelJson.parse(Files.readString(labels, StandardCharsets.UTF_8));
-        //    이전 리포트(--eval.baseline)도 같은 이유로 여기서 읽는다 - 경로가 틀렸는데 DB 조회가 끝난 뒤에야 알게 되지 않도록. 없으면 null
-        List<ReportedPair> baseline = readBaseline(args);
+        //    B-cubed 정답(--eval.bcubed)도 같은 이유로 여기서 읽는다. 없으면 null(알림 단위 절을 쓰지 않음)
+        BCubedGold bcubedGold = readBCubedGold(args);
 
         // 2) 쌍마다 두 알림의 이벤트 배정을 DB 에서 읽어 관측으로 만들고 센다
         //    pairs → 관측: [Observation(25154, 28106, SAME, assigned=true, sameEvent=false), ...]
@@ -62,16 +69,55 @@ public class EvaluationRunTool implements ApplicationRunner {
 
         // 4) 리포트는 항상 로그로, --eval.report 가 있으면 파일로도 쓴다
         //    마크다운(줄 단위): '# 클러스터링 평가 - cluster-eval-2026-11' → '## 요약' → '- 점수 …점' → '- 맞게 묶은 비율 …%' → '- 빠짐없이 묶은 비율 …%' → 틀린 쌍 표
-        //    --eval.baseline 이 있으면 이전 리포트의 틀린 쌍과 비교한 "이전 대비" 절이 붙는다(없으면 diff=null → 절 없음)
-        ReportDiff.Result diff = baseline == null ? null : ReportDiff.compare(baseline, toReportedPairs(result));
-        String report = ReportFormatter.format(datasetName(labels), LocalDateTime.now(), result, rows, diff);
+        String report = ReportFormatter.format(datasetName(labels), LocalDateTime.now(), result, rows);
+        //    알림 단위 점수는 쌍 리포트 맨 끝에 새 절로 붙인다 - 틀린 쌍 표의 위치가 흔들리지 않아 두 리포트를 diff 로 비교하기 쉽다
+        if (bcubedGold != null) {
+            report += formatBCubedSection(scoreBCubed(bcubedGold));
+        }
         log.info("\n{}", report);
-        if (args.containsOption("eval.report")) {
-            Files.writeString(Path.of(args.getOptionValues("eval.report").get(0)), report, StandardCharsets.UTF_8);
+        if (reportPath != null) {
+            Files.writeString(reportPath, report, StandardCharsets.UTF_8);
         }
 
-        // 5) 웹 서버가 계속 떠 있지 않게 끝나면 종료한다
-        SpringApplication.exit(context, () -> 0);
+        // 5) 끝나면 종료한다. System.exit 로 넘겨야 프로세스 종료 코드가 결과와 같아진다(안 넘기면 정상 실행도 1 로 끝났다)
+        System.exit(SpringApplication.exit(context, () -> 0));
+    }
+
+    // 정답에 점수 대상으로 올라간 알림(events + solo)의 이벤트 배정을 DB 에서 읽어 B-cubed 로 계산한다.
+    // 분류 불가 알림은 점수에서 빠지므로 배정을 읽지 않는다(DB 조회만 늘고 결과는 같다). 미배정은 맵에 넣지 않고, 점수기가 혼자인 이벤트로 계산한다
+    private BCubedResult scoreBCubed(BCubedGold gold) {
+        Map<Long, Long> systemEventOf = new HashMap<>();
+        for (Long alertId : gold.clusterOf().keySet()) {
+            assignmentReader.findEventId(alertId).ifPresent(eventId -> systemEventOf.put(alertId, eventId));
+        }
+        return BCubedScorer.score(gold.clusterOf(), gold.unsure(), systemEventOf);
+    }
+
+    // 쉬운 말만 쓴다(영어 지표 이름 금지)
+    private static String formatBCubedSection(BCubedResult r) {
+        String score = r.score().isPresent() ? String.format(Locale.ROOT, "%.1f점", r.score().getAsDouble()) : "-";
+        return "\n## 알림 단위 점수\n"
+                + "- 점수 " + score + " — 맞게 묶은 비율과 빠짐없이 묶은 비율의 조화평균 (알림마다 구해 평균)\n"
+                + "- 맞게 묶은 비율 " + percent(r.precisionRate()) + "\n"
+                + "- 빠짐없이 묶은 비율 " + percent(r.completenessRate()) + "\n"
+                + "- 점수 대상 " + r.scored() + "건(정답 파일에 있는 알림끼리만 비교, 미배정 " + r.unassigned() + "건은 혼자인 이벤트로 포함), 제외: 분류 불가 " + r.excludedUnsure()
+                + "건\n";
+    }
+
+    private static String percent(OptionalDouble rate) {
+        return rate.isPresent() ? String.format(Locale.ROOT, "%.1f%%", rate.getAsDouble()) : "-";
+    }
+
+    // --eval.bcubed 가 없으면 null. 있으면 정답 JSON 을 끝까지 읽는다(형식 오류·검토 미완료면 여기서 실패)
+    private static BCubedGold readBCubedGold(ApplicationArguments args) throws IOException {
+        if (!args.containsOption("eval.bcubed")) {
+            return null;
+        }
+        Path path = Path.of(singleValue(args, "eval.bcubed", "--eval.bcubed=<B-cubed 정답 JSON 경로> 값이 비어 있습니다"));
+        if (!Files.isRegularFile(path)) {
+            throw new IllegalArgumentException("B-cubed 정답 JSON 파일이 없습니다: " + path);
+        }
+        return BCubedLabelJson.parse(Files.readString(path, StandardCharsets.UTF_8));
     }
 
     // 두 알림 모두 이벤트에 있을 때만 assigned, 그때만 같은 이벤트 여부를 비교한다
@@ -84,45 +130,23 @@ public class EvaluationRunTool implements ApplicationRunner {
         return new Observation(p.alertA(), p.alertB(), p.label(), assigned, assigned && eventA.equals(eventB));
     }
 
-    private static Path requiredLabelsPath(ApplicationArguments args) {
-        List<String> values = args.getOptionValues("eval.labels");
+    // 같은 옵션을 두 번 주면 뒤쪽 값을 조용히 버리지 않고 실패한다 - 사용자가 믿는 입력과 실제 채점 입력이 달라지면 안 된다
+    private static String singleValue(ApplicationArguments args, String name, String emptyMessage) {
+        List<String> values = args.getOptionValues(name);
         if (values == null || values.isEmpty()) {
-            throw new IllegalArgumentException("--eval.labels=<라벨 JSON 경로> 가 필요합니다");
+            throw new IllegalArgumentException(emptyMessage);
         }
-        Path path = Path.of(values.get(0));
+        if (values.size() > 1) {
+            throw new IllegalArgumentException("--" + name + " 는 한 번만 줄 수 있습니다(받은 값 " + values.size() + "개: "
+                    + String.join(", ", values) + ")");
+        }
+        return values.get(0);
+    }
+
+    private static Path requiredLabelsPath(ApplicationArguments args) {
+        Path path = Path.of(singleValue(args, "eval.labels", "--eval.labels=<라벨 JSON 경로> 가 필요합니다"));
         if (!Files.isRegularFile(path)) {
             throw new IllegalArgumentException("라벨 JSON 파일이 없습니다: " + path);
-        }
-        return path;
-    }
-
-    // --eval.baseline 이 없으면 null(비교 안 함). 있으면 이전 리포트의 틀린 쌍(마크다운 표)을 읽는다
-    private static List<ReportedPair> readBaseline(ApplicationArguments args) throws IOException {
-        if (!args.containsOption("eval.baseline")) {
-            return null;
-        }
-        return BaselineReportParser.parse(Files.readString(baselinePath(args), StandardCharsets.UTF_8));
-    }
-
-    // WrongPair(놓침/잘못 묶음) → ReportedPair: 비교는 id 쌍과 종류만 쓴다
-    private static List<ReportedPair> toReportedPairs(PairCountResult result) {
-        return result.wrongPairs().stream()
-                .map(w -> new ReportedPair(w.alertA(), w.alertB(), toKind(w.kind())))
-                .toList();
-    }
-
-    private static ReportedPair.Kind toKind(PairCountResult.WrongKind kind) {
-        return kind == PairCountResult.WrongKind.MISSED ? ReportedPair.Kind.MISSED : ReportedPair.Kind.OVER_MERGED;
-    }
-
-    private static Path baselinePath(ApplicationArguments args) {
-        List<String> values = args.getOptionValues("eval.baseline");
-        if (values == null || values.isEmpty()) {
-            throw new IllegalArgumentException("--eval.baseline=<이전 리포트 경로> 값이 비어 있습니다");
-        }
-        Path path = Path.of(values.get(0));
-        if (!Files.isRegularFile(path)) {
-            throw new IllegalArgumentException("이전 리포트 파일이 없습니다: " + path);
         }
         return path;
     }

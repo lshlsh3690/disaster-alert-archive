@@ -1,7 +1,7 @@
 package com.disaster.alert.alertapi.domain.event.evaluation;
 
 import com.disaster.alert.alertapi.domain.event.evaluation.AssignmentReader.PairFacts;
-import com.disaster.alert.alertapi.domain.event.evaluation.PairCountResult.WrongKind;
+import com.disaster.alert.alertapi.domain.event.evaluation.PairCountResult.ErrorType;
 import com.disaster.alert.alertapi.domain.event.evaluation.ReportFormatter.Row;
 import org.junit.jupiter.api.Test;
 
@@ -97,7 +97,7 @@ class ReportFormatterTest {
         Locale.setDefault(Locale.GERMANY);
         try {
             // 준비: 거리 0.1234 가 있는 틀린 쌍 1건
-            Row row = new Row(1, 2, WrongKind.MISSED, new PairFacts("산불", "산불", true, 5, 0.1234));
+            Row row = new Row(1, 2, ErrorType.MISSED, new PairFacts("산불", "산불", true, 5, 0.1234));
 
             // 실행
             String report = ReportFormatter.format("ds", RUN_AT, guideExample(), List.of(row));
@@ -115,8 +115,8 @@ class ReportFormatterTest {
     @Test
     void 표_행에_유형은_같으면_하나_다르면_슬래시_거리_없으면_대시() {
         // 준비: 유형이 같은 쌍(임베딩 있음)과 유형이 다른 쌍(임베딩 없음, 시군구 불일치)
-        Row sameType = new Row(101, 102, WrongKind.MISSED, new PairFacts("산불", "산불", true, 5, 0.2));
-        Row diffType = new Row(201, 202, WrongKind.OVER_MERGED, new PairFacts("산불", "호우", false, 30, null));
+        Row sameType = new Row(101, 102, ErrorType.MISSED, new PairFacts("산불", "산불", true, 5, 0.2));
+        Row diffType = new Row(201, 202, ErrorType.OVER_MERGED, new PairFacts("산불", "호우", false, 30, null));
 
         // 실행
         String report = ReportFormatter.format("ds", RUN_AT, guideExample(), List.of(sameType, diffType));
@@ -128,33 +128,4 @@ class ReportFormatterTest {
                 .contains("| 201 | 202 | 산불/호우 | 아니오 | 30 | - |");
     }
 
-    // 틀린 쌍 표에 "종류"(놓침/잘못 묶음) 칸이 있어야 이전 리포트와 비교할 때 종류가 바뀐 쌍을 가릴 수 있고,
-    // diff 를 받으면 "이전 대비" 절(요약 줄 + 새로 틀린 쌍 표 + 고쳐진 쌍)을 쓰며 안 받으면 그 절을 아예 쓰지 않는다.
-    // Red 단계: 뼈대는 종류 칸도 "## 이전 대비" 절도 쓰지 않아 첫 단언에서 실패한다.
-    @Test
-    void 종류_칸을_쓰고_diff가_있을_때만_이전_대비_절을_쓴다() {
-        // 준비: 이번에 틀린 쌍 하나(301,302 놓침). 이전 리포트에는 없던 쌍이라 "새로 틀림", 101~102 는 이전에만 있어 "고쳐짐"
-        Row newWrong = new Row(301, 302, WrongKind.MISSED, new PairFacts("산불", "산불", true, 5, 0.2));
-        ReportDiff.Result diff = new ReportDiff.Result(
-                List.of(new ReportedPair(101, 102, ReportedPair.Kind.MISSED)),
-                List.of(new ReportedPair(301, 302, ReportedPair.Kind.MISSED)),
-                List.of());
-
-        // 실행: diff 를 준 경우와 안 준 경우
-        String withDiff = ReportFormatter.format("ds", RUN_AT, guideExample(), List.of(newWrong), diff);
-        String withoutDiff = ReportFormatter.format("ds", RUN_AT, guideExample(), List.of(newWrong));
-
-        // 검증: 기존 6칸 뒤에 "종류" 칸이 붙어 표 행이 "... | 0.200 | 놓침 |" 로 끝난다(앞 6칸을 그대로 두어 옛 표 읽기와 호환)
-        assertThat(withDiff).contains("| alertA | alertB | 유형 | 같은 시군구 | 간격(시간) | 본문 거리 | 종류 |")
-                .contains("| 301 | 302 | 산불 | 예 | 5 | 0.200 | 놓침 |");
-        // 검증: 이전 대비 절 — 요약 줄(고쳐짐 1, 새로 틀림 1, 종류 바뀜 0), 새로 틀린 쌍 표(사실은 이번 행에서 가져옴), 고쳐진 쌍
-        assertThat(withDiff)
-                .contains("## 이전 대비")
-                .contains("- 고쳐짐 1쌍, 새로 틀림 1쌍, 종류 바뀜 0쌍")
-                .contains("### 새로 틀린 쌍")
-                .contains("### 고쳐진 쌍")
-                .contains("- 101 ↔ 102");
-        // 검증: --eval.baseline 을 안 준 실행은 절 자체가 없다(빈 절이 "퇴행 없음" 으로 읽히지 않게)
-        assertThat(withoutDiff).doesNotContain("## 이전 대비");
-    }
 }

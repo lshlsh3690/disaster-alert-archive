@@ -27,4 +27,16 @@ public class AsyncConfig {
         executor.initialize();
         return executor;
     }
+
+    // 클러스터링 일일 검사 전용. 하루 한 번 도는 작업이라 스레드 1개면 충분하고, 번역 풀과 나눠 서로 밀리지 않게 한다.
+    @Bean(name = "clusteringCheckExecutor")
+    public Executor clusteringCheckExecutor() {
+        ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
+        executor.setCorePoolSize(1);
+        executor.setMaxPoolSize(1);
+        executor.setQueueCapacity(1);
+        executor.setThreadNamePrefix("clustering-check-");
+        executor.initialize();
+        return executor;
+    }
 }
