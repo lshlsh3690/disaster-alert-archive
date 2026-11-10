@@ -44,8 +44,8 @@ public record PairCountResult(int correctlyMerged, int missed, int overMerged,
     }
 
     // 과소병합(놓침), 과병합(잘못 묶음)
-    public enum WrongKind { MISSED, OVER_MERGED }
+    public enum ErrorType { MISSED, OVER_MERGED }
 
-    public record WrongPair(long alertA, long alertB, WrongKind kind) {
+    public record WrongPair(long alertA, long alertB, ErrorType kind) {
     }
 }

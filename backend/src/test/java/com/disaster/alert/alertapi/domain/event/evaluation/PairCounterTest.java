@@ -2,7 +2,7 @@ package com.disaster.alert.alertapi.domain.event.evaluation;
 
 import com.disaster.alert.alertapi.domain.event.evaluation.LabelJson.Label;
 import com.disaster.alert.alertapi.domain.event.evaluation.PairCounter.Observation;
-import com.disaster.alert.alertapi.domain.event.evaluation.PairCountResult.WrongKind;
+import com.disaster.alert.alertapi.domain.event.evaluation.PairCountResult.ErrorType;
 import com.disaster.alert.alertapi.domain.event.evaluation.PairCountResult.WrongPair;
 import org.junit.jupiter.api.Test;
 
@@ -41,9 +41,9 @@ class PairCounterTest {
         assertThat(result.underMergeRate().getAsDouble()).isEqualTo(50.0);
         assertThat(result.overMergeRate().getAsDouble()).isCloseTo(33.3333, within(0.001));
         assertThat(result.wrongPairs()).containsExactlyInAnyOrder(
-                new WrongPair(30, 31, WrongKind.MISSED),
-                new WrongPair(40, 41, WrongKind.MISSED),
-                new WrongPair(50, 51, WrongKind.OVER_MERGED));
+                new WrongPair(30, 31, ErrorType.MISSED),
+                new WrongPair(40, 41, ErrorType.MISSED),
+                new WrongPair(50, 51, ErrorType.OVER_MERGED));
     }
 
     // 분모가 0 이면 0% 가 아니라 "비율 없음" 이어야 한다(0% 는 "아주 좋음" 으로 오해된다).

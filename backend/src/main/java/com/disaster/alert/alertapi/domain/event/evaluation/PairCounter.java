@@ -1,7 +1,7 @@
 package com.disaster.alert.alertapi.domain.event.evaluation;
 
 import com.disaster.alert.alertapi.domain.event.evaluation.LabelJson.Label;
-import com.disaster.alert.alertapi.domain.event.evaluation.PairCountResult.WrongKind;
+import com.disaster.alert.alertapi.domain.event.evaluation.PairCountResult.ErrorType;
 import com.disaster.alert.alertapi.domain.event.evaluation.PairCountResult.WrongPair;
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
@@ -48,12 +48,12 @@ public final class PairCounter {
                     correct++;
                 } else {
                     missed++;
-                    wrong.add(new WrongPair(o.alertA(), o.alertB(), WrongKind.MISSED));
+                    wrong.add(new WrongPair(o.alertA(), o.alertB(), ErrorType.MISSED));
                 }
             } else if (o.sameEvent()) {
                 // 4) 다른 사건인데 같은 이벤트면 잘못 묶음 (다른 이벤트는 어디에도 안 센다)
                 over++;
-                wrong.add(new WrongPair(o.alertA(), o.alertB(), WrongKind.OVER_MERGED));
+                wrong.add(new WrongPair(o.alertA(), o.alertB(), ErrorType.OVER_MERGED));
             }
         }
         return new PairCountResult(correct, missed, over, unsure, unassigned,

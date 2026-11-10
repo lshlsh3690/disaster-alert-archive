@@ -1,7 +1,7 @@
 package com.disaster.alert.alertapi.domain.event.evaluation;
 
 import com.disaster.alert.alertapi.domain.event.evaluation.AssignmentReader.PairFacts;
-import com.disaster.alert.alertapi.domain.event.evaluation.PairCountResult.WrongKind;
+import com.disaster.alert.alertapi.domain.event.evaluation.PairCountResult.ErrorType;
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
 
@@ -18,7 +18,7 @@ import java.util.OptionalDouble;
 public final class ReportFormatter {
 
     /** 틀린 쌍(놓침·잘못 묶음) 한 줄: 알림 id 둘, 종류, 사실. */
-    public record Row(long alertA, long alertB, WrongKind kind, PairFacts facts) {
+    public record Row(long alertA, long alertB, ErrorType kind, PairFacts facts) {
     }
 
     private static final String WRONG_PAIRS_HEADING = "## 놓친 쌍 / 잘못 묶은 쌍";
@@ -63,8 +63,8 @@ public final class ReportFormatter {
         sb.append("|---|---|---|---|---|---|---|\n");
     }
 
-    private static String kindLabel(WrongKind kind) {
-        return kind == WrongKind.MISSED ? "놓침" : "잘못 묶음";
+    private static String kindLabel(ErrorType kind) {
+        return kind == ErrorType.MISSED ? "놓침" : "잘못 묶음";
     }
 
     private static void appendRow(StringBuilder sb, long alertA, long alertB, String kind, PairFacts f) {

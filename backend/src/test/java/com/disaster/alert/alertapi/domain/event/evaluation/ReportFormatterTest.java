@@ -1,7 +1,7 @@
 package com.disaster.alert.alertapi.domain.event.evaluation;
 
 import com.disaster.alert.alertapi.domain.event.evaluation.AssignmentReader.PairFacts;
-import com.disaster.alert.alertapi.domain.event.evaluation.PairCountResult.WrongKind;
+import com.disaster.alert.alertapi.domain.event.evaluation.PairCountResult.ErrorType;
 import com.disaster.alert.alertapi.domain.event.evaluation.ReportFormatter.Row;
 import org.junit.jupiter.api.Test;
 
@@ -97,7 +97,7 @@ class ReportFormatterTest {
         Locale.setDefault(Locale.GERMANY);
         try {
             // 준비: 거리 0.1234 가 있는 틀린 쌍 1건
-            Row row = new Row(1, 2, WrongKind.MISSED, new PairFacts("산불", "산불", true, 5, 0.1234));
+            Row row = new Row(1, 2, ErrorType.MISSED, new PairFacts("산불", "산불", true, 5, 0.1234));
 
             // 실행
             String report = ReportFormatter.format("ds", RUN_AT, guideExample(), List.of(row));
@@ -115,8 +115,8 @@ class ReportFormatterTest {
     @Test
     void 표_행에_유형은_같으면_하나_다르면_슬래시_거리_없으면_대시() {
         // 준비: 유형이 같은 쌍(임베딩 있음)과 유형이 다른 쌍(임베딩 없음, 시군구 불일치)
-        Row sameType = new Row(101, 102, WrongKind.MISSED, new PairFacts("산불", "산불", true, 5, 0.2));
-        Row diffType = new Row(201, 202, WrongKind.OVER_MERGED, new PairFacts("산불", "호우", false, 30, null));
+        Row sameType = new Row(101, 102, ErrorType.MISSED, new PairFacts("산불", "산불", true, 5, 0.2));
+        Row diffType = new Row(201, 202, ErrorType.OVER_MERGED, new PairFacts("산불", "호우", false, 30, null));
 
         // 실행
         String report = ReportFormatter.format("ds", RUN_AT, guideExample(), List.of(sameType, diffType));
