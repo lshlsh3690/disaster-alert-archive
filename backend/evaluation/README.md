@@ -40,6 +40,20 @@ docker exec -i postgres pg_restore -U postgres -d "$EVAL_DB_NAME" --no-owner < <
 
 라벨은 알림 id 로 DB 를 찾으므로, 덤프에는 라벨된 알림이 같은 id 로 들어 있어야 하고 `embedding`·`alert_kind` 도 채워져 있어야 한다. 이미 있는 사본을 다른 이름으로 복제할 때는 `CREATE DATABASE <새 이름> TEMPLATE disaster_alert_eval_v5;` 를 쓴다.
 
+## 운영 일일 구조 검사
+
+운영 서버가 매일 00:30 KST 에 최근 7일의 사건 알림을 다시 세어 `clustering_daily_check` 에 하루 한 줄로 남긴다. 사람이 실행하는 도구가 아니다.
+
+```sql
+SELECT check_date, incident_count, unassigned_count, no_embedding_count, checked_at
+FROM clustering_daily_check ORDER BY check_date DESC LIMIT 14;
+```
+
+- `unassigned_count`: 이벤트에 들어가지 못한 사건 알림 수. 정상은 0 이다.
+- `no_embedding_count`: 임베딩 없는 사건 알림 수. 규칙 경로로 묶이는 알림이 있어 0 이 아니어도 정상일 수 있다.
+- 미배정이 새로 잡혔거나 늘어난 날만 `log.error` 로 남긴다. 한 번 알린 미배정은 줄지 않는 한 다시 알리지 않으므로, 이 표를 함께 본다.
+- 7일 넘게 앱이 꺼져 있었던 날은 채워지지 않는다.
+
 ## 클러스터링 평가
 
 DB 에 저장된 이벤트 배정을 읽어 라벨과 비교한다. 클러스터링을 다시 하지 않으므로, 코드를 바꿨다면 먼저 [재클러스터링](#재클러스터링)을 한다.
