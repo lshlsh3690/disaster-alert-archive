@@ -26,7 +26,7 @@ import java.util.Optional;
 import java.util.OptionalDouble;
 
 /**
- * 클러스터링 평가 실행 진입점. 사용법은 docs/CLUSTERING_EVAL_GUIDE.md "실행" 절.
+ * 클러스터링 평가 실행 진입점. 사용법은 docs/event-clustering/CLUSTERING_EVAL_GUIDE.md "실행" 절.
  *
  * <p>{@code --eval.labels}(필수) 라벨 JSON 을 읽어 DB 의 이벤트 배정과 비교하고,
  * {@code --eval.report}(선택) 경로에 마크다운 리포트를 쓴다. {@code --eval.bcubed}(선택)에 B-cubed 정답 JSON 을
@@ -70,7 +70,7 @@ public class EvaluationRunTool implements ApplicationRunner {
         // 4) 리포트는 항상 로그로, --eval.report 가 있으면 파일로도 쓴다
         //    마크다운(줄 단위): '# 클러스터링 평가 - cluster-eval-2026-11' → '## 요약' → '- 점수 …점' → '- 맞게 묶은 비율 …%' → '- 빠짐없이 묶은 비율 …%' → 틀린 쌍 표
         String report = ReportFormatter.format(datasetName(labels), LocalDateTime.now(), result, rows);
-        //    알림 단위 점수는 쌍 리포트 맨 끝에 새 절로 붙인다 - 앞쪽 절 순서를 건드리지 않아 BaselineReportParser 가 그대로 읽는다
+        //    알림 단위 점수는 쌍 리포트 맨 끝에 새 절로 붙인다 - 틀린 쌍 표의 위치가 흔들리지 않아 두 리포트를 diff 로 비교하기 쉽다
         if (bcubedGold != null) {
             report += formatBCubedSection(scoreBCubed(bcubedGold));
         }
@@ -84,7 +84,7 @@ public class EvaluationRunTool implements ApplicationRunner {
     }
 
     // 정답에 점수 대상으로 올라간 알림(events + solo)의 이벤트 배정을 DB 에서 읽어 B-cubed 로 계산한다.
-    // 분류 불가 알림은 점수에서 빠지므로 배정을 읽지 않는다(DB 조회만 늘고 결과는 같다). 미배정은 맵에서 뺀다
+    // 분류 불가 알림은 점수에서 빠지므로 배정을 읽지 않는다(DB 조회만 늘고 결과는 같다). 미배정은 맵에 넣지 않고, 점수기가 혼자인 이벤트로 계산한다
     private BCubedResult scoreBCubed(BCubedGold gold) {
         Map<Long, Long> systemEventOf = new HashMap<>();
         for (Long alertId : gold.clusterOf().keySet()) {
@@ -100,8 +100,8 @@ public class EvaluationRunTool implements ApplicationRunner {
                 + "- 점수 " + score + " — 맞게 묶은 비율과 빠짐없이 묶은 비율의 조화평균 (알림마다 구해 평균)\n"
                 + "- 맞게 묶은 비율 " + percent(r.precisionRate()) + "\n"
                 + "- 빠짐없이 묶은 비율 " + percent(r.completenessRate()) + "\n"
-                + "- 점수 대상 " + r.scored() + "건(정답 파일에 있는 알림끼리만 비교), 제외: 분류 불가 " + r.excludedUnsure()
-                + "건, 미배정 " + r.unassigned() + "건\n";
+                + "- 점수 대상 " + r.scored() + "건(정답 파일에 있는 알림끼리만 비교, 미배정 " + r.unassigned() + "건은 혼자인 이벤트로 포함), 제외: 분류 불가 " + r.excludedUnsure()
+                + "건\n";
     }
 
     private static String percent(OptionalDouble rate) {
