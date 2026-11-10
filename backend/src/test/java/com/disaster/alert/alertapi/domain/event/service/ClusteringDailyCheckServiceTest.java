@@ -10,6 +10,8 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -79,6 +81,70 @@ class ClusteringDailyCheckServiceTest {
         ClusteringDailyCheck saved = repository.findById(DAY).orElseThrow();
         assertThat(saved.getIncidentCount()).isEqualTo(2);
         assertThat(saved.getUnassignedCount()).isEqualTo(2);
+    }
+
+    // 결정: 최근 N일을 통째로 다시 계산하므로, 앱이 꺼져 있어 검사 행이 빠진 날도 다음 실행에서 채워진다.
+    // Red 에서는 뼈대가 아무것도 저장하지 않아, 가운데 날의 행이 없다는 단언(isPresent)에서 실패한다.
+    @Test
+    void 가운데_날의_검사_행이_빠져_있어도_최근_N일을_돌리면_채워진다() {
+        // 준비: 연속 3일. 첫날·마지막날은 이미 검사돼 행이 있고(알림 없음, 0건), 가운데 날만 행이 없다
+        LocalDate first = LocalDate.of(2001, 6, 1);
+        LocalDate middle = first.plusDays(1);
+        LocalDate last = first.plusDays(2);
+        repository.save(ClusteringDailyCheck.of(first, 0, 0, 0, LocalDateTime.of(2001, 6, 2, 0, 30)));
+        repository.save(ClusteringDailyCheck.of(last, 0, 0, 0, LocalDateTime.of(2001, 6, 4, 0, 30)));
+        // 준비: 빠진 가운데 날에 사건 알림 2건 - 미배정 1건(301), 배정 1건(302)
+        insertAlert(9_100_000_301L, "INCIDENT", "2001-06-02 09:00:00", vector());
+        insertAlert(9_100_000_302L, "INCIDENT", "2001-06-02 15:00:00", vector());
+        assign(9_100_000_302L);
+
+        // 실행: 마지막 날을 포함해 과거로 3일
+        service.checkRecent(last, 3);
+
+        // 검증: 세 날 모두 행이 있고, 빠졌던 가운데 날에는 실제 건수(대상 2, 미배정 1)가 채워졌다
+        assertThat(repository.findById(first)).isPresent();
+        assertThat(repository.findById(last)).isPresent();
+        assertThat(repository.findById(middle)).isPresent();
+        ClusteringDailyCheck filled = repository.findById(middle).orElseThrow();
+        assertThat(filled.getIncidentCount()).isEqualTo(2);
+        assertThat(filled.getUnassignedCount()).isEqualTo(1);
+    }
+
+    // 결정: 매일 7일을 다시 세도 같은 미배정에 경보가 반복되면 안 된다. 그래서 반환값은 "새로 잡혔거나 이전 저장값보다
+    // 늘어난" 날만 담고, 같은 값이거나 0건인 날은 뺀다. 저장은 반환 여부와 상관없이 네 날 모두 최신 값이어야 한다.
+    // Red 에서는 뼈대가 빈 목록을 돌려줘 "B, C 가 들어 있다"는 단언에서 실패한다.
+    @Test
+    void 미배정이_새로_잡혔거나_늘어난_날만_돌려주고_저장은_모든_날_최신값이다() {
+        // 연속 4일: A(06-10) B(06-11) C(06-12) D(06-13)
+        LocalDate a = LocalDate.of(2001, 6, 10);
+        LocalDate b = a.plusDays(1);
+        LocalDate c = a.plusDays(2);
+        LocalDate d = a.plusDays(3);
+        // 준비: A·B 는 이전 검사에서 미배정 1건으로 저장돼 있다. C·D 는 저장 행이 없다
+        LocalDateTime before = LocalDateTime.of(2001, 6, 13, 0, 30);
+        repository.save(ClusteringDailyCheck.of(a, 1, 1, 1, before));
+        repository.save(ClusteringDailyCheck.of(b, 1, 1, 1, before));
+        // 준비 A: 알림 그대로 미배정 1건 -> 저장값과 같아서 돌려주지 않는다
+        insertAlert(9_100_000_401L, "INCIDENT", "2001-06-10 09:00:00", null);
+        // 준비 B: 저장 뒤 수집이 늦게 들어와 미배정 2건 -> 1에서 2로 늘어서 돌려준다
+        insertAlert(9_100_000_411L, "INCIDENT", "2001-06-11 09:00:00", null);
+        insertAlert(9_100_000_412L, "INCIDENT", "2001-06-11 10:00:00", null);
+        // 준비 C: 저장 행 없이 미배정 1건 -> 새로 잡힌 것이라 돌려준다
+        insertAlert(9_100_000_421L, "INCIDENT", "2001-06-12 09:00:00", null);
+        // 준비 D: 알림이 있지만 전부 배정됨(미배정 0건) -> 행은 저장하되 돌려주지 않는다
+        insertAlert(9_100_000_431L, "INCIDENT", "2001-06-13 09:00:00", vector());
+        assign(9_100_000_431L);
+
+        // 실행
+        List<ClusteringDailyCheck> flagged = service.checkRecent(d, 4);
+
+        // 검증: 돌려준 날은 B, C 뿐 (A 는 같은 값, D 는 0건이라 제외)
+        assertThat(flagged).extracting(ClusteringDailyCheck::getCheckDate).containsExactlyInAnyOrder(b, c);
+        // 검증: 저장 행은 네 날 모두 최신 미배정 건수 (A 1, B 2, C 1, D 0)
+        assertThat(repository.findById(a).orElseThrow().getUnassignedCount()).isEqualTo(1);
+        assertThat(repository.findById(b).orElseThrow().getUnassignedCount()).isEqualTo(2);
+        assertThat(repository.findById(c).orElseThrow().getUnassignedCount()).isEqualTo(1);
+        assertThat(repository.findById(d).orElseThrow().getUnassignedCount()).isZero();
     }
 
     private void insertAlert(long id, String kind, String createdAt, String embedding) {

@@ -8,6 +8,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.List;
 
 /**
  * 하루 한 번, 지난 하루의 사건 알림 중 이벤트 미배정 건수를 세어 남기는 일일 구조 검사.
@@ -68,5 +69,15 @@ public class ClusteringDailyCheckService {
             check.update(counts[0], counts[1], counts[2], checkedAt);
         }
         return repository.save(check);
+    }
+
+    // Red 단계 뼈대 - 구현은 Green 에서
+    /**
+     * lastDate 를 포함해 과거로 days 일을 각각 다시 검사해 저장하고, 미배정이 새로 잡혔거나 이전 저장값보다
+     * 늘어난 날의 결과만 돌려준다.
+     */
+    @Transactional
+    public List<ClusteringDailyCheck> checkRecent(LocalDate lastDate, int days) {
+        return List.of();
     }
 }
