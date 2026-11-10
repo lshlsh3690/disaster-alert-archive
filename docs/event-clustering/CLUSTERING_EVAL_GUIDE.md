@@ -155,5 +155,6 @@ set -a; . ../.env.dev; set +a
 - `--eval.labels`(필수): 라벨 JSON 경로.
 - `--eval.report`(선택): 마크다운 리포트 경로. 없으면 로그로만 출력한다.
 - `--eval.baseline`(선택): 비교할 **이전 리포트** 경로(예: 지금 기준선 `backend/evaluation/reports/2026-11_2026-11-09.md`). 주면 `## 이전 대비` 절이 붙고, 안 주면 그 절이 없다. 파일이 없거나 `## 놓친 쌍 / 잘못 묶은 쌍` 절 제목이 없으면(`IllegalArgumentException`) DB 를 건드리기 전에 즉시 실패한다. 읽는 법은 위 "이전 대비" 절.
+- `--eval.bcubed`(선택): B-cubed 정답 JSON 경로(예: `backend/evaluation/datasets/bcubed-2026-05.labels.json`). 주면 리포트 맨 끝에 `## 알림 단위 점수` 절이 붙고, 안 주면 그 절이 없다. `unreviewed` 가 남았거나 형식이 틀리면 DB 를 건드리기 전에 즉시 실패한다. `--eval.labels` 는 이 옵션과 상관없이 계속 필수다.
 - 리포트 머리에는 데이터셋 이름과 실행 시각만 적고, 끝나면 애플리케이션이 종료된다.
 - 라벨 파일 형식 오류는 즉시 실패한다. 항목 검증 오류(숫자가 아니거나 없는 id, 같은 id, 알 수 없는 label, (a,b)/(b,a) 중복)는 "N번째 항목"을 함께 알려 주고, JSON 구문이 깨졌거나 최상위가 배열이 아니면 항목 번호 없이 알려 준다.
