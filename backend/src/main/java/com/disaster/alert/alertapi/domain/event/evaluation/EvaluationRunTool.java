@@ -48,6 +48,9 @@ public class EvaluationRunTool implements ApplicationRunner {
         //    JSON 배열: [{"q":1,"label":"SAME","a":{"id":25154,"message":"..."},"b":{"id":28106,"message":"..."}}, ...]
         //    → pairs   : [LabeledPair(25154, 28106, SAME), LabeledPair(24037, 28111, DIFF), ...]  (원문 등 사람이 보는 필드는 버림)
         Path labels = requiredLabelsPath(args);
+        //    저장 경로도 여기서 확인한다 - 옵션이 잘못됐는데 채점이 다 끝난 뒤에야 실패하지 않도록
+        Path reportPath = args.containsOption("eval.report")
+                ? Path.of(singleValue(args, "eval.report", "--eval.report=<리포트 경로> 값이 비어 있습니다")) : null;
         List<LabeledPair> pairs = LabelJson.parse(Files.readString(labels, StandardCharsets.UTF_8));
         //    이전 리포트(--eval.baseline)도 같은 이유로 여기서 읽는다 - 경로가 틀렸는데 DB 조회가 끝난 뒤에야 알게 되지 않도록. 없으면 null
         List<ReportedPair> baseline = readBaseline(args);
@@ -77,12 +80,12 @@ public class EvaluationRunTool implements ApplicationRunner {
             report += formatBCubedSection(scoreBCubed(bcubedGold));
         }
         log.info("\n{}", report);
-        if (args.containsOption("eval.report")) {
-            Files.writeString(Path.of(args.getOptionValues("eval.report").get(0)), report, StandardCharsets.UTF_8);
+        if (reportPath != null) {
+            Files.writeString(reportPath, report, StandardCharsets.UTF_8);
         }
 
-        // 5) 웹 서버가 계속 떠 있지 않게 끝나면 종료한다
-        SpringApplication.exit(context, () -> 0);
+        // 5) 끝나면 종료한다. System.exit 로 넘겨야 프로세스 종료 코드가 결과와 같아진다(안 넘기면 정상 실행도 1 로 끝났다)
+        System.exit(SpringApplication.exit(context, () -> 0));
     }
 
     // 정답에 점수 대상으로 올라간 알림(events + solo)의 이벤트 배정을 DB 에서 읽어 B-cubed 로 계산한다.
@@ -115,11 +118,7 @@ public class EvaluationRunTool implements ApplicationRunner {
         if (!args.containsOption("eval.bcubed")) {
             return null;
         }
-        List<String> values = args.getOptionValues("eval.bcubed");
-        if (values == null || values.isEmpty()) {
-            throw new IllegalArgumentException("--eval.bcubed=<B-cubed 정답 JSON 경로> 값이 비어 있습니다");
-        }
-        Path path = Path.of(values.get(0));
+        Path path = Path.of(singleValue(args, "eval.bcubed", "--eval.bcubed=<B-cubed 정답 JSON 경로> 값이 비어 있습니다"));
         if (!Files.isRegularFile(path)) {
             throw new IllegalArgumentException("B-cubed 정답 JSON 파일이 없습니다: " + path);
         }
@@ -136,12 +135,21 @@ public class EvaluationRunTool implements ApplicationRunner {
         return new Observation(p.alertA(), p.alertB(), p.label(), assigned, assigned && eventA.equals(eventB));
     }
 
-    private static Path requiredLabelsPath(ApplicationArguments args) {
-        List<String> values = args.getOptionValues("eval.labels");
+    // 같은 옵션을 두 번 주면 뒤쪽 값을 조용히 버리지 않고 실패한다 - 사용자가 믿는 입력과 실제 채점 입력이 달라지면 안 된다
+    private static String singleValue(ApplicationArguments args, String name, String emptyMessage) {
+        List<String> values = args.getOptionValues(name);
         if (values == null || values.isEmpty()) {
-            throw new IllegalArgumentException("--eval.labels=<라벨 JSON 경로> 가 필요합니다");
+            throw new IllegalArgumentException(emptyMessage);
         }
-        Path path = Path.of(values.get(0));
+        if (values.size() > 1) {
+            throw new IllegalArgumentException("--" + name + " 는 한 번만 줄 수 있습니다(받은 값 " + values.size() + "개: "
+                    + String.join(", ", values) + ")");
+        }
+        return values.get(0);
+    }
+
+    private static Path requiredLabelsPath(ApplicationArguments args) {
+        Path path = Path.of(singleValue(args, "eval.labels", "--eval.labels=<라벨 JSON 경로> 가 필요합니다"));
         if (!Files.isRegularFile(path)) {
             throw new IllegalArgumentException("라벨 JSON 파일이 없습니다: " + path);
         }
@@ -168,11 +176,7 @@ public class EvaluationRunTool implements ApplicationRunner {
     }
 
     private static Path baselinePath(ApplicationArguments args) {
-        List<String> values = args.getOptionValues("eval.baseline");
-        if (values == null || values.isEmpty()) {
-            throw new IllegalArgumentException("--eval.baseline=<이전 리포트 경로> 값이 비어 있습니다");
-        }
-        Path path = Path.of(values.get(0));
+        Path path = Path.of(singleValue(args, "eval.baseline", "--eval.baseline=<이전 리포트 경로> 값이 비어 있습니다"));
         if (!Files.isRegularFile(path)) {
             throw new IllegalArgumentException("이전 리포트 파일이 없습니다: " + path);
         }
