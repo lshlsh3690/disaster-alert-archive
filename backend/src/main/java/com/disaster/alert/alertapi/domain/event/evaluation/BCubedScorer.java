@@ -36,7 +36,7 @@ public final class BCubedScorer {
         //    분류 불가 건수는 unsure 집합 크기다 — 실제 정답 파일(BCubedLabelJson)은 unsure 알림을 goldClusterOf 에 넣지 않으므로
         //    "goldClusterOf 에 있는 것만" 세면 항상 0 이 된다
         int excludedUnsure = unsure.size();
-        int excludedUnassigned = 0;
+        int unassigned = 0;
         List<Map.Entry<Long, Long>> targets = new ArrayList<>();
         for (Map.Entry<Long, Long> gold : goldClusterOf.entrySet()) {
             if (unsure.contains(gold.getKey())) {
@@ -45,13 +45,13 @@ public final class BCubedScorer {
             if (systemEventOf.containsKey(gold.getKey())) {
                 targets.add(gold);
             } else {
-                excludedUnassigned++;
+                unassigned++;
             }
         }
 
         // 2) 대상이 0 이면 평균을 정할 수 없다 — 0% 로 지어내지 않고 empty
         if (targets.isEmpty()) {
-            return new BCubedResult(0, excludedUnsure, excludedUnassigned,
+            return new BCubedResult(0, excludedUnsure, unassigned,
                     OptionalDouble.empty(), OptionalDouble.empty());
         }
 
@@ -76,7 +76,7 @@ public final class BCubedScorer {
             completenessSum += (double) both / goldSize.get(t.getValue());
         }
         int n = targets.size();
-        return new BCubedResult(n, excludedUnsure, excludedUnassigned,
+        return new BCubedResult(n, excludedUnsure, unassigned,
                 OptionalDouble.of(precisionSum / n * 100), OptionalDouble.of(completenessSum / n * 100));
     }
 }

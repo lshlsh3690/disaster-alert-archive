@@ -7,11 +7,11 @@ import java.util.OptionalDouble;
  *
  * @param scored             점수 대상 알림 수
  * @param excludedUnsure     분류 불가라 뺀 알림 수
- * @param excludedUnassigned 이벤트에 배정되지 않아 뺀 알림 수
+ * @param unassigned         이벤트에 배정되지 않은 알림 수 (점수에는 혼자인 이벤트로 포함되고, 리포트에 알리려고 센다)
  * @param precisionRate      맞게 묶은 비율(%) — 알림마다 "내 이벤트 안에서 나와 같은 사건인 비율" 의 평균
  * @param completenessRate   빠짐없이 묶은 비율(%) — 알림마다 "나와 같은 사건 중 내 이벤트에 든 비율" 의 평균
  */
-public record BCubedResult(int scored, int excludedUnsure, int excludedUnassigned,
+public record BCubedResult(int scored, int excludedUnsure, int unassigned,
                            OptionalDouble precisionRate, OptionalDouble completenessRate) {
 
     /**

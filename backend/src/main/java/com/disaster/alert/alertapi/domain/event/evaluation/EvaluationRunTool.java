@@ -101,7 +101,7 @@ public class EvaluationRunTool implements ApplicationRunner {
                 + "- 맞게 묶은 비율 " + percent(r.precisionRate()) + "\n"
                 + "- 빠짐없이 묶은 비율 " + percent(r.completenessRate()) + "\n"
                 + "- 점수 대상 " + r.scored() + "건(정답 파일에 있는 알림끼리만 비교), 제외: 분류 불가 " + r.excludedUnsure()
-                + "건, 미배정 " + r.excludedUnassigned() + "건\n";
+                + "건, 미배정 " + r.unassigned() + "건\n";
     }
 
     private static String percent(OptionalDouble rate) {
