@@ -13,4 +13,5 @@
 
 관련 위치
 - 구현 상세(as-built): `specs/001-event-clustering-pipeline/spec.md`, `plan.md`
+- 백필·평가 실행 명령어: [`backend/evaluation/README.md`](../../backend/evaluation/README.md)
 - 평가 데이터: `backend/evaluation/datasets/`. 분류기 평가 도구는 `AlertKindEvalTool`(backend, 프로필 `alert-kind-eval`)

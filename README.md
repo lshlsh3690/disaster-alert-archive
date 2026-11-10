@@ -316,6 +316,7 @@ DB에 붙는 통합 테스트는 `@IntegrationTest`(= `@SpringBootTest` + `test`
 | [`specs/004-legal-district-matching/`](specs/004-legal-district-matching/) | 법정동 코드 기반 지역 매칭 |
 | [`specs/005-translation-pipeline/`](specs/005-translation-pipeline/) | 다국어 번역 파이프라인 |
 | [`docs/`](docs/) | PRD·TRD·API 명세·데이터 모델·테스트 케이스 |
+| [`backend/evaluation/README.md`](backend/evaluation/README.md) | 백필·평가 실행 명령어 모음 |
 | [`CLAUDE.md`](CLAUDE.md) | 저장소 작업 가이드(아키텍처 요약·팀 컨벤션·함정) |
 
 ---
