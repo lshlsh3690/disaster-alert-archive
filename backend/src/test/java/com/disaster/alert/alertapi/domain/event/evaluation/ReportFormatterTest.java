@@ -17,7 +17,7 @@ class ReportFormatterTest {
     private static final LocalDateTime RUN_AT = LocalDateTime.of(2026, 10, 19, 9, 0);
 
     private static PairCountResult guideExample() {
-        // 가이드 예시(쌍 6개)의 결과: 맞게 묶음 2, 놓침 2, 잘못 묶음 1 → 50.0% / 33.3%
+        // 가이드 예시(쌍 6개)의 결과: 맞게 묶음 2, 과소병합 2, 과병합 1 → 50.0% / 33.3%
         return new PairCountResult(2, 2, 1, 0, 0, OptionalDouble.of(50.0), OptionalDouble.of(100.0 / 3),
                 List.of());
     }
@@ -27,7 +27,7 @@ class ReportFormatterTest {
     // Red 단계: 포매터는 아직 옛 두 줄("→ 과소병합율 ...")만 쓰므로 점수·맞게 묶은 비율·빠짐없이 묶은 비율 줄이 없어 실패한다.
     @Test
     void 요약에_점수와_두_비율_줄이_나온다() {
-        // 준비: 맞게 묶음 39, 놓침 21, 잘못 묶음 3(현재 develop 측정값), 모르겠음 6쌍 제외
+        // 준비: 맞게 묶음 39, 과소병합 21, 과병합 3(현재 develop 측정값), 모르겠음 6쌍 제외
         // 과소병합율 = 21/60 = 35.0%, 과병합율 = 3/42 = 7.1% (PairCounter 가 이미 계산해 넘기는 값)
         PairCountResult result = new PairCountResult(39, 21, 3, 6, 0,
                 OptionalDouble.of(21 * 100.0 / 60), OptionalDouble.of(3 * 100.0 / 42), List.of());
@@ -51,7 +51,7 @@ class ReportFormatterTest {
     // Red 단계: 포매터가 점수 줄을 아직 쓰지 않아 실패한다.
     @Test
     void 점수는_산술평균이_아니라_조화평균이다() {
-        // 준비: 맞게 묶음 10, 놓침 10, 잘못 묶음 0 → 맞게 묶은 비율 100%, 빠짐없이 묶은 비율 50% (과소병합율 50.0, 과병합율 0.0)
+        // 준비: 맞게 묶음 10, 과소병합 10, 과병합 0 → 맞게 묶은 비율 100%, 빠짐없이 묶은 비율 50% (과소병합율 50.0, 과병합율 0.0)
         PairCountResult result = new PairCountResult(10, 10, 0, 0, 0,
                 OptionalDouble.of(50.0), OptionalDouble.of(0.0), List.of());
 

@@ -22,7 +22,7 @@ class PairCounterTest {
     // Red 단계: 뼈대는 모든 개수 0, 비율 empty, 틀린 쌍 없음 → correctlyMerged 기대(2)에서 실패한다.
     @Test
     void 가이드_예시_6쌍은_과소_50퍼센트_과병합_33점3퍼센트() {
-        // 준비: 쌍 1~2 맞게 묶음, 3~4 놓침, 5 잘못 묶음, 6 은 어느 개수에도 안 들어감
+        // 준비: 쌍 1~2 맞게 묶음, 3~4 과소병합, 5 과병합, 6 은 어느 개수에도 안 들어감
         List<Observation> observations = List.of(
                 obs(1, Label.SAME, true, true),
                 obs(2, Label.SAME, true, true),
@@ -34,7 +34,7 @@ class PairCounterTest {
         // 실행
         PairCountResult result = PairCounter.count(observations);
 
-        // 검증: 개수, 비율, 그리고 틀린 쌍은 놓침 2 + 잘못 묶음 1 만 담긴다
+        // 검증: 개수, 비율, 그리고 틀린 쌍은 과소병합 2 + 과병합 1 만 담긴다
         assertThat(result.correctlyMerged()).isEqualTo(2);
         assertThat(result.missed()).isEqualTo(2);
         assertThat(result.overMerged()).isEqualTo(1);
@@ -60,16 +60,16 @@ class PairCounterTest {
         // 실행
         PairCountResult result = PairCounter.count(observations);
 
-        // 검증: 두 분모(맞게 묶음+놓침, 맞게 묶음+잘못 묶음)가 모두 0 → 비율 empty
+        // 검증: 두 분모(맞게 묶음+과소병합, 맞게 묶음+과병합)가 모두 0 → 비율 empty
         assertThat(result.underMergeRate()).isEmpty();
         assertThat(result.overMergeRate()).isEmpty();
         assertThat(result.excludedUnsure()).isEqualTo(1);
-        // DIFF+다른 이벤트 쌍은 맞게 묶음·놓침·잘못 묶음·미배정 어디에도 들어가지 않는다
+        // DIFF+다른 이벤트 쌍은 맞게 묶음·과소병합·과병합·미배정 어디에도 들어가지 않는다
         assertThat(result.correctlyMerged() + result.missed() + result.overMerged()
                 + result.excludedUnassigned()).isZero();
     }
 
-    // 잘못 묶음만 있고 같은 사건 라벨이 없으면 과소병합율은 분모 0(비율 없음)인데 과병합율은 100% 로 계산돼야 한다.
+    // 과병합만 있고 같은 사건 라벨이 없으면 과소병합율은 분모 0(비율 없음)인데 과병합율은 100% 로 계산돼야 한다.
     // 한쪽 분모만 0 일 때 다른 쪽이 같이 사라지지 않는지 고정한다.
     // Red 단계: 뼈대는 과병합율도 empty 를 돌려줘 getAsDouble 에서 NoSuchElementException 으로 실패한다.
     @Test
@@ -80,7 +80,7 @@ class PairCounterTest {
         // 실행
         PairCountResult result = PairCounter.count(observations);
 
-        // 검증: 과소병합율 분모 = 맞게 묶음(0)+놓침(0) = 0 → empty, 과병합율 = 1÷(0+1) = 100%
+        // 검증: 과소병합율 분모 = 맞게 묶음(0)+과소병합(0) = 0 → empty, 과병합율 = 1÷(0+1) = 100%
         assertThat(result.underMergeRate()).isEmpty();
         assertThat(result.overMergeRate().getAsDouble()).isEqualTo(100.0);
     }
@@ -91,7 +91,7 @@ class PairCounterTest {
     // Red 단계: 뼈대는 제외 개수가 전부 0 이라 excludedUnsure 기대(1)에서 실패한다.
     @Test
     void UNSURE_미배정은_모르겠음으로만_세고_미배정은_비율에서_빠진다() {
-        // 준비: UNSURE+미배정 1쌍, SAME+미배정 1쌍(놓침으로 오인되기 쉬움), SAME 맞게 묶음 1쌍
+        // 준비: UNSURE+미배정 1쌍, SAME+미배정 1쌍(과소병합으로 오인되기 쉬움), SAME 맞게 묶음 1쌍
         List<Observation> observations = List.of(
                 obs(1, Label.UNSURE, false, false),
                 obs(2, Label.SAME, false, false),
@@ -100,7 +100,7 @@ class PairCounterTest {
         // 실행
         PairCountResult result = PairCounter.count(observations);
 
-        // 검증: 모르겠음 1, 미배정 1(UNSURE 쌍은 미배정에 안 셈), 놓침 0, 과소병합율 = 0÷(1+0) = 0%
+        // 검증: 모르겠음 1, 미배정 1(UNSURE 쌍은 미배정에 안 셈), 과소병합 0, 과소병합율 = 0÷(1+0) = 0%
         assertThat(result.excludedUnsure()).isEqualTo(1);
         assertThat(result.excludedUnassigned()).isEqualTo(1);
         assertThat(result.missed()).isZero();

@@ -163,7 +163,7 @@ AI 기반 이벤트 클러스터링으로 중복 알림을 제거하고, 기상 
 정답과 실제 이벤트 배정을 비교할 수 있는 알림 쌍
     ↓ EvaluationRunTool → EventEvaluationService
 쌍별 비교 결과
-(맞게 묶음·놓침·잘못 묶음·맞게 분리)
+(맞게 묶음·과소병합·과병합·맞게 분리)
     ↓ PairwiseEvaluator
 전체·표본층별 지표 + 오류 원인 집계
     ↓ EvaluationReportFormatter
