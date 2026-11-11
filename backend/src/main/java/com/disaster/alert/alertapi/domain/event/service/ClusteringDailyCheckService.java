@@ -29,12 +29,12 @@ public class ClusteringDailyCheckService {
             WHERE created_at >= ? AND created_at < ? AND alert_kind = 'INCIDENT'
             """;
 
-    // 미배정 = 이벤트 매핑 표에 없는 사건 알림
+    // 미배정 = 이벤트가 없는(event_id 가 비어 있는) 사건 알림
     private static final String COUNT_UNASSIGNED = """
             SELECT COUNT(*)
             FROM disaster_alert
             WHERE created_at >= ? AND created_at < ? AND alert_kind = 'INCIDENT'
-              AND disaster_alert_id NOT IN (SELECT alert_id FROM event_alert_mapping)
+              AND event_id IS NULL
             """;
 
     private static final String COUNT_NO_EMBEDDING = """

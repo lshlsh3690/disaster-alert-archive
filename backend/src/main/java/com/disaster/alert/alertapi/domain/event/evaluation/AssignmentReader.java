@@ -34,13 +34,10 @@ public class AssignmentReader {
         }
     }
 
-    // 한 알림은 하나의 이벤트에만 속한다(uq_event_alert_mapping_alert).
-    // disaster_alert 를 기준으로 LEFT JOIN 해 두 경우를 가른다: 알림 행이 없으면 0행(라벨 파일 오류),
-    // 알림은 있고 매핑이 없으면 1행에 event_id=NULL(미배정).
+    // 한 알림은 하나의 이벤트에만 속한다(disaster_alert.event_id).
+    // 알림 행이 없으면 0행(라벨 파일 오류), 알림은 있고 이벤트가 없으면 1행에 event_id=NULL(미배정).
     private static final String EVENT_ID_SQL =
-            "SELECT m.event_id FROM disaster_alert d "
-                    + "LEFT JOIN event_alert_mapping m ON m.alert_id = d.disaster_alert_id "
-                    + "WHERE d.disaster_alert_id = ?";
+            "SELECT d.event_id FROM disaster_alert d WHERE d.disaster_alert_id = ?";
 
     // 거리는 DB 의 <=> (코사인 거리)로 계산해 1536차원 벡터를 앱으로 가져오지 않는다.
     // 어느 한쪽 embedding 이 NULL 이면 <=> 도 NULL 이다. 시군구는 법정동 코드 앞 5자리 일치 여부.

@@ -11,7 +11,7 @@ import java.time.LocalDateTime;
  */
 public record EventTimelineRow(
         Long alertId,
-        int sequenceNo,
+        Integer sequenceNo,
         String message,
         String disasterType,
         DisasterLevel emergencyLevel,

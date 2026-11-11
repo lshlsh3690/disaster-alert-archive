@@ -80,10 +80,9 @@ UNIQUE(`provider`, `provider_user_id`)
 | alert_count | INT | |
 | cooldown_hours | INT | 이후 마이그레이션에서 추가 |
 | is_broadcast | BOOLEAN | 이후 마이그레이션에서 추가 — 광역 브로드캐스트 이벤트 여부 |
-| is_advisory | BOOLEAN | 이후 마이그레이션에서 추가 — 안내성(일반 안전안내) 이벤트 여부 |
 | created_at | TIMESTAMP | |
 
-**`event_alert_mapping`** (복합키: event_id + alert_id, alert_id는 UNIQUE — 알림 1건은 이벤트 1개에만 속함)
+**`event_alert_mapping`** — **V137(2026-11-11)에서 삭제**. 알림 1건은 이벤트 1개에만 속해(이벤트:알림 = 1:N) 연결 표 없이 `disaster_alert` 의 `event_id`(FK, `ON DELETE SET NULL`)·`event_sequence_no`·`event_similarity_score`·`event_merge_method`·`event_added_at` 으로 옮겼다. 아래는 삭제 전 구조(복합키: event_id + alert_id, alert_id는 UNIQUE)
 | 컬럼 | 타입 | 비고 |
 |---|---|---|
 | event_id (PK, FK, CASCADE) | BIGINT | |
@@ -91,7 +90,7 @@ UNIQUE(`provider`, `provider_user_id`)
 | sequence_no | INT | |
 | added_at | TIMESTAMP | |
 | similarity_score | DOUBLE | 이후 마이그레이션에서 추가 |
-| merge_method | VARCHAR(16) | 이후 마이그레이션에서 추가 — ENUM(`SEED`,`EMBEDDING`,`BROADCAST`,`IDENTITY`,`LLM`,`LLM_FALLBACK`,`GLOBAL_TYPE`,`REGIONAL_TYPE`,`ADVISORY`) |
+| merge_method | VARCHAR(16) | 이후 마이그레이션에서 추가 — ENUM(`SEED`,`EMBEDDING`,`BROADCAST`,`IDENTITY`,`LLM`,`LLM_FALLBACK`,`GLOBAL_TYPE`,`REGIONAL_TYPE`) |
 
 **`disaster_event_translation`** (복합키: disaster_event_id + language_code)
 | 컬럼 | 타입 | 비고 |
@@ -333,7 +332,7 @@ UNIQUE(`provider`, `provider_user_id`)
 - `member` 1—N `member_social` (소셜 계정 연동)
 - `disaster_alert` 1—N `disaster_alert_region` N—1 `legal_district`
 - `disaster_alert` 1—N `disaster_alert_translation`, 1—N `comment`, 1—N `notification_log`
-- `disaster_event` 1—N `event_alert_mapping` N—1 `disaster_alert` (alert_id는 UNIQUE — 다대다처럼 보이지만 실제로는 이벤트:알림 = 1:N)
+- `disaster_event` 1—N `disaster_alert` (`disaster_alert.event_id`, V137 전에는 `event_alert_mapping` 연결 표)
 - `disaster_event` 1—N `disaster_event_translation`
 - `user_disaster_alert` 1—N `user_disaster_alert_region` N—1 `legal_district`, 1—N `comment`
 - `community_post`, `comment` 각각 N—1 `member`
@@ -342,7 +341,7 @@ UNIQUE(`provider`, `provider_user_id`)
 ## 3. 알려진 이슈
 
 1. **`disaster_alert.embedding`(VECTOR 512) 컬럼이 JPA 엔티티에 매핑되어 있지 않음.** 이벤트 클러스터링 서비스가 네이티브 쿼리로 직접 다루는 것으로 보인다 — 엔티티만 보고 스키마를 파악하면 이 컬럼을 놓치기 쉽다.
-2. `disaster_events`의 `cooldown_hours`/`is_broadcast`/`is_advisory`, `event_alert_mapping`의 `similarity_score`/`merge_method`는 최초 테이블 생성 마이그레이션 이후 별도 `ALTER TABLE`로 추가된 컬럼이다 — 클러스터링 기능이 반복적으로 확장되어 온 이력을 반영한다.
+2. `disaster_events`의 `cooldown_hours`/`is_broadcast`(`is_advisory` 는 V42 에서 추가했다가 V136 에서 삭제), `event_alert_mapping`의 `similarity_score`/`merge_method`(V137 에서 `disaster_alert` 로 옮김)는 최초 테이블 생성 마이그레이션 이후 별도 `ALTER TABLE`로 추가된 컬럼이다 — 클러스터링 기능이 반복적으로 확장되어 온 이력을 반영한다.
 3. PRD 5.7(사용자 제재) 구현 시 `member`뿐 아니라 `comment`/`community_post`/`user_disaster_alert`에도 상태·사유 컬럼이 필요할 수 있다 (1.5절 참고).
 
 ## 4. 참고

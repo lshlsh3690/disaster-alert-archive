@@ -24,7 +24,7 @@
 
 | 클러스터링 | 맞게 묶은 비율 | 빠짐없이 묶은 비율 | 그냥 평균 | 점수(조화평균) |
 |---|---|---|---|---|
-| 2026-11-09 develop, 2026-11 셋(사본 `disaster_alert_eval_v5`) | 80.5% | 75.4% | 78.0 | **77.9** |
+| 2026-11-11 develop, 2026-11 셋(사본 `disaster_alert_eval_v5`, 문맥 재확인 라벨) | 89.5% | 70.3% | 79.9 | **78.8** |
 | 모든 알림을 이벤트 하나로 묶음 | 5% | 100% | 52.5 | **9.5** |
 | 모든 알림을 따로 둠 | (묶은 쌍 없음) | 0% | — | **0** |
 
@@ -82,36 +82,34 @@
 판정 순간을 기록하던 `clustering_trace` 테이블은 **2026-11-08 에 들어냈다**(경위는 `CLUSTERING_EVALUATION.md` 9절). 그래서 지금 쓸 수 있는 수단은 둘뿐이다.
 
 1. **재클러스터링 로그** — 알림마다 탄 경로와 병합 결과가 찍힌다. 후보 이벤트와 거리(`event=… dist=…`)는 **임베딩 경로(일반 후보 검색)에서만** 찍힌다. 동물 경로(`clusterAnimal`)는 후보 수와 선택된 이벤트만 남기고 후보 목록·거리는 남기지 않으므로 로그를 보존해도 동물 후보는 확인할 수 없다. 재클러스터링할 때 로그를 파일로 남겨 두면 그 실행에 한해 판정을 되짚을 수 있다.
-2. **후보 검색을 SQL 로 재현** — 나중에 들어온 알림 기준으로 "같은 시군구 + 후보 윈도우(168h) 안 이벤트"를 거리순으로 다시 뽑아 본다. `findTopCandidates` 처럼 윈도우는 **이벤트의 마지막 알림 시각**(판정 시점 이전)으로 검사하고 broadcast·advisory 이벤트는 뺀다. 그래도 그 순간 실제로 본 후보가 아니라 **지금 이벤트 배정으로 다시 계산한 값**이라는 한계가 있다.
+2. **후보 검색을 SQL 로 재현** — 나중에 들어온 알림 기준으로 "같은 시군구 + 후보 윈도우(168h) 안 이벤트"를 거리순으로 다시 뽑아 본다. `findTopCandidates` 처럼 윈도우는 **이벤트의 마지막 알림 시각**(판정 시점 이전)으로 검사하고 broadcast 이벤트는 뺀다. 그래도 그 순간 실제로 본 후보가 아니라 **지금 이벤트 배정으로 다시 계산한 값**이라는 한계가 있다.
 
 ```sql
 -- 먼저 들어온 알림이 속한 정답 이벤트
-SELECT event_id FROM event_alert_mapping WHERE alert_id = <먼저 알림 id>;
+SELECT event_id FROM disaster_alert WHERE disaster_alert_id = <먼저 알림 id>;
 
 -- 나중 알림 기준으로 같은 시군구·168h 안 후보를 거리순으로 재현
 WITH t AS (SELECT embedding, created_at FROM disaster_alert WHERE disaster_alert_id = <나중 알림 id>),
      s AS (SELECT DISTINCT left(legal_district_code,5) c FROM disaster_alert_region WHERE disaster_alert_id = <나중 알림 id>)
-SELECT m.event_id, round(min(a.embedding <=> (SELECT embedding FROM t))::numeric,4) AS dist
-FROM event_alert_mapping m
-JOIN disaster_alert a ON a.disaster_alert_id = m.alert_id
+SELECT a.event_id, round(min(a.embedding <=> (SELECT embedding FROM t))::numeric,4) AS dist
+FROM disaster_alert a
 JOIN disaster_alert_region r ON r.disaster_alert_id = a.disaster_alert_id
-JOIN disaster_events e ON e.id = m.event_id
-WHERE e.is_broadcast = false AND e.is_advisory = false
+JOIN disaster_events e ON e.id = a.event_id
+WHERE e.is_broadcast = false
   AND left(r.legal_district_code,5) IN (SELECT c FROM s)
   AND a.created_at < (SELECT created_at FROM t)
   AND a.embedding IS NOT NULL
   -- 이벤트의 마지막 알림(판정 시점 이전)이 168h 안인가 = 168h 안에 알림이 하나라도 있는가
-  AND EXISTS (SELECT 1 FROM event_alert_mapping m2
-              JOIN disaster_alert a2 ON a2.disaster_alert_id = m2.alert_id
-              WHERE m2.event_id = m.event_id
+  AND EXISTS (SELECT 1 FROM disaster_alert a2
+              WHERE a2.event_id = a.event_id
                 AND a2.created_at < (SELECT created_at FROM t)
                 AND a2.created_at > (SELECT created_at FROM t) - interval '168 hours')
-GROUP BY m.event_id ORDER BY dist LIMIT 3;
+GROUP BY a.event_id ORDER BY dist LIMIT 3;
 ```
 
 정답 이벤트가 이 SQL 의 상위 3개(실제 검색의 상위 3개와 같은 범위)에 있어도 **이것만으로 판정 단계 실패를 확정하지 마라** — 이 결과는 판정 당시의 후보를 증명하지 못한다. 재클러스터링 로그로 정답 이벤트가 실제 검색 후보였음을 확인한 경우에만 검색이 아니라 판정(임계값·LLM 폴백·가드)에서 막힌 것으로 본다. 그 다음은 코드를 읽어야 한다 — 기록이 있어도 "무엇을 봤는가"까지만 알 수 있고 "왜 그 가드에 걸렸는가"는 코드에만 있다(2026-11-07 거제 화재 사례에서 실제로 그랬다).
 
-- 평가 사본에서 재클러스터링(백필)할 때는 `event_alert_mapping`, `disaster_event_translation`, `event_region_impact`, `region_risk_index`, `disaster_events` 를 **한 번의 `TRUNCATE` 명령**으로 함께 비운 뒤 돌려야 한다. 앞의 세 표는 `disaster_events` 를 참조하는 외래 키가 있어 같은 명령에 넣지 않으면 `TRUNCATE` 가 실패한다. 위험도 기능은 2026-11-05 에 삭제됐지만 `event_region_impact`·`region_risk_index` 테이블과 외래 키는 남아 있어 지금도 비워야 한다. 자동으로 지우지 않는다. 명령은 `EventClusteringBackfillTool` javadoc 의 권장 절차와 같다: `TRUNCATE event_alert_mapping, disaster_event_translation, event_region_impact, region_risk_index, disaster_events RESTART IDENTITY;`
+- 평가 사본에서 재클러스터링(백필)할 때는 먼저 알림의 이벤트 배정(`disaster_alert` 의 `event_` 컬럼 5개)을 `NULL` 로 지우고, `disaster_events` 를 참조하는 `disaster_event_translation`·`event_region_impact`·`region_risk_index` 를 `TRUNCATE` 한 뒤, `disaster_events` 를 `DELETE` 한다. `disaster_alert.event_id` 가 `disaster_events` 를 참조해 `disaster_events` 는 `TRUNCATE` 할 수 없다(`TRUNCATE … CASCADE` 는 `disaster_alert` 까지 비우므로 절대 쓰지 않는다). 위험도 기능은 2026-11-05 에 삭제됐지만 `event_region_impact`·`region_risk_index` 테이블과 외래 키는 남아 있어 지금도 비워야 한다. 자동으로 지우지 않는다. 명령은 `EventClusteringBackfillTool` javadoc 의 권장 절차·`backend/evaluation/README.md` 와 같다.
 
 ## 이 도구가 하지 않는 것
 - **왜 놓쳤는지(검색 단계인지 판정 단계인지) 계산하지 않는다.** 어느 단계가 막혔는지는 필요할 때 별도로 조사한다.
@@ -119,12 +117,12 @@ GROUP BY m.event_id ORDER BY dist LIMIT 3;
 
 ## 데이터셋
 `backend/evaluation/datasets/`의 JSON 배열. 항목마다 `q`(문항 번호), `label`(SAME·DIFF·UNSURE), `relation`, `gap`, `a`·`b`(각각 `id`, `at`, `type`, `region`, `message`)가 있다. 평가 계산에는 `a.id`·`b.id`·`label` 만 쓰고 나머지는 사람이 판정을 대조하려고 둔 필드다. 데이터셋 이름은 파일명에서 확장자를 뗀 것이다.
-- `cluster-eval-2026-11.json`: **유일한 평가 셋**(272쌍, 같은 사건 126 / 다른 사건 104 / 모르겠음 42). 2026-11-09 한 번의 라벨링으로 매긴 쌍만 담는다. 사본 `disaster_alert_eval_v5`(운영 분류값) 에서 잰다. 구성·기준은 `.rubric.md`
+- `cluster-eval-2026-11.json`: **유일한 평가 셋**(272쌍, 같은 사건 145 / 다른 사건 82 / 모르겠음 45). 2026-11-09 한 번의 라벨링으로 매긴 쌍만 담는다. 사본 `disaster_alert_eval_v5`(운영 분류값) 에서 잰다. 구성·기준은 `.rubric.md`
 - 예전 셋(`cluster-eval-2026-10-incident`·`-test`, 개발용 `cluster-eval-2026-10`)은 모두 지웠다 — 기준이 바뀌기 전 라벨이라 섞이면 헷갈린다(경위는 `CLUSTERING_EVALUATION.md` 4절, 파일은 git 이력)
 
 리포트를 볼 때는 전체 쌍 수 대비 계산에 쓰인 쌍 수("제외" 줄)를 함께 본다.
 
-리포트는 `backend/evaluation/reports/` 에 둔다. 지금 기준점은 `2026-11_2026-11-09.md` 다. 그 전 리포트는 지운 예전 셋으로 잰 기록이라 이 셋과 직접 비교하지 않는다. 그중 `*_2026-10-19.md` 세 개가 이 도구로 잰 첫 기준점이었고, 그 전 리포트(`before.md`, `after_v0.md` 등)는 옛 형식이라 직접 비교하지 않는다.
+리포트는 `backend/evaluation/reports/` 에 둔다. 지금 기준점은 `2026-11_2026-11-11-recheck.md` 다(문맥 재확인 라벨 반영). 그 전 리포트는 지운 예전 셋으로 잰 기록이라 이 셋과 직접 비교하지 않는다. 그중 `*_2026-10-19.md` 세 개가 이 도구로 잰 첫 기준점이었고, 그 전 리포트(`before.md`, `after_v0.md` 등)는 옛 형식이라 직접 비교하지 않는다.
 
 ## 실행
 라벨은 JSON 파일에서 바로 읽는다(DB 적재 없음, `evaluation_label` 테이블도 쓰지 않는다). 평가용 DB 사본에서 `eval` 프로필로 실행한다(OpenAI 호출 없음, 운영 DB 에는 실행하지 않는다). `backend/` 에서 루트 `.env.dev` 를 불러온 뒤 실행한다.

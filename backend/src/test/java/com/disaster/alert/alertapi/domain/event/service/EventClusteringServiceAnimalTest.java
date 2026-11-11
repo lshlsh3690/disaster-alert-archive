@@ -4,11 +4,9 @@ import com.disaster.alert.alertapi.domain.disasteralert.model.DisasterAlert;
 import com.disaster.alert.alertapi.domain.disasteralert.model.DisasterLevel;
 import com.disaster.alert.alertapi.domain.disasteralert.repository.DisasterAlertRepository;
 import com.disaster.alert.alertapi.domain.event.model.DisasterEvent;
-import com.disaster.alert.alertapi.domain.event.model.EventAlertMapping;
 import com.disaster.alert.alertapi.domain.event.model.MergeMethod;
 import com.disaster.alert.alertapi.domain.event.repository.AlertEmbeddingRepository;
 import com.disaster.alert.alertapi.domain.event.repository.DisasterEventRepository;
-import com.disaster.alert.alertapi.domain.event.repository.EventAlertMappingRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -58,7 +56,6 @@ class EventClusteringServiceAnimalTest {
     @Mock EmbeddingModel embeddingModel;
     @Mock DisasterAlertRepository disasterAlertRepository;
     @Mock DisasterEventRepository disasterEventRepository;
-    @Mock EventAlertMappingRepository eventAlertMappingRepository;
     @Mock AlertEmbeddingRepository alertEmbeddingRepository;
     @Mock EventLLMDecisionService llmDecisionService;
 
@@ -68,9 +65,8 @@ class EventClusteringServiceAnimalTest {
     @BeforeEach
     void setUp() {
         service = new EventClusteringService(embeddingModel, disasterAlertRepository, disasterEventRepository,
-                eventAlertMappingRepository, alertEmbeddingRepository, llmDecisionService);
+                alertEmbeddingRepository, llmDecisionService);
         // 운영 기본값(application.yml)과 같게 맞춘다 - 동물 경로의 윈도우·후보 수·거리·병합 상한이 이 값들에 의존한다.
-        ReflectionTestUtils.setField(service, "similarityThreshold", 0.85);
         ReflectionTestUtils.setField(service, "candidateWindowHours", 168);
         ReflectionTestUtils.setField(service, "maxRegionSpan", 10);
         ReflectionTestUtils.setField(service, "nationwideSidoSpan", 8);
@@ -83,10 +79,8 @@ class EventClusteringServiceAnimalTest {
         ReflectionTestUtils.setField(service, "regionalTypesCsv", "산불:168,산사태:168,홍수:168");
         ReflectionTestUtils.setField(service, "regionalAdjacentTypesCsv", "산불");
         ReflectionTestUtils.setField(service, "regionalAdjacentWindowHours", 24);
-        ReflectionTestUtils.setField(service, "relaxedThresholdTypesCsv", "폭염,한파,대설,강풍,가축질병");
-        ReflectionTestUtils.setField(service, "relaxedSimilarityThreshold", 0.65);
-        ReflectionTestUtils.setField(service, "episodicTypesCsv", "폭염,한파,대설,강풍,가축질병");
-        ReflectionTestUtils.setField(service, "episodicWindowHours", 168);
+        ReflectionTestUtils.setField(service, "sustainedTypesCsv", "폭염,한파,대설,강풍,가축질병");
+        ReflectionTestUtils.setField(service, "sustainedWindowHours", 168);
         ReflectionTestUtils.setField(service, "adjacentWindowHours", 48);
         ReflectionTestUtils.setField(service, "adjacentMaxEventAgeHours", 72);
         ReflectionTestUtils.setField(service, "crossRegionWindowHours", 336);
@@ -101,7 +95,6 @@ class EventClusteringServiceAnimalTest {
             return e;
         });
         when(alertEmbeddingRepository.findEmbeddingText(ALERT_ID)).thenReturn(EMBEDDING);
-        when(eventAlertMappingRepository.countByEventId(anyLong())).thenReturn(2);
     }
 
     /** 유형 '기타' 알림을 만든다. withRegion=false 면 지역 코드를 붙이지 않는다. */
@@ -118,12 +111,13 @@ class EventClusteringServiceAnimalTest {
     }
 
     /** 후보 이벤트 {id} 를 병합 상한 판정용으로 등록한다: 알림 수 alertCount, 걸친 시도 수 sidoCount. */
-    private void stubCandidateEvent(long id, int alertCount, int sidoCount) {
+    private DisasterEvent stubCandidateEvent(long id, int alertCount, int sidoCount) {
         DisasterEvent ev = DisasterEvent.builder().primaryDisasterType("기타").alertCount(alertCount)
                 .firstAlertAt(now.minusDays(2)).lastAlertAt(now.minusDays(1)).build();
         ReflectionTestUtils.setField(ev, "id", id);
         when(disasterEventRepository.findById(id)).thenReturn(Optional.of(ev));
-        when(eventAlertMappingRepository.countDistinctSidoByEventId(id)).thenReturn(sidoCount);
+        when(disasterEventRepository.countDistinctSidoByEventId(id)).thenReturn(sidoCount);
+        return ev;
     }
 
 
@@ -140,10 +134,10 @@ class EventClusteringServiceAnimalTest {
         when(disasterEventRepository.findCrossRegionCandidatesSido(anyString(), any(), any(), anyLong(), anyString(),
                 anyList(), anyDouble(), anyInt()))
                 .thenReturn(List.<Object[]>of(new Object[]{10L, 0.20}, new Object[]{11L, 0.30}));
-        when(eventAlertMappingRepository.findRepresentativeMessages(anyList()))
+        when(disasterEventRepository.findRepresentativeMessages(anyList()))
                 .thenReturn(List.<Object[]>of(new Object[]{10L, "대표 본문 10"}, new Object[]{11L, "대표 본문 11"}));
         when(llmDecisionService.pickSameIncident(anyString(), anyList())).thenReturn(1);
-        stubCandidateEvent(11L, 3, 2);   // 상한(30건/10개 시도)에 한참 못 미치는 이벤트 - 병합 허용
+        DisasterEvent picked = stubCandidateEvent(11L, 3, 2);   // 상한(30건/10개 시도)에 한참 못 미치는 이벤트 - 병합 허용
 
         service.clusterNewAlert(ALERT_ID);
 
@@ -161,12 +155,16 @@ class EventClusteringServiceAnimalTest {
         verify(llmDecisionService, never()).pickSameGeneralIncident(any(), any());
 
         // 병합 대상은 LLM 이 고른 11번, 방식은 LLM.
-        ArgumentCaptor<EventAlertMapping> mapping = ArgumentCaptor.forClass(EventAlertMapping.class);
-        verify(eventAlertMappingRepository).save(mapping.capture());
-        assertThat(mapping.getValue().getId().getEventId()).isEqualTo(11L);
-        assertThat(mapping.getValue().getMergeMethod()).isEqualTo(MergeMethod.LLM);
-        verify(disasterEventRepository).incrementOnMerge(11L, alert.getCreatedAt());
-
+        ArgumentCaptor<DisasterAlert> mapping = ArgumentCaptor.forClass(DisasterAlert.class);
+        verify(disasterAlertRepository).saveAndFlush(mapping.capture());
+        assertThat(mapping.getValue().getEventMergeMethod()).isEqualTo(MergeMethod.LLM);
+        // 병합 순서: 기존 3건 + 1 = 4 번째, 이벤트의 알림 수(4)와 마지막 알림 시각(now, 기존은 하루 전)이 이 이벤트 객체에서 갱신된다.
+        assertThat(mapping.getValue().getEventSequenceNo()).isEqualTo(4);
+        assertThat(picked.getAlertCount()).isEqualTo(4);
+        assertThat(picked.getLastAlertAt()).isEqualTo(alert.getCreatedAt());
+        // 이벤트 연결은 마지막에 확인한다 - 갱신이 안 된 상태에서도 값 단언이 먼저 원인을 드러내도록.
+        assertThat(mapping.getValue().getEvent()).as("알림이 병합 대상 이벤트에 연결돼야 한다").isNotNull()
+                .extracting(DisasterEvent::getId).isEqualTo(11L);
     }
 
     // 결정: 토착종(멧돼지·들개·뱀)은 국지적으로만 움직이므로 시도가 아니라 시군구 단위 쿼리를 쓴다.

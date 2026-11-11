@@ -1,0 +1,75 @@
+<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>클러스터링 정답 라벨링 2026-11</title>
+<style>
+:root{--bg:#fff;--fg:#1a1a1a;--mut:#666;--card:#f6f7f9;--bd:#d9dce1;--a:#2563eb}
+@media(prefers-color-scheme:dark){:root{--bg:#15171a;--fg:#e8e8e8;--mut:#9aa0a6;--card:#1f2226;--bd:#33373d;--a:#60a5fa}}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.6 system-ui,sans-serif}main{max-width:900px;margin:0 auto;padding:16px}
+.bar{position:sticky;top:0;z-index:2;background:var(--bg);padding:10px 0;border-bottom:1px solid var(--bd);display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.bar progress{flex:1;min-width:120px}
+details.rub{border:1px solid var(--bd);border-radius:10px;padding:10px 14px;margin:12px 0;background:var(--card)}details.rub summary{cursor:pointer;font-weight:600}
+.pair{border:1px solid var(--bd);border-radius:10px;margin:14px 0;padding:12px;background:var(--card);scroll-margin-top:70px}
+.pair.cur{outline:2px solid var(--a)}.pair.done{opacity:.72}
+.cols{display:grid;grid-template-columns:1fr 1fr;gap:10px}@media(max-width:640px){.cols{grid-template-columns:1fr}}
+.m{background:var(--bg);border:1px solid var(--bd);border-radius:8px;padding:10px}.meta{color:var(--mut);font-size:13px;margin-bottom:4px}
+.msg{white-space:pre-wrap;word-break:keep-all}.gap{color:var(--mut);font-size:13px;margin:6px 0 0}
+.ans{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}.ans label{border:1px solid var(--bd);border-radius:8px;padding:6px 14px;cursor:pointer;background:var(--bg)}
+.ans input{margin-right:6px}.ans label:has(input:checked){border-color:var(--a);outline:2px solid var(--a)}
+button{font:inherit;padding:6px 14px;border-radius:8px;border:1px solid var(--bd);background:var(--bg);color:var(--fg);cursor:pointer}
+button.pri{background:var(--a);border-color:var(--a);color:#fff}.hint{color:var(--mut);font-size:13px}
+</style></head><body><main>
+<h1 style="font-size:20px;margin:8px 0">클러스터링 정답 라벨링 — 2026-11 (__N__문항)</h1>
+<p class="hint">두 재난문자가 <b>같은 사건</b>인지 고르세요. 시스템 결과는 숨겼습니다. 답은 이 브라우저에 자동 저장되고, 끝나면 <b>내보내기</b>를 누르세요.
+키보드: <b>1</b> 같은 사건 · <b>2</b> 다른 사건 · <b>3</b> 모르겠음 (현재 문항에 답하고 다음 미응답 문항으로 이동) · <b>J/K</b> 다음/이전</p>
+<details class="rub" open><summary>판정 기준 (CLUSTERING_CRITERIA.md 1절)</summary>
+<ol>
+<li>같은 지역에서 <b>하나의 사고·사건</b>이 이어짐(발생 → 통제·대피 → 복구·해제 등 후속 문자) → <b>같은 사건</b></li>
+<li>인접 지역이고 <b>같은 개체·현상이 이어짐</b>(사고 확산, 동물 이동 등, 문자에 연속성 단서가 있어야 함) → <b>같은 사건</b></li>
+<li><b>별개의 사고·사건</b>(각각 다른 장소·번지의 화재, 서로 다른 지점의 시설 파손, 같은 날 따로 발생한 사고 등) → <b>다른 사건</b></li>
+</ol>
+<p><b>경계 사례 (2026-11-09 확정 — 위보다 우선)</b></p>
+<ul>
+<li><b>A. 호우</b>: 같은 호우 동안 <b>같은 시군구</b> 안의 <b>서로 다른 곳</b>에 난 침수·범람·도로 통제·해제·대피 → <b>같은 사건</b>. 유형이 교통통제여도 원인이 같은 호우면 같음. 이웃 시군구는 같은 호우라도 <b>다른 사건</b>(2026-11-11).</li>
+<li><b>B. 산불 확산</b>: 큰 산불이 번지며 차례로 나온 대피명령·통제 → 문자에 이어짐 표시가 <b>없어도 같은 사건</b>.</li>
+<li><b>C. 산불 별개 발화</b>: 같은 군·같은 날이어도 서로 다른 곳에서 각각 <b>"발생"</b>을 알리면 → <b>다른 사건</b>. (새 발생이면 C, 번짐·접근·대피면 B)</li>
+</ul>
+<p class="hint">판단이 안 서면 "모르겠음" — 점수 계산에서 빠집니다.</p></details>
+<div class="bar"><span id="cnt"></span><progress id="pg" max="1" value="0"></progress>
+<button id="next">다음 미응답</button><button class="pri" id="exp">내보내기</button></div>
+<div id="list"></div>
+<details class="rub"><summary>내보내기가 안 되면 — 아래 내용을 복사</summary><textarea id="txt" style="width:100%;height:120px" readonly></textarea></details>
+</main><script>
+const Q=__DATA__;
+const KEY="cluster-eval-2026-11-v2-labels";
+let A={};try{A=JSON.parse(localStorage.getItem(KEY)||"{}")}catch(e){A={}}
+const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(A))}catch(e){}};
+const L={SAME:"같은 사건",DIFF:"다른 사건",UNSURE:"모르겠음"};
+const list=document.getElementById("list");let cur=0;
+function el(t,c,x){const e=document.createElement(t);if(c)e.className=c;if(x!=null)e.textContent=x;return e}
+Q.forEach((p,i)=>{const d=el("div","pair");d.id="p"+i;
+ d.append(el("div","meta","Q"+p.q+" · "+p.a_type+(p.a_type!==p.b_type?" / "+p.b_type:"")+" · "+p.rel));
+ const c=el("div","cols");
+ [["A",p.a_at,p.a_region,p.a_msg],["B",p.b_at,p.b_region,p.b_msg]].forEach(function(x){
+  const m=el("div","m");m.append(el("div","meta",x[0]+" · "+x[1]+" · "+x[2]),el("div","msg",x[3]));c.append(m)});
+ d.append(c,el("div","gap","간격 "+p.gap));
+ const an=el("div","ans");
+ ["SAME","DIFF","UNSURE"].forEach(function(v,k){const lb=el("label");const r=el("input");r.type="radio";r.name="q"+i;r.value=v;
+  if(A[p.q]===v)r.checked=true;r.onchange=function(){A[p.q]=v;save();upd();cur=i};lb.append(r,document.createTextNode((k+1)+" "+L[v]));an.append(lb)});
+ d.append(an);d.onclick=function(){setCur(i,false)};list.append(d)});
+function upd(){const n=Q.filter(function(p){return A[p.q]}).length;document.getElementById("cnt").textContent=n+" / "+Q.length;
+ const pg=document.getElementById("pg");pg.max=Q.length;pg.value=n;
+ Q.forEach(function(p,i){document.getElementById("p"+i).classList.toggle("done",!!A[p.q])})}
+function setCur(i,scroll){document.getElementById("p"+cur).classList.remove("cur");cur=Math.max(0,Math.min(Q.length-1,i));
+ const e=document.getElementById("p"+cur);e.classList.add("cur");if(scroll!==false)e.scrollIntoView({block:"start",behavior:"smooth"})}
+function nextOpen(){for(let k=1;k<=Q.length;k++){const j=(cur+k)%Q.length;if(!A[Q[j].q])return setCur(j)}}
+document.getElementById("next").onclick=nextOpen;
+document.addEventListener("keydown",function(e){if(e.target.tagName==="TEXTAREA")return;
+ const m={"1":"SAME","2":"DIFF","3":"UNSURE"}[e.key];
+ if(m){const p=Q[cur];A[p.q]=m;save();
+  const r=document.querySelector("input[name=q"+cur+"][value="+m+"]");if(r)r.checked=true;upd();nextOpen()}
+ else if(e.key==="j"||e.key==="J")setCur(cur+1);else if(e.key==="k"||e.key==="K")setCur(cur-1)});
+function out(){return JSON.stringify(Q.filter(function(p){return A[p.q]}).map(function(p){return {q:p.q,a_id:p.a_id,b_id:p.b_id,label:A[p.q]}}))}
+document.getElementById("exp").onclick=function(){const s=out();document.getElementById("txt").value=s;
+ try{const b=new Blob([s],{type:"application/json"});const u=URL.createObjectURL(b);const a=document.createElement("a");
+  a.href=u;a.download="cluster-eval-2026-11.labels.json";document.body.append(a);a.click();a.remove();URL.revokeObjectURL(u)}catch(e){}};
+upd();const f=Q.findIndex(function(p){return !A[p.q]});setCur(f<0?0:f,false);
+</script></body></html>

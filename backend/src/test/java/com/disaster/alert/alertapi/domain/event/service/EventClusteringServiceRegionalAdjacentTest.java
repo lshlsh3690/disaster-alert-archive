@@ -4,11 +4,9 @@ import com.disaster.alert.alertapi.domain.disasteralert.model.DisasterAlert;
 import com.disaster.alert.alertapi.domain.disasteralert.model.DisasterLevel;
 import com.disaster.alert.alertapi.domain.disasteralert.repository.DisasterAlertRepository;
 import com.disaster.alert.alertapi.domain.event.model.DisasterEvent;
-import com.disaster.alert.alertapi.domain.event.model.EventAlertMapping;
 import com.disaster.alert.alertapi.domain.event.model.MergeMethod;
 import com.disaster.alert.alertapi.domain.event.repository.AlertEmbeddingRepository;
 import com.disaster.alert.alertapi.domain.event.repository.DisasterEventRepository;
-import com.disaster.alert.alertapi.domain.event.repository.EventAlertMappingRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -27,7 +25,6 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
@@ -55,18 +52,19 @@ class EventClusteringServiceRegionalAdjacentTest {
     @Mock EmbeddingModel embeddingModel;
     @Mock DisasterAlertRepository disasterAlertRepository;
     @Mock DisasterEventRepository disasterEventRepository;
-    @Mock EventAlertMappingRepository eventAlertMappingRepository;
     @Mock AlertEmbeddingRepository alertEmbeddingRepository;
     @Mock EventLLMDecisionService llmDecisionService;
 
     EventClusteringService service;
     LocalDateTime now = LocalDateTime.of(2026, 7, 20, 12, 0);
 
+    DisasterEvent adjacentEvent;
+    DisasterEvent sameSigunguEvent;
+
     @BeforeEach
     void setUp() {
         service = new EventClusteringService(embeddingModel, disasterAlertRepository, disasterEventRepository,
-                eventAlertMappingRepository, alertEmbeddingRepository, llmDecisionService);
-        ReflectionTestUtils.setField(service, "similarityThreshold", 0.85);
+                alertEmbeddingRepository, llmDecisionService);
         ReflectionTestUtils.setField(service, "candidateWindowHours", 168);
         ReflectionTestUtils.setField(service, "maxRegionSpan", 10);
         ReflectionTestUtils.setField(service, "nationwideSidoSpan", 8);
@@ -77,10 +75,8 @@ class EventClusteringServiceRegionalAdjacentTest {
         ReflectionTestUtils.setField(service, "globalTypesCsv", "태풍");
         ReflectionTestUtils.setField(service, "globalWindowHours", 168);
         ReflectionTestUtils.setField(service, "regionalTypesCsv", "산불:168,산사태:168,홍수:168");
-        ReflectionTestUtils.setField(service, "relaxedThresholdTypesCsv", "폭염,한파,대설,강풍,가축질병");
-        ReflectionTestUtils.setField(service, "relaxedSimilarityThreshold", 0.65);
-        ReflectionTestUtils.setField(service, "episodicTypesCsv", "폭염,한파,대설,강풍,가축질병");
-        ReflectionTestUtils.setField(service, "episodicWindowHours", 168);
+        ReflectionTestUtils.setField(service, "sustainedTypesCsv", "폭염,한파,대설,강풍,가축질병");
+        ReflectionTestUtils.setField(service, "sustainedWindowHours", 168);
         ReflectionTestUtils.setField(service, "regionalAdjacentTypesCsv", "산불");
         ReflectionTestUtils.setField(service, "regionalAdjacentWindowHours", 24);
 
@@ -92,11 +88,30 @@ class EventClusteringServiceRegionalAdjacentTest {
         when(alertEmbeddingRepository.findEmbeddingText(1L)).thenReturn("[0.1,0.2]");
         when(disasterEventRepository.findTopCandidates(anyString(), any(String[].class), any(LocalDateTime.class)))
                 .thenReturn(List.of());
-        when(eventAlertMappingRepository.countByEventId(anyLong())).thenReturn(3);
+        // 병합 대상 이벤트 둘을 findById 로 돌려준다 - 알림 3건이 쌓였고 마지막 알림은 알림 시각보다 2시간 이르다(순번은 4).
+        adjacentEvent = regionalEvent(ADJACENT_EVENT_ID);
+        sameSigunguEvent = regionalEvent(SAME_SIGUNGU_EVENT_ID);
         when(disasterEventRepository.findRegionalTypeMergeTarget(
                 anyString(), any(String[].class), any(LocalDateTime.class))).thenReturn(Optional.empty());
         when(disasterEventRepository.findRegionalTypeAdjacentMergeTarget(
                 anyString(), any(String[].class), any(LocalDateTime.class))).thenReturn(Optional.empty());
+    }
+
+    private DisasterEvent regionalEvent(long id) {
+        DisasterEvent ev = DisasterEvent.builder().id(id).primaryDisasterType("산불")
+                .firstAlertAt(now.minusHours(10)).lastAlertAt(now.minusHours(2)).alertCount(3).build();
+        when(disasterEventRepository.findById(id)).thenReturn(Optional.of(ev));
+        return ev;
+    }
+
+    /** 알림이 event 에 붙었음: 알림이 가리키는 이벤트 id, 순번(3 + 1 = 4), 이벤트의 알림 수(4)와 마지막 알림 시각(now). */
+    private void assertMergedInto(DisasterAlert savedAlert, DisasterEvent event) {
+        assertThat(savedAlert.getEventSequenceNo()).isEqualTo(4);
+        assertThat(event.getAlertCount()).isEqualTo(4);
+        assertThat(event.getLastAlertAt()).isEqualTo(now);
+        // 이벤트 연결은 마지막에 확인한다 - 갱신이 안 된 상태에서도 값 단언이 먼저 원인을 드러내도록.
+        assertThat(savedAlert.getEvent()).as("알림이 병합 대상 이벤트에 연결돼야 한다").isNotNull()
+                .extracting(DisasterEvent::getId).isEqualTo(event.getId());
     }
 
     private DisasterAlert alert(String type, String message, String... regionCodes) {
@@ -140,10 +155,10 @@ class EventClusteringServiceRegionalAdjacentTest {
 
         verify(disasterEventRepository).findRegionalTypeAdjacentMergeTarget(
                 eq("산불"), eq(new String[]{"47810"}), eq(now.minusHours(24)));
-        ArgumentCaptor<EventAlertMapping> mapping = ArgumentCaptor.forClass(EventAlertMapping.class);
-        verify(eventAlertMappingRepository).save(mapping.capture());
-        assertThat(mapping.getValue().getMergeMethod()).isEqualTo(MergeMethod.REGIONAL_TYPE);
-        verify(disasterEventRepository).incrementOnMerge(ADJACENT_EVENT_ID, now);
+        ArgumentCaptor<DisasterAlert> mapping = ArgumentCaptor.forClass(DisasterAlert.class);
+        verify(disasterAlertRepository).saveAndFlush(mapping.capture());
+        assertThat(mapping.getValue().getEventMergeMethod()).isEqualTo(MergeMethod.REGIONAL_TYPE);
+        assertMergedInto(mapping.getValue(), adjacentEvent);
         verify(disasterEventRepository, never()).save(any(DisasterEvent.class));
     }
 
@@ -159,14 +174,16 @@ class EventClusteringServiceRegionalAdjacentTest {
         service.clusterNewAlert(1L);
 
         verifyAdjacentNeverQueried();
-        verify(disasterEventRepository).incrementOnMerge(SAME_SIGUNGU_EVENT_ID, now);
-        ArgumentCaptor<EventAlertMapping> mapping = ArgumentCaptor.forClass(EventAlertMapping.class);
-        verify(eventAlertMappingRepository).save(mapping.capture());
-        assertThat(mapping.getValue().getMergeMethod()).isEqualTo(MergeMethod.REGIONAL_TYPE);
+        ArgumentCaptor<DisasterAlert> mapping = ArgumentCaptor.forClass(DisasterAlert.class);
+        verify(disasterAlertRepository).saveAndFlush(mapping.capture());
+        assertThat(mapping.getValue().getEventMergeMethod()).isEqualTo(MergeMethod.REGIONAL_TYPE);
+        // 같은 시군구 이벤트만 갱신되고 인접 이벤트는 그대로다.
+        assertMergedInto(mapping.getValue(), sameSigunguEvent);
+        assertThat(adjacentEvent.getAlertCount()).isEqualTo(3);
     }
 
     @Test
-    @DisplayName("c) 같은 시군구·인접 모두 없음: 신규 이벤트(비안내·비광역) 생성 [회귀 보호]")
+    @DisplayName("c) 같은 시군구·인접 모두 없음: 신규 이벤트(비광역) 생성 [회귀 보호]")
     void noTargets_createsNewEvent() {
         alert("산불", FIRE_INCIDENT, SIGUNGU_CODE);
 
@@ -174,7 +191,6 @@ class EventClusteringServiceRegionalAdjacentTest {
 
         ArgumentCaptor<DisasterEvent> event = ArgumentCaptor.forClass(DisasterEvent.class);
         verify(disasterEventRepository).save(event.capture());
-        assertThat(event.getValue().isAdvisory()).isFalse();
         assertThat(event.getValue().isBroadcast()).isFalse();
     }
 

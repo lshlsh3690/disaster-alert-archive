@@ -45,7 +45,7 @@ class AssignmentReaderTest {
 
         jdbc.update("INSERT INTO disaster_events(id, event_title, first_alert_at, last_alert_at, alert_count) "
                 + "VALUES (9000000001, '평가 테스트 이벤트', '2026-10-01 10:00:00', '2026-10-01 10:00:00', 1)");
-        jdbc.update("INSERT INTO event_alert_mapping(event_id, alert_id, sequence_no) VALUES (9000000001, ?, 1)", A1);
+        jdbc.update("UPDATE disaster_alert SET event_id = 9000000001, event_sequence_no = 1 WHERE disaster_alert_id = ?", A1);
     }
 
     // 평가는 "두 알림 모두 이벤트에 들어 있는가" 로 미배정을 가른다. 이벤트에 없는 알림이 예외나 0 이 아니라

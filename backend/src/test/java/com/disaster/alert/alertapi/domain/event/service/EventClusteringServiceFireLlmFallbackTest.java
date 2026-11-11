@@ -4,11 +4,9 @@ import com.disaster.alert.alertapi.domain.disasteralert.model.DisasterAlert;
 import com.disaster.alert.alertapi.domain.disasteralert.model.DisasterLevel;
 import com.disaster.alert.alertapi.domain.disasteralert.repository.DisasterAlertRepository;
 import com.disaster.alert.alertapi.domain.event.model.DisasterEvent;
-import com.disaster.alert.alertapi.domain.event.model.EventAlertMapping;
 import com.disaster.alert.alertapi.domain.event.model.MergeMethod;
 import com.disaster.alert.alertapi.domain.event.repository.AlertEmbeddingRepository;
 import com.disaster.alert.alertapi.domain.event.repository.DisasterEventRepository;
-import com.disaster.alert.alertapi.domain.event.repository.EventAlertMappingRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -29,7 +27,6 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
-import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -52,7 +49,6 @@ class EventClusteringServiceFireLlmFallbackTest {
     @Mock EmbeddingModel embeddingModel;
     @Mock DisasterAlertRepository disasterAlertRepository;
     @Mock DisasterEventRepository disasterEventRepository;
-    @Mock EventAlertMappingRepository eventAlertMappingRepository;
     @Mock AlertEmbeddingRepository alertEmbeddingRepository;
     @Mock EventLLMDecisionService llmDecisionService;
 
@@ -61,8 +57,7 @@ class EventClusteringServiceFireLlmFallbackTest {
     @BeforeEach
     void setUp() {
         service = new EventClusteringService(embeddingModel, disasterAlertRepository, disasterEventRepository,
-                eventAlertMappingRepository, alertEmbeddingRepository, llmDecisionService);
-        ReflectionTestUtils.setField(service, "similarityThreshold", 0.85);
+                alertEmbeddingRepository, llmDecisionService);
         ReflectionTestUtils.setField(service, "candidateWindowHours", 168);
         ReflectionTestUtils.setField(service, "maxRegionSpan", 10);
         ReflectionTestUtils.setField(service, "nationwideSidoSpan", 8);
@@ -73,9 +68,7 @@ class EventClusteringServiceFireLlmFallbackTest {
         ReflectionTestUtils.setField(service, "globalTypesCsv", "태풍");
         ReflectionTestUtils.setField(service, "globalWindowHours", 168);
         ReflectionTestUtils.setField(service, "regionalTypesCsv", "산불:336,산사태:168,홍수:168");
-        ReflectionTestUtils.setField(service, "relaxedThresholdTypesCsv", "폭염,한파,대설,강풍,가축질병");
-        ReflectionTestUtils.setField(service, "relaxedSimilarityThreshold", 0.65);
-        ReflectionTestUtils.setField(service, "episodicTypesCsv", "");
+        ReflectionTestUtils.setField(service, "sustainedTypesCsv", "");
         ReflectionTestUtils.setField(service, "adjacentWindowHours", 48);
         ReflectionTestUtils.setField(service, "adjacentMaxEventAgeHours", 72);
 
@@ -85,7 +78,6 @@ class EventClusteringServiceFireLlmFallbackTest {
             return e;
         });
         when(alertEmbeddingRepository.findEmbeddingText(1L)).thenReturn("[0.1,0.2]");
-        when(eventAlertMappingRepository.countByEventId(anyLong())).thenReturn(2);
     }
 
     /**
@@ -109,7 +101,7 @@ class EventClusteringServiceFireLlmFallbackTest {
         when(disasterAlertRepository.findById(1L)).thenReturn(Optional.of(alert));
 
         DisasterEvent event = DisasterEvent.builder()
-                .primaryDisasterType("화재").firstAlertAt(eventAt).lastAlertAt(eventAt).build();
+                .primaryDisasterType("화재").firstAlertAt(eventAt).lastAlertAt(eventAt).alertCount(2).build();
         ReflectionTestUtils.setField(event, "id", EVENT_ID);
         when(disasterEventRepository.findById(EVENT_ID)).thenReturn(Optional.of(event));
 
@@ -127,10 +119,16 @@ class EventClusteringServiceFireLlmFallbackTest {
         // 검증: 후보가 비워지지 않으므로 LLM 이 실제로 호출되어야 한다(옛 72h 가드가 있었다면 여기서 실패한다)
         verify(llmDecisionService).pickSameGeneralIncident(anyString(), anyList());
         // 검증: LLM 이 고른 이벤트에 LLM_FALLBACK 으로 붙고, 단발 신규 이벤트(save)는 만들어지지 않는다
-        ArgumentCaptor<EventAlertMapping> mapping = ArgumentCaptor.forClass(EventAlertMapping.class);
-        verify(eventAlertMappingRepository).save(mapping.capture());
-        assertThat(mapping.getValue().getMergeMethod()).isEqualTo(MergeMethod.LLM_FALLBACK);
-        verify(disasterEventRepository).incrementOnMerge(EVENT_ID, alertAt);
+        ArgumentCaptor<DisasterAlert> mapping = ArgumentCaptor.forClass(DisasterAlert.class);
+        verify(disasterAlertRepository).saveAndFlush(mapping.capture());
+        assertThat(mapping.getValue().getEventMergeMethod()).isEqualTo(MergeMethod.LLM_FALLBACK);
+        // 병합 결과: 알림이 이 이벤트에 3 번째(기존 2건 + 1)로 붙고, 이벤트의 알림 수·마지막 알림 시각(79.7h 뒤의 alertAt)이 갱신된다.
+        assertThat(mapping.getValue().getEventSequenceNo()).isEqualTo(3);
+        assertThat(event.getAlertCount()).isEqualTo(3);
+        assertThat(event.getLastAlertAt()).isEqualTo(alertAt);
+        // 이벤트 연결은 마지막에 확인한다 - 갱신이 안 된 상태에서도 값 단언이 먼저 원인을 드러내도록.
+        assertThat(mapping.getValue().getEvent()).as("알림이 병합 대상 이벤트에 연결돼야 한다").isNotNull()
+                .extracting(DisasterEvent::getId).isEqualTo(EVENT_ID);
         verify(disasterEventRepository, never()).save(any(DisasterEvent.class));
     }
 }

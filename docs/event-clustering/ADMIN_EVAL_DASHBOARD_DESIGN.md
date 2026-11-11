@@ -55,7 +55,7 @@
 | 컬럼 | 내용 |
 |---|---|
 | `alert_id` | 알림 id (PK) |
-| `path` | `EMBEDDING`, `REGIONAL`(지역 한정), `EPISODIC`, `PERSON`(신원 키), `GLOBAL_TYPE`(태풍), `BROADCAST`, `NO_REGION`, `SKIPPED`(비사건 제외) |
+| `path` | `EMBEDDING`, `REGIONAL`(지역 한정), `SUSTAINED`, `PERSON`(신원 키), `GLOBAL_TYPE`(태풍), `BROADCAST`, `NO_REGION`, `SKIPPED`(비사건 제외) |
 | `candidates` | 같은 시군구 후보 이벤트와 거리 JSON `[{"event":15918,"dist":0.387}]` |
 | `adjacent_candidates` | 인접 시군구 후보(사고성 유형만) JSON, 없으면 null |
 | `threshold` | 적용된 병합 기준 거리 |
@@ -73,8 +73,8 @@
 | `ANIMAL` | `clusterAnimal` — 동물 탈출·출몰(같은 종 + 같은·인접 지역 후보, 후보가 있으면 항상 LLM 판정 — 후보 0건이면 LLM 없이 새 이벤트라 `llm_called=false` 도 정상. 2026-10-27 별도 cross-region 패스에서 옮김) | 후보 목록(0건이면 `[]`) / null |
 | `GLOBAL_TYPE` | `clusterGlobalType` — 유형이 태풍이면 발송 시군구 수와 무관하게 여기로 온다. 키는 유형만 | null / null |
 | `REGIONAL` | `clusterRegionalType`(인접 시군구 산불 병합 `mergeIntoAdjacentRegionalEvent` 포함) | null / null |
-| `EPISODIC` | `clusterEpisodicType`, 시군구 1개 | null / null |
-| `BROADCAST` | `clusterBroadcast` — 발송 시군구 수가 기준: 10개 초과, 또는 에피소드형 유형이 2개 이상. 키는 시도+유형(시도 8개 이상이면 전국+유형) | null / null |
+| `SUSTAINED` | `clusterSustainedType`, 시군구 1개 | null / null |
+| `BROADCAST` | `clusterBroadcast` — 발송 시군구 수가 기준: 10개 초과, 또는 지속형 유형이 2개 이상. 키는 시도+유형(시도 8개 이상이면 전국+유형) | null / null |
 | `NO_REGION` | 임베딩 경로에 왔는데 지역 코드가 없음(항상 신규) | null / null |
 | `EMBEDDING` | 임베딩 경로 후보 검색·임계값·인접·LLM 폴백 | 후보 목록(0건이면 `[]`) / 적용한 병합 거리 상한 |
 

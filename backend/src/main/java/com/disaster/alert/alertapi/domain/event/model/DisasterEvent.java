@@ -6,6 +6,7 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.DynamicUpdate;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
@@ -35,6 +36,9 @@ import java.util.regex.Pattern;
 @AllArgsConstructor
 @Builder
 @EntityListeners(AuditingEntityListener.class)
+// 제목 승급은 native updateTitleIfEquals 로 하므로, 병합 때 엔티티가 전체 컬럼을 다시 쓰면 승급된 제목을
+// 옛 값으로 덮을 수 있다 — 바뀐 컬럼(alert_count·last_alert_at)만 UPDATE 하게 한다.
+@DynamicUpdate
 public class DisasterEvent {
 
     @Id
@@ -72,14 +76,6 @@ public class DisasterEvent {
      */
     @Column(name = "is_broadcast", nullable = false)
     private boolean broadcast;
-
-    /**
-     * 안내성 이벤트 여부. 산불의 건조특보·소각금지·예방캠페인 등 실제 화재가 아닌 안내 알림을 모은
-     * 롤링 이벤트("{시군구} 산불예방안내"). true 면 사건 머지·후보 검색({@code findRegionalTypeMergeTarget},
-     * {@code findTopCandidates})에서 제외돼 안내성이 사건 버킷에 끼지 않는다. 프론트는 이 플래그로 필터/약화.
-     */
-    @Column(name = "is_advisory", nullable = false)
-    private boolean advisory;
 
     @CreatedDate
     @Column(name = "created_at", nullable = false, updatable = false)
@@ -233,5 +229,23 @@ public class DisasterEvent {
      */
     public boolean isActive(LocalDateTime now) {
         return lastAlertAt.isAfter(now.minusHours(cooldownHours));
+    }
+
+    /**
+     * 알림 한 건이 이 이벤트에 병합될 때 이벤트 자신의 집계를 갱신하고, 그 알림의 순번을 돌려준다.
+     *
+     * <p>반환값은 올린 뒤의 {@link #alertCount} — 호출한 쪽이 이 값을 알림의
+     * event_sequence_no 로 쓴다. 따로 COUNT 쿼리를 날리지 않아도 이벤트가 읽힌 시점의 건수가 곧 순번이다.
+     *
+     * @param alertAt 병합되는 알림의 시각
+     */
+    public int addAlert(LocalDateTime alertAt) {
+        // 1) 건수는 항상 올린다 — 시각이 과거여도 이벤트에 든 알림은 늘어난 것이다.
+        alertCount++;
+        // 2) lastAlertAt 은 더 늦은 시각일 때만 당긴다 — 백필처럼 시간 역순으로 들어와도 뒤로 가지 않게.
+        if (lastAlertAt == null || alertAt.isAfter(lastAlertAt)) {
+            lastAlertAt = alertAt;
+        }
+        return alertCount;
     }
 }

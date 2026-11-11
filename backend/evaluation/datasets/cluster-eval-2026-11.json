@@ -1,4 +1,4 @@
- [
+[
   {
     "q": 1,
     "label": "DIFF",
@@ -81,7 +81,7 @@
   },
   {
     "q": 5,
-    "label": "DIFF",
+    "label": "SAME",
     "relation": "같은 시군구",
     "gap": "3일 17시간",
     "a": {
@@ -461,7 +461,7 @@
   },
   {
     "q": 24,
-    "label": "UNSURE",
+    "label": "DIFF",
     "relation": "이웃 시군구",
     "gap": "1시간 34분",
     "a": {
@@ -641,7 +641,7 @@
   },
   {
     "q": 34,
-    "label": "UNSURE",
+    "label": "DIFF",
     "relation": "이웃 시군구",
     "gap": "1일 19시간",
     "a": {
@@ -661,7 +661,7 @@
   },
   {
     "q": 35,
-    "label": "DIFF",
+    "label": "SAME",
     "relation": "같은 시군구",
     "gap": "4시간 27분",
     "a": {
@@ -861,7 +861,7 @@
   },
   {
     "q": 49,
-    "label": "DIFF",
+    "label": "UNSURE",
     "relation": "같은 시군구",
     "gap": "2일 22시간",
     "a": {
@@ -1021,7 +1021,7 @@
   },
   {
     "q": 59,
-    "label": "UNSURE",
+    "label": "DIFF",
     "relation": "이웃 시군구",
     "gap": "0시간 48분",
     "a": {
@@ -1041,7 +1041,7 @@
   },
   {
     "q": 60,
-    "label": "DIFF",
+    "label": "SAME",
     "relation": "같은 시군구",
     "gap": "1일 3시간",
     "a": {
@@ -1281,7 +1281,7 @@
   },
   {
     "q": 74,
-    "label": "DIFF",
+    "label": "SAME",
     "relation": "이웃 시군구",
     "gap": "18시간 14분",
     "a": {
@@ -1301,7 +1301,7 @@
   },
   {
     "q": 75,
-    "label": "DIFF",
+    "label": "SAME",
     "relation": "같은 시군구",
     "gap": "20시간 4분",
     "a": {
@@ -1461,7 +1461,7 @@
   },
   {
     "q": 85,
-    "label": "SAME",
+    "label": "DIFF",
     "relation": "이웃 시군구",
     "gap": "1시간 52분",
     "a": {
@@ -1921,7 +1921,7 @@
   },
   {
     "q": 108,
-    "label": "DIFF",
+    "label": "SAME",
     "relation": "이웃 시군구",
     "gap": "22시간 29분",
     "a": {
@@ -2021,7 +2021,7 @@
   },
   {
     "q": 114,
-    "label": "SAME",
+    "label": "UNSURE",
     "relation": "같은 시군구",
     "gap": "2시간 53분",
     "a": {
@@ -2061,7 +2061,7 @@
   },
   {
     "q": 116,
-    "label": "SAME",
+    "label": "DIFF",
     "relation": "같은 시군구",
     "gap": "10시간 51분",
     "a": {
@@ -2161,7 +2161,7 @@
   },
   {
     "q": 121,
-    "label": "DIFF",
+    "label": "UNSURE",
     "relation": "이웃 시군구",
     "gap": "1일 2시간",
     "a": {
@@ -2261,7 +2261,7 @@
   },
   {
     "q": 127,
-    "label": "DIFF",
+    "label": "SAME",
     "relation": "같은 시군구",
     "gap": "7시간 9분",
     "a": {
@@ -2301,7 +2301,7 @@
   },
   {
     "q": 129,
-    "label": "DIFF",
+    "label": "SAME",
     "relation": "같은 시군구",
     "gap": "1일 17시간",
     "a": {
@@ -2541,7 +2541,7 @@
   },
   {
     "q": 141,
-    "label": "DIFF",
+    "label": "UNSURE",
     "relation": "같은 시군구",
     "gap": "1일 2시간",
     "a": {
@@ -2701,7 +2701,7 @@
   },
   {
     "q": 152,
-    "label": "DIFF",
+    "label": "UNSURE",
     "relation": "같은 시군구",
     "gap": "11시간 39분",
     "a": {
@@ -2781,7 +2781,7 @@
   },
   {
     "q": 156,
-    "label": "DIFF",
+    "label": "SAME",
     "relation": "같은 시군구",
     "gap": "23시간 26분",
     "a": {
@@ -2841,7 +2841,7 @@
   },
   {
     "q": 161,
-    "label": "DIFF",
+    "label": "SAME",
     "relation": "같은 시군구",
     "gap": "1시간 4분",
     "a": {
@@ -2861,7 +2861,7 @@
   },
   {
     "q": 162,
-    "label": "DIFF",
+    "label": "SAME",
     "relation": "같은 시군구",
     "gap": "22시간 50분",
     "a": {
@@ -3021,7 +3021,7 @@
   },
   {
     "q": 170,
-    "label": "DIFF",
+    "label": "SAME",
     "relation": "같은 시군구",
     "gap": "1일 21시간",
     "a": {
@@ -3081,7 +3081,7 @@
   },
   {
     "q": 176,
-    "label": "DIFF",
+    "label": "UNSURE",
     "relation": "같은 시군구",
     "gap": "2일 7시간",
     "a": {
@@ -3121,7 +3121,7 @@
   },
   {
     "q": 179,
-    "label": "SAME",
+    "label": "DIFF",
     "relation": "이웃 시군구",
     "gap": "0시간 47분",
     "a": {
@@ -3141,7 +3141,7 @@
   },
   {
     "q": 180,
-    "label": "DIFF",
+    "label": "SAME",
     "relation": "같은 시군구",
     "gap": "3일 13시간",
     "a": {
@@ -3301,7 +3301,7 @@
   },
   {
     "q": 190,
-    "label": "DIFF",
+    "label": "SAME",
     "relation": "같은 시군구",
     "gap": "2일 2시간",
     "a": {
@@ -3661,7 +3661,7 @@
   },
   {
     "q": 213,
-    "label": "DIFF",
+    "label": "SAME",
     "relation": "같은 시군구",
     "gap": "1일 17시간",
     "a": {
@@ -3821,7 +3821,7 @@
   },
   {
     "q": 222,
-    "label": "DIFF",
+    "label": "SAME",
     "relation": "같은 시군구",
     "gap": "1시간 27분",
     "a": {
@@ -3941,7 +3941,7 @@
   },
   {
     "q": 228,
-    "label": "DIFF",
+    "label": "SAME",
     "relation": "같은 시군구",
     "gap": "17시간 40분",
     "a": {
@@ -4081,7 +4081,7 @@
   },
   {
     "q": 235,
-    "label": "DIFF",
+    "label": "SAME",
     "relation": "이웃 시군구",
     "gap": "1일 3시간",
     "a": {
@@ -4741,7 +4741,7 @@
   },
   {
     "q": 272,
-    "label": "DIFF",
+    "label": "SAME",
     "relation": "같은 시군구",
     "gap": "2시간 26분",
     "a": {
@@ -5141,7 +5141,7 @@
   },
   {
     "q": 292,
-    "label": "DIFF",
+    "label": "SAME",
     "relation": "같은 시군구",
     "gap": "1일 5시간",
     "a": {
@@ -5201,7 +5201,7 @@
   },
   {
     "q": 296,
-    "label": "DIFF",
+    "label": "SAME",
     "relation": "같은 시군구",
     "gap": "2일 5시간",
     "a": {
@@ -5281,7 +5281,7 @@
   },
   {
     "q": 300,
-    "label": "DIFF",
+    "label": "SAME",
     "relation": "같은 시군구",
     "gap": "23시간 3분",
     "a": {
@@ -5421,7 +5421,7 @@
   },
   {
     "q": 307,
-    "label": "DIFF",
+    "label": "SAME",
     "relation": "같은 시군구",
     "gap": "9시간 34분",
     "a": {
