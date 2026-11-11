@@ -94,7 +94,7 @@ docker compose -f docker-compose.dev.yml up postgres redis   # Postgres(pgvector
 **DB 테이블은 남겨 두었습니다** (`region_risk_index`, `region_risk_daily`, `event_region_impact`,
 `region_risk_history`, `disaster_risk_profile`, `intensity_bracket`). 런타임 코드는 이 표들을 읽거나 쓰지 않지만,
 `EventClusteringBackfillTool` 의 백필 정리 절차는 `event_region_impact`·`region_risk_index` 를 수동 `TRUNCATE` 대상으로
-안내합니다(이벤트를 참조하는 외래 키에 막히지 않게 비우는 용도). 되돌릴 여지를 남기려고 드롭 마이그레이션을 추가하지 않았습니다. **`region_adjacency` 는 예외로
+안내합니다(이벤트를 참조하는 외래 키에 막히지 않게 비우는 용도). 이벤트 자체는 `disaster_alert.event_id` 가 참조해 `TRUNCATE` 할 수 없어 `DELETE` 합니다(V137 이후). 되돌릴 여지를 남기려고 드롭 마이그레이션을 추가하지 않았습니다. **`region_adjacency` 는 예외로
 계속 쓰입니다** — 클러스터링의 인접 시군구 병합이 이 표를 읽습니다.
 
 옛 명세는 `specs/002-risk-scoring/` 에 그대로 두었습니다(as-built 기록).
