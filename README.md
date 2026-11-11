@@ -139,10 +139,8 @@ AI 기반 이벤트 클러스터링으로 중복 알림을 제거하고, 기상 
 이벤트 배정 결과
 (배정 이벤트 ID·신규/병합 여부·병합 방식)
     ↓
-이벤트·알림 연결·판정 기록 저장
-(disaster_events + event_alert_mapping + clustering_trace)
-    ↓ EventCrossRegionService
-이벤트 묶음 후처리
+이벤트 저장·알림에 이벤트 연결
+(disaster_events + disaster_alert.event_id·순번·병합 방식)
     ↓ EventQueryService → EventController
 이벤트 목록·상세·타임라인 UI
 ```
