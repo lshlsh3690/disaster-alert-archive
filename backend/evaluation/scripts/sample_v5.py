@@ -1,6 +1,9 @@
 """disaster_alert_eval_v5(운영 분류값을 가져온 사본)에서 새 평가 쌍 301개를 뽑는다.
 틀은 2026-11 루브릭 그대로: 둘 다 INCIDENT, 임베딩 있음, 같은 유형, 168h 이내, 같은 시군구 또는 region_adjacency 이웃,
-기존 사건 셋·홀드아웃·삭제된 개발용 150쌍의 알림 제외, 한 알림은 한 번만, 작은 층부터, 시드 20261109."""
+기존 사건 셋·홀드아웃·삭제된 개발용 150쌍의 알림 제외, 한 알림은 한 번만, 작은 층부터, 시드 20261109.
+
+일회성 기록용이다 — 그대로 다시 돌리는 도구가 아니다. 작업 디렉터리 S 는 작성 당시 세션 임시 폴더이고,
+제외 입력인 예전 셋(cluster-eval-2026-10-incident·-test 등)은 2026-11-09 에 지워 git 이력에만 있다."""
 import csv, io, subprocess, random, bisect, sys
 from datetime import datetime, timedelta
 from collections import defaultdict, Counter

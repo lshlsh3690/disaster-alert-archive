@@ -117,12 +117,12 @@ GROUP BY a.event_id ORDER BY dist LIMIT 3;
 
 ## 데이터셋
 `backend/evaluation/datasets/`의 JSON 배열. 항목마다 `q`(문항 번호), `label`(SAME·DIFF·UNSURE), `relation`, `gap`, `a`·`b`(각각 `id`, `at`, `type`, `region`, `message`)가 있다. 평가 계산에는 `a.id`·`b.id`·`label` 만 쓰고 나머지는 사람이 판정을 대조하려고 둔 필드다. 데이터셋 이름은 파일명에서 확장자를 뗀 것이다.
-- `cluster-eval-2026-11.json`: **유일한 평가 셋**(272쌍, 같은 사건 126 / 다른 사건 104 / 모르겠음 42). 2026-11-09 한 번의 라벨링으로 매긴 쌍만 담는다. 사본 `disaster_alert_eval_v5`(운영 분류값) 에서 잰다. 구성·기준은 `.rubric.md`
+- `cluster-eval-2026-11.json`: **유일한 평가 셋**(272쌍, 같은 사건 145 / 다른 사건 82 / 모르겠음 45). 2026-11-09 한 번의 라벨링으로 매긴 쌍만 담는다. 사본 `disaster_alert_eval_v5`(운영 분류값) 에서 잰다. 구성·기준은 `.rubric.md`
 - 예전 셋(`cluster-eval-2026-10-incident`·`-test`, 개발용 `cluster-eval-2026-10`)은 모두 지웠다 — 기준이 바뀌기 전 라벨이라 섞이면 헷갈린다(경위는 `CLUSTERING_EVALUATION.md` 4절, 파일은 git 이력)
 
 리포트를 볼 때는 전체 쌍 수 대비 계산에 쓰인 쌍 수("제외" 줄)를 함께 본다.
 
-리포트는 `backend/evaluation/reports/` 에 둔다. 지금 기준점은 `2026-11_2026-11-11.md` 다. 그 전 리포트는 지운 예전 셋으로 잰 기록이라 이 셋과 직접 비교하지 않는다. 그중 `*_2026-10-19.md` 세 개가 이 도구로 잰 첫 기준점이었고, 그 전 리포트(`before.md`, `after_v0.md` 등)는 옛 형식이라 직접 비교하지 않는다.
+리포트는 `backend/evaluation/reports/` 에 둔다. 지금 기준점은 `2026-11_2026-11-11-recheck.md` 다(문맥 재확인 라벨 반영). 그 전 리포트는 지운 예전 셋으로 잰 기록이라 이 셋과 직접 비교하지 않는다. 그중 `*_2026-10-19.md` 세 개가 이 도구로 잰 첫 기준점이었고, 그 전 리포트(`before.md`, `after_v0.md` 등)는 옛 형식이라 직접 비교하지 않는다.
 
 ## 실행
 라벨은 JSON 파일에서 바로 읽는다(DB 적재 없음, `evaluation_label` 테이블도 쓰지 않는다). 평가용 DB 사본에서 `eval` 프로필로 실행한다(OpenAI 호출 없음, 운영 DB 에는 실행하지 않는다). `backend/` 에서 루트 `.env.dev` 를 불러온 뒤 실행한다.
