@@ -40,8 +40,9 @@ class ReportFormatterTest {
         assertThat(report)
                 .contains("## 요약")
                 .contains("- 점수 76.5점 — 맞게 묶은 비율과 빠짐없이 묶은 비율의 조화평균")
-                .contains("- 맞게 묶은 비율 92.9% — 묶은 42쌍 중 39쌍 맞음, 3쌍 잘못 묶음 (과병합율 7.1%)")
-                .contains("- 빠짐없이 묶은 비율 65.0% — 같은 사건 60쌍 중 39쌍 묶음, 21쌍 놓침 (과소병합율 35.0%)")
+                // 틀린 쌍의 종류 이름을 과병합/과소병합으로 통일한다(비율 이름·괄호의 율 이름과 같은 말을 쓰려는 것)
+                .contains("- 맞게 묶은 비율 92.9% — 묶은 42쌍 중 39쌍 맞음, 3쌍 과병합 (과병합율 7.1%)")
+                .contains("- 빠짐없이 묶은 비율 65.0% — 같은 사건 60쌍 중 39쌍 묶음, 21쌍 과소병합 (과소병합율 35.0%)")
                 .contains("- 제외: 모르겠음 6쌍, 이벤트 미배정 0쌍");
     }
 
@@ -122,10 +123,13 @@ class ReportFormatterTest {
         String report = ReportFormatter.format("ds", RUN_AT, guideExample(), List.of(sameType, diffType));
 
         // 검증: 헤더와 두 행. 같은 유형은 "산불" 하나, 다른 유형은 "산불/호우", 거리 없으면 "-"
+        // 표 제목과 종류 칸도 과소병합(MISSED)/과병합(OVER_MERGED) 이름을 쓴다
         assertThat(report)
+                .contains("## 과소병합 쌍 / 과병합 쌍")
                 .contains("| alertA | alertB | 유형 | 같은 시군구 | 간격(시간) | 본문 거리 |")
                 .contains("| 101 | 102 | 산불 | 예 | 5 |")
-                .contains("| 201 | 202 | 산불/호우 | 아니오 | 30 | - |");
+                .contains("| 0.200 | 과소병합 |")
+                .contains("| 201 | 202 | 산불/호우 | 아니오 | 30 | - | 과병합 |");
     }
 
 }
