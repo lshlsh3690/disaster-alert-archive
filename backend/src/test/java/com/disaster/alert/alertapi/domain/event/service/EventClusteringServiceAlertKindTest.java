@@ -118,7 +118,8 @@ class EventClusteringServiceAlertKindTest {
 
         // 검증 1: 임베딩(유료 호출)과 이벤트 리포지토리(후보 검색·저장)를 전혀 건드리지 않는다.
         verifyNoInteractions(embeddingModel, disasterEventRepository);
-        // 검증 2: 알림 저장도 없다 — 재배정이 일어났다면 save 나 더티 체킹으로 새 소속이 반영됐을 것이다.
+        // 검증 2: 알림 저장도 없다(save·saveAndFlush 둘 다) — 재배정이 일어났다면 저장 호출이나 더티 체킹으로 새 소속이 반영됐을 것이다.
+        verify(disasterAlertRepository, never()).saveAndFlush(any(DisasterAlert.class));
         verify(disasterAlertRepository, never()).save(any(DisasterAlert.class));
         // 검증 3: 소속은 여전히 이벤트 7 이다(덮어쓰기 방지가 이 가드의 존재 이유).
         assertThat(alert.getEventId()).isEqualTo(7L);

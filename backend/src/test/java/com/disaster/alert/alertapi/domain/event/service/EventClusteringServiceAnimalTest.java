@@ -156,7 +156,7 @@ class EventClusteringServiceAnimalTest {
 
         // 병합 대상은 LLM 이 고른 11번, 방식은 LLM.
         ArgumentCaptor<DisasterAlert> mapping = ArgumentCaptor.forClass(DisasterAlert.class);
-        verify(disasterAlertRepository).save(mapping.capture());
+        verify(disasterAlertRepository).saveAndFlush(mapping.capture());
         assertThat(mapping.getValue().getEventMergeMethod()).isEqualTo(MergeMethod.LLM);
         // 병합 순서: 기존 3건 + 1 = 4 번째, 이벤트의 알림 수(4)와 마지막 알림 시각(now, 기존은 하루 전)이 이 이벤트 객체에서 갱신된다.
         assertThat(mapping.getValue().getEventSequenceNo()).isEqualTo(4);

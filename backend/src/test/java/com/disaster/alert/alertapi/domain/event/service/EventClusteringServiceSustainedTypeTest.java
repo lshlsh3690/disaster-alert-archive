@@ -156,7 +156,7 @@ class EventClusteringServiceSustainedTypeTest {
 
     private void assertMergedRegionalType(long eventId) {
         ArgumentCaptor<DisasterAlert> mapping = ArgumentCaptor.forClass(DisasterAlert.class);
-        verify(disasterAlertRepository).save(mapping.capture());
+        verify(disasterAlertRepository).saveAndFlush(mapping.capture());
         assertThat(mapping.getValue().getEventMergeMethod()).isEqualTo(MergeMethod.REGIONAL_TYPE);
         assertMergedInto(mapping.getValue(), eventId);
         verify(disasterEventRepository, never()).save(any(DisasterEvent.class));
@@ -189,7 +189,7 @@ class EventClusteringServiceSustainedTypeTest {
         verify(disasterEventRepository).save(event.capture());
         assertThat(event.getValue().getPrimaryDisasterType()).isEqualTo("폭염");
         ArgumentCaptor<DisasterAlert> mapping = ArgumentCaptor.forClass(DisasterAlert.class);
-        verify(disasterAlertRepository).save(mapping.capture());
+        verify(disasterAlertRepository).saveAndFlush(mapping.capture());
         assertThat(mapping.getValue().getEventMergeMethod()).isEqualTo(MergeMethod.SEED);
     }
 
@@ -305,7 +305,7 @@ class EventClusteringServiceSustainedTypeTest {
 
     private void assertMergedBroadcast(long eventId) {
         ArgumentCaptor<DisasterAlert> mapping = ArgumentCaptor.forClass(DisasterAlert.class);
-        verify(disasterAlertRepository).save(mapping.capture());
+        verify(disasterAlertRepository).saveAndFlush(mapping.capture());
         assertThat(mapping.getValue().getEventMergeMethod()).isEqualTo(MergeMethod.BROADCAST);
         assertMergedInto(mapping.getValue(), eventId);
         verify(disasterEventRepository, never()).save(any(DisasterEvent.class));
@@ -444,7 +444,7 @@ class EventClusteringServiceSustainedTypeTest {
         service.clusterNewAlert(1L);
 
         verifyLocalPathsUntouched();
-        verify(disasterAlertRepository, never()).save(org.mockito.ArgumentMatchers.<DisasterAlert>argThat(
+        verify(disasterAlertRepository, never()).saveAndFlush(org.mockito.ArgumentMatchers.<DisasterAlert>argThat(
                 m -> m.getEventMergeMethod() == MergeMethod.EMBEDDING || m.getEventMergeMethod() == MergeMethod.REGIONAL_TYPE));
         assertExistingEventUntouched();
         assertSavedOnlyBroadcastEvent();

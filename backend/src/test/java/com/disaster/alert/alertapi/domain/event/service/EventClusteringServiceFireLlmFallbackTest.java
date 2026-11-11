@@ -120,7 +120,7 @@ class EventClusteringServiceFireLlmFallbackTest {
         verify(llmDecisionService).pickSameGeneralIncident(anyString(), anyList());
         // 검증: LLM 이 고른 이벤트에 LLM_FALLBACK 으로 붙고, 단발 신규 이벤트(save)는 만들어지지 않는다
         ArgumentCaptor<DisasterAlert> mapping = ArgumentCaptor.forClass(DisasterAlert.class);
-        verify(disasterAlertRepository).save(mapping.capture());
+        verify(disasterAlertRepository).saveAndFlush(mapping.capture());
         assertThat(mapping.getValue().getEventMergeMethod()).isEqualTo(MergeMethod.LLM_FALLBACK);
         // 병합 결과: 알림이 이 이벤트에 3 번째(기존 2건 + 1)로 붙고, 이벤트의 알림 수·마지막 알림 시각(79.7h 뒤의 alertAt)이 갱신된다.
         assertThat(mapping.getValue().getEventSequenceNo()).isEqualTo(3);

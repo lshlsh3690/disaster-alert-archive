@@ -144,7 +144,7 @@ class EventClusteringServiceAdjacentCandidateTest {
 
     private void assertMergedEmbedding(long eventId) {
         ArgumentCaptor<DisasterAlert> mapping = ArgumentCaptor.forClass(DisasterAlert.class);
-        verify(disasterAlertRepository).save(mapping.capture());
+        verify(disasterAlertRepository).saveAndFlush(mapping.capture());
         assertThat(mapping.getValue().getEventMergeMethod()).isEqualTo(MergeMethod.EMBEDDING);
         // 알림이 붙은 이벤트 id, 순번(기존 2건 + 1 = 3), 이벤트의 알림 수(3)·마지막 알림 시각(now)이 모두 갱신돼야 한다.
         assertThat(mapping.getValue().getEventSequenceNo()).isEqualTo(3);
@@ -159,7 +159,7 @@ class EventClusteringServiceAdjacentCandidateTest {
     private void assertNewEventCreated() {
         verify(disasterEventRepository).save(any(DisasterEvent.class));
         ArgumentCaptor<DisasterAlert> mapping = ArgumentCaptor.forClass(DisasterAlert.class);
-        verify(disasterAlertRepository).save(mapping.capture());
+        verify(disasterAlertRepository).saveAndFlush(mapping.capture());
         assertThat(mapping.getValue().getEventMergeMethod()).isEqualTo(MergeMethod.SEED);
         // 신규 이벤트로 갔으므로 후보로 등록해 둔 기존 이벤트는 어느 것도 알림 수가 늘지 않았다.
         events.values().forEach(ev -> assertThat(ev.getAlertCount()).isEqualTo(2));

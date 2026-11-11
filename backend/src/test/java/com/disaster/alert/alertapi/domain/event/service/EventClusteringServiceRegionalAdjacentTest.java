@@ -156,7 +156,7 @@ class EventClusteringServiceRegionalAdjacentTest {
         verify(disasterEventRepository).findRegionalTypeAdjacentMergeTarget(
                 eq("산불"), eq(new String[]{"47810"}), eq(now.minusHours(24)));
         ArgumentCaptor<DisasterAlert> mapping = ArgumentCaptor.forClass(DisasterAlert.class);
-        verify(disasterAlertRepository).save(mapping.capture());
+        verify(disasterAlertRepository).saveAndFlush(mapping.capture());
         assertThat(mapping.getValue().getEventMergeMethod()).isEqualTo(MergeMethod.REGIONAL_TYPE);
         assertMergedInto(mapping.getValue(), adjacentEvent);
         verify(disasterEventRepository, never()).save(any(DisasterEvent.class));
@@ -175,7 +175,7 @@ class EventClusteringServiceRegionalAdjacentTest {
 
         verifyAdjacentNeverQueried();
         ArgumentCaptor<DisasterAlert> mapping = ArgumentCaptor.forClass(DisasterAlert.class);
-        verify(disasterAlertRepository).save(mapping.capture());
+        verify(disasterAlertRepository).saveAndFlush(mapping.capture());
         assertThat(mapping.getValue().getEventMergeMethod()).isEqualTo(MergeMethod.REGIONAL_TYPE);
         // 같은 시군구 이벤트만 갱신되고 인접 이벤트는 그대로다.
         assertMergedInto(mapping.getValue(), sameSigunguEvent);
