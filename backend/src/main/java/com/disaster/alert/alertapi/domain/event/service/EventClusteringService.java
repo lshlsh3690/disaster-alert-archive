@@ -871,11 +871,15 @@ public class EventClusteringService {
         //    후보 검색 직후라 없을 수 없지만, 없으면 예외로 실패시킨다(clusterNewAlert 의 try/catch 가 잡아 로그).
         DisasterEvent event = disasterEventRepository.findById(eventId)
                 .orElseThrow(() -> new IllegalStateException("머지 대상 이벤트가 없음: eventId=" + eventId));
-        // 2) 이벤트 집계를 올리고 그 순번을 알림에 매긴다 — 트랜잭션 커밋 때 dirty checking 으로 UPDATE 된다.
+        // 2) 이벤트 집계를 올리고 그 순번을 알림에 매긴다 — 이벤트는 dirty checking 대상이다.
         int seq = event.addAlert(alert.getCreatedAt());
         alert.assignToEvent(event, seq, similarity, method);
-        // 3) 알림 쪽 변경도 명시적으로 저장한다.
-        disasterAlertRepository.save(alert);
+        // 3) 알림 쪽 변경을 저장하면서 즉시 flush 한다 — 알림 UPDATE 와 위 이벤트 UPDATE 가 함께 이 자리에서 나간다.
+        //    save 만 쓰면 둘 다 트랜잭션 커밋 때 나가, DB 오류가 어느 알림 것인지 모르는 채 clusterNewAlert 밖에서 터진다.
+        //    flush 하면 오류가 clusterNewAlert 의 try/catch 안에서 alertId 와 함께 로그로 남는다. 다만 트랜잭션은
+        //    롤백 전용으로 표시돼 커밋 때 UnexpectedRollbackException 이 나므로, 다음 알림을 계속 처리하는 것은
+        //    DisasterFetchScheduler 의 try/catch 가 맡는다.
+        disasterAlertRepository.saveAndFlush(alert);
         log.info("clusterNewAlert: alertId={} → event={} 머지 (method={}, similarity={}, seq={})",
                 alert.getId(), eventId, method, similarity, seq);
     }
@@ -891,7 +895,8 @@ public class EventClusteringService {
         );
         DisasterEvent saved = disasterEventRepository.save(event);
         alert.assignToEvent(saved, 1, null, MergeMethod.SEED);
-        disasterAlertRepository.save(alert);
+        // 알림 배정을 즉시 flush 한다 — 머지 경로와 같은 이유(DB 오류를 커밋 시점이 아니라 이 자리에서 alertId 와 함께 남기기 위해).
+        disasterAlertRepository.saveAndFlush(alert);
         log.info("clusterNewAlert: alertId={} → 신규 event={} (broadcast={}, title='{}')",
                 alert.getId(), saved.getId(), broadcast, saved.getEventTitle());
     }
