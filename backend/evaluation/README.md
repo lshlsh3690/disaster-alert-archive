@@ -72,12 +72,14 @@ DB 에 저장된 이벤트 배정을 읽어 라벨과 비교한다. 클러스터
 
 ## 재클러스터링
 
-평가 사본의 이벤트를 비우고, 저장된 임베딩으로 현재 코드와 설정대로 다시 묶는다. **`TRUNCATE` 는 평가 사본에만 실행한다.**
+평가 사본의 이벤트를 비우고, 저장된 임베딩으로 현재 코드와 설정대로 다시 묶는다. **아래 비우기 명령은 평가 사본에만 실행한다.**
 
 ```bash
-# 1) 이벤트 비우기 (외래 키 때문에 한 명령으로)
+# 1) 이벤트 비우기 — 알림의 이벤트 배정을 지우고, 이벤트를 참조하는 표를 비운 뒤 이벤트를 DELETE 한다.
+#    disaster_alert.event_id 가 disaster_events 를 참조해 disaster_events 는 TRUNCATE 할 수 없다
+#    (TRUNCATE ... CASCADE 는 disaster_alert 까지 비우므로 절대 쓰지 않는다).
 docker exec -i postgres psql -U postgres -d "$EVAL_DB_NAME" -c \
-  "TRUNCATE event_alert_mapping, disaster_event_translation, event_region_impact, region_risk_index, disaster_events RESTART IDENTITY;"
+  "UPDATE disaster_alert SET event_id = NULL, event_sequence_no = NULL, event_similarity_score = NULL, event_merge_method = NULL, event_added_at = NULL WHERE event_id IS NOT NULL OR event_sequence_no IS NOT NULL; TRUNCATE disaster_event_translation, event_region_impact, region_risk_index; DELETE FROM disaster_events; SELECT setval(pg_get_serial_sequence('disaster_events', 'id'), 1, false);"
 
 # 2) 다시 묶기 — 'EventClusteringBackfillTool 완료' 로그가 나오면 Ctrl+C
 ./gradlew bootRun --args="--spring.profiles.active=backfill --backfill.recluster=true \

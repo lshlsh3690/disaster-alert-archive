@@ -41,7 +41,7 @@
 ### 3.1 이벤트 클러스터링 파이프라인
 알림(`DisasterAlert`)을 임베딩 기반으로 하나의 `DisasterEvent`로 묶는다. `domain/event/service/`에 구현:
 
-- `EventClusteringService`: 같은 시군구 후보 중 코사인 유사도 ≥ `clustering.similarity-threshold`(기본 0.85)면 병합
+- `EventClusteringService`: 같은 시군구 후보 중 코사인 거리 ≤ 0.15(유사도 ≥ 0.85, 코드에 고정)면 병합
 - `EventCrossRegionService`: 실종자·탈출 동물처럼 지역을 이동하는 사건을 LLM으로 판정해 교차 지역 병합
 - `EventFragmentMergeService`: 30분 주기 스케줄러 — 파편화된 소규모 이벤트를 같은 유형/시도의 이벤트로 다중 메시지 LLM 비교를 통해 재흡수
 - `EventLLMDecisionService`: 위 서비스들의 공용 LLM 판정 호출부. on/off 플래그 없이 항상 동작하며, 사고성 유형 화이트리스트·borderline 거리 구간·이동 키워드 게이트로 호출 대상을 좁힌다

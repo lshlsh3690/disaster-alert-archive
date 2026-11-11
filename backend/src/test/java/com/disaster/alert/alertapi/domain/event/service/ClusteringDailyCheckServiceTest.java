@@ -36,7 +36,7 @@ class ClusteringDailyCheckServiceTest {
 
     @BeforeEach
     void seedEvent() {
-        // 배정된 알림이 매달릴 이벤트 하나 (event_alert_mapping 이 이벤트를 외래 키로 참조한다)
+        // 배정된 알림이 매달릴 이벤트 하나 (disaster_alert.event_id 가 이벤트를 외래 키로 참조한다)
         jdbc.update("INSERT INTO disaster_events(id, event_title, first_alert_at, last_alert_at, alert_count) "
                 + "VALUES (?, '일일 검사 테스트 이벤트', '2001-03-04 10:00:00', '2001-03-04 10:00:00', 1)", EVENT_ID);
     }
@@ -152,7 +152,7 @@ class ClusteringDailyCheckServiceTest {
     }
 
     private void assign(long alertId) {
-        jdbc.update("INSERT INTO event_alert_mapping(event_id, alert_id, sequence_no) VALUES (?, ?, 1)",
+        jdbc.update("UPDATE disaster_alert SET event_id = ?, event_sequence_no = 1 WHERE disaster_alert_id = ?",
                 EVENT_ID, alertId);
     }
 

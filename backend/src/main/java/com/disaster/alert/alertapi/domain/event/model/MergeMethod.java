@@ -1,7 +1,7 @@
 package com.disaster.alert.alertapi.domain.event.model;
 
 /**
- * 매핑 행이 어떤 방식으로 이벤트에 합류했는지 표식 (event_alert_mapping.merge_method).
+ * 매핑 행이 어떤 방식으로 이벤트에 합류했는지 표식 (disaster_alert.event_merge_method).
  *
  * <p>감사/튜닝용 — 특히 가장 위험한 {@link #LLM} 머지를 사후 검수/되돌리기 위해 박제한다.
  * (코사인 유사도는 임베딩에서 재계산되지만, LLM 판정은 일회성이라 재구성 불가.)
@@ -39,11 +39,5 @@ public enum MergeMethod {
      * 한 산불/호우 episode 가 본문 텍스트 차이(코사인&lt;0.85)로 수십 개 이벤트로 파편화되던 것을 차단.
      * 전국 단일인 {@link #GLOBAL_TYPE}(태풍)과 같은 철학이되 시군구 스코프(전국 blob 방지).
      */
-    REGIONAL_TYPE,
-    /**
-     * (레거시) 안내성 머지 — 과거에 안내 알림을 시군구별 안내 이벤트(is_advisory=true)에 모으던 방식의 표시.
-     * 비사건(alert_kind=ADVISORY)을 클러스터링에서 제외하면서 새로 만들지 않지만, 운영 DB 에 남아 있는
-     * event_alert_mapping.merge_method='ADVISORY' 행을 읽어야 해서 값은 유지한다.
-     */
-    ADVISORY
+    REGIONAL_TYPE
 }

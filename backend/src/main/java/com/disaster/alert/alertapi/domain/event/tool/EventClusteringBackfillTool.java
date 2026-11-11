@@ -33,8 +33,12 @@ import java.util.Map;
  * cd backend && set -a && source ../.env.dev && set +a
  * # 1) 배치 임베딩 (전체, ~분 단위)
  * ./gradlew bootRun --args='--backfill.embed-only=true'
- * # 2) 이벤트 비우고 — 이벤트를 참조하는 번역·위험도 표도 함께 비워야 외래 키에 막히지 않는다.
- * #    psql -c "TRUNCATE event_alert_mapping, disaster_event_translation, event_region_impact, region_risk_index, disaster_events RESTART IDENTITY;"
+ * # 2) 이벤트 비우기 — 알림의 이벤트 배정(event_ 컬럼 5개)을 먼저 지우고, 이벤트를 참조하는 번역·위험도 표를 비운 뒤
+ * #    이벤트를 DELETE 한다. disaster_alert.event_id 가 disaster_events 를 참조해 disaster_events 는 TRUNCATE 할 수 없다
+ * #    (TRUNCATE ... CASCADE 는 disaster_alert 까지 비우므로 절대 쓰지 않는다).
+ * #    psql -c "UPDATE disaster_alert SET event_id = NULL, event_sequence_no = NULL, event_similarity_score = NULL, event_merge_method = NULL, event_added_at = NULL WHERE event_id IS NOT NULL OR event_sequence_no IS NOT NULL;"
+ * #    psql -c "TRUNCATE disaster_event_translation, event_region_impact, region_risk_index;"
+ * #    psql -c "DELETE FROM disaster_events; SELECT setval(pg_get_serial_sequence('disaster_events', 'id'), 1, false);"
  * # 3) 저장 벡터로 클러스터링 (임베딩 호출 X, borderline 사고성 건만 LLM 호출, ~분 단위)
  * ./gradlew bootRun --args='--backfill.recluster=true'
  * # 4) 임계값 튜닝: application.yml 수정 → (2)~(3) 반복 (임베딩 비용 없음, LLM 폴백 비용만)
@@ -73,8 +77,8 @@ public class EventClusteringBackfillTool implements ApplicationRunner {
                 alertIds.size(), limit, recluster);
         if (recluster) {
             log.info("  recluster 모드: 저장된 임베딩 재사용(임베딩 호출 X, borderline 사고성 건은 LLM 폴백 호출). " +
-                    "이벤트 테이블을 먼저 비웠는지 확인하세요 (TRUNCATE event_alert_mapping, "
-                    + "disaster_event_translation, event_region_impact, region_risk_index, disaster_events).");
+                    "이벤트를 먼저 비웠는지 확인하세요 (disaster_alert 의 event_ 컬럼 NULL → "
+                    + "TRUNCATE disaster_event_translation, event_region_impact, region_risk_index → DELETE FROM disaster_events).");
         }
 
         int processed = 0;

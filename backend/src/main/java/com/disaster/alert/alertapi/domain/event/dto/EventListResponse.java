@@ -20,7 +20,6 @@ public record EventListResponse(
         LocalDateTime firstAlertAt,
         LocalDateTime lastAlertAt,
         int alertCount,
-        boolean advisory,
         String translatedTitle,
         String language
 ) {
@@ -40,7 +39,6 @@ public record EventListResponse(
                 e.getFirstAlertAt(),
                 e.getLastAlertAt(),
                 e.getAlertCount(),
-                e.isAdvisory(),
                 translatedTitle,
                 language
         );

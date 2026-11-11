@@ -1,5 +1,6 @@
 package com.disaster.alert.alertapi.domain.event.repository;
 
+import com.disaster.alert.alertapi.domain.event.dto.EventTimelineRow;
 import com.disaster.alert.alertapi.domain.event.model.DisasterEvent;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -9,8 +10,10 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.time.LocalDateTime;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 public interface DisasterEventRepository extends JpaRepository<DisasterEvent, Long> {
 
@@ -18,35 +21,6 @@ public interface DisasterEventRepository extends JpaRepository<DisasterEvent, Lo
     // active 는 (now - last_alert_at < cooldown_hours) 파생값.
     // DB now() 는 운영 JVM/DB 가 UTC 면 KST 값과 9시간 어긋나므로 쓰지 않고,
     // 호출 측이 KST now 를 :now 로 주입한다.
-
-    /** 필터 없음 — 최신순 전체. */
-    Page<DisasterEvent> findAllByOrderByLastAlertAtDesc(Pageable pageable);
-
-    /** 진행 중(active=true): 마지막 알림이 cooldown 이내. */
-    @Query(value = """
-            SELECT * FROM disaster_events
-            WHERE last_alert_at > CAST(:now AS timestamp) - (cooldown_hours * interval '1 hour')
-            ORDER BY last_alert_at DESC
-            """,
-            countQuery = """
-            SELECT count(*) FROM disaster_events
-            WHERE last_alert_at > CAST(:now AS timestamp) - (cooldown_hours * interval '1 hour')
-            """,
-            nativeQuery = true)
-    Page<DisasterEvent> findActive(@Param("now") LocalDateTime now, Pageable pageable);
-
-    /** 지난 사건(active=false): 마지막 알림이 cooldown 경과. */
-    @Query(value = """
-            SELECT * FROM disaster_events
-            WHERE last_alert_at <= CAST(:now AS timestamp) - (cooldown_hours * interval '1 hour')
-            ORDER BY last_alert_at DESC
-            """,
-            countQuery = """
-            SELECT count(*) FROM disaster_events
-            WHERE last_alert_at <= CAST(:now AS timestamp) - (cooldown_hours * interval '1 hour')
-            """,
-            nativeQuery = true)
-    Page<DisasterEvent> findInactive(@Param("now") LocalDateTime now, Pageable pageable);
 
     /**
      * 조회 API 필터 검색 — active + 유형/지역/기간/키워드를 nullable 가드로 결합한 단일 쿼리.
@@ -70,7 +44,6 @@ public interface DisasterEventRepository extends JpaRepository<DisasterEvent, Lo
     @Query(value = """
             SELECT * FROM disaster_events e
             WHERE e.alert_count >= 2
-              AND (CAST(:advisory AS boolean) IS NULL OR e.is_advisory = CAST(:advisory AS boolean))
               AND (CAST(:type AS varchar) IS NULL OR e.primary_disaster_type = :type)
               AND (CAST(:region AS varchar) IS NULL OR e.primary_region_name LIKE :region || '%')
               AND (CAST(:regionCode AS varchar) IS NULL OR e.primary_region_code = :regionCode)
@@ -85,7 +58,6 @@ public interface DisasterEventRepository extends JpaRepository<DisasterEvent, Lo
             countQuery = """
             SELECT count(*) FROM disaster_events e
             WHERE e.alert_count >= 2
-              AND (CAST(:advisory AS boolean) IS NULL OR e.is_advisory = CAST(:advisory AS boolean))
               AND (CAST(:type AS varchar) IS NULL OR e.primary_disaster_type = :type)
               AND (CAST(:region AS varchar) IS NULL OR e.primary_region_name LIKE :region || '%')
               AND (CAST(:regionCode AS varchar) IS NULL OR e.primary_region_code = :regionCode)
@@ -106,7 +78,6 @@ public interface DisasterEventRepository extends JpaRepository<DisasterEvent, Lo
             @Param("startDate") LocalDateTime startDate,
             @Param("endDate") LocalDateTime endDate,
             @Param("keyword") String keyword,
-            @Param("advisory") Boolean advisory,
             Pageable pageable
     );
 
@@ -120,6 +91,10 @@ public interface DisasterEventRepository extends JpaRepository<DisasterEvent, Lo
      *   <li>코사인 거리 (embedding &lt;=&gt; new_emb) 최소값 기준 정렬, 상위 3개</li>
      * </ol>
      *
+     * <p>두 쿼리로 나눈다: 기간 안의 비광역 이벤트를 받고({@link #findRecentEventIds}), 그중 새 알림과 같은
+     * 시군구 알림만으로 거리를 재 가까운 3개를 고른다({@link #findClosestEvents}). 거리는 이벤트의 모든 알림이
+     * 아니라 <b>같은 시군구 알림</b>만으로 잰다(다른 시군구 알림과의 거리는 섞지 않는다).
+     *
      * <p><b>지역 hard 필터인 이유</b>: 폭염·호우·물놀이 안전수칙 같은 템플릿형 메시지는 본문이
      * 거의 동일해 다른 시군구끼리도 임베딩 유사도가 매우 높다. 지역을 soft 신호로 두면(cross-region
      * 자동병합) 전북+전남+충남이 한 폭염 이벤트로 뭉치는 다지역 blob 이 생긴다(실데이터 검증).
@@ -129,30 +104,39 @@ public interface DisasterEventRepository extends JpaRepository<DisasterEvent, Lo
      * <p>반환: {eventId, minDistance} 튜플 0~3 행. distance 0.0=동일, 1.0=직교.
      * top-2/3 는 디버깅·임계값 튜닝 로깅용.
      */
+    default List<Object[]> findTopCandidates(String newEmbedding, String[] sigunguCodes, LocalDateTime sinceTime) {
+        List<Long> candidates = findRecentEventIds(sinceTime);
+        if (candidates.isEmpty()) {
+            return List.of();
+        }
+        return findClosestEvents(newEmbedding, candidates, sigunguCodes);
+    }
+
+    /** 마지막 알림이 기간 안인 비광역 이벤트(유형 무관). */
+    @Query("""
+            SELECT e.id
+            FROM DisasterEvent e
+            WHERE e.lastAlertAt > :since
+              AND e.broadcast = false
+            """)
+    List<Long> findRecentEventIds(@Param("since") LocalDateTime since);
+
+    /** 후보 이벤트별로, 주어진 시군구에 속한 알림과 새 알림의 최소 거리. 가까운 순 3개, {eventId, minDistance}. */
     @Query(value = """
-            SELECT e.id AS event_id,
-                   MIN(da.embedding <=> CAST(:newEmbedding AS vector)) AS min_distance
-            FROM disaster_events e
-            JOIN event_alert_mapping m ON m.event_id = e.id
-            JOIN disaster_alert da ON da.disaster_alert_id = m.alert_id
-            WHERE e.last_alert_at > :sinceTime
-              AND e.is_broadcast = false
-              AND e.is_advisory = false
-              AND da.embedding IS NOT NULL
-              AND EXISTS (
-                  SELECT 1 FROM disaster_alert_region dar
-                  WHERE dar.disaster_alert_id = da.disaster_alert_id
-                    AND LEFT(dar.legal_district_code, 5) = ANY(CAST(:sigunguCodes AS varchar[]))
-              )
-            GROUP BY e.id
+            SELECT a.event_id,
+                   MIN(a.embedding <=> CAST(:newEmbedding AS vector)) AS min_distance
+            FROM disaster_alert a
+            JOIN disaster_alert_region r ON r.disaster_alert_id = a.disaster_alert_id
+            WHERE a.event_id IN (:eventIds)
+              AND a.embedding IS NOT NULL
+              AND LEFT(r.legal_district_code, 5) = ANY(CAST(:sigunguCodes AS varchar[]))
+            GROUP BY a.event_id
             ORDER BY min_distance ASC
             LIMIT 3
             """, nativeQuery = true)
-    List<Object[]> findTopCandidates(
-            @Param("newEmbedding") String newEmbedding,
-            @Param("sigunguCodes") String[] sigunguCodes,
-            @Param("sinceTime") LocalDateTime sinceTime
-    );
+    List<Object[]> findClosestEvents(@Param("newEmbedding") String newEmbedding,
+                                     @Param("eventIds") List<Long> eventIds,
+                                     @Param("sigunguCodes") String[] sigunguCodes);
 
     /**
      * 사고성 유형의 인접 시군구 후보 검색 — {@link #findTopCandidates} 와 같은 반환 형태({eventId, minDistance}).
@@ -162,32 +146,34 @@ public interface DisasterEventRepository extends JpaRepository<DisasterEvent, Lo
      * 대상은 "이벤트 알림 중 하나라도 이웃 시군구에 속하는 이벤트"라서, 같은 시군구 알림이 섞인 이벤트나
      * 다지역 알림이 섞인 이벤트도 포함될 수 있다(이웃만 대상인 것은 아니다).
      * 인접 병합된 이벤트의 primary_region_code 는 첫 알림 지역으로 고정된다.
+     *
+     * <p>{@link #findTopCandidates} 와 같은 후보 목록을 쓰고, 거리는 이웃 시군구 알림만으로 잰다.
      */
+    default List<Object[]> findTopAdjacentCandidates(String newEmbedding, String[] sigunguCodes, LocalDateTime sinceTime) {
+        List<Long> candidates = findRecentEventIds(sinceTime);
+        if (candidates.isEmpty()) {
+            return List.of();
+        }
+        return findClosestAdjacentEvents(newEmbedding, candidates, sigunguCodes);
+    }
+
+    /** 후보 이벤트별로, 주어진 시군구의 이웃(region_adjacency)에 속한 알림과 새 알림의 최소 거리. 가까운 순 3개. */
     @Query(value = """
-            SELECT e.id AS event_id,
-                   MIN(da.embedding <=> CAST(:newEmbedding AS vector)) AS min_distance
-            FROM disaster_events e
-            JOIN event_alert_mapping m ON m.event_id = e.id
-            JOIN disaster_alert da ON da.disaster_alert_id = m.alert_id
-            WHERE e.last_alert_at > :sinceTime
-              AND e.is_broadcast = false
-              AND e.is_advisory = false
-              AND da.embedding IS NOT NULL
-              AND EXISTS (
-                  SELECT 1 FROM disaster_alert_region dar
-                  JOIN region_adjacency ra ON ra.neighbor_code = LEFT(dar.legal_district_code, 5)
-                  WHERE dar.disaster_alert_id = da.disaster_alert_id
-                    AND ra.region_code = ANY(CAST(:sigunguCodes AS varchar[]))
-              )
-            GROUP BY e.id
+            SELECT a.event_id,
+                   MIN(a.embedding <=> CAST(:newEmbedding AS vector)) AS min_distance
+            FROM disaster_alert a
+            JOIN disaster_alert_region r ON r.disaster_alert_id = a.disaster_alert_id
+            JOIN region_adjacency ra     ON ra.neighbor_code = LEFT(r.legal_district_code, 5)
+            WHERE a.event_id IN (:eventIds)
+              AND a.embedding IS NOT NULL
+              AND ra.region_code = ANY(CAST(:sigunguCodes AS varchar[]))
+            GROUP BY a.event_id
             ORDER BY min_distance ASC
             LIMIT 3
             """, nativeQuery = true)
-    List<Object[]> findTopAdjacentCandidates(
-            @Param("newEmbedding") String newEmbedding,
-            @Param("sigunguCodes") String[] sigunguCodes,
-            @Param("sinceTime") LocalDateTime sinceTime
-    );
+    List<Object[]> findClosestAdjacentEvents(@Param("newEmbedding") String newEmbedding,
+                                             @Param("eventIds") List<Long> eventIds,
+                                             @Param("sigunguCodes") String[] sigunguCodes);
 
     /**
      * 지역 한정 유형 머지 대상 검색 — 같은 유형 + 같은 시군구(footprint 교집합) + 윈도우 안의
@@ -199,39 +185,50 @@ public interface DisasterEventRepository extends JpaRepository<DisasterEvent, Lo
      * 수십 개로 파편화되기 때문. 유형 자체를 키로 삼되, 태풍({@link #findFirstByBroadcastTrue...})처럼
      * 전국으로 풀지 않고 <b>시군구 교집합</b>으로 묶어 전국 blob 을 차단한다.
      *
-     * <p>시군구 매칭은 이벤트 footprint 전체(걸친 모든 알림 지역)와 새 알림 시군구의 교집합({@link
-     * #findTopCandidates}와 동일한 EXISTS 필터). {@code is_broadcast=false}만 — 광역 산불은 호출 측이
-     * span 게이트로 걸러 broadcast 경로로 보낸다. 동률(같은 윈도우 다수 후보)은 last_alert_at DESC 로 결정적.
+     * <p>두 쿼리로 나눈다: 후보 이벤트(유형·기간, {@link #findRegionalTypeCandidates})를 최근순으로 받고,
+     * 그중 이벤트 footprint 전체(걸친 모든 알림 지역)가 새 알림 시군구와 겹치는 첫 이벤트를 고른다
+     * ({@link #findEventsWithSigungu}). {@code is_broadcast=false}만 — 광역 산불은 호출 측이 span 게이트로
+     * 걸러 broadcast 경로로 보낸다. 마지막 알림 시각이 같은 후보는 id 가 큰(나중에 생긴) 쪽을 고른다.
      *
      * @param type         새 알림 유형 (예: "산불", "폭염")
      * @param sigunguCodes 새 알림 시군구 코드(앞 5자) 배열 — footprint 교집합 키
      * @param sinceTime    윈도우 하한 (유형별: 현재 산불·산사태·홍수 모두 7일 전)
      * @return 머지할 이벤트 id, 없으면 empty(신규 이벤트)
      */
-    @Query(value = """
+    default Optional<Long> findRegionalTypeMergeTarget(String type, String[] sigunguCodes, LocalDateTime sinceTime) {
+        // 1) 같은 유형·기간 안의 후보 이벤트를 최근순으로 받고, 2) 그중 새 알림과 같은 시군구 알림을 가진 이벤트를 고른다
+        List<Long> candidates = findRegionalTypeCandidates(type, sinceTime);
+        if (candidates.isEmpty()) {
+            return Optional.empty();
+        }
+        Set<Long> matched = new HashSet<>(findEventsWithSigungu(candidates, sigunguCodes));
+        return candidates.stream().filter(matched::contains).findFirst();
+    }
+
+    /** 같은 유형이고 마지막 알림이 기간 안인 이벤트(광역 제외), 최근순(동률은 id 큰 순). */
+    @Query("""
             SELECT e.id
-            FROM disaster_events e
-            WHERE e.is_broadcast = false
-              AND e.is_advisory = false
-              AND e.primary_disaster_type = :type
-              AND e.last_alert_at > :sinceTime
-              AND EXISTS (
-                  SELECT 1 FROM event_alert_mapping m
-                  JOIN disaster_alert_region dar ON dar.disaster_alert_id = m.alert_id
-                  WHERE m.event_id = e.id
-                    AND LEFT(dar.legal_district_code, 5) = ANY(CAST(:sigunguCodes AS varchar[]))
-              )
-            ORDER BY e.last_alert_at DESC
-            LIMIT 1
+            FROM DisasterEvent e
+            WHERE e.primaryDisasterType = :type
+              AND e.lastAlertAt > :since
+              AND e.broadcast = false
+            ORDER BY e.lastAlertAt DESC, e.id DESC
+            """)
+    List<Long> findRegionalTypeCandidates(@Param("type") String type, @Param("since") LocalDateTime since);
+
+    /** 후보 이벤트 중 그 안의 알림이 주어진 시군구에 걸친 이벤트. */
+    @Query(value = """
+            SELECT DISTINCT a.event_id
+            FROM disaster_alert a
+            JOIN disaster_alert_region r ON r.disaster_alert_id = a.disaster_alert_id
+            WHERE a.event_id IN (:eventIds)
+              AND LEFT(r.legal_district_code, 5) = ANY(CAST(:sigunguCodes AS varchar[]))
             """, nativeQuery = true)
-    Optional<Long> findRegionalTypeMergeTarget(
-            @Param("type") String type,
-            @Param("sigunguCodes") String[] sigunguCodes,
-            @Param("sinceTime") LocalDateTime sinceTime
-    );
+    List<Long> findEventsWithSigungu(@Param("eventIds") List<Long> eventIds,
+                                     @Param("sigunguCodes") String[] sigunguCodes);
 
     /**
-     * 같은 시군구에 대상이 없을 때, 인접 시군구의 진행 중인 사건(비안내·비광역) 이벤트 중 last_alert_at 이
+     * 같은 시군구에 대상이 없을 때, 인접 시군구의 진행 중인 사건(비광역) 이벤트 중 last_alert_at 이
      * 가장 최근인 1개를 찾는다.
      *
      * <p>2025-03 경북 대형 산불(의성→안동→청송→영양→영덕)이 시군구별 5개 이벤트로 쪼개진 것을 잇기 위한
@@ -241,35 +238,34 @@ public interface DisasterEventRepository extends JpaRepository<DisasterEvent, Lo
      * 며칠 사이 여러 시군구를 건너므로 개수로 자르면 연쇄가 끊기고, 별개의 산불은 마지막 알림이 24h 안에
      * 겹치지 않아 시간 조건만으로 걸러진다. {@code region_adjacency} 는 양방향(대칭) 저장이라
      * {@code region_code = 새 알림 시군구} 로 보면 그 이웃({@code neighbor_code})의 이벤트가 잡힌다.
-     * 안내·광역 이벤트는 {@link #findRegionalTypeMergeTarget} 와 같은 이유로 제외한다.
+     * 광역 이벤트는 {@link #findRegionalTypeMergeTarget} 와 같은 이유로 제외한다.
      *
      * @param type         새 알림 유형 (예: "산불")
      * @param sigunguCodes 새 알림 시군구 코드(앞 5자) 배열
      * @param since        이벤트 마지막 알림 시각 하한
      * @return 머지할 이벤트 id, 없으면 empty
      */
+    default Optional<Long> findRegionalTypeAdjacentMergeTarget(String type, String[] sigunguCodes, LocalDateTime since) {
+        // 같은 시군구 버전과 같은 후보 목록에서, 새 알림 시군구의 이웃 시군구 알림을 가진 이벤트를 고른다
+        List<Long> candidates = findRegionalTypeCandidates(type, since);
+        if (candidates.isEmpty()) {
+            return Optional.empty();
+        }
+        Set<Long> matched = new HashSet<>(findEventsWithAdjacentSigungu(candidates, sigunguCodes));
+        return candidates.stream().filter(matched::contains).findFirst();
+    }
+
+    /** 후보 이벤트 중 그 안의 알림이 주어진 시군구의 이웃(region_adjacency)에 걸친 이벤트. */
     @Query(value = """
-            SELECT e.id
-            FROM disaster_events e
-            WHERE e.is_broadcast = false
-              AND e.is_advisory = false
-              AND e.primary_disaster_type = :type
-              AND e.last_alert_at > :since
-              AND EXISTS (
-                  SELECT 1 FROM event_alert_mapping m
-                  JOIN disaster_alert_region dar ON dar.disaster_alert_id = m.alert_id
-                  JOIN region_adjacency ra ON ra.neighbor_code = LEFT(dar.legal_district_code, 5)
-                  WHERE m.event_id = e.id
-                    AND ra.region_code = ANY(CAST(:sigunguCodes AS varchar[]))
-              )
-            ORDER BY e.last_alert_at DESC
-            LIMIT 1
+            SELECT DISTINCT a.event_id
+            FROM disaster_alert a
+            JOIN disaster_alert_region r ON r.disaster_alert_id = a.disaster_alert_id
+            JOIN region_adjacency ra     ON ra.neighbor_code = LEFT(r.legal_district_code, 5)
+            WHERE a.event_id IN (:eventIds)
+              AND ra.region_code = ANY(CAST(:sigunguCodes AS varchar[]))
             """, nativeQuery = true)
-    Optional<Long> findRegionalTypeAdjacentMergeTarget(
-            @Param("type") String type,
-            @Param("sigunguCodes") String[] sigunguCodes,
-            @Param("since") LocalDateTime since
-    );
+    List<Long> findEventsWithAdjacentSigungu(@Param("eventIds") List<Long> eventIds,
+                                             @Param("sigunguCodes") String[] sigunguCodes);
 
     /**
      * 광역 broadcast 이벤트 머지 대상 검색 — 같은 시도 + 같은 유형 + 윈도우 안의 broadcast 이벤트 1개.
@@ -285,20 +281,17 @@ public interface DisasterEventRepository extends JpaRepository<DisasterEvent, Lo
      * @param primaryDisasterType 새 알림 유형 (예: "폭염")
      * @param sidoPrefix          시도 코드 앞 2자리 (예: "48" = 경남)
      * @param lastAlertAt         윈도우 하한 (이 시각 이후 last_alert_at 인 이벤트만)
-     *
-     * <p>{@code is_advisory=false} 만 본다 — 과거에 만들어진 안내 광역 이벤트(is_advisory=true)가 사건 광역에
-     * 섞이지 않게 한다. 이름의 "General" 이 그 뜻이다.
      */
     @Query(value = """
             SELECT * FROM disaster_events
-            WHERE is_broadcast = true AND is_advisory = false
+            WHERE is_broadcast = true
               AND primary_disaster_type = :primaryDisasterType
               AND primary_region_code LIKE CONCAT(:sidoPrefix, '%')
               AND last_alert_at > :lastAlertAt
             ORDER BY last_alert_at DESC
             LIMIT 1
             """, nativeQuery = true)
-    Optional<DisasterEvent> findLatestGeneralBroadcastBySido(
+    Optional<DisasterEvent> findLatestBroadcastBySido(
             @Param("primaryDisasterType") String primaryDisasterType,
             @Param("sidoPrefix") String sidoPrefix,
             @Param("lastAlertAt") LocalDateTime lastAlertAt);
@@ -309,36 +302,19 @@ public interface DisasterEventRepository extends JpaRepository<DisasterEvent, Lo
      * <p>전국 이벤트는 특정 시도에 귀속되지 않으므로 {@code primary_region_code = null} 로 저장하고,
      * 시도 키 없이 유형만으로 묶는다(라벨 "전국 {유형}"). 행안부 전국 호우/대설 안내처럼 17개 시도
      * 전체에 발송되는 알림이 시도별로 흩어지지 않게 하나로 통합.
-     *
-     * <p>시도 버전과 같은 이유로 {@code is_advisory=false} 만 본다. 이름의 "General" 이 그 뜻이다(기존 안내 광역 제외).
      */
     @Query(value = """
             SELECT * FROM disaster_events
-            WHERE is_broadcast = true AND is_advisory = false
+            WHERE is_broadcast = true
               AND primary_disaster_type = :primaryDisasterType
               AND primary_region_code IS NULL
               AND last_alert_at > :lastAlertAt
             ORDER BY last_alert_at DESC
             LIMIT 1
             """, nativeQuery = true)
-    Optional<DisasterEvent> findLatestGeneralBroadcastNationwide(
+    Optional<DisasterEvent> findLatestBroadcastNationwide(
             @Param("primaryDisasterType") String primaryDisasterType,
             @Param("lastAlertAt") LocalDateTime lastAlertAt);
-
-    /**
-     * 새 알림이 머지된 후 이벤트의 last_alert_at, alert_count 갱신.
-     *
-     * <p>JPA Dirty Checking 도 가능하지만 동시성 + 명시성 위해 native UPDATE 사용.
-     * lastAlertAt 은 새 값이 기존보다 클 때만 갱신 (백필 시 시간 역순 입력 방어).
-     */
-    @Modifying
-    @Query(value = """
-            UPDATE disaster_events
-            SET last_alert_at = GREATEST(last_alert_at, :alertAt),
-                alert_count = alert_count + 1
-            WHERE id = :eventId
-            """, nativeQuery = true)
-    int incrementOnMerge(@Param("eventId") Long eventId, @Param("alertAt") LocalDateTime alertAt);
 
     /**
      * 제목 승급 — 현재 제목이 {@code ifTitle}(기본 제목)일 때만 {@code title}로 교체.
@@ -390,24 +366,22 @@ public interface DisasterEventRepository extends JpaRepository<DisasterEvent, Lo
             SELECT e.id AS event_id,
                    MIN(da.embedding <=> CAST(:newEmbedding AS vector)) AS min_distance
             FROM disaster_events e
-            JOIN event_alert_mapping m ON m.event_id = e.id
-            JOIN disaster_alert da ON da.disaster_alert_id = m.alert_id
+            JOIN disaster_alert da ON da.event_id = e.id
             WHERE e.last_alert_at > :sinceTime
               AND e.first_alert_at <= :untilTime
               AND e.is_broadcast = false
               AND e.id <> :selfEventId
               AND da.embedding IS NOT NULL
               AND EXISTS (
-                  SELECT 1 FROM event_alert_mapping m2
-                  JOIN disaster_alert da2 ON da2.disaster_alert_id = m2.alert_id
-                  WHERE m2.event_id = e.id
+                  SELECT 1 FROM disaster_alert da2
+                  WHERE da2.event_id = e.id
                     AND da2.disaster_type = '기타'
                     AND da2.message ~ :speciesRegex
               )
               AND EXISTS (
-                  SELECT 1 FROM event_alert_mapping m3
-                  JOIN disaster_alert_region dar ON dar.disaster_alert_id = m3.alert_id
-                  WHERE m3.event_id = e.id
+                  SELECT 1 FROM disaster_alert da3
+                  JOIN disaster_alert_region dar ON dar.disaster_alert_id = da3.disaster_alert_id
+                  WHERE da3.event_id = e.id
                     AND (
                         LEFT(dar.legal_district_code, 2) IN (:sidoCodes)
                         OR EXISTS (
@@ -448,24 +422,22 @@ public interface DisasterEventRepository extends JpaRepository<DisasterEvent, Lo
             SELECT e.id AS event_id,
                    MIN(da.embedding <=> CAST(:newEmbedding AS vector)) AS min_distance
             FROM disaster_events e
-            JOIN event_alert_mapping m ON m.event_id = e.id
-            JOIN disaster_alert da ON da.disaster_alert_id = m.alert_id
+            JOIN disaster_alert da ON da.event_id = e.id
             WHERE e.last_alert_at > :sinceTime
               AND e.first_alert_at <= :untilTime
               AND e.is_broadcast = false
               AND e.id <> :selfEventId
               AND da.embedding IS NOT NULL
               AND EXISTS (
-                  SELECT 1 FROM event_alert_mapping m2
-                  JOIN disaster_alert da2 ON da2.disaster_alert_id = m2.alert_id
-                  WHERE m2.event_id = e.id
+                  SELECT 1 FROM disaster_alert da2
+                  WHERE da2.event_id = e.id
                     AND da2.disaster_type = '기타'
                     AND da2.message ~ :speciesRegex
               )
               AND EXISTS (
-                  SELECT 1 FROM event_alert_mapping m3
-                  JOIN disaster_alert_region dar ON dar.disaster_alert_id = m3.alert_id
-                  WHERE m3.event_id = e.id
+                  SELECT 1 FROM disaster_alert da3
+                  JOIN disaster_alert_region dar ON dar.disaster_alert_id = da3.disaster_alert_id
+                  WHERE da3.event_id = e.id
                     AND (
                         LEFT(dar.legal_district_code, 5) IN (:sigunguCodes)
                         OR EXISTS (
@@ -505,8 +477,7 @@ public interface DisasterEventRepository extends JpaRepository<DisasterEvent, Lo
     @Query(value = """
             SELECT e.id AS event_id, MAX(e.last_alert_at) AS recency
             FROM disaster_events e
-            JOIN event_alert_mapping m ON m.event_id = e.id
-            JOIN disaster_alert da ON da.disaster_alert_id = m.alert_id
+            JOIN disaster_alert da ON da.event_id = e.id
             WHERE e.last_alert_at > :sinceTime
               AND e.is_broadcast = false
               AND e.id <> :selfEventId
@@ -526,4 +497,33 @@ public interface DisasterEventRepository extends JpaRepository<DisasterEvent, Lo
             @Param("selfEventId") Long selfEventId,
             @Param("limit") int limit
     );
+
+    // ── 이벤트에 든 알림 (disaster_alert.event_id) ──────────────────
+
+    /** 이벤트 타임라인 — 소속 재난문자를 최신순으로. 지역명은 빠져 있으며 서비스에서 batch 조회 후 합친다. */
+    @Query("""
+            SELECT new com.disaster.alert.alertapi.domain.event.dto.EventTimelineRow(
+                a.id, a.eventSequenceNo, a.message, a.disasterType, a.emergencyLevel, a.createdAt)
+            FROM DisasterAlert a
+            WHERE a.event.id = :eventId
+            ORDER BY a.createdAt DESC
+            """)
+    List<EventTimelineRow> findTimelineRows(@Param("eventId") Long eventId);
+
+    /** 이벤트가 걸친 distinct 시도 수 (법정동 코드 앞 2자리) — span-cap 판정용. */
+    @Query(value = """
+            SELECT count(DISTINCT left(r.legal_district_code, 2))
+            FROM disaster_alert a
+            JOIN disaster_alert_region r ON r.disaster_alert_id = a.disaster_alert_id
+            WHERE a.event_id = :eventId
+            """, nativeQuery = true)
+    int countDistinctSidoByEventId(@Param("eventId") Long eventId);
+
+    /** 후보 이벤트들의 대표(1번, 첫) 알림 본문 — LLM 프롬프트용. 반환 {event_id, message}. */
+    @Query(value = """
+            SELECT a.event_id, a.message
+            FROM disaster_alert a
+            WHERE a.event_id IN (:eventIds) AND a.event_sequence_no = 1
+            """, nativeQuery = true)
+    List<Object[]> findRepresentativeMessages(@Param("eventIds") List<Long> eventIds);
 }

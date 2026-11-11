@@ -13,7 +13,6 @@ import com.disaster.alert.alertapi.domain.event.dto.EventTimelineRow;
 import com.disaster.alert.alertapi.domain.event.model.DisasterEvent;
 import com.disaster.alert.alertapi.domain.event.repository.DisasterEventRepository;
 import com.disaster.alert.alertapi.domain.event.repository.DisasterEventTranslationRepository;
-import com.disaster.alert.alertapi.domain.event.repository.EventAlertMappingRepository;
 import com.disaster.alert.alertapi.domain.legaldistrict.service.LegalDistrictTranslationService;
 import com.disaster.alert.alertapi.global.translation.SupportedLanguage;
 import com.disaster.alert.alertapi.global.translation.TranslationService;
@@ -47,7 +46,6 @@ public class EventQueryService {
     private static final ZoneId KST = ZoneId.of("Asia/Seoul");
 
     private final DisasterEventRepository disasterEventRepository;
-    private final EventAlertMappingRepository eventAlertMappingRepository;
     private final DisasterAlertRepository disasterAlertRepository;
 
     // 번역
@@ -78,7 +76,7 @@ public class EventQueryService {
         Page<DisasterEvent> page = disasterEventRepository.search(
                 req.getActive(), now,
                 req.getType(), req.getRegion(), req.getDistrictCode(),
-                start, end, req.getKeyword(), req.getAdvisory(),
+                start, end, req.getKeyword(),
                 pageOnly);
 
         Optional<SupportedLanguage> langOpt = SupportedLanguage.fromRequestParam(lang);
@@ -116,7 +114,7 @@ public class EventQueryService {
         DisasterEvent event = disasterEventRepository.findById(id)
                 .orElseThrow(() -> new CustomException(ErrorCode.EVENT_NOT_FOUND, "id=" + id));
 
-        List<EventTimelineRow> rows = eventAlertMappingRepository.findTimelineRows(id);
+        List<EventTimelineRow> rows = disasterEventRepository.findTimelineRows(id);
         Map<Long, List<String>> regionNamesByAlert = loadRegionNames(rows);
 
         Optional<SupportedLanguage> langOpt = SupportedLanguage.fromRequestParam(lang);

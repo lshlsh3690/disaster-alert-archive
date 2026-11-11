@@ -5,7 +5,6 @@ import com.disaster.alert.alertapi.domain.disasteralert.repository.DisasterAlert
 import com.disaster.alert.alertapi.domain.event.model.DisasterEvent;
 import com.disaster.alert.alertapi.domain.event.repository.AlertEmbeddingRepository;
 import com.disaster.alert.alertapi.domain.event.repository.DisasterEventRepository;
-import com.disaster.alert.alertapi.domain.event.repository.EventAlertMappingRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -38,7 +37,6 @@ class EventClusteringServiceAlwaysOnTest {
     @Mock EmbeddingModel embeddingModel;
     @Mock DisasterAlertRepository disasterAlertRepository;
     @Mock DisasterEventRepository disasterEventRepository;
-    @Mock EventAlertMappingRepository eventAlertMappingRepository;
     @Mock AlertEmbeddingRepository alertEmbeddingRepository;
     @Mock EventLLMDecisionService llmDecisionService;
 
@@ -47,9 +45,8 @@ class EventClusteringServiceAlwaysOnTest {
     @BeforeEach
     void setUp() {
         service = new EventClusteringService(embeddingModel, disasterAlertRepository, disasterEventRepository,
-                eventAlertMappingRepository, alertEmbeddingRepository, llmDecisionService);
+                alertEmbeddingRepository, llmDecisionService);
         // application.yml 기본값
-        ReflectionTestUtils.setField(service, "similarityThreshold", 0.85);
         ReflectionTestUtils.setField(service, "candidateWindowHours", 168);
         ReflectionTestUtils.setField(service, "maxRegionSpan", 10);
         ReflectionTestUtils.setField(service, "nationwideSidoSpan", 8);

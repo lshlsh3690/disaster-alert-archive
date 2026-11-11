@@ -10,7 +10,6 @@ import com.disaster.alert.alertapi.domain.disasteralert.model.DisasterLevel;
 import com.disaster.alert.alertapi.domain.disasteralert.model.RegionCodeUnit;
 import com.disaster.alert.alertapi.domain.disasteralert.repository.DisasterAlertRepository;
 import com.disaster.alert.alertapi.domain.disasteralert.repository.DisasterAlertTranslationRepository;
-import com.disaster.alert.alertapi.domain.event.repository.EventAlertMappingRepository;
 import com.disaster.alert.alertapi.domain.legaldistrict.model.LegalDistrict;
 import com.disaster.alert.alertapi.domain.legaldistrict.service.LegalDistrictTranslationService;
 import com.disaster.alert.alertapi.domain.weather.repository.WeatherHourlyCorrelationRollupRepository;
@@ -59,7 +58,6 @@ public class DisasterAlertService {
 
     private final LegalDistrictCache legalDistrictCache;
 
-    private final EventAlertMappingRepository eventAlertMappingRepository;
     private final WeatherHourlyCorrelationRollupRepository weatherHourlyCorrelationRollupRepository;
 
     // ─── 다국어 응답용 의존성 ──────────────────────────────
@@ -542,8 +540,7 @@ public class DisasterAlertService {
      * <p>메서드 레벨 {@code @Transactional}을 떼어냈다 — 번역 캐시 미스 시 안의
      * {@code translationService.ensureTranslated(...)}가 OpenAI를 호출하는데(네트워크, 수백
      * ms~수 초), 이 메서드 전체가 트랜잭션이면 그 호출 내내 DB 커넥션을 쥐고 있게 된다. 여기서
-     * 쓰는 조회들({@code findById}, {@code legalDistrictNamesByAlertId},
-     * {@code findEventIdByAlertId} 등)은 모두 Spring Data가 호출마다 자체 트랜잭션을 열어주므로
+     * 쓰는 조회들({@code findById}, {@code legalDistrictNamesByAlertId} 등)은 모두 Spring Data가 호출마다 자체 트랜잭션을 열어주므로
      * 원자성 문제는 없다. DTO({@link DisasterAlertDetailDto})는 {@code alert}의 기본 컬럼
      * getter만 읽으므로(지연 로딩 연관관계 접근 없음) 트랜잭션 밖에서 변환해도
      * LazyInitializationException이 나지 않는다.
@@ -554,7 +551,7 @@ public class DisasterAlertService {
 
         List<String> regionNames = disasterAlertRepository.legalDistrictNamesByAlertId(id);
         DisasterAlertDetailDto dto = new DisasterAlertDetailDto(alert, regionNames);
-        dto.setEventId(eventAlertMappingRepository.findEventIdByAlertId(id));
+        dto.setEventId(alert.getEventId());
 
         SupportedLanguage.fromRequestParam(lang).ifPresent(language -> {
             // 1) 메시지/유형 번역 (없으면 lazy 번역 호출)
