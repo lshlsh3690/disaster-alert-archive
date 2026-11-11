@@ -48,7 +48,13 @@ public class DisasterFetchScheduler {
             // 분류기·서비스가 모든 예외를 삼켜(실패는 null=미분류) 클러스터링을 막지 않는다. 지연은 OpenAI 호출 시간만큼이다.
             alertKindService.classifyAndSave(alertId);
             // 이벤트 클러스터링 (동물 탈출·출몰도 이 안의 동물 경로가 판정 순간에 처리한다)
-            eventClusteringService.clusterNewAlert(alertId);
+            // clusterNewAlert 안의 try/catch 는 DB 예외를 막지 못한다 — 리포지토리 호출에서 난 예외가 트랜잭션을
+            // 롤백 전용으로 표시해, 커밋 때 UnexpectedRollbackException 이 여기로 올라온다. 남은 알림을 계속 처리하도록 여기서 잡는다.
+            try {
+                eventClusteringService.clusterNewAlert(alertId);
+            } catch (Exception e) {
+                log.error("클러스터링 트랜잭션 실패 — alertId={} 건너뜀(백필 도구로 다시 묶을 수 있음)", alertId, e);
+            }
         });
     }
 }
