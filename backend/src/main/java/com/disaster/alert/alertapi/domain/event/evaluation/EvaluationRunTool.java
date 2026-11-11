@@ -60,7 +60,7 @@ public class EvaluationRunTool implements ApplicationRunner {
         //                  excludedUnassigned=0, underMergeRate=50.0, overMergeRate=33.3, wrongPairs=[(25154,28106,MISSED), ...])
         PairCountResult result = PairCounter.count(pairs.stream().map(this::observe).toList());
 
-        // 3) 틀린 쌍(놓침·잘못 묶음)에만 사실 4개를 붙인다
+        // 3) 틀린 쌍(과소병합·과병합)에만 사실 4개를 붙인다
         //    WrongPair(25154, 28106, MISSED) → Row(25154, 28106, PairFacts("산불", "산불", true, 5, 0.2))
         List<Row> rows = result.wrongPairs().stream().map(w -> {
             PairFacts facts = assignmentReader.findFacts(w.alertA(), w.alertB());
