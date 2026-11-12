@@ -94,7 +94,7 @@ interface KoreaMap25DProps {
   onRegionSelect?: (sel: { sido: string; sigungu?: string }) => void;
   /** 시도별/시군구별 보기 전환 버튼을 보여 줄지. 보기 단위를 고정하는 곳(알림 목록 페이지)에서는 false */
   showModeToggle?: boolean;
-  /** 처음 보여 줄 보기 단위. 기본은 시군구별 보기, 알림 목록 페이지는 시도 전체를 먼저 보여 주려고 "sido" 를 쓴다 */
+  /** 처음 보여 줄 보기 단위. 기본은 시군구별 보기 */
   defaultMode?: MapMode;
   /**
    * 바깥(예: 알림 목록의 검색 필터)에서 고른 지역으로 지도를 확대한다. 시도명("경기도")과 시군구("수원시 장안구", 읍면동이
@@ -161,6 +161,8 @@ export default function KoreaMap25D({
     if (!sido) {
       if (hadFocusRef.current) {
         hadFocusRef.current = false;
+        // 확대하려고 시도 보기로 바꿨던 것을 처음 보기 단위로 되돌린다(필터를 비우면 시군구 보기로 돌아가게).
+        setMode(defaultMode);
         setDrillSido(null);
         setDrillSigungu(null);
       }
@@ -180,7 +182,7 @@ export default function KoreaMap25D({
     // 구가 있는 시 전체("수원시")는 단독 경계가 없으니 그 시의 구들을 묶는 코드 앞 4자리로 확대한다.
     const city = match ? null : regions.filter((r) => `${r.n} `.startsWith(`${focusSido} ${focusSigungu} `));
     setDrillSigungu(match ? match.c : city && city.length > 0 ? city[0].c.slice(0, 4) : null);
-  }, [focusSido, focusSigungu, sigunguQuery.data]);
+  }, [focusSido, focusSigungu, sigunguQuery.data, defaultMode]);
 
   const metroCounts = useMemo(() => groupToMetros(sidoData ?? []), [sidoData]);
 
