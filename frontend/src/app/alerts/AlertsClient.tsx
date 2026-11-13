@@ -172,6 +172,11 @@ function AlertsClientInner() {
 
     setPage(0);
     setFormState(parsed);
+    // URL 이 바뀌어 시도와 시군구가 함께 들어온 경우(예: 시군구 보기 지도에서 다른 시도의 시군구를 누름)는 사용자가 시도를
+    // 바꾼 것이 아니므로, 위의 "시도가 바뀌면 시군구를 비우는" effect 가 방금 받은 시군구를 지우지 않게 기준값을 맞춰 둔다.
+    // 시군구 목록이 늦게 도착해 선택 칸이 비어 보이지 않도록 다시 반영할 값도 이 URL 값으로 바꾼다.
+    prevSidoRef.current = parsed.sido ?? "";
+    urlSigunguRef.current = parsed.sigungu;
     reset({
       sido: parsed.sido ?? "",
       sigungu: parsed.sigungu ?? "",
@@ -201,8 +206,10 @@ function AlertsClientInner() {
     const qs = new URLSearchParams();
     if (v.sido) qs.set("sido", v.sido);
     if (v.sigungu) qs.set("sigungu", v.sigungu);
-    if (v.startDate) qs.set("startDate", v.startDate);
-    if (v.endDate) qs.set("endDate", v.endDate);
+    // 날짜는 비어 있어도 키를 남긴다. 날짜 키가 아예 없는 URL 은 "오늘"로 채워지므로(parseAlertsSearchForm),
+    // 사용자가 날짜를 지우고 검색했을 때(전체 기간)는 빈 값(`startDate=&endDate=`)으로 그 의도를 남겨야 한다.
+    qs.set("startDate", v.startDate ?? "");
+    qs.set("endDate", v.endDate ?? "");
     if (v.type) qs.set("type", v.type);
     if (v.levelText) qs.set("levelText", v.levelText);
     if (v.keyword) qs.set("keyword", v.keyword);
@@ -211,8 +218,11 @@ function AlertsClientInner() {
   };
 
   const onReset = () => {
-    reset({});
-    setFormState({});
+    // 초기화는 처음 들어온 상태(날짜 = 오늘)로 돌린다. 이미 /alerts 에 쿼리 없이 있으면 URL 이 그대로라 URL 동기화
+    // effect 가 다시 돌지 않으므로, 기본값을 여기서 직접 폼과 조회 조건에 넣는다.
+    const defaults = parseAlertsSearchForm(new URLSearchParams());
+    reset({ startDate: defaults.startDate, endDate: defaults.endDate });
+    setFormState(defaults);
     setPage(0);
     router.push("/alerts");
   };
@@ -230,6 +240,16 @@ function AlertsClientInner() {
     router.push(`/alerts?${qs.toString()}`, { scroll: false });
   }, [searchParams, router]);
 
+  // 통계 링크는 목록이 실제로 쓰는 날짜를 넘긴다. URL 에 날짜 키가 없으면 목록은 오늘로 조회하는데(parseAlertsSearchForm),
+  // URL 을 그대로 넘기면 /stats 는 날짜 없음 = 전체 기간으로 열린다. /stats 는 빈 값("")을 "전체"로 바꾸지 않고 그대로
+  // 조회 조건에 넣으므로, 전체 기간이면 빈 키를 남기지 않고 키를 뺀다.
+  const statsQs = new URLSearchParams(searchParams.toString());
+  statsQs.delete("startDate");
+  statsQs.delete("endDate");
+  if (formState.startDate) statsQs.set("startDate", formState.startDate);
+  if (formState.endDate) statsQs.set("endDate", formState.endDate);
+  const statsHref = `/stats${statsQs.toString() ? `?${statsQs.toString()}` : ""}`;
+
   return (
     <main className="bg-[var(--canvas)] min-h-[calc(100vh-48px)]">
       <div className="mx-auto max-w-7xl space-y-4 px-4 py-8 sm:px-6 sm:space-y-6">
@@ -240,7 +260,7 @@ function AlertsClientInner() {
           </div>
           <div className="flex items-center gap-2">
             <Link
-              href={`/stats${searchParams.toString() ? `?${searchParams.toString()}` : ""}`}
+              href={statsHref}
               className="rounded-[var(--radius-control)] border border-[var(--line)] bg-[var(--surface)] px-3 py-2 text-sm font-semibold text-[var(--text-body)] transition-colors hover:border-[var(--blue)] hover:text-[var(--blue)]"
             >
               📊 {t("alertList.viewStats")}
@@ -429,7 +449,7 @@ function AlertsClientInner() {
           {/* 오른쪽: 폴리곤 지도 + 통계 */}
           <div className="flex w-full min-w-0 flex-col gap-4">
             <div className="overflow-hidden rounded-[var(--radius-panel-card)] border border-[var(--line)] bg-[var(--surface)] shadow-[0_10px_30px_rgba(28,39,60,0.04)]">
-              <KoreaMap25D height="520px" todayOnly={false} params={mapParams} countLabel={t("alertList.mapCountLabel")} compact showModeToggle={false} defaultMode="sido" focusSido={watchedSido || undefined} focusSigungu={watchedSigungu || undefined} onRegionSelect={onMapRegionSelect} />
+              <KoreaMap25D height="520px" todayOnly={false} params={mapParams} countLabel={t("alertList.mapCountLabel")} compact showModeToggle={false} focusSido={watchedSido || undefined} focusSigungu={watchedSigungu || undefined} onRegionSelect={onMapRegionSelect} />
             </div>
 
             {/* 재난 통계 요약 */}
