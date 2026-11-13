@@ -240,6 +240,16 @@ function AlertsClientInner() {
     router.push(`/alerts?${qs.toString()}`, { scroll: false });
   }, [searchParams, router]);
 
+  // 통계 링크는 목록이 실제로 쓰는 날짜를 넘긴다. URL 에 날짜 키가 없으면 목록은 오늘로 조회하는데(parseAlertsSearchForm),
+  // URL 을 그대로 넘기면 /stats 는 날짜 없음 = 전체 기간으로 열린다. /stats 는 빈 값("")을 "전체"로 바꾸지 않고 그대로
+  // 조회 조건에 넣으므로, 전체 기간이면 빈 키를 남기지 않고 키를 뺀다.
+  const statsQs = new URLSearchParams(searchParams.toString());
+  statsQs.delete("startDate");
+  statsQs.delete("endDate");
+  if (formState.startDate) statsQs.set("startDate", formState.startDate);
+  if (formState.endDate) statsQs.set("endDate", formState.endDate);
+  const statsHref = `/stats${statsQs.toString() ? `?${statsQs.toString()}` : ""}`;
+
   return (
     <main className="bg-[var(--canvas)] min-h-[calc(100vh-48px)]">
       <div className="mx-auto max-w-7xl space-y-4 px-4 py-8 sm:px-6 sm:space-y-6">
@@ -250,7 +260,7 @@ function AlertsClientInner() {
           </div>
           <div className="flex items-center gap-2">
             <Link
-              href={`/stats${searchParams.toString() ? `?${searchParams.toString()}` : ""}`}
+              href={statsHref}
               className="rounded-[var(--radius-control)] border border-[var(--line)] bg-[var(--surface)] px-3 py-2 text-sm font-semibold text-[var(--text-body)] transition-colors hover:border-[var(--blue)] hover:text-[var(--blue)]"
             >
               📊 {t("alertList.viewStats")}
