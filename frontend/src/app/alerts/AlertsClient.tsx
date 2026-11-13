@@ -172,6 +172,11 @@ function AlertsClientInner() {
 
     setPage(0);
     setFormState(parsed);
+    // URL 이 바뀌어 시도와 시군구가 함께 들어온 경우(예: 시군구 보기 지도에서 다른 시도의 시군구를 누름)는 사용자가 시도를
+    // 바꾼 것이 아니므로, 위의 "시도가 바뀌면 시군구를 비우는" effect 가 방금 받은 시군구를 지우지 않게 기준값을 맞춰 둔다.
+    // 시군구 목록이 늦게 도착해 선택 칸이 비어 보이지 않도록 다시 반영할 값도 이 URL 값으로 바꾼다.
+    prevSidoRef.current = parsed.sido ?? "";
+    urlSigunguRef.current = parsed.sigungu;
     reset({
       sido: parsed.sido ?? "",
       sigungu: parsed.sigungu ?? "",
