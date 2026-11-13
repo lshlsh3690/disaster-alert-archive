@@ -206,8 +206,10 @@ function AlertsClientInner() {
     const qs = new URLSearchParams();
     if (v.sido) qs.set("sido", v.sido);
     if (v.sigungu) qs.set("sigungu", v.sigungu);
-    if (v.startDate) qs.set("startDate", v.startDate);
-    if (v.endDate) qs.set("endDate", v.endDate);
+    // 날짜는 비어 있어도 키를 남긴다. 날짜 키가 아예 없는 URL 은 "오늘"로 채워지므로(parseAlertsSearchForm),
+    // 사용자가 날짜를 지우고 검색했을 때(전체 기간)는 빈 값(`startDate=&endDate=`)으로 그 의도를 남겨야 한다.
+    qs.set("startDate", v.startDate ?? "");
+    qs.set("endDate", v.endDate ?? "");
     if (v.type) qs.set("type", v.type);
     if (v.levelText) qs.set("levelText", v.levelText);
     if (v.keyword) qs.set("keyword", v.keyword);
@@ -216,8 +218,11 @@ function AlertsClientInner() {
   };
 
   const onReset = () => {
-    reset({});
-    setFormState({});
+    // 초기화는 처음 들어온 상태(날짜 = 오늘)로 돌린다. 이미 /alerts 에 쿼리 없이 있으면 URL 이 그대로라 URL 동기화
+    // effect 가 다시 돌지 않으므로, 기본값을 여기서 직접 폼과 조회 조건에 넣는다.
+    const defaults = parseAlertsSearchForm(new URLSearchParams());
+    reset({ startDate: defaults.startDate, endDate: defaults.endDate });
+    setFormState(defaults);
     setPage(0);
     router.push("/alerts");
   };

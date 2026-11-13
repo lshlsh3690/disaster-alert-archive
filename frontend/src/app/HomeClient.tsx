@@ -88,7 +88,7 @@ export default function HomeClient() {
                 <strong>{data?.todayUserCount ?? 0}</strong>
                 <p>{t("dashboard.todayUserReports")}</p>
               </Link>
-              <Link className="stat-card stat-card--green" href={{ pathname: "/alerts", query: { source: "USER" } } as never}>
+              <Link className="stat-card stat-card--green" href={{ pathname: "/alerts", query: { source: "USER", startDate: "", endDate: "" } } as never}>
                 <span className="stat-card__icon" aria-hidden="true">
                   <svg viewBox="0 0 24 24">
                     <path d="M4 19h16v2H4v-2Zm2-2V9h3v8H6Zm5 0V3h3v14h-3Zm5 0v-5h3v5h-3Z" />
