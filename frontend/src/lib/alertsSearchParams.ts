@@ -25,8 +25,24 @@ function readParam(sp: RawSearchParams, key: string): string | undefined {
   return (Array.isArray(v) ? v[0] : v) || undefined;
 }
 
-/** 클라이언트의 useSearchParams()와 서버의 searchParams prop 둘 다 받을 수 있다. */
-export function parseAlertsSearchForm(sp: RawSearchParams): AlertsSearchForm {
+/**
+ * Red 단계 뼈대 — 구현은 Green 에서.
+ * now 의 Asia/Seoul 기준 날짜(YYYY-MM-DD)를 돌려줘야 하지만 지금은 틀린 기본값("")만 돌려준다.
+ */
+export function todayKst(now: Date = new Date()): string {
+  void now;
+  return "";
+}
+
+/**
+ * 클라이언트의 useSearchParams()와 서버의 searchParams prop 둘 다 받을 수 있다.
+ * Red 단계 뼈대 — today 는 받기만 하고 아직 쓰지 않는다(날짜 기본값 처리는 Green 에서).
+ */
+export function parseAlertsSearchForm(
+  sp: RawSearchParams,
+  today: string = todayKst(),
+): AlertsSearchForm {
+  void today;
   const source = readParam(sp, "source");
   return {
     sido: readParam(sp, "sido"),
