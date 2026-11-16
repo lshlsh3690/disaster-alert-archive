@@ -36,15 +36,15 @@ class AlertPlaceFactsTest {
 
     // 시군구 이름 항목: (공백 없는 이름, 시도 2자리, 시군구 식별자). 이름은 시도 표기 없이 구·군 이름만 둔다 —
     // 시도는 항목의 두 번째 칸이 따로 들고 있다. 같은 이름이 시도별로 여러 항목으로 들어 있다.
-    // 북구는 대구 항목을 일부러 앞에 뒀다 — 이름이 맞는 첫 항목을 그냥 고르는 구현은 부산 문자를 대구로 읽어 걸러진다.
+    // 북구는 대구 항목, 서구는 부산 항목을 일부러 앞에 뒀다 — 이름이 맞는 첫 항목을 그냥 고르는 구현은 부산 문자를 대구로 읽어 걸러진다.
     private static final List<PlaceDirectory.NameEntry> NAME_ENTRIES = List.of(
             new PlaceDirectory.NameEntry("산청군", "48", SANCHEONG),
             new PlaceDirectory.NameEntry("함양군", "48", HAMYANG),
             new PlaceDirectory.NameEntry("북구", "27", DAEGU_BUK),
             new PlaceDirectory.NameEntry("북구", "26", BUSAN_BUK),
             // 서구도 인천 옛 서구(폐지 코드)와 부산 서구가 같이 있다 — "인천서구청"은 이름 앞의 시도(인천)로 옛 서구를 골라야 한다.
-            new PlaceDirectory.NameEntry("서구", "28", OLD_SEO),
             new PlaceDirectory.NameEntry("서구", "26", BUSAN_SEO),
+            new PlaceDirectory.NameEntry("서구", "28", OLD_SEO),
             new PlaceDirectory.NameEntry("검단구", "28", GEOMDAN),
             new PlaceDirectory.NameEntry("서해구", "28", SEOHAE),
             new PlaceDirectory.NameEntry("세종시", "36", SEJONG));
@@ -103,8 +103,8 @@ class AlertPlaceFactsTest {
 
     // E: [인천서구청] 문자 하나가 개편 뒤 DB 에는 "검단구, 서해구" 두 곳으로 수신된 것으로 남아 있다.
     // 수신 지역 두 곳을 시군구 둘로 세면 안 되고, 발신 기관(옛 구청) 기준으로 폐지된 옛 서구 코드 하나로 본다.
-    // 서구는 부산(26140)에도 있다 — 이름 앞의 "인천"으로 인천 옛 서구를 골라야 한다(픽스처에서 인천 항목을 먼저 둬서
-    // Red 뼈대는 우연히 통과한다. Green 에서는 순서와 무관하게 이 결과가 나와야 한다).
+    // 서구는 부산(26140)에도 있다 — 이름 앞의 "인천"으로 인천 옛 서구를 골라야 한다(픽스처에서 부산 항목을 먼저 둬서
+    // 첫 항목을 고르는 Red 뼈대는 부산 서구 26140 을 돌려줘 실패한다).
     @Test
     void 인천_옛_구청은_새_구로_쪼개지_않고_옛_구청_하나의_시군구로_본다() {
         // 준비: 발신 기관은 옛 서구청, 수신 코드는 새 구 두 개(검단구·서해구)

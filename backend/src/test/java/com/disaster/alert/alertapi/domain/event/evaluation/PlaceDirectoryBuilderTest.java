@@ -51,26 +51,28 @@ class PlaceDirectoryBuilderTest {
     // E: 인천 옛 서구(28260)는 폐지(is_active=false)라도 [인천서구청] 문자를 위해 이름 후보에 넣는다. 그런데 V126 이
     // 옛 구 간선을 지웠기 때문에 이웃은 옛 구를 이어받은 새 구(서해구 28275·검단구 28290)들의 이웃을 합쳐서 만든다.
     @Test
-    void 인천_옛_서구는_폐지라도_이름_후보에_들고_이웃은_새_구들의_합집합이다() {
+    void 인천_옛_서구는_폐지라도_이름_후보에_들고_이웃은_새_구들의_이웃과_새_구_자신이다() {
         // 준비: 폐지된 옛 서구 행("(폐지)" 표기가 이름에 붙어 있다)과 후속 새 구 두 개
         List<DistrictRow> districts = List.of(
                 new DistrictRow("2826000000", "인천광역시 서구 (폐지)", false),
                 new DistrictRow("2827500000", "인천광역시 서해구", true),
                 new DistrictRow("2829000000", "인천광역시 검단구", true));
-        // 새 구들의 이웃: 서해구 → 계양(28245), 검단구 → 계양(28245)·김포(41570). 옛 서구 자신의 간선은 없다
+        // 새 구들의 이웃: 서해구 → 계양(28245)·검단구, 검단구 → 계양(28245)·김포(41570)·서해구. 옛 서구 자신의 간선은 없다
         List<AdjacencyRow> adjacency = new ArrayList<>();
         adjacency.addAll(bothWays("28275", "28245"));
         adjacency.addAll(bothWays("28290", "28245"));
         adjacency.addAll(bothWays("28290", "41570"));
+        adjacency.addAll(bothWays("28275", "28290"));
 
         // 실행
         PlaceDirectory directory = PlaceDirectoryBuilder.build(districts, adjacency);
 
         // 검증 1: "서구"(시도 28)가 옛 서구 코드로 이름 후보에 있다 — "(폐지)" 표기와 시도 이름은 이름에 남지 않는다
         assertThat(directory.names()).contains(new NameEntry("서구", "28", "28260"));
-        // 검증 2: 옛 서구의 이웃 = 서해구 이웃 ∪ 검단구 이웃
+        // 검증 2: 옛 서구의 이웃 = 서해구 이웃 ∪ 검단구 이웃 ∪ 서해구·검단구 자신. 천안시(하위 구 자신 제외)와 달리
+        //        옛 코드는 사라지고 새 구로 대체돼 같은 지역이 둘로 나뉜 것이므로, 새 구 자신이 "그 밖"이 아니라 이웃이다
         assertThat(directory.neighbors().getOrDefault("28260", Set.of()))
-                .containsExactlyInAnyOrder("28245", "41570");
+                .containsExactlyInAnyOrder("28245", "41570", "28275", "28290");
     }
 
     // 세종은 시군구가 따로 없는 특별자치시라 시 하나가 시군구(36110)다. 법정동 이름은 "세종특별자치시"지만
