@@ -27,6 +27,7 @@ class AlertPlaceFactsTest {
     private static final String OLD_SEO = "28260";
     private static final String GEOMDAN = "28290";
     private static final String SEOHAE = "28275";
+    private static final String SEJONG = "36110";
 
     private static final Map<String, String> SIGUNGU_ID_BY_NAME = Map.of(
             "산청군", SANCHEONG,
@@ -34,7 +35,8 @@ class AlertPlaceFactsTest {
             // 키는 시도 약칭 + 구 이름이다 — 서구는 부산·대구·대전에도 있어 "서구"만으로는 모호하다.
             "인천서구", OLD_SEO,
             "검단구", GEOMDAN,
-            "서해구", SEOHAE);
+            "서해구", SEOHAE,
+            "세종시", SEJONG);
 
     // 이웃 표: 산청과 함양은 서로 이웃(region_adjacency 는 양방향 행으로 들어 있다고 보고 양쪽을 다 둔다).
     private static final Map<String, Set<String>> ADJACENT_IDS = Map.of(
@@ -49,7 +51,6 @@ class AlertPlaceFactsTest {
 
     // D: 발신 기관이 시군구 소속이면 부서 이름이 붙어도 시군구 기관이고, 그 시군구의 문자로 본다.
     // 부서명("상하수도과")까지 통째로 시군구 이름 표에서 찾으려 하면 못 찾아 "모름"이 되는 사고를 막는 결정이다.
-    // Red 단계: 뼈대는 기관 종류 NONE, 시군구 비어 있음을 돌려줘 기관 종류 단언(SIGUNGU 기대)에서 실패한다.
     @Test
     void 시군구_부서_이름이_붙은_기관도_시군구_기관이고_그_시군구의_문자다() {
         // 준비: 본문 끝 [ ] 안이 "산청군" + 부서명. 수신 지역은 산청 한 곳
@@ -67,7 +68,6 @@ class AlertPlaceFactsTest {
 
     // I: 철도·관리본부처럼 시군구가 아닌 기관은 기관 이름만으로 시군구를 정할 수 없다.
     // 문자 속 장소는 규칙으로 안정적으로 못 뽑으므로 억지로 추정하지 않고 "모름"으로 두어 판단을 LLM 에 넘긴다.
-    // Red 단계: 뼈대는 기관 종류를 NONE 으로 돌려줘 NON_SIGUNGU 기대에서 실패한다.
     @Test
     void 시군구가_아닌_기관의_문자는_시군구를_모름으로_둔다() {
         // 준비: 발신 기관이 철도공사. 본문에는 장소(경부선 구간)가 있지만 시군구 이름은 없다
@@ -84,7 +84,6 @@ class AlertPlaceFactsTest {
 
     // E: [인천서구청] 문자 하나가 개편 뒤 DB 에는 "검단구, 서해구" 두 곳으로 수신된 것으로 남아 있다.
     // 수신 지역 두 곳을 시군구 둘로 세면 안 되고, 발신 기관(옛 구청) 기준으로 폐지된 옛 서구 코드 하나로 본다.
-    // Red 단계: 뼈대는 기관 종류를 NONE 으로 돌려줘 SIGUNGU 기대에서 실패한다(시군구 단언은 그 뒤라 아직 안 본다).
     @Test
     void 인천_옛_구청은_새_구로_쪼개지_않고_옛_구청_하나의_시군구로_본다() {
         // 준비: 발신 기관은 옛 서구청, 수신 코드는 새 구 두 개(검단구·서해구)
@@ -101,7 +100,6 @@ class AlertPlaceFactsTest {
 
     // G: 시군구 경계에 걸친 다리(임천교)는 두 시군구가 각각 문자를 보낸다. 시설 이름이 같으면 같은 시설 "후보"로 올리고
     // (같은 시설·같은 비인지는 판단 몫), 시군구 관계는 이웃으로 낸다 — 이웃이라 A 규칙만으로는 다른 사건이 되는 쌍이다.
-    // Red 단계: 뼈대는 관계 UNKNOWN, 시설 후보 빈 목록을 돌려줘 ADJACENT 기대에서 실패한다.
     @Test
     void 이웃_시군구가_같은_다리_이름을_쓰면_같은_시설_후보로_잡는다() {
         // 준비: 함양과 산청이 4분 간격으로 같은 다리(임천교) 통행제한 해제를 알린 실제 사례(기준 문서 G)
@@ -117,5 +115,22 @@ class AlertPlaceFactsTest {
         // (유림면·화계리 같은 행정구역 이름은 시설 이름이 아니므로 후보에 들지 않는다)
         assertThat(result.relation()).isEqualTo(SigunguRelation.ADJACENT);
         assertThat(result.sharedFacilityNames()).containsExactly("임천교");
+    }
+
+    // D: 발신 기관은 본문 끝에만 있는 게 아니다. 평가 셋 문자 544건 중 27건은 "[세종시청] 오늘 …"처럼 맨 앞에 붙는다.
+    // 끝만 보면 이 문자들은 기관이 없는 문자(NONE)가 되어 시군구를 모름으로 처리하게 되므로, 맨 앞도 발신 기관으로 읽는다.
+    @Test
+    void 발신_기관이_본문_맨_앞에_있어도_시군구_기관으로_읽는다() {
+        // 준비: 대괄호가 맨 앞에만 있고 끝에는 없는 본문
+        AlertInput input = alert("[세종시청] 오늘 9시 2분경 연동면 도로에 토사가 유출되어 통제 중입니다.",
+                LocalDateTime.of(2025, 8, 6, 9, 5), "교통통제", SEJONG);
+
+        // 실행
+        AlertFacts result = facts.analyze(input);
+
+        // 검증: 앞쪽 [ ] 안 문자열이 발신 기관이고, 부서가 없는 "세종시청"도 시군구 기관으로 세종 코드가 된다
+        assertThat(result.senderAgency()).contains("세종시청");
+        assertThat(result.agencyKind()).isEqualTo(AgencyKind.SIGUNGU);
+        assertThat(result.sigunguId()).contains(SEJONG);
     }
 }
