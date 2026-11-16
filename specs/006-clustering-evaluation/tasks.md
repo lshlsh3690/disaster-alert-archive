@@ -48,16 +48,16 @@ description: "006 이벤트 클러스터링 평가·검증 작업 목록"
 
 ### 사용자 스토리 1 테스트 (Red) ⚠️
 
-- [ ] T002 [US1] `{main}/domain/event/evaluation/AlertPlaceFacts.java`에 사실 계산기 뼈대를 만든다 — 입력 레코드(본문, 발송 시각, 유형, 수신 시군구 코드 목록)와 결과 레코드(발신 기관, 기관 종류 `SIGUNGU`/`NON_SIGUNGU`/`NONE`, 이 문자의 시군구 또는 모름, 시군구 관계 `SAME`/`ADJACENT`/`OTHER`/`UNKNOWN`, 간격, 같은 시설 후보 목록). 시군구 이름→코드와 이웃 관계는 생성자로 받는 조회 함수/맵으로 주입해 DB 없이 돌게 한다. 모든 메서드는 틀린 기본값(빈 값, `UNKNOWN`)을 돌려준다
-- [ ] T003 [US1] `{test}/domain/event/evaluation/AlertPlaceFactsTest.java`에 핵심 동작 2~4개만 Red로 쓴다: (1) 본문 끝 `[산청군상하수도과]` → 시군구 기관, 시군구=산청군(D) (2) `[한국철도공사]` 같은 시군구가 아닌 기관 → 시군구 "모름"(I) (3) `[인천서구청]` → 옛 구청 이름 그대로 하나의 시군구(E) (4) 두 본문에 `임천교`가 같이 나오면 같은 시설 후보로 잡힌다(G). 경계값(괄호 없음, 공백 변형 등)은 쓰지 않는다
-- [ ] T004 [US1] `./gradlew test --tests "*AlertPlaceFactsTest"`로 단언에서 실패하는 것을 확인하고, 뼈대(T002)와 테스트(T003)를 `commit-message` 스킬로 커밋한다(tdd-developer RED 자동 커밋)
-- [ ] T005 ⛔ [US1] **멈춘다.** 사용자에게 테스트 파일 경로와 실행 방법을 알리고 "Red 확인했다"/"Green 진행해"를 기다린다
+- [x] T002 [US1] `{main}/domain/event/evaluation/AlertPlaceFacts.java`에 사실 계산기 뼈대를 만든다 — 입력 레코드(본문, 발송 시각, 유형, 수신 시군구 코드 목록)와 결과 레코드(발신 기관, 기관 종류 `SIGUNGU`/`NON_SIGUNGU`/`NONE`, 이 문자의 시군구 또는 모름, 시군구 관계 `SAME`/`ADJACENT`/`OTHER`/`UNKNOWN`, 간격, 같은 시설 후보 목록). 시군구 이름→코드와 이웃 관계는 생성자로 받는 조회 함수/맵으로 주입해 DB 없이 돌게 한다. 모든 메서드는 틀린 기본값(빈 값, `UNKNOWN`)을 돌려준다
+- [x] T003 [US1] `{test}/domain/event/evaluation/AlertPlaceFactsTest.java`에 핵심 동작 2~4개만 Red로 쓴다: (1) 본문 끝 `[산청군상하수도과]` → 시군구 기관, 시군구=산청군(D) (2) `[한국철도공사]` 같은 시군구가 아닌 기관 → 시군구 "모름"(I) (3) `[인천서구청]` → 옛 구청 이름 그대로 하나의 시군구(E) (4) 두 본문에 `임천교`가 같이 나오면 같은 시설 후보로 잡힌다(G). 경계값(괄호 없음, 공백 변형 등)은 쓰지 않는다
+- [x] T004 [US1] `./gradlew test --tests "*AlertPlaceFactsTest"`로 단언에서 실패하는 것을 확인하고, 뼈대(T002)와 테스트(T003)를 `commit-message` 스킬로 커밋한다(tdd-developer RED 자동 커밋)
+- [x] T005 ⛔ [US1] **멈춘다.** 사용자에게 테스트 파일 경로와 실행 방법을 알리고 "Red 확인했다"/"Green 진행해"를 기다린다
 
 ### 사용자 스토리 1 구현 (Green)
 
-- [ ] T006 [US1] `{main}/domain/event/evaluation/AlertPlaceFacts.java`에 T003을 통과시키는 최소 구현을 쓴다 — 발신 기관 추출(본문 끝 `[...]`), 기관 종류 판정, 시군구 이름 매칭(E는 인천 옛 구청 이름 유지), 시군구 관계(이웃 조회), 간격, 시설 이름 토큰(`…교`·`…천`·`…강`·`…지하차도`·`…터널`·`…저수지`) 교집합. 테스트 파일은 고치지 않는다
+- [x] T006 [US1] `{main}/domain/event/evaluation/AlertPlaceFacts.java`에 T003을 통과시키는 최소 구현을 쓴다 — 발신 기관 추출(본문 끝 `[...]`), 기관 종류 판정, 시군구 이름 매칭(E는 인천 옛 구청 이름 유지), 시군구 관계(이웃 조회), 간격, 시설 이름 토큰(`…교`·`…천`·`…강`·`…지하차도`·`…터널`·`…저수지`) 교집합. 테스트 파일은 고치지 않는다
 - [ ] T007 [US1] `{main}/domain/event/evaluation/`에 `legal_district`·`region_adjacency`를 JdbcTemplate로 읽어 T002의 조회 함수/맵을 만들어 주는 로더를 둔다(평가 도구·일일 채점이 같이 씀). 시도 코드 파생은 CLAUDE.md 법정동 절의 중복 지점과 같은 방식(`substring(0,2)`)을 따른다
-- [ ] T008 [US1] 변경이 100줄 이상이면 `code-reviewer`에 `git diff`와 변경 줄 범위를 넣어 검토받고 결과를 사용자에게 보고한다
+- [x] T008 [US1] 변경이 100줄 이상이면 `code-reviewer`에 `git diff`와 변경 줄 범위를 넣어 검토받고 결과를 사용자에게 보고한다
 
 **체크포인트**: 사실 계산기가 단위 테스트로 동작한다. US2·US5를 시작할 수 있다.
 
