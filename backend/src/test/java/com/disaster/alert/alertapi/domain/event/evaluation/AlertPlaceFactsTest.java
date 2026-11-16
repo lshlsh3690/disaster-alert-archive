@@ -36,6 +36,9 @@ class AlertPlaceFactsTest {
     // 광주: 경기 광주시(41610)와, 통합 뒤 시도 12 로 옮긴 광주권 구(광산구 12330)가 이름이 겹친다.
     private static final String GYEONGGI_GWANGJU = "41610";
     private static final String GWANGSAN = "12330";
+    // 수원: 시 코드(41110)가 이름 항목이고, 수신 코드는 구(영통구 41117)로 온다.
+    private static final String SUWON = "41110";
+    private static final String SUWON_YEONGTONG = "41117";
 
     // 시군구 이름 항목: (공백 없는 이름, 시도 2자리, 시군구 식별자). 이름은 시도 표기 없이 구·군 이름만 둔다 —
     // 시도는 항목의 두 번째 칸이 따로 들고 있다. 같은 이름이 시도별로 여러 항목으로 들어 있다.
@@ -52,6 +55,7 @@ class AlertPlaceFactsTest {
             new PlaceDirectory.NameEntry("서해구", "28", SEOHAE),
             new PlaceDirectory.NameEntry("광주시", "41", GYEONGGI_GWANGJU),
             new PlaceDirectory.NameEntry("광산구", "12", GWANGSAN),
+            new PlaceDirectory.NameEntry("수원시", "41", SUWON),
             new PlaceDirectory.NameEntry("세종시", "36", SEJONG));
 
     // 시도 별칭 → 시도 2자리. 기관 이름 앞에 시도 표기가 있는지 볼 때 쓴다.
@@ -176,6 +180,23 @@ class AlertPlaceFactsTest {
         // 검증: 경기 광주시(41610)로 읽지 않고, 시군구가 아닌 기관 + 시군구 모름
         assertThat(result.agencyKind()).isEqualTo(AgencyKind.NON_SIGUNGU);
         assertThat(result.sigunguId()).isEmpty();
+    }
+
+    // 수원·용인·고양·창원은 "특례시"가 붙은 공식 이름으로도 문자를 보낸다. 법정동 이름은 "수원시"라 "수원특례시"로는 이름 표에 안 맞아
+    // 시군구가 아닌 기관(NON_SIGUNGU)으로 잘못 분류된다. 운영 모의 계산에서 [수원특례시] 24건·[용인특례시] 6건, 모두 30건이 그랬다.
+    // 기관 이름의 "특례시"를 "시"로 바꿔 찾으면 시군구 기관이어야 한다. 현재 구현은 이름이 안 맞아 NON_SIGUNGU 로 실패한다.
+    @Test
+    void 특례시_표기의_기관도_시_이름으로_찾아_시군구_기관으로_본다() {
+        // 준비: 발신 기관 "수원특례시", 수신 지역은 수원의 구(영통구) — 이름 항목은 시 코드(41110)의 "수원시"
+        AlertInput input = alert("수원시 일부 지역 정전이 발생했습니다. [수원특례시]",
+                LocalDateTime.of(2025, 8, 6, 10, 0), "정전", SUWON_YEONGTONG);
+
+        // 실행
+        AlertFacts result = facts.analyze(input);
+
+        // 검증: 시군구 기관이고, 시군구는 수원시(시 코드 41110) — 수신 구 코드(41117)로 대신 채우지 않는다
+        assertThat(result.agencyKind()).isEqualTo(AgencyKind.SIGUNGU);
+        assertThat(result.sigunguId()).contains(SUWON);
     }
 
     // G: 시군구 경계에 걸친 다리(임천교)는 두 시군구가 각각 문자를 보낸다. 시설 이름이 같으면 같은 시설 "후보"로 올리고
