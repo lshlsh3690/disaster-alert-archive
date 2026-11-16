@@ -30,14 +30,14 @@ public class AlertPlaceFacts {
         SIGUNGU,
         /** 철도·경찰청·도청·관리본부 등 시군구가 아닌 기관 */
         NON_SIGUNGU,
-        /** 본문 끝에 발신 기관 표시가 없음 */
+        /** 본문 끝·맨 앞 어디에도 발신 기관 표시가 없음 */
         NONE
     }
 
     /**
      * 문자 하나에서 뽑은 사실.
      *
-     * @param senderAgency          본문 끝 `[...]` 안의 문자열(없으면 비어 있음)
+     * @param senderAgency          본문 끝(없으면 맨 앞) `[...]` 안의 문자열(없으면 비어 있음)
      * @param agencyKind            발신 기관 종류
      * @param sigunguId             이 문자의 시군구 식별자. 시군구 기관이면 정해지고,
      *                              시군구가 아닌 기관이면 "모름"(비어 있음 — 문자 속 장소는 LLM 이 판단, I)
@@ -62,8 +62,12 @@ public class AlertPlaceFacts {
     public record PairFacts(SigunguRelation relation, Duration gap, List<String> sharedFacilityNames) {
     }
 
-    // 본문 맨 끝(뒤 공백 허용)의 [발신기관]. 본문 중간의 대괄호([긴급] 같은 말머리)는 발신 기관이 아니므로 끝만 본다.
+    // 발신 기관 표시는 본문 맨 끝(뒤 공백 허용)이 기본 형태다(평가 셋 544건 중 517건). 본문 중간의 대괄호는 기관이 아니므로 보지 않는다.
     private static final Pattern SENDER_AT_END = Pattern.compile("\\[([^\\[\\]]+)]\\s*$");
+
+    // 끝에 없을 때만 보는 맨 앞 형태("[세종시청] 오늘 …", "[서울경찰청]용산구에서 …" — 27건). 괄호 뒤 공백은 있어도 없어도 된다.
+    // 끝을 먼저 보는 이유: 끝 표시가 있던 기존 문자의 결과를 바꾸지 않기 위해서다(둘 다 있는 문자는 평가 셋에 없다).
+    private static final Pattern SENDER_AT_START = Pattern.compile("^\\s*\\[([^\\[\\]]+)]");
 
     // 시설 이름 후보: 한글·숫자 덩어리가 시설 접미사로 "끝나는" 경우만 잡는다. 끝 경계(?![가-힣0-9])가 없으면
     // "교통통제"에서 "교"를 잡는 식으로 일반 낱말이 시설로 오인된다. 앞에 최소 1글자(+)를 요구해 접미사만 홀로 잡히지 않게 한다.
@@ -92,12 +96,12 @@ public class AlertPlaceFacts {
     public AlertFacts analyze(AlertInput alert) {
         int receivedCount = (int) alert.receivedSigunguCodes().stream().distinct().count();
 
-        // 1) 발신 기관을 본문 끝에서 뽑는다 — 없으면 시군구를 판단할 근거가 없으니 NONE
-        Matcher sender = SENDER_AT_END.matcher(alert.body());
-        if (!sender.find()) {
+        // 1) 발신 기관을 본문 끝, 없으면 맨 앞에서 뽑는다 — 둘 다 없으면 시군구를 판단할 근거가 없으니 NONE
+        Optional<String> sender = findSender(alert.body());
+        if (sender.isEmpty()) {
             return new AlertFacts(Optional.empty(), AgencyKind.NONE, Optional.empty(), receivedCount);
         }
-        String agency = sender.group(1);
+        String agency = sender.get();
 
         // 2) 공백을 없앤 기관 이름의 앞부분이 시군구 이름과 가장 길게 맞는 것을 찾는다 —
         //    부서·대책본부가 붙어도("산청군상하수도과") 시군구 기관이고, 길게 맞는 쪽을 골라 짧은 이름에 잘못 걸리는 것을 막는다
@@ -137,6 +141,16 @@ public class AlertPlaceFacts {
         Set<String> inB = facilityTokens(b.body());
         List<String> shared = facilityTokens(a.body()).stream().filter(inB::contains).toList();
         return new PairFacts(relation, gap, shared);
+    }
+
+    // 발신 기관 문자열: 끝 대괄호 우선, 없으면 맨 앞 대괄호. 둘 다 없으면 비어 있다.
+    private static Optional<String> findSender(String body) {
+        Matcher atEnd = SENDER_AT_END.matcher(body);
+        if (atEnd.find()) {
+            return Optional.of(atEnd.group(1));
+        }
+        Matcher atStart = SENDER_AT_START.matcher(body);
+        return atStart.find() ? Optional.of(atStart.group(1)) : Optional.empty();
     }
 
     // 본문에서 시설 이름 후보를 등장 순서대로(중복 제거) 뽑는다. 행정구역(…면·…리)은 접미사 목록에 없어 안 잡힌다.
