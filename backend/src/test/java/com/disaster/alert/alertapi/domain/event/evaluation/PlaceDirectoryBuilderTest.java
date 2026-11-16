@@ -89,4 +89,26 @@ class PlaceDirectoryBuilderTest {
         // 검증: 이름 "세종시", 시도 36, 식별자 36110 항목이 있다
         assertThat(directory.names()).contains(new NameEntry("세종시", "36", "36110"));
     }
+
+    // 인천 옛 중구(28110)·옛 동구(28140)는 둘 다 제물포구(28125)로 이어진 같은 지역이다. 이웃 표에서 서로를 "그 밖"으로 두면
+    // 옛 중구청과 옛 동구청 문자가 OTHER 로 계산되므로, 후속 구를 공유하는 옛 구끼리는 서로 이웃으로 본다.
+    @Test
+    void 같은_후속_구로_이어진_인천_옛_구끼리는_서로_이웃이다() {
+        // 준비: 폐지된 옛 중구·옛 동구, 후속 제물포구(28125)·영종구(28155) — 중구는 둘 다, 동구는 제물포구로만 이어진다
+        List<DistrictRow> districts = List.of(
+                new DistrictRow("2811000000", "인천광역시 중구 (폐지)", false),
+                new DistrictRow("2814000000", "인천광역시 동구 (폐지)", false),
+                new DistrictRow("2812500000", "인천광역시 제물포구", true),
+                new DistrictRow("2815500000", "인천광역시 영종구", true));
+        List<AdjacencyRow> adjacency = new ArrayList<>();
+        adjacency.addAll(bothWays("28125", "28155"));
+        adjacency.addAll(bothWays("28125", "28177"));
+
+        // 실행
+        PlaceDirectory directory = PlaceDirectoryBuilder.build(districts, adjacency);
+
+        // 검증: 옛 중구의 이웃에 옛 동구가, 옛 동구의 이웃에 옛 중구가 있다(양방향)
+        assertThat(directory.neighbors().getOrDefault("28110", Set.of())).contains("28140");
+        assertThat(directory.neighbors().getOrDefault("28140", Set.of())).contains("28110");
+    }
 }

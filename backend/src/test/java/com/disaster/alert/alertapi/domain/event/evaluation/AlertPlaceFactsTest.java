@@ -33,6 +33,9 @@ class AlertPlaceFactsTest {
     private static final String BUSAN_SEO = "26140";
     private static final String BUSAN_BUK = "26320";
     private static final String DAEGU_BUK = "27230";
+    // 광주: 경기 광주시(41610)와, 통합 뒤 시도 12 로 옮긴 광주권 구(광산구 12330)가 이름이 겹친다.
+    private static final String GYEONGGI_GWANGJU = "41610";
+    private static final String GWANGSAN = "12330";
 
     // 시군구 이름 항목: (공백 없는 이름, 시도 2자리, 시군구 식별자). 이름은 시도 표기 없이 구·군 이름만 둔다 —
     // 시도는 항목의 두 번째 칸이 따로 들고 있다. 같은 이름이 시도별로 여러 항목으로 들어 있다.
@@ -47,6 +50,8 @@ class AlertPlaceFactsTest {
             new PlaceDirectory.NameEntry("서구", "28", OLD_SEO),
             new PlaceDirectory.NameEntry("검단구", "28", GEOMDAN),
             new PlaceDirectory.NameEntry("서해구", "28", SEOHAE),
+            new PlaceDirectory.NameEntry("광주시", "41", GYEONGGI_GWANGJU),
+            new PlaceDirectory.NameEntry("광산구", "12", GWANGSAN),
             new PlaceDirectory.NameEntry("세종시", "36", SEJONG));
 
     // 시도 별칭 → 시도 2자리. 기관 이름 앞에 시도 표기가 있는지 볼 때 쓴다.
@@ -54,7 +59,9 @@ class AlertPlaceFactsTest {
             "인천", "28",
             "부산", "26",
             "부산시", "26",
-            "대구", "27");
+            "대구", "27",
+            // "광주시"는 경기 광주시 이름이면서, 통합된 광주(시도 12)를 가리키는 시도 별칭이기도 하다
+            "광주시", "12");
 
     // 이웃 표: 산청과 함양은 서로 이웃(region_adjacency 는 양방향 행으로 들어 있다고 보고 양쪽을 다 둔다).
     private static final Map<String, Set<String>> ADJACENT_IDS = Map.of(
@@ -149,6 +156,24 @@ class AlertPlaceFactsTest {
         AlertFacts result = facts.analyze(input);
 
         // 검증: 기관은 있으나 시군구가 아닌 기관이고, 시군구는 모름
+        assertThat(result.agencyKind()).isEqualTo(AgencyKind.NON_SIGUNGU);
+        assertThat(result.sigunguId()).isEmpty();
+    }
+
+    // 이름이 하나뿐이어도("광주시" = 경기 광주시 41610) 수신 지역의 시도(12 광주)와 다르고 기관 이름이 그 시도의 이름("광주시" → 12)으로
+    // 읽히면 시군구가 아니라 광역 단위(시도) 기관이다. 운영 [광주시] 76건 중 75건은 경기 광주시, 1건이 광주 수신 문자였다 —
+    // 이 1건을 경기 광주시로 읽으면 광주 문자가 경기 시군구로 둔갑해 다른 사건과 엉뚱한 장소 관계가 계산된다.
+    // 현재 구현은 이름 항목이 하나뿐이면 수신 시도와 무관하게 41610 으로 읽어 실패한다.
+    @Test
+    void 이름이_하나뿐이어도_수신_시도의_시도_이름이면_광역_기관으로_본다() {
+        // 준비: 발신 기관 "광주시", 수신 지역은 광주권 구(광산구, 시도 12) — 경기(41)가 아니다
+        AlertInput input = alert("광산구 상가 화재 발생, 인근 주민은 창문을 닫아 주십시오. [광주시]",
+                LocalDateTime.of(2025, 8, 6, 10, 0), "화재", GWANGSAN);
+
+        // 실행
+        AlertFacts result = facts.analyze(input);
+
+        // 검증: 경기 광주시(41610)로 읽지 않고, 시군구가 아닌 기관 + 시군구 모름
         assertThat(result.agencyKind()).isEqualTo(AgencyKind.NON_SIGUNGU);
         assertThat(result.sigunguId()).isEmpty();
     }
