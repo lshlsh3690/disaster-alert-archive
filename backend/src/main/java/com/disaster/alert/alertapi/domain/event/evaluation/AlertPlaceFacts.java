@@ -106,19 +106,37 @@ public class AlertPlaceFacts {
         String agency = sender.get();
 
         // 2) 공백을 없앤 기관 이름으로 시군구를 찾는다 — 부서·대책본부가 붙어도("산청군상하수도과") 시군구 기관이다
-        String compact = agency.replaceAll("\s+", "");
+        String compact = agency.replaceAll("\\s+", "");
         Set<String> receivedSidos = alert.receivedSigunguCodes().stream()
                 .map(code -> code.substring(0, 2)).collect(Collectors.toSet());
-        Lookup found = lookup(compact, receivedSidos);
-        if (!found.nameMatched()) {
-            // 이름이 하나도 안 맞으면 앞의 시도 표기를 떼고 다시 찾는다("인천서구청" → "인천" + "서구청") — 이때는 그 시도로만 가린다
-            found = lookupAfterSidoAlias(compact);
-        }
+        Lookup found = resolve(compact, receivedSidos);
 
         // 3) 이름이 끝까지 안 맞으면 시군구가 아닌 기관(I)이고, 맞았는데 시도로도 못 좁히면 시군구 기관이지만 시군구는 "모름"
         //    어느 쪽이든 수신 지역으로 대신 채우지 않는다
         AgencyKind kind = found.nameMatched() ? AgencyKind.SIGUNGU : AgencyKind.NON_SIGUNGU;
         return new AlertFacts(Optional.of(agency), kind, found.sigunguId(), receivedCount);
+    }
+
+    // 이름 찾기 전략. 먼저 기관 이름 전체로 찾고, 아래 두 경우에는 앞의 시도 표기를 떼고 다시 찾는다.
+    //  (가) 이름이 하나도 안 맞을 때("인천서구청" → "인천" + "서구청") — 이때는 그 시도로만 가린다.
+    //  (나) 이름이 하나로 정해졌지만 그 시도가 수신 시도에 없고, 앞의 시도 표기는 수신 시도일 때 — 광역 기관이 구·시 이름과 겹친 경우다.
+    //       운영 [광주시] 76건 중 광주 수신 1건이 경기 광주시(41610)로 읽히면 안 되기 때문이다.
+    //  수신 시도가 비어 있거나 별칭이 수신 시도가 아니면 (나)는 걸리지 않아 후보 그대로 쓴다(산청군이 다른 시도로 보낸 문자 등).
+    private Lookup resolve(String compact, Set<String> receivedSidos) {
+        Lookup found = lookup(compact, receivedSidos);
+        Optional<String> alias = directory.sidoByAlias().keySet().stream()
+                .filter(compact::startsWith).max(Comparator.comparingInt(String::length));
+        Optional<String> aliasSido = alias.map(directory.sidoByAlias()::get);
+        // 식별자 앞 2자리가 곧 시도 코드다(5자리 시군구 코드의 구조)
+        boolean ownSidoNotReceived = found.sigunguId().isPresent()
+                && !receivedSidos.contains(found.sigunguId().get().substring(0, 2));
+        boolean aliasSidoReceived = aliasSido.isPresent() && receivedSidos.contains(aliasSido.get());
+        if (found.nameMatched() && !(ownSidoNotReceived && aliasSidoReceived)) {
+            return found;
+        }
+        // 별칭을 뗀 나머지가 비면("부산시", "광주시") 이름이 없어 NOT_MATCHED 다(광역 단위 기관)
+        return alias.map(a -> lookup(compact.substring(a.length()), Set.of(aliasSido.get())))
+                .orElse(Lookup.NOT_MATCHED);
     }
 
     /** 이름 찾기 결과. nameMatched 는 이름이 하나라도 맞았는지, sigunguId 는 시도로 하나로 좁혀졌을 때만 있다. */
@@ -142,15 +160,6 @@ public class AlertPlaceFacts {
         // 후보가 하나뿐이면 수신 시도와 달라도 그대로 쓴다(산청군처럼 이름이 유일한 경우). 둘 이상 남으면 정하지 못한다.
         Optional<String> id = candidates.size() == 1 ? Optional.of(candidates.get(0).sigunguId()) : Optional.empty();
         return new Lookup(true, id);
-    }
-
-    // 가장 긴 시도 별칭으로 앞을 떼고 나머지로 다시 찾는다. "부산시" 처럼 뗀 나머지가 비면 이름이 없어 NOT_MATCHED 다(광역 단위 기관).
-    private Lookup lookupAfterSidoAlias(String compact) {
-        return directory.sidoByAlias().keySet().stream()
-                .filter(compact::startsWith)
-                .max(Comparator.comparingInt(String::length))
-                .map(alias -> lookup(compact.substring(alias.length()), Set.of(directory.sidoByAlias().get(alias))))
-                .orElse(Lookup.NOT_MATCHED);
     }
 
     /**

@@ -49,7 +49,8 @@ public class PlaceDirectoryBuilder {
             "28140", List.of("28125"));
 
     // 시도 별칭 → 시도 2자리. 기관 이름 앞에 시도 표기가 붙은 경우("인천서구청", "부산시북구")를 떼어 내는 데 쓴다.
-    // 광주는 2026-07 통합으로 전남광주통합특별시(12)가 됐고, 경기 광주시와 헷갈리지 않게 "광주시"도 12 로 둔다(이름 항목의 "광주시"가 먼저 걸린다).
+    // 광주는 2026-07 통합으로 전남광주통합특별시(12)가 됐다. "광주시"는 경기 광주시 이름이기도 해서, 이름 항목이 먼저 걸리되
+    // 수신 지역이 12 일 때만 광주(광역) 기관으로 읽는다(AlertPlaceFacts.resolve) — 수신이 경기면 경기 광주시 그대로다.
     private static final Map<String, String> SIDO_BY_ALIAS = buildSidoAliases();
 
     /**
@@ -116,7 +117,9 @@ public class PlaceDirectoryBuilder {
         //    인천 옛 구는 후속 새 구 이웃의 합집합에 새 구 자신도 넣는다(옛 코드가 사라지고 새 구로 대체돼 같은 지역이 나뉜 것).
         Map<String, Set<String>> derived = new LinkedHashMap<>();
         wardsOfCity.forEach((city, wards) -> derived.put(city, withCityCodes(unionOf(neighbors, wards, false), cityOfWard)));
-        SUCCESSORS.forEach((old, successors) -> derived.put(old, withCityCodes(unionOf(neighbors, successors, true), cityOfWard)));
+        Map<String, Set<String>> oldDistricts = new LinkedHashMap<>();
+        SUCCESSORS.forEach((old, successors) -> oldDistricts.put(old, withCityCodes(unionOf(neighbors, successors, true), cityOfWard)));
+        derived.putAll(linkOldDistrictsSharingSuccessors(oldDistricts));
         // 3) 반영하고, 상대 쪽에도 되돌려 넣어 양방향으로 만든다 — compare 가 한쪽만 조회하므로 어느 쪽에서 봐도 이웃이어야 한다
         derived.forEach((code, found) -> {
             found.remove(code);
@@ -126,6 +129,20 @@ public class PlaceDirectoryBuilder {
         });
         derived.forEach((code, found) -> found.forEach(other -> neighbors.computeIfAbsent(other, k -> new LinkedHashSet<>()).add(code)));
         return neighbors;
+    }
+
+    // 후속 구를 공유하는 옛 구끼리(중구·동구 → 제물포구)는 같은 지역이 이어진 것이라 "그 밖"이 아니라 서로 이웃이다.
+    // 판정은 합치기 전 원본 집합으로 하고 결과를 복사본에 넣어, 처리 순서에 따라 결과가 달라지지 않게 한다.
+    private static Map<String, Set<String>> linkOldDistrictsSharingSuccessors(Map<String, Set<String>> oldDistricts) {
+        Map<String, Set<String>> linked = new LinkedHashMap<>();
+        oldDistricts.forEach((old, set) -> linked.put(old, new LinkedHashSet<>(set)));
+        oldDistricts.forEach((x, setX) -> SUCCESSORS.forEach((y, successorsOfY) -> {
+            if (!x.equals(y) && successorsOfY.stream().anyMatch(setX::contains)) {
+                linked.get(x).add(y);
+                linked.get(y).add(x);
+            }
+        }));
+        return linked;
     }
 
     private static Set<String> unionOf(Map<String, Set<String>> neighbors, List<String> members, boolean includeMembers) {
