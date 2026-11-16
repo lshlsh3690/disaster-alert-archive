@@ -74,17 +74,17 @@ public class AlertPlaceFacts {
     private static final Pattern FACILITY_TOKEN =
             Pattern.compile("[가-힣0-9]+(?:지하차도|터널|저수지|교|천|강)(?![가-힣0-9])");
 
-    private final Map<String, String> sigunguIdByName;
+    private final PlaceDirectory directory;
     private final Map<String, Set<String>> adjacentIds;
 
     /**
-     * @param sigunguIdByName 시군구 이름(예: "산청군") → 시군구 식별자. 폐지된 인천 옛 구(예: "인천서구" → 옛 서구 코드)도
-     *                        들어온다 — E: 옛 구청 문자는 새 구(검단구·서해구)로 쪼개지 않고 폐지 코드 하나로 본다
-     * @param adjacentIds     시군구 식별자 → 이웃 시군구 식별자 집합(region_adjacency)
+     * @param directory 시군구 이름 항목(이름·시도·식별자)·시도 별칭·이웃 표를 담은 장소 사전. 북구·서구처럼 시도마다 겹치는
+     *                  이름은 시도로 가려야 하므로 이름을 식별자 하나에 대응시키지 않는다. 폐지된 인천 옛 구도 이름 후보에 든다 —
+     *                  E: 옛 구청 문자는 새 구(검단구·서해구)로 쪼개지 않고 폐지 코드 하나로 본다
      */
-    public AlertPlaceFacts(Map<String, String> sigunguIdByName, Map<String, Set<String>> adjacentIds) {
-        this.sigunguIdByName = sigunguIdByName;
-        this.adjacentIds = adjacentIds;
+    public AlertPlaceFacts(PlaceDirectory directory) {
+        this.directory = directory;
+        this.adjacentIds = directory.neighbors();
     }
 
     /**
@@ -106,10 +106,12 @@ public class AlertPlaceFacts {
         // 2) 공백을 없앤 기관 이름의 앞부분이 시군구 이름과 가장 길게 맞는 것을 찾는다 —
         //    부서·대책본부가 붙어도("산청군상하수도과") 시군구 기관이고, 길게 맞는 쪽을 골라 짧은 이름에 잘못 걸리는 것을 막는다
         String compact = agency.replaceAll("\\s+", "");
-        Optional<String> sigunguId = sigunguIdByName.entrySet().stream()
-                .filter(e -> compact.startsWith(e.getKey()))
-                .max((x, y) -> Integer.compare(x.getKey().length(), y.getKey().length()))
-                .map(Map.Entry::getValue);
+        // Red 단계 뼈대 — 시도를 가리지 않고 이름이 들어 있는 항목 중 가장 긴 것(같으면 먼저 나온 것)을 고른다.
+        // 시도 별칭 처리와 수신 지역 시도로 고르는 알고리즘은 Green 에서 쓴다.
+        Optional<String> sigunguId = directory.names().stream()
+                .filter(e -> compact.contains(e.name()))
+                .max((x, y) -> Integer.compare(x.name().length(), y.name().length()))
+                .map(PlaceDirectory.NameEntry::sigunguId);
 
         // 3) 못 찾으면 시군구가 아닌 기관(I) — 수신 지역으로 대신 채우지 않고 "모름"으로 둔다
         AgencyKind kind = sigunguId.isPresent() ? AgencyKind.SIGUNGU : AgencyKind.NON_SIGUNGU;
