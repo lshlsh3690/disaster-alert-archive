@@ -106,7 +106,9 @@ public class AlertPlaceFacts {
         String agency = sender.get();
 
         // 2) 공백을 없앤 기관 이름으로 시군구를 찾는다 — 부서·대책본부가 붙어도("산청군상하수도과") 시군구 기관이다
-        String compact = agency.replaceAll("\\s+", "");
+        // "특례시"는 "시"로 바꿔 찾는다 — 법정동 이름은 "수원시"라 공식 표기 "수원특례시"가 안 맞아 시군구 기관이 아닌 것으로
+        // 잘못 분류됐다(운영 [수원특례시] 24건·[용인특례시] 6건). 발신 기관 원문(senderAgency)은 그대로 둔다.
+        String compact = agency.replaceAll("\\s+", "").replace("특례시", "시");
         Set<String> receivedSidos = alert.receivedSigunguCodes().stream()
                 .map(code -> code.substring(0, 2)).collect(Collectors.toSet());
         Lookup found = resolve(compact, receivedSidos);
