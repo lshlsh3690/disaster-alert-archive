@@ -19,12 +19,6 @@ import java.util.Set;
  */
 public class AlertPlaceFacts {
 
-    /**
-     * 인천 옛 구청(E)은 DB 의 새 구(검단구·서해구 등)로 쪼개지 않고 이 접두사 + 옛 구청 이름
-     * (예: {@code LEGACY:인천서구})을 시군구 식별자로 쓴다. DB 시군구 코드와 절대 겹치지 않게 하려는 표지다.
-     */
-    public static final String LEGACY_ID_PREFIX = "LEGACY:";
-
     /** 문자 하나의 입력. 수신 시군구 코드는 disaster_alert_region 의 시군구 코드 목록이다. */
     public record AlertInput(String body, LocalDateTime sentAt, String disasterType, List<String> receivedSigunguCodes) {
     }
@@ -68,7 +62,8 @@ public class AlertPlaceFacts {
     }
 
     /**
-     * @param sigunguIdByName 시군구 이름(예: "산청군") → 시군구 식별자
+     * @param sigunguIdByName 시군구 이름(예: "산청군") → 시군구 식별자. 폐지된 인천 옛 구(예: "인천서구" → 옛 서구 코드)도
+     *                        들어온다 — E: 옛 구청 문자는 새 구(검단구·서해구)로 쪼개지 않고 폐지 코드 하나로 본다
      * @param adjacentIds     시군구 식별자 → 이웃 시군구 식별자 집합(region_adjacency)
      */
     public AlertPlaceFacts(Map<String, String> sigunguIdByName, Map<String, Set<String>> adjacentIds) {

@@ -10,7 +10,6 @@ import org.junit.jupiter.api.Test;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -21,16 +20,19 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 class AlertPlaceFactsTest {
 
-    // 시군구 코드는 이 테스트 안에서만 쓰는 값이다(실제 코드와 같을 필요 없음). 이름 → 식별자 표.
+    // 시군구 이름 → 식별자 표. 코드는 실제 법정동 시군구 코드(앞 5자리)다.
     private static final String SANCHEONG = "48860";
     private static final String HAMYANG = "48870";
-    // 옛 인천 서구는 개편 뒤 검단구·서해구로 나뉘었다 — DB 에는 새 구만 있고 옛 서구는 없다.
-    private static final String GEOMDAN = "28261";
-    private static final String SEOHAE = "28262";
+    // 옛 인천 서구는 개편 뒤 검단구·서해구로 나뉘었다 — 옛 서구 코드는 폐지(is_active=false)로 DB 에 남아 있다.
+    private static final String OLD_SEO = "28260";
+    private static final String GEOMDAN = "28290";
+    private static final String SEOHAE = "28275";
 
     private static final Map<String, String> SIGUNGU_ID_BY_NAME = Map.of(
             "산청군", SANCHEONG,
             "함양군", HAMYANG,
+            // 키는 시도 약칭 + 구 이름이다 — 서구는 부산·대구·대전에도 있어 "서구"만으로는 모호하다.
+            "인천서구", OLD_SEO,
             "검단구", GEOMDAN,
             "서해구", SEOHAE);
 
@@ -81,20 +83,20 @@ class AlertPlaceFactsTest {
     }
 
     // E: [인천서구청] 문자 하나가 개편 뒤 DB 에는 "검단구, 서해구" 두 곳으로 수신된 것으로 남아 있다.
-    // 수신 지역 두 곳을 시군구 둘로 세면 안 되고, 옛 구청 이름 그대로 하나의 시군구(LEGACY:인천서구)로 본다.
-    // Red 단계: 뼈대는 시군구를 비워(모름) 돌려줘 "옛 서구 하나" 기대에서 실패한다.
+    // 수신 지역 두 곳을 시군구 둘로 세면 안 되고, 발신 기관(옛 구청) 기준으로 폐지된 옛 서구 코드 하나로 본다.
+    // Red 단계: 뼈대는 기관 종류를 NONE 으로 돌려줘 SIGUNGU 기대에서 실패한다(시군구 단언은 그 뒤라 아직 안 본다).
     @Test
     void 인천_옛_구청은_새_구로_쪼개지_않고_옛_구청_하나의_시군구로_본다() {
-        // 준비: 발신 기관은 옛 서구청, 수신 코드는 새 구 두 개. 이름 표에는 "인천서구"가 없다(DB 에 없으므로)
+        // 준비: 발신 기관은 옛 서구청, 수신 코드는 새 구 두 개(검단구·서해구)
         AlertInput input = alert("서구 일부 도로가 침수되어 통제합니다. [인천서구청]",
                 LocalDateTime.of(2025, 8, 6, 10, 0), "호우", GEOMDAN, SEOHAE);
 
         // 실행
         AlertFacts result = facts.analyze(input);
 
-        // 검증: 시군구 기관이고, 시군구는 검단구·서해구 어느 쪽도 아닌 옛 서구 하나
+        // 검증: 시군구 기관이고, 시군구는 검단구·서해구 어느 쪽도 아닌 폐지된 옛 서구 코드 하나
         assertThat(result.agencyKind()).isEqualTo(AgencyKind.SIGUNGU);
-        assertThat(result.sigunguId()).isEqualTo(Optional.of(AlertPlaceFacts.LEGACY_ID_PREFIX + "인천서구"));
+        assertThat(result.sigunguId()).contains(OLD_SEO);
     }
 
     // G: 시군구 경계에 걸친 다리(임천교)는 두 시군구가 각각 문자를 보낸다. 시설 이름이 같으면 같은 시설 "후보"로 올리고
