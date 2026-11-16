@@ -56,7 +56,7 @@ description: "006 이벤트 클러스터링 평가·검증 작업 목록"
 ### 사용자 스토리 1 구현 (Green)
 
 - [x] T006 [US1] `{main}/domain/event/evaluation/AlertPlaceFacts.java`에 T003을 통과시키는 최소 구현을 쓴다 — 발신 기관 추출(본문 끝 `[...]`), 기관 종류 판정, 시군구 이름 매칭(E는 인천 옛 구청 이름 유지), 시군구 관계(이웃 조회), 간격, 시설 이름 토큰(`…교`·`…천`·`…강`·`…지하차도`·`…터널`·`…저수지`) 교집합. 테스트 파일은 고치지 않는다
-- [ ] T007 [US1] `{main}/domain/event/evaluation/`에 `legal_district`·`region_adjacency`를 JdbcTemplate로 읽어 T002의 조회 함수/맵을 만들어 주는 로더를 둔다(평가 도구·일일 채점이 같이 씀). 시도 코드 파생은 CLAUDE.md 법정동 절의 중복 지점과 같은 방식(`substring(0,2)`)을 따른다
+- [x] T007 [US1] `{main}/domain/event/evaluation/`에 `legal_district`·`region_adjacency`를 JdbcTemplate로 읽어 T002의 조회 함수/맵을 만들어 주는 로더를 둔다(평가 도구·일일 채점이 같이 씀). 시도 코드 파생은 CLAUDE.md 법정동 절의 중복 지점과 같은 방식(`substring(0,2)`)을 따른다
 - [x] T008 [US1] 변경이 100줄 이상이면 `code-reviewer`에 `git diff`와 변경 줄 범위를 넣어 검토받고 결과를 사용자에게 보고한다
 
 **체크포인트**: 사실 계산기가 단위 테스트로 동작한다. US2·US5를 시작할 수 있다.
