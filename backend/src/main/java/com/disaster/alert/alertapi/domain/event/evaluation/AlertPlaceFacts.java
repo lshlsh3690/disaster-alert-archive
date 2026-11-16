@@ -2,6 +2,7 @@ package com.disaster.alert.alertapi.domain.event.evaluation;
 
 import java.time.Duration;
 import java.time.LocalDateTime;
+import java.util.Comparator;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -9,6 +10,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 /**
  * 재난문자가 "어느 시군구의 문자인가"와 두 문자의 장소 관계를 기준 문서
@@ -103,19 +105,52 @@ public class AlertPlaceFacts {
         }
         String agency = sender.get();
 
-        // 2) 공백을 없앤 기관 이름의 앞부분이 시군구 이름과 가장 길게 맞는 것을 찾는다 —
-        //    부서·대책본부가 붙어도("산청군상하수도과") 시군구 기관이고, 길게 맞는 쪽을 골라 짧은 이름에 잘못 걸리는 것을 막는다
-        String compact = agency.replaceAll("\\s+", "");
-        // Red 단계 뼈대 — 시도를 가리지 않고 이름이 들어 있는 항목 중 가장 긴 것(같으면 먼저 나온 것)을 고른다.
-        // 시도 별칭 처리와 수신 지역 시도로 고르는 알고리즘은 Green 에서 쓴다.
-        Optional<String> sigunguId = directory.names().stream()
-                .filter(e -> compact.contains(e.name()))
-                .max((x, y) -> Integer.compare(x.name().length(), y.name().length()))
-                .map(PlaceDirectory.NameEntry::sigunguId);
+        // 2) 공백을 없앤 기관 이름으로 시군구를 찾는다 — 부서·대책본부가 붙어도("산청군상하수도과") 시군구 기관이다
+        String compact = agency.replaceAll("\s+", "");
+        Set<String> receivedSidos = alert.receivedSigunguCodes().stream()
+                .map(code -> code.substring(0, 2)).collect(Collectors.toSet());
+        Lookup found = lookup(compact, receivedSidos);
+        if (!found.nameMatched()) {
+            // 이름이 하나도 안 맞으면 앞의 시도 표기를 떼고 다시 찾는다("인천서구청" → "인천" + "서구청") — 이때는 그 시도로만 가린다
+            found = lookupAfterSidoAlias(compact);
+        }
 
-        // 3) 못 찾으면 시군구가 아닌 기관(I) — 수신 지역으로 대신 채우지 않고 "모름"으로 둔다
-        AgencyKind kind = sigunguId.isPresent() ? AgencyKind.SIGUNGU : AgencyKind.NON_SIGUNGU;
-        return new AlertFacts(Optional.of(agency), kind, sigunguId, receivedCount);
+        // 3) 이름이 끝까지 안 맞으면 시군구가 아닌 기관(I)이고, 맞았는데 시도로도 못 좁히면 시군구 기관이지만 시군구는 "모름"
+        //    어느 쪽이든 수신 지역으로 대신 채우지 않는다
+        AgencyKind kind = found.nameMatched() ? AgencyKind.SIGUNGU : AgencyKind.NON_SIGUNGU;
+        return new AlertFacts(Optional.of(agency), kind, found.sigunguId(), receivedCount);
+    }
+
+    /** 이름 찾기 결과. nameMatched 는 이름이 하나라도 맞았는지, sigunguId 는 시도로 하나로 좁혀졌을 때만 있다. */
+    private record Lookup(boolean nameMatched, Optional<String> sigunguId) {
+        static final Lookup NOT_MATCHED = new Lookup(false, Optional.empty());
+    }
+
+    // 이름의 앞부분이 가장 길게 맞는 항목들을 모은 뒤, 같은 이름이 여러 시도에 있으면 allowedSidos 로 가린다.
+    // 길게 맞는 쪽을 먼저 고르는 이유: 짧은 이름에 잘못 걸리는 것을 막기 위해서다(예: "천안시동남구"가 "천안시"에 걸리지 않게).
+    private Lookup lookup(String name, Set<String> allowedSidos) {
+        int longest = directory.names().stream().filter(e -> name.startsWith(e.name()))
+                .mapToInt(e -> e.name().length()).max().orElse(0);
+        if (longest == 0) {
+            return Lookup.NOT_MATCHED;
+        }
+        List<PlaceDirectory.NameEntry> candidates = directory.names().stream()
+                .filter(e -> name.startsWith(e.name()) && e.name().length() == longest).toList();
+        if (candidates.size() > 1) {
+            candidates = candidates.stream().filter(e -> allowedSidos.contains(e.sidoCode())).toList();
+        }
+        // 후보가 하나뿐이면 수신 시도와 달라도 그대로 쓴다(산청군처럼 이름이 유일한 경우). 둘 이상 남으면 정하지 못한다.
+        Optional<String> id = candidates.size() == 1 ? Optional.of(candidates.get(0).sigunguId()) : Optional.empty();
+        return new Lookup(true, id);
+    }
+
+    // 가장 긴 시도 별칭으로 앞을 떼고 나머지로 다시 찾는다. "부산시" 처럼 뗀 나머지가 비면 이름이 없어 NOT_MATCHED 다(광역 단위 기관).
+    private Lookup lookupAfterSidoAlias(String compact) {
+        return directory.sidoByAlias().keySet().stream()
+                .filter(compact::startsWith)
+                .max(Comparator.comparingInt(String::length))
+                .map(alias -> lookup(compact.substring(alias.length()), Set.of(directory.sidoByAlias().get(alias))))
+                .orElse(Lookup.NOT_MATCHED);
     }
 
     /**
