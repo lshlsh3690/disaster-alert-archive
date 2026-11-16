@@ -159,8 +159,8 @@ as-built 상세 동작(파일:라인 근거 포함)은 레포 루트 `specs/` �
 
 | 명세 | 대상 |
 |------|------|
-| `specs/001-event-clustering-pipeline/` | 이벤트 클러스터링 (37개 기능 요구사항) |
-| `specs/002-risk-scoring/` | ~~위험도 계산·감쇠·확산~~ — 2026-11-05 기능 삭제, 기록용 |
+| `specs/001-event-clustering-pipeline/` | 이벤트 클러스터링 (37개 기능 요구사항) + 유형별 기준 `CLUSTERING_CRITERIA.md` |
 | `specs/003-fcm-notification/` | FCM 알림 |
 | `specs/004-legal-district-matching/` | 법정동 기반 지역 매칭 |
 | `specs/005-translation-pipeline/` | 번역 파이프라인 |
+| `specs/006-clustering-evaluation/` | 클러스터링 평가·검증 (정답 기준, 라벨 셋, 지표, 운영 검증) |

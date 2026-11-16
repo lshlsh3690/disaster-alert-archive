@@ -4,15 +4,15 @@
 > - **안내성(advisory) 분리 경로** — 2026-10-17 `d314cb3d` 에서 삭제. 비사건(`alert_kind=ADVISORY`)을 클러스터링에서 아예 제외하면서 쓸모없어졌다. `FireAlertClassifier`·`AdvisoryClassifier` 클래스와 `clustering.advisory-split-types`·`advisory-window-hours` 설정이 함께 사라졌다. 이 문서의 관련 FR·서술은 **현재 코드에 대응물이 없다**.
 > - **`EventCrossRegionService`(사후 cross-region 병합 패스)** — 2026-10-27 삭제. 동물 탈출·출몰은 클러스터링 안의 `EventClusteringService.clusterAnimal` 경로가 판정 순간에 처리한다.
 > - **위험도 연동** — 2026-11-05 `domain/risk` 전체와 `AlertClusteredEvent` 발행 삭제. 테이블은 남아 있으나 런타임 코드가 읽거나 쓰지 않는다.
-> - **판정 기록(`clustering_trace`)** — 2026-11-08 삭제. 모델·리포지토리·`EventClusteringService` 의 기록 배선이 모두 사라졌다(테이블과 V133 은 남김). 이 문서의 "판정 기록 경로는 `ANIMAL`" 같은 서술은 대응물이 없다. 경위는 `docs/event-clustering/CLUSTERING_EVALUATION.md` 9절.
+> - **판정 기록(`clustering_trace`)** — 2026-11-08 삭제. 모델·리포지토리·`EventClusteringService` 의 기록 배선이 모두 사라졌다(테이블과 V133 은 남김). 이 문서의 "판정 기록 경로는 `ANIMAL`" 같은 서술은 대응물이 없다. 경위는 `specs/006-clustering-evaluation/research.md` 4절.
 >
-> 그 밖의 서술은 2026-11-07 에 개별 확인하지 않았다. 현재 기준은 항상 `docs/event-clustering/CLUSTERING_CRITERIA.md` 와 실제 코드다.
+> 그 밖의 서술은 2026-11-07 에 개별 확인하지 않았다. 현재 기준은 항상 `specs/001-event-clustering-pipeline/CLUSTERING_CRITERIA.md` 와 실제 코드다.
 
 **브랜치**: `001-event-clustering-pipeline` | **날짜**: 2026-08-05 | **명세**: [spec.md](./spec.md)
 
 **입력**: `specs/001-event-clustering-pipeline/spec.md`의 기능 명세
 
-**기준 문서**: 유형별 병합·분리 기준은 [`docs/event-clustering/CLUSTERING_CRITERIA.md`](../../docs/event-clustering/CLUSTERING_CRITERIA.md)를 따른다.
+**기준 문서**: 유형별 병합·분리 기준은 [`CLUSTERING_CRITERIA.md`](CLUSTERING_CRITERIA.md)(같은 폴더)를 따른다.
 
 **참고**: 이 계획 역시 spec.md와 마찬가지로 **사후 문서화(as-built)** 다. "Phase 0/1 설계 산출물을 만든다"는 원래 워크플로우 대신, 이미 구현된 코드를 근거로 실제 아키텍처 결정과 그 근거를 역기술한다. research.md/data-model.md/contracts/quickstart.md 같은 Phase 산출물은 이번 문서화 범위에서 별도로 생성하지 않았다(아래 "프로젝트 구조" 참고).
 

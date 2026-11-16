@@ -12,7 +12,7 @@ import java.util.Locale;
 import java.util.OptionalDouble;
 
 /**
- * 평가 결과를 마크다운 리포트로 만든다. 형식은 docs/CLUSTERING_EVAL_GUIDE.md "리포트" 절.
+ * 평가 결과를 마크다운 리포트로 만든다. 형식은 specs/006-clustering-evaluation/quickstart.md "리포트" 절.
  */
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
 public final class ReportFormatter {

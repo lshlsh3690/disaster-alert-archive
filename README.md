@@ -172,7 +172,7 @@ Markdown 평가 보고서 + 오류 사례
 
 현재 평가기는 최종 이벤트 배정을 비교하며, 검색·판정 오류 원인은 후보를 근사해 계산한다. 실제 `clustering_trace`를 이용한 단계별 자동 검증은 추가 연결이 필요하다.
 
-유형별 기준과 평가 방법은 [이벤트 클러스터링 문서](docs/event-clustering/README.md)를 참고한다.
+유형별 기준은 [`CLUSTERING_CRITERIA.md`](specs/001-event-clustering-pipeline/CLUSTERING_CRITERIA.md), 평가 방법과 결과는 [`specs/006-clustering-evaluation/`](specs/006-clustering-evaluation/)를 참고한다.
 
 ---
 
@@ -308,11 +308,11 @@ DB에 붙는 통합 테스트는 `@IntegrationTest`(= `@SpringBootTest` + `test`
 
 | 문서 | 내용 |
 |------|------|
-| [`specs/001-event-clustering-pipeline/`](specs/001-event-clustering-pipeline/) | 이벤트 클러스터링 파이프라인 as-built 명세 |
-| [`specs/002-risk-scoring/`](specs/002-risk-scoring/) | ~~지역 위험도 계산·감쇠·확산~~ — 2026-11-05 기능 삭제. 당시 동작의 기록으로만 남김 |
+| [`specs/001-event-clustering-pipeline/`](specs/001-event-clustering-pipeline/) | 이벤트 클러스터링 파이프라인 as-built 명세 + 유형별 병합·분리 기준([`CLUSTERING_CRITERIA.md`](specs/001-event-clustering-pipeline/CLUSTERING_CRITERIA.md)) |
 | [`specs/003-fcm-notification/`](specs/003-fcm-notification/) | FCM 푸시 알림 |
 | [`specs/004-legal-district-matching/`](specs/004-legal-district-matching/) | 법정동 코드 기반 지역 매칭 |
 | [`specs/005-translation-pipeline/`](specs/005-translation-pipeline/) | 다국어 번역 파이프라인 |
+| [`specs/006-clustering-evaluation/`](specs/006-clustering-evaluation/) | 이벤트 클러스터링 평가·검증 — 같은 사건 정답, 라벨 셋, 지표, 운영 검증. 평가 결과·읽는 법 문서 포함 |
 | [`docs/`](docs/) | PRD·TRD·API 명세·데이터 모델·테스트 케이스 |
 | [`backend/evaluation/README.md`](backend/evaluation/README.md) | 백필·평가 실행 명령어 모음 |
 | [`CLAUDE.md`](CLAUDE.md) | 저장소 작업 가이드(아키텍처 요약·팀 컨벤션·함정) |

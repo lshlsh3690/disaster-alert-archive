@@ -26,7 +26,7 @@ import java.util.Optional;
 import java.util.OptionalDouble;
 
 /**
- * 클러스터링 평가 실행 진입점. 사용법은 docs/event-clustering/CLUSTERING_EVAL_GUIDE.md "실행" 절.
+ * 클러스터링 평가 실행 진입점. 사용법은 specs/006-clustering-evaluation/quickstart.md "실행" 절.
  *
  * <p>{@code --eval.labels}(필수) 라벨 JSON 을 읽어 DB 의 이벤트 배정과 비교하고,
  * {@code --eval.report}(선택) 경로에 마크다운 리포트를 쓴다. {@code --eval.bcubed}(선택)에 B-cubed 정답 JSON 을

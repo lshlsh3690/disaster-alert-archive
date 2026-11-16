@@ -38,7 +38,7 @@ import static org.mockito.Mockito.when;
 
 /**
  * 동물 탈출·출몰 알림이 {@code doCluster} 안의 동물 경로(실종자 다음)에서 처리되는지 검증한다.
- * 기준: docs/event-clustering/CLUSTERING_CRITERIA.md 3절 2번 동물 경로. 순수 Mockito 단위 테스트(DB·Spring 없음).
+ * 기준: specs/001-event-clustering-pipeline/CLUSTERING_CRITERIA.md 3절 2번 동물 경로. 순수 Mockito 단위 테스트(DB·Spring 없음).
  *
  * <p>Red 단계에서는 동물 알림이 아직 기존 임베딩 경로(findTopCandidates -> 새 이벤트)를 타므로
  * 동물 후보 쿼리 verify("Wanted but not invoked") 또는 path 단언(EMBEDDING != ANIMAL)에서 실패한다.
