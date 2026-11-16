@@ -63,15 +63,15 @@ aside h3{margin:0 0 6px;font-size:15px}
  <label><input type="checkbox" id="all"> 보이는 것 모두 선택</label>
  <span id="selc" class="mut"></span>
  <button id="new" class="pri">새 사건으로 묶기</button>
- <select id="target"></select><button id="add">이 사건에 추가</button>
+ <select id="target" aria-label="추가할 사건"></select><button id="add">이 사건에 추가</button>
  <button id="solo">혼자</button><button id="unsure">분류 불가</button><button id="clear">미검토로</button>
 </div>
 <div class="filters">
- <select id="fstatus"><option value="all">전체</option><option value="none" selected>미검토</option><option value="solo">혼자</option><option value="unsure">분류 불가</option><option value="grouped">묶은 것</option></select>
- <select id="ftype"><option value="">모든 유형</option></select>
+ <select id="fstatus" aria-label="검토 상태 필터"><option value="all">전체</option><option value="none" selected>미검토</option><option value="solo">혼자</option><option value="unsure">분류 불가</option><option value="grouped">묶은 것</option></select>
+ <select id="ftype" aria-label="유형 필터"><option value="">모든 유형</option></select>
  <input type="search" id="fq" placeholder="지역·본문 검색">
- <select id="fchunk"><option value="">덩어리 크기: 전체</option><option value="1">1건 덩어리 (혼자 후보)</option><option value="2">2건 이상 덩어리</option></select>
- <select id="sort"><option value="chunk">덩어리순</option><option value="time">시간순</option><option value="region">지역순</option><option value="sender">덩어리 안 발신 기관순</option></select>
+ <select id="fchunk" aria-label="덩어리 크기 필터"><option value="">덩어리 크기: 전체</option><option value="1">1건 덩어리 (혼자 후보)</option><option value="2">2건 이상 덩어리</option></select>
+ <select id="sort" aria-label="정렬"><option value="chunk">덩어리순</option><option value="time">시간순</option><option value="region">지역순</option><option value="sender">덩어리 안 발신 기관순</option></select>
  <span id="fcount" class="mut"></span><button id="funfold" hidden>사건 보기 해제</button>
 </div>
 <div id="list"></div>
@@ -86,7 +86,7 @@ const $=id=>document.getElementById(id);
 const byId=new Map(DATA.map(x=>[x.id,x]));
 let st={assign:{},next:1};          // assign[id]: 사건 번호(숫자) | 'solo' | 'unsure'
 try{const s=localStorage.getItem(KEY);if(s)st=JSON.parse(s)}catch(e){}
-let sel=new Set();let folderFilter=null;
+let sel=new Set();let folderFilter=null;let focusId=null;
 const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(st))}catch(e){}};
 const color=n=>'hsl('+((n*47)%360)+',60%,42%)';
 const isNum=v=>typeof v==='number';
@@ -205,7 +205,7 @@ function render(){
     const c=el('div','card'+(sel.has(x.id)?' sel':''));
     c.style.borderLeftColor=isNum(v)?color(v):(v==='solo'?'#6b7280':(v==='unsure'?'#b45309':'var(--bd)'));
     const top=el('div','top');
-    const cb=el('input');cb.type='checkbox';cb.checked=sel.has(x.id);top.appendChild(cb);
+    const cb=el('input');cb.type='checkbox';cb.checked=sel.has(x.id);cb.dataset.id=x.id;cb.setAttribute("aria-label","알림 id "+x.id+" "+x.at+" 선택");top.appendChild(cb);
     top.appendChild(el('span',null,x.at));top.appendChild(el('span','tag',x.type));
     const b=el('span','badge '+(isNum(v)?'':(v||'none')),isNum(v)?'사건 #'+v:(v==='solo'?'혼자':(v==='unsure'?'분류 불가':'미검토')));
     if(isNum(v))b.style.background=color(v);top.appendChild(b);
@@ -219,8 +219,9 @@ function render(){
     c.appendChild(el('div','msg',x.message));
     const rs=x.regions||[];
     c.appendChild(el('div','mut',(rs.length>4?rs.slice(0,4).join(', ')+' 외 '+(rs.length-4)+'곳':rs.join(', '))));
-    c.addEventListener('click',()=>{if(sel.has(x.id))sel.delete(x.id);else sel.add(x.id);render()});
+    c.addEventListener('click',()=>{if(sel.has(x.id))sel.delete(x.id);else sel.add(x.id);focusId=x.id;render()});
     list.appendChild(c)}
+  if(focusId!==null){const f=list.querySelector('input[data-id="'+focusId+'"]');if(f)f.focus();focusId=null}
   $('selc').textContent=sel.size+'건 선택';
   ['new','solo','unsure','clear'].forEach(i=>$(i).disabled=sel.size===0);
   $('add').disabled=sel.size===0||!$('target').value;
