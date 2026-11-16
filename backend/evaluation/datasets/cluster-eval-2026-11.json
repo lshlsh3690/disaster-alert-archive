@@ -2061,7 +2061,7 @@
   },
   {
     "q": 116,
-    "label": "DIFF",
+    "label": "SAME",
     "relation": "같은 시군구",
     "gap": "10시간 51분",
     "a": {
