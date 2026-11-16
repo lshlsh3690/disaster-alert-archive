@@ -43,7 +43,7 @@ public final class PairCounter {
                 continue;
             }
             if (o.label() == Label.SAME) {
-                // 3) 같은 사건: 같은 이벤트면 맞게 묶음, 아니면 놓침
+                // 3) 같은 사건: 같은 이벤트면 맞게 묶음, 아니면 과소병합
                 if (o.sameEvent()) {
                     correct++;
                 } else {
@@ -51,7 +51,7 @@ public final class PairCounter {
                     wrong.add(new WrongPair(o.alertA(), o.alertB(), ErrorType.MISSED));
                 }
             } else if (o.sameEvent()) {
-                // 4) 다른 사건인데 같은 이벤트면 잘못 묶음 (다른 이벤트는 어디에도 안 센다)
+                // 4) 다른 사건인데 같은 이벤트면 과병합 (다른 이벤트는 어디에도 안 센다)
                 over++;
                 wrong.add(new WrongPair(o.alertA(), o.alertB(), ErrorType.OVER_MERGED));
             }

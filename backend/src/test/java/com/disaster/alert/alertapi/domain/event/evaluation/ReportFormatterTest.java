@@ -17,7 +17,7 @@ class ReportFormatterTest {
     private static final LocalDateTime RUN_AT = LocalDateTime.of(2026, 10, 19, 9, 0);
 
     private static PairCountResult guideExample() {
-        // 가이드 예시(쌍 6개)의 결과: 맞게 묶음 2, 놓침 2, 잘못 묶음 1 → 50.0% / 33.3%
+        // 가이드 예시(쌍 6개)의 결과: 맞게 묶음 2, 과소병합 2, 과병합 1 → 50.0% / 33.3%
         return new PairCountResult(2, 2, 1, 0, 0, OptionalDouble.of(50.0), OptionalDouble.of(100.0 / 3),
                 List.of());
     }
@@ -27,7 +27,7 @@ class ReportFormatterTest {
     // Red 단계: 포매터는 아직 옛 두 줄("→ 과소병합율 ...")만 쓰므로 점수·맞게 묶은 비율·빠짐없이 묶은 비율 줄이 없어 실패한다.
     @Test
     void 요약에_점수와_두_비율_줄이_나온다() {
-        // 준비: 맞게 묶음 39, 놓침 21, 잘못 묶음 3(현재 develop 측정값), 모르겠음 6쌍 제외
+        // 준비: 맞게 묶음 39, 과소병합 21, 과병합 3(현재 develop 측정값), 모르겠음 6쌍 제외
         // 과소병합율 = 21/60 = 35.0%, 과병합율 = 3/42 = 7.1% (PairCounter 가 이미 계산해 넘기는 값)
         PairCountResult result = new PairCountResult(39, 21, 3, 6, 0,
                 OptionalDouble.of(21 * 100.0 / 60), OptionalDouble.of(3 * 100.0 / 42), List.of());
@@ -40,8 +40,9 @@ class ReportFormatterTest {
         assertThat(report)
                 .contains("## 요약")
                 .contains("- 점수 76.5점 — 맞게 묶은 비율과 빠짐없이 묶은 비율의 조화평균")
-                .contains("- 맞게 묶은 비율 92.9% — 묶은 42쌍 중 39쌍 맞음, 3쌍 잘못 묶음 (과병합율 7.1%)")
-                .contains("- 빠짐없이 묶은 비율 65.0% — 같은 사건 60쌍 중 39쌍 묶음, 21쌍 놓침 (과소병합율 35.0%)")
+                // 틀린 쌍의 종류 이름을 과병합/과소병합으로 통일한다(비율 이름·괄호의 율 이름과 같은 말을 쓰려는 것)
+                .contains("- 맞게 묶은 비율 92.9% — 묶은 42쌍 중 39쌍 맞음, 3쌍 과병합 (과병합율 7.1%)")
+                .contains("- 빠짐없이 묶은 비율 65.0% — 같은 사건 60쌍 중 39쌍 묶음, 21쌍 과소병합 (과소병합율 35.0%)")
                 .contains("- 제외: 모르겠음 6쌍, 이벤트 미배정 0쌍");
     }
 
@@ -50,7 +51,7 @@ class ReportFormatterTest {
     // Red 단계: 포매터가 점수 줄을 아직 쓰지 않아 실패한다.
     @Test
     void 점수는_산술평균이_아니라_조화평균이다() {
-        // 준비: 맞게 묶음 10, 놓침 10, 잘못 묶음 0 → 맞게 묶은 비율 100%, 빠짐없이 묶은 비율 50% (과소병합율 50.0, 과병합율 0.0)
+        // 준비: 맞게 묶음 10, 과소병합 10, 과병합 0 → 맞게 묶은 비율 100%, 빠짐없이 묶은 비율 50% (과소병합율 50.0, 과병합율 0.0)
         PairCountResult result = new PairCountResult(10, 10, 0, 0, 0,
                 OptionalDouble.of(50.0), OptionalDouble.of(0.0), List.of());
 
@@ -122,10 +123,13 @@ class ReportFormatterTest {
         String report = ReportFormatter.format("ds", RUN_AT, guideExample(), List.of(sameType, diffType));
 
         // 검증: 헤더와 두 행. 같은 유형은 "산불" 하나, 다른 유형은 "산불/호우", 거리 없으면 "-"
+        // 표 제목과 종류 칸도 과소병합(MISSED)/과병합(OVER_MERGED) 이름을 쓴다
         assertThat(report)
+                .contains("## 과소병합 쌍 / 과병합 쌍")
                 .contains("| alertA | alertB | 유형 | 같은 시군구 | 간격(시간) | 본문 거리 |")
                 .contains("| 101 | 102 | 산불 | 예 | 5 |")
-                .contains("| 201 | 202 | 산불/호우 | 아니오 | 30 | - |");
+                .contains("| 0.200 | 과소병합 |")
+                .contains("| 201 | 202 | 산불/호우 | 아니오 | 30 | - | 과병합 |");
     }
 
 }

@@ -70,15 +70,15 @@ docker compose -f docker-compose.dev.yml up postgres redis   # Postgres(pgvector
 - `EventLLMDecisionService` — 위 서비스들이 borderline 병합 판정에 공용으로 사용하는 LLM 판정 호출부 (Spring AI + `gpt-4o-mini`). 호출당 비용이 들지만 on/off 플래그 없이 항상 동작하며, 사고성 유형 화이트리스트(`llm-fallback.accident-types`)·borderline 거리 구간(`llm-fallback.distance-ceil`)·이동 키워드(`mover-keywords`/`animal-keywords`) 게이트로 호출 대상을 좁힙니다.
 - `application.yml`의 `clustering.*` 블록 값들은 별도 `@ConfigurationProperties` 클래스 없이 `EventClusteringService`에 개별 `@Value` 필드로 흩어져 바인딩됩니다. 각 임계값/키워드 목록이 존재하는 이유(blob 방지, 유형별 머지 윈도우 등)가 한국어 주석으로 설명되어 있습니다. **클러스터링 임계값을 변경하기 전에 반드시 그 주석들을 먼저 읽으세요** — 대부분의 값은 임의가 아니라 실제 사건 데이터로 튜닝된 값입니다. (지속형 유형[폭염·한파·대설·강풍·가축질병]은 시군구 1개 알림이면 `sustained-types` 키 병합을 타고, 다지역(시군구 2개 이상) 알림은 지역 이벤트와 섞이지 않게 광역(broadcast) 경로로 갑니다(사고성 유형은 전파 허용이라 제외). 지속형 유형에만 임베딩 병합 하한을 0.65로 낮추던 `relaxed-threshold-types`·`relaxed-similarity-threshold`는 지속형 유형이 임베딩 경로에 오지 않아 실행되지 않는 분기라 2026-11-11 삭제했습니다.)
 - `EventClusteringBackfillTool` — 현재 클러스터링 설정으로 과거 알림을 재처리하는 도구. 임계값 튜닝 시 사용.
-- `DisasterCooldown` — 재난 **유형**(지역 무관) → 쿨다운 시간 매핑(산불·지진·폭염 등 168h / 태풍·호우·화재 등 72h / 붕괴·정전·교통 등 24h, 미등록·null 72h). 이벤트 생성 시 1회 산정해 `disaster_events.cooldown_hours` 에 저장하고, 조회 시 `now - last_alert_at < cooldown` 으로 진행 중 여부를 파생합니다. 예전에는 여기에 더해 **화재에만** LLM 폴백 병합 시간 상한(`allowsLlmFallbackMerge`)이 걸려 있었으나 **2026-11-07 에 제거했습니다**(`c356062a`) — `allowsAccidentMerge` 는 이제 후보 이벤트가 사고성 유형인지만 봅니다. 2026-11-08 에 분류가 채워진 사본에서 가드 유무만 바꿔 두 번 재클러스터링해 효과를 쟀고, **과소병합은 줄고 과병합은 늘어나는 맞바꿈**이라는 것을 확인한 뒤 **대가를 알고 유지하기로 했습니다**. 되살리거나 좁힐 때의 출발점이 되는 수치·표본 판독 내역은 `docs/event-clustering/CLUSTERING_EVALUATION.md` 10절과 `allowsAccidentMerge` javadoc 에 있습니다 — **여기에 다시 적지 않습니다**(같은 수치를 세 곳에 두었다가 두 번 어긋났습니다).
+- `DisasterCooldown` — 재난 **유형**(지역 무관) → 쿨다운 시간 매핑(산불·지진·폭염 등 168h / 태풍·호우·화재 등 72h / 붕괴·정전·교통 등 24h, 미등록·null 72h). 이벤트 생성 시 1회 산정해 `disaster_events.cooldown_hours` 에 저장하고, 조회 시 `now - last_alert_at < cooldown` 으로 진행 중 여부를 파생합니다. 예전에는 여기에 더해 **화재에만** LLM 폴백 병합 시간 상한(`allowsLlmFallbackMerge`)이 걸려 있었으나 **2026-11-07 에 제거했습니다**(`c356062a`) — `allowsAccidentMerge` 는 이제 후보 이벤트가 사고성 유형인지만 봅니다. 2026-11-08 에 분류가 채워진 사본에서 가드 유무만 바꿔 두 번 재클러스터링해 효과를 쟀고, **과소병합은 줄고 과병합은 늘어나는 맞바꿈**이라는 것을 확인한 뒤 **대가를 알고 유지하기로 했습니다**. 되살리거나 좁힐 때의 출발점이 되는 수치·표본 판독 내역은 `specs/006-clustering-evaluation/research.md` 3절과 `allowsAccidentMerge` javadoc 에 있습니다 — **여기에 다시 적지 않습니다**(같은 수치를 세 곳에 두었다가 두 번 어긋났습니다).
 - **안내성(advisory) 분리 경로는 2026-10-17 `d314cb3d` 에서 삭제했습니다** — 비사건(`alert_kind=ADVISORY`)을 아예 클러스터링하지 않게 되면서 쓸모없어졌습니다. 같이 지워진 것: `AdvisoryClassifier`, `FireAlertClassifier`, `clusterAdvisory`/`clusterAdvisoryType`/`clusterAdvisoryBroadcast`/`isAdvisorySplitType`, 설정 `clustering.advisory-split-types`·`advisory-window-hours`. 남아 있던 `disaster_events.is_advisory` 컬럼(V42)과 그 전에 만들어진 안내 이벤트(운영 627개)도 **2026-11-11 `V136__drop_advisory_events.sql` 로 지웠습니다** — 엔티티 필드, 이벤트 목록 조회의 `advisory` 파라미터·응답 필드, 후보 검색 쿼리의 `is_advisory = false` 필터, `MergeMethod.ADVISORY` 도 함께 삭제. 안내 이벤트에만 들어 있던 알림은 미배정으로 남습니다(운영 기준 ADVISORY 5,491건, INCIDENT 산불 177건).
 - 지속형 유형(`clustering.sustained-types` 폭염·한파·대설·강풍·가축질병)은 "유형+시군구" 하나의 이벤트에 이어 붙이고(시군구 1개 알림 한정, 끊김 기준 `sustained-window-hours` 168h, `clusterSustainedType`), 지역 한정 유형(`clustering.regional-types`)의 산불 알림은 같은 시군구에 이벤트가 없으면 `regional-adjacent-types`/`regional-adjacent-window-hours`(24h)에 따라 인접 시군구의 진행 중 이벤트에 병합합니다(시군구 개수 상한 없음, `mergeIntoAdjacentRegionalEvent`). 폭염·한파 등의 특보는 대부분 `ADVISORY` 로 분류돼 앞단에서 빠지지만, **지속형 경로는 사건으로 분류된 알림도 처리하며 실제로는 대설 사건 문자(제설·통제 등)가 대부분입니다.** (2026-11-11 이전 문서는 "null 알림에만 실질 적용"이라고 잘못 적었습니다.)
 
 클러스터링·LLM 폴백·동물 경로는 **항상 켜져 있습니다** — 2026-10-10 에 on/off 환경변수(`CLUSTERING_ENABLED`, `LLM_FALLBACK_ENABLED`, `CROSS_REGION_ENABLED`)를 삭제했습니다. 클러스터링이 꺼지면 이벤트가 생기지 않아 목록·상세·타임라인이 비기 때문입니다. 대신 새 알림마다 임베딩 호출이 들고 수집 루프(`DisasterFetchScheduler`) 안에서 동기로 실행되며, 백필 recluster 모드도 borderline 사고성 건은 LLM 을 호출합니다(완전히 공짜인 튜닝 루프가 아님).
 
-**유형별 병합·분리 기준의 원본은 `docs/event-clustering/CLUSTERING_CRITERIA.md` 입니다** — 그 문서가 기준의 단일 출처이고 CLAUDE.md 는 기준을 다시 쓰지 않습니다. 기준을 바꾸면 그 문서를 먼저 고치세요. (2026-10-17 안내 경로 삭제가 CLAUDE.md 에 반영되지 않아 3주간 없는 기능을 설명하고 있던 전례가 있습니다.)
+**유형별 병합·분리 기준의 원본은 `specs/001-event-clustering-pipeline/CLUSTERING_CRITERIA.md` 입니다** — 그 문서가 기준의 단일 출처이고 CLAUDE.md 는 기준을 다시 쓰지 않습니다. 기준을 바꾸면 그 문서를 먼저 고치세요. (2026-10-17 안내 경로 삭제가 CLAUDE.md 에 반영되지 않아 3주간 없는 기능을 설명하고 있던 전례가 있습니다.)
 
-이 서브시스템의 as-built 상세 동작(37개 기능 요구사항, file:line 근거 포함)은 `specs/001-event-clustering-pipeline/spec.md`·`plan.md` 참고.
+이 서브시스템의 as-built 상세 동작(37개 기능 요구사항, file:line 근거 포함)은 `specs/001-event-clustering-pipeline/spec.md`·`plan.md` 참고. 평가·검증(같은 사건 정답 기준, 라벨 셋, 지표, 운영 검증)과 평가 결과·읽는 법 문서는 `specs/006-clustering-evaluation/` 에 있습니다(2026-11-13 `docs/event-clustering/` 에서 옮김).
 
 ### 위험도 계산 — 2026-11-05 삭제
 
@@ -97,7 +97,7 @@ docker compose -f docker-compose.dev.yml up postgres redis   # Postgres(pgvector
 안내합니다(이벤트를 참조하는 외래 키에 막히지 않게 비우는 용도). 이벤트 자체는 `disaster_alert.event_id` 가 참조해 `TRUNCATE` 할 수 없어 `DELETE` 합니다(V137 이후). 되돌릴 여지를 남기려고 드롭 마이그레이션을 추가하지 않았습니다. **`region_adjacency` 는 예외로
 계속 쓰입니다** — 클러스터링의 인접 시군구 병합이 이 표를 읽습니다.
 
-옛 명세는 `specs/002-risk-scoring/` 에 그대로 두었습니다(as-built 기록).
+옛 명세 `specs/002-risk-scoring/` 은 2026-11-13 삭제했습니다 — 필요하면 git 이력(`ac229936`)에서 찾습니다.
 
 ### 알림 (FCM)
 

@@ -50,7 +50,7 @@
 모든 임계값·키워드는 `application.yml`의 `clustering.*`에 있으며, 실데이터 튜닝 근거가 주석으로 남아있다. 대부분 기능은 환경변수 플래그로 기본 비활성화되어 있어, 배포 환경별로 on/off 여부를 확인해야 한다.
 
 ### 3.2 ~~위험도 계산~~ — 2026-11-05 삭제 (검증 불가로 폐기, `CLAUDE.md` 참고)
-이 절의 기능은 **현재 존재하지 않는다.** `domain/risk/`(`RiskDecayScheduler`·`LlmRiskProfiler` 포함)와 `AlertClusteredEvent` 발행은 코드에서 제거됐고, 점수를 검증할 방법이 없어 폐기했다. DB 테이블은 남겨 두었다(되돌릴 여지, `docs/DATA_MODEL.md` 1.9절). 삭제 전 동작은 `specs/002-risk-scoring/` 에 기록으로만 남아 있다.
+이 절의 기능은 **현재 존재하지 않는다.** `domain/risk/`(`RiskDecayScheduler`·`LlmRiskProfiler` 포함)와 `AlertClusteredEvent` 발행은 코드에서 제거됐고, 점수를 검증할 방법이 없어 폐기했다. DB 테이블은 남겨 두었다(되돌릴 여지, `docs/DATA_MODEL.md` 1.9절). 삭제 전 동작을 적은 `specs/002-risk-scoring/` 도 2026-11-13 삭제했다(git 이력 `ac229936` 에 있음).
 
 ### 3.3 알림(FCM) 발송
 - `AlertNotificationService`가 알림의 법정동 코드(및 시/도 전체 등록자를 위해 파생한 시도 코드)로 발송 대상을 조회

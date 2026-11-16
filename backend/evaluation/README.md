@@ -1,6 +1,6 @@
 # 백필·평가 실행 명령어
 
-수동으로 돌리는 도구의 명령어 모음이다. 평가 결과를 읽는 법은 [CLUSTERING_EVAL_GUIDE.md](../../docs/event-clustering/CLUSTERING_EVAL_GUIDE.md)를 본다.
+수동으로 돌리는 도구의 명령어 모음이다. 평가 결과를 읽는 법은 [quickstart.md](../../specs/006-clustering-evaluation/quickstart.md)를 본다.
 
 | 하려는 일 | 프로필 | OpenAI 비용 | 끝나면 |
 |---|---|---|---|
