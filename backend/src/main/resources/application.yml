@@ -183,6 +183,10 @@ clustering:
     span-cap-sido: 10                         # 최대 걸친 시도 수
     mover-keywords: "찾습니다|실종|수배|가출|배회|탈출|출몰|멧돼지|들개|늑대"   # 현재 읽는 코드 없음(옛 게이트)
     animal-keywords: "탈출|출몰|멧돼지|들개|늑대"   # 인물(이름+나이) 아닌 동물·비정형만 임베딩+LLM
+  # 일일 채점(ClusteringDailyScoreScheduler) — 판사(LLM)를 매일 수백 번 부르는 유료 기능이라 시작일이 있어야만 돈다.
+  # 비어 있으면 아무것도 채점하지 않고(운영 도입 승인 전 배포돼도 비용이 안 나가게), 값(yyyy-MM-dd)이 있으면 그 날짜 이전은 채점하지 않는다.
+  daily-score:
+    start-date: ${CLUSTERING_DAILY_SCORE_START_DATE:}
 
 springdoc:
   swagger-ui:

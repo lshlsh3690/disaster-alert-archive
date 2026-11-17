@@ -1,14 +1,13 @@
 package com.disaster.alert.alertapi.domain.event.evaluation;
 
-import com.disaster.alert.alertapi.domain.event.evaluation.AlertPlaceFacts.AlertInput;
 import com.disaster.alert.alertapi.domain.event.evaluation.AssignmentReader.AlertSnapshot;
 import com.disaster.alert.alertapi.domain.event.evaluation.JudgeAgreementCounter.Judged;
 import com.disaster.alert.alertapi.domain.event.evaluation.JudgeAgreementReport.CallFailure;
 import com.disaster.alert.alertapi.domain.event.evaluation.JudgeAgreementReport.PairRecord;
+import com.disaster.alert.alertapi.domain.event.evaluation.JudgeInputAssembler.Session;
 import com.disaster.alert.alertapi.domain.event.evaluation.LabelJson.Label;
 import com.disaster.alert.alertapi.domain.event.evaluation.LabelJson.LabeledPair;
 import com.disaster.alert.alertapi.domain.event.judge.ClusteringJudge;
-import com.disaster.alert.alertapi.domain.event.judge.ClusteringJudge.JudgeAlert;
 import com.disaster.alert.alertapi.domain.event.judge.ClusteringJudge.JudgeInput;
 import com.disaster.alert.alertapi.domain.event.judge.ClusteringJudge.JudgeResult;
 import lombok.RequiredArgsConstructor;
@@ -38,15 +37,14 @@ public class JudgeAgreementRunner {
     private static final int PROGRESS_INTERVAL = 50;
 
     private final AssignmentReader assignmentReader;
-    private final PlaceDirectoryLoader placeDirectoryLoader;
+    private final JudgeInputAssembler inputAssembler;
     private final ClusteringJudge judge;
 
     /** 라벨 쌍(사람 UNSURE 포함)을 받아 판정·집계해 마크다운 리포트를 돌려준다. */
     public String run(String datasetName, List<LabeledPair> pairs) {
         // 1) 사람 UNSURE 쌍을 빼고 대상만 남긴다. 사실 계산기·지역 이름 표는 한 번만 만든다
         List<LabeledPair> targets = pairs.stream().filter(p -> p.label() != Label.UNSURE).toList();
-        AlertPlaceFacts facts = new AlertPlaceFacts(placeDirectoryLoader.load());
-        Map<String, String> regionNames = assignmentReader.findSigunguNames();
+        Session inputs = inputAssembler.open();
         Map<Long, AlertSnapshot> snapshots = new HashMap<>();
         log.info("판사 일치율 측정 시작: 대상 {}쌍(사람 UNSURE {}쌍 제외), 프롬프트 {}, 모델 {}",
                 targets.size(), pairs.size() - targets.size(), ClusteringJudge.PROMPT_VERSION, ClusteringJudge.MODEL);
@@ -59,7 +57,7 @@ public class JudgeAgreementRunner {
             // 2) 알림이 DB 에 없으면(라벨 파일과 사본이 어긋남) 예외로 멈춘다 - 이건 호출 실패로 삼킬 문제가 아니다
             AlertSnapshot first = snapshots.computeIfAbsent(p.alertA(), assignmentReader::findAlert);
             AlertSnapshot second = snapshots.computeIfAbsent(p.alertB(), assignmentReader::findAlert);
-            JudgeResult result = callJudge(p, first, second, facts, regionNames, callFailures);
+            JudgeResult result = callJudge(p, first, second, inputs, callFailures);
             if (result != null) {
                 judged.add(new Judged(p.label(), result));
                 records.add(new PairRecord(p.label(), result.verdict(), result.rawResponse(), first, second));
@@ -75,9 +73,9 @@ public class JudgeAgreementRunner {
     // 판사 호출만 예외를 쌍 단위로 잡는다: 네트워크 오류 한 건 때문에 이미 쓴 요금(앞선 판정)을 통째로 버리지 않으려는 것이다.
     // 입력 조립(사실 계산)은 외부 호출이 없는 우리 코드라 try 밖에 둔다 - 그 안의 버그가 호출 실패로 숨어 분모만 조용히 줄지 않게.
     // 실패 쌍은 형식 실패와 섞지 않고 호출 실패 목록에 id 와 사유를 남긴다(null 반환). 어디서 실패했는지는 이 warn 로그와 리포트 마지막 절에서 본다
-    private JudgeResult callJudge(LabeledPair p, AlertSnapshot first, AlertSnapshot second, AlertPlaceFacts facts,
-                                  Map<String, String> regionNames, List<CallFailure> callFailures) {
-        JudgeInput input = toInput(first, second, facts, regionNames);
+    private JudgeResult callJudge(LabeledPair p, AlertSnapshot first, AlertSnapshot second, Session inputs,
+                                  List<CallFailure> callFailures) {
+        JudgeInput input = inputs.toInput(first, second);
         try {
             return judge.judge(input);
         } catch (RuntimeException e) {
@@ -85,25 +83,5 @@ public class JudgeAgreementRunner {
             callFailures.add(new CallFailure(p.alertA(), p.alertB(), e.toString()));
             return null;
         }
-    }
-
-    // 판사 입력: 두 알림의 값 + 규칙으로 계산한 사실. 이벤트 배정은 넣지 않는다(JudgeInput 에 그런 필드가 없다)
-    private static JudgeInput toInput(AlertSnapshot first, AlertSnapshot second, AlertPlaceFacts facts,
-                                      Map<String, String> regionNames) {
-        AlertInput inputA = input(first);
-        AlertInput inputB = input(second);
-        return new JudgeInput(judgeAlert(first, inputA, facts, regionNames), judgeAlert(second, inputB, facts, regionNames),
-                facts.compare(inputA, inputB));
-    }
-
-    private static JudgeAlert judgeAlert(AlertSnapshot s, AlertInput input, AlertPlaceFacts facts,
-                                         Map<String, String> regionNames) {
-        // 이름 표에 없는 코드는 코드 그대로 보인다 - 이름을 지어내는 것보다 낫다
-        List<String> names = s.sigunguCodes().stream().map(code -> regionNames.getOrDefault(code, code)).toList();
-        return new JudgeAlert(s.sentAt(), s.type(), names, s.message(), facts.analyze(input));
-    }
-
-    private static AlertInput input(AlertSnapshot s) {
-        return new AlertInput(s.message(), s.sentAt(), s.type(), s.sigunguCodes());
     }
 }

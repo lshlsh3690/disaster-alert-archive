@@ -25,8 +25,10 @@ import java.util.Map;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -197,6 +199,47 @@ class ClusteringDailyScoreServiceTest {
                         tuple(missed, JudgeVerdict.SAME, false, e1, e2, Disagreement.MISSED),
                         tuple(separated, JudgeVerdict.DIFF, false, e1, e2, null),
                         tuple(formatFailure, JudgeVerdict.FORMAT_FAILURE, false, e1, e2, null));
+    }
+
+    // 결정(research R4): 시스템이 같은 이벤트에 넣은 쌍은 유형이 달라도 대상이다. 클러스터링 후보 검색이 유형을 보지 않아
+    // 화재 알림과 교통통제 알림이 한 이벤트에 들어갈 수 있고, 그 과병합을 점수에서 놓치면 맞게 묶은 비율이 실제보다 높게 나온다.
+    // 다른 이벤트 쌍(②)은 여전히 같은 유형만 본다.
+    @Test
+    void 같은_이벤트면_유형이_달라도_대상이고_다른_이벤트는_같은_유형만_본다() {
+        long e1 = event(9_200_002_001L);
+        long e2 = event(9_200_002_002L);
+        xId = 9_200_002_101L;
+        alert(xId, "화재", X_TIME, SAME_AREA, e1);
+        long sameEventOtherType = 9_200_002_102L;
+        // 앞선 날 알림으로 둔다(그날 알림이면 그 알림도 X 가 되어 둘 사이에 쌍이 생긴다)
+        alert(sameEventOtherType, "교통통제", "2001-03-03 11:00:00", SAME_AREA, e1);
+        alert(9_200_002_103L, "교통통제", "2001-03-03 10:00:00", SAME_AREA, e2);
+
+        service.score(DAY);
+
+        assertThat(pairRepository.findByScoreDate(DAY))
+                .extracting(ClusteringDailyScorePair::getAlertA, ClusteringDailyScorePair::getAlertB)
+                .containsExactly(tuple(xId, sameEventOtherType));
+    }
+
+    // 결정: 판사 호출이 한 번이라도 실패하면 그날은 아무것도 저장하지 않는다. 일부만 저장하면 그날 점수가 틀린 값으로 남고,
+    // 기록이 남은 날은 다시 채점하지 않으므로(R7) 틀린 값이 고쳐지지도 않는다. 기록이 없으면 다음 실행이 다시 채점한다.
+    @Test
+    void 판사_호출이_실패하면_그날은_아무것도_저장하지_않는다() {
+        long e1 = event(9_200_003_001L);
+        xId = 9_200_003_101L;
+        alert(xId, "화재", X_TIME, SAME_AREA, e1);
+        alert(9_200_003_102L, "화재", "2001-03-04 10:00:00", SAME_AREA, e1);
+        alert(9_200_003_103L, "화재", "2001-03-04 11:00:00", SAME_AREA, e1);
+        // when(judge.judge(..)) 로 다시 스텁하면 @BeforeEach 의 답이 null 입력으로 불려 깨지므로 do- 형식으로 덮어쓴다
+        doReturn(new JudgeResult(JudgeVerdict.SAME, 100, 1))
+                .doThrow(new RuntimeException("판사 호출 실패(테스트)"))
+                .when(judge).judge(any());
+
+        assertThatThrownBy(() -> service.score(DAY)).isInstanceOf(IllegalStateException.class);
+
+        assertThat(scoreRepository.findById(DAY)).isEmpty();
+        assertThat(pairRepository.findByScoreDate(DAY)).isEmpty();
     }
 
     /** 이벤트 행 하나. disaster_alert.event_id 가 이벤트를 외래 키로 참조하므로 알림보다 먼저 넣는다. */
