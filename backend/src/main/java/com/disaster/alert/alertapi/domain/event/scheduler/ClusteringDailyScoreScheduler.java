@@ -73,12 +73,17 @@ public class ClusteringDailyScoreScheduler {
         LocalDate yesterday = LocalDate.now(KST).minusDays(1);
         for (int i = LOOKBACK_DAYS - 1; i >= 0; i--) {
             LocalDate date = yesterday.minusDays(i);
-            // 3) 도입일 이전이거나 이미 채점한 날은 건너뛴다(유료 호출을 두 번 쓰지 않는다)
-            if (date.isBefore(startDate) || scoreRepository.existsById(date)) {
+            // 3) 도입일 이전은 건너뛴다
+            if (date.isBefore(startDate)) {
                 continue;
             }
-            // 4) 한 날의 실패가 다른 날을 막지 않게 날짜마다 잡는다. 실패한 날은 기록이 없어 다음 실행이 다시 채점한다
+            // 4) 한 날의 실패가 다른 날을 막지 않게 날짜마다 잡는다. 기록 조회(DB)도 같은 경계 안에 둬서, 조회가 일시적으로
+            //    실패해도 뒤의 날짜는 계속 처리한다. 실패한 날은 기록이 없어 다음 실행이 다시 채점한다
             try {
+                // 이미 채점한 날은 건너뛴다(유료 호출을 두 번 쓰지 않는다)
+                if (scoreRepository.existsById(date)) {
+                    continue;
+                }
                 scoreService.score(date);
             } catch (Exception e) {
                 logFailure(date, i == LOOKBACK_DAYS - 1, e);
