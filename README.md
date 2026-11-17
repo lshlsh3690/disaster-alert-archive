@@ -1,323 +1,111 @@
-
-
 # Disaster Alert Archive
 
 > 재난 안전 문자 아카이브 및 사용자 맞춤형 실시간 알림 서비스
 
 [![Next.js](https://img.shields.io/badge/Next.js-16-000000?logo=next.js&logoColor=white)](https://nextjs.org/)
 [![Spring Boot](https://img.shields.io/badge/Spring_Boot-3.4.4-6DB33F?logo=springboot&logoColor=white)](https://spring.io/projects/spring-boot)
-[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-15_+_pgvector-4169E1?logo=postgresql&logoColor=white)](https://www.postgresql.org/)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16_+_pgvector-4169E1?logo=postgresql&logoColor=white)](https://www.postgresql.org/)
 [![Redis](https://img.shields.io/badge/Redis-7-DC382D?logo=redis&logoColor=white)](https://redis.io/)
 [![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?logo=docker&logoColor=white)](https://www.docker.com/)
 
 **🔗 배포 URL: [https://disaster-alert-archive.co.kr/](https://disaster-alert-archive.co.kr/)**
 
----
-
 ## 소개
 
-행정안전부 공공 API로 수집한 재난 안전 문자를 아카이빙하고, 사용자가 설정한 관심 지역에 실시간 푸시 알림을 제공하는 서비스입니다.  
-AI 기반 이벤트 클러스터링으로 중복 알림을 제거하고, 기상 데이터와 연계한 재난 통계 대시보드를 제공합니다.
-
----
+행정안전부 공공 API로 수집한 재난 안전 문자를 아카이빙하고, 사용자가 설정한 관심 지역에 실시간 푸시 알림을 보내는 서비스입니다.
+AI 기반 이벤트 클러스터링으로 같은 사건의 알림을 하나로 묶고, 기상 데이터와 연계한 재난 통계를 제공합니다.
 
 ## 주요 기능
 
 | 기능 | 설명 |
 |------|------|
-| 재난 문자 아카이빙 | 행안부 Open API 수집 및 DB 저장, 검색/필터 제공 |
-| 맞춤 푸시 알림 | 관심 지역 설정 → Firebase FCM 실시간 알림 (게스트 포함) |
-| 이벤트 클러스터링 | 임베딩(text-embedding-3-small) + GPT-4o-mini로 중복 알림 병합 |
-| 재난 통계 대시보드 | 지역별·유형별·기간별 통계 및 기상 상관 분석 시각화 |
-| ~~위험도 분석~~ | **2026-11-05 삭제** — 점수를 검증할 방법이 없어 폐기했다(가중치·감쇠 상수가 근거 없는 값이고 정답이 없음). 안전 서비스에서 검증되지 않은 수치를 보여주는 것이 없는 것보다 나쁘다고 판단. |
-| 날씨 연계 | 기상청 관측 데이터 수집 및 재난 발령 시점 날씨 조회 |
-| 다국어 지원 | OpenAI 기반 재난 문자·이벤트 제목 번역 (원본 KO → EN/JA/ZH). 법정동 명칭은 별도 시드 테이블 조회(EN/JA/ZH) |
-| 소셜 로그인 | Google / Naver / Kakao OAuth2 |
-| 재난 제보 / 커뮤니티 | 사용자 재난 제보 알림 작성, 커뮤니티 게시판(공지·자유), 재난 문자·제보별 댓글 |
-| 실종자 알림 병합 | 실종자 관련 재난 문자를 동일 인물 기준으로 판정해 지역을 넘어 하나의 이벤트로 병합 |
-| 공개 OpenAPI | 토큰 기반 재난 문자 공개 API (JSON/CSV) |
-| 지도 연동 | 시도·시군구·읍면동 드릴다운 SVG 지도로 지역별 재난 현황 히트맵 시각화 |
-
----
+| 재난 문자 아카이빙 | 행안부 Open API 수집·저장, 검색/필터 |
+| 맞춤 푸시 알림 | 관심 지역 설정 → FCM 푸시 (모바일, 게스트 포함) |
+| 이벤트 클러스터링 | 임베딩 + LLM 판정으로 같은 사건의 알림을 하나의 이벤트로 병합 |
+| 실종자 알림 병합 | 동일 인물 판정으로 지역을 넘어 하나의 이벤트로 병합 |
+| 재난 통계·지도 | 지역별·유형별·기간별 통계, 기상 연계, 시도→읍면동 드릴다운 지도 |
+| 다국어 | 재난 문자·이벤트 제목 번역 (KO → EN/JA/ZH) |
+| 커뮤니티 | 재난 제보, 게시판, 댓글, 소셜 로그인(Google·Naver·Kakao) |
+| 공개 OpenAPI | 토큰 기반 재난 문자 API (JSON/CSV) |
 
 ## 기술 스택
 
-### Frontend
-
-| 분류 | 기술 |
+| 영역 | 기술 |
 |------|------|
-| Framework | Next.js 16 (App Router) |
-| 상태 관리 | Zustand |
-| 서버 상태 | TanStack Query (React Query) |
-| 폼 | React Hook Form + Zod |
-| 스타일링 | TailwindCSS 4 |
-| 차트 | Recharts |
-| 다국어 | i18next + react-i18next (KO/EN/JA/ZH) |
-| 알림 | Firebase SDK (FCM) + PWA (`@ducanh2912/next-pwa`) |
-| 지도 | 자체 SVG 지도 (법정동 경계 정적 데이터, PostGIS 로 생성) |
-| 테스트 | Jest (`npm test`), Playwright 스크린샷 스크립트 (`scripts/`) |
-| 배포 | 맥북 셀프호스팅 (Docker Compose, `docker-compose.prod.yml`의 frontend 서비스) |
-
-### Backend
-
-| 분류 | 기술 |
-|------|------|
-| Framework | Spring Boot 3.4.4 |
-| ORM | JPA + QueryDSL + Spring Data JDBC |
-| DB 마이그레이션 | Flyway |
-| 인증/인가 | Spring Security + JWT + OAuth2 (Google·Naver·Kakao) |
-| 캐시 | Redis |
-| AI | Spring AI 1.0.0 — `gpt-4o-mini` (이벤트 병합 판정), `text-embedding-3-small` 1536차원 (클러스터링) |
-| 번역 | OpenAI `gpt-4o` (KO → EN/JA/ZH) — 번역만 상위 모델을 per-call 오버라이드. 대상 언어는 법정동 시드 언어와 일치 |
-| 푸시 알림 | Firebase Admin SDK (FCM) |
-| 로깅 | LogTrace 스타일 AOP 호출 추적 (`global/logtrace`) |
-| 모니터링 | Spring Actuator |
-| API 문서 | SpringDoc OpenAPI (Swagger UI) |
-| 배포 | 맥북 셀프호스팅 + Docker Compose, self-hosted GitHub Actions 러너 |
-
-### 데이터
-
-| 분류 | 기술 |
-|------|------|
-| 메인 DB | PostgreSQL + pgvector (VECTOR 1536) — 로컬·운영(맥북) 모두 `pgvector/pgvector:pg16` 컨테이너 |
-| 캐시 | Redis 7 |
-| 마이그레이션 | Flyway (`backend/src/main/resources/db/migration`, `ddl-auto: validate`) |
-
-### 외부 API
-
-| API | 용도 |
-|-----|------|
-| 행정안전부 재난문자 API | 재난 안전 문자 수집 |
-| 기상청 기상 API | 관측·요약 데이터 수집 |
-| OpenAI API | 임베딩(이벤트 클러스터링), LLM 판정(이벤트 병합·동물 경로), 재난 문자 다국어 번역 |
-| Firebase Cloud Messaging | 웹 푸시 알림 |
-| OAuth (Google·Naver·Kakao) | 소셜 로그인 |
-
-### Infrastructure
-
-| 분류 | 기술 |
-|------|------|
-| 호스팅 | 맥북 셀프호스팅 (프론트엔드+백엔드+Postgres+Redis 전부 한 Docker Compose 스택) |
-| 컨테이너 | Docker + Docker Compose |
-| 외부 접속 | Cloudflare Tunnel (자동 HTTPS, 포트포워딩 불필요) |
-| CI/CD | GitHub Actions (맥북에 설치한 self-hosted 러너에서 빌드·배포) |
-
----
+| Frontend | Next.js 16 (App Router), TanStack Query, Zustand, TailwindCSS 4, i18next, PWA + Firebase |
+| Backend | Spring Boot 3.4, JPA + QueryDSL, Spring Security + JWT, Flyway, Spring AI (OpenAI) |
+| Data | PostgreSQL 16 + pgvector, Redis 7 |
+| 외부 API | 행안부 재난문자, 기상청, OpenAI, Firebase Cloud Messaging, OAuth |
+| Infra | 셀프호스팅 Docker Compose, Cloudflare Tunnel, GitHub Actions (self-hosted 러너) |
 
 ## 시스템 아키텍처
 
 ![System Architecture](docs/system_architecture.png)
 
-> 편집 원본은 [`docs/system_architecture.svg`](docs/system_architecture.svg)다. 텍스트·도형이 전부 벡터라
-> 별도 툴 없이 SVG를 직접 고칠 수 있고, git diff 에도 변경 내용이 그대로 남는다.
-> 웹 PNG(`system_architecture.png`)는 이 SVG를 렌더링해 내보낸 결과물이므로, 수정할 때는 SVG를 먼저 고칠 것.
-
----
-
-## 이벤트 클러스터링 파이프라인
-
-원본 알림이 이벤트 데이터로 가공되는 과정과, 평가용 데이터가 검증 지표로 변환되는 과정을 정리한다.
-
-### 구현 파이프라인
-
-```text
-재난문자 API 수집·저장 — 매 1분
-(DisasterFetchScheduler → DisasterAlertService)
-    ↓
-원본 알림 데이터 + 지역 매핑
-(disaster_alert + disaster_alert_region)
-    ↓ AlertKindService → AlertKindClassifier
-사건/비사건 분류값이 추가된 알림
-(alert_kind)
-    ↓ EventClusteringService
-클러스터링 비교용 데이터 준비
-(지역·발송 시각·필요한 경우 본문 임베딩)
-    ↓ DisasterEventRepository
-연관 이벤트 후보 데이터
-(후보 이벤트 ID·유사도 등 비교 정보)
-    ↓ EventClusteringService + 필요한 경우 LLM 판정
-이벤트 배정 결과
-(배정 이벤트 ID·신규/병합 여부·병합 방식)
-    ↓
-이벤트 저장·알림에 이벤트 연결
-(disaster_events + disaster_alert.event_id·순번·병합 방식)
-    ↓ EventQueryService → EventController
-이벤트 목록·상세·타임라인 UI
-```
-
-### 검증 파이프라인
-
-```text
-운영 데이터 스냅샷
-    ↓ 평가 환경으로 복사
-평가 사본 DB
-    ↓ AlertKindBackfillTool
-사건/비사건 분류값이 채워진 평가 데이터
-    ↓ EventClusteringBackfillTool — 임베딩 준비
-임베딩이 준비된 평가 데이터
-    ↓ 이벤트·매핑·판정 기록 초기화 후 재클러스터링
-평가용 이벤트 배정 + 판정 기록
-    ↓ 필요한 경우 지역 간 병합 후처리
-최종 클러스터링 결과
-    ↓ 사람 정답 라벨 CSV와 연결
-정답과 실제 이벤트 배정을 비교할 수 있는 알림 쌍
-    ↓ EvaluationRunTool → EventEvaluationService
-쌍별 비교 결과
-(맞게 묶음·과소병합·과병합·맞게 분리)
-    ↓ PairwiseEvaluator
-전체·표본층별 지표 + 오류 원인 집계
-    ↓ EvaluationReportFormatter
-Markdown 평가 보고서 + 오류 사례
-```
-
-현재 평가기는 최종 이벤트 배정을 비교하며, 검색·판정 오류 원인은 후보를 근사해 계산한다. 실제 `clustering_trace`를 이용한 단계별 자동 검증은 추가 연결이 필요하다.
-
-유형별 기준은 [`CLUSTERING_CRITERIA.md`](specs/001-event-clustering-pipeline/CLUSTERING_CRITERIA.md), 평가 방법과 결과는 [`specs/006-clustering-evaluation/`](specs/006-clustering-evaluation/)를 참고한다.
-
----
+이벤트 클러스터링 흐름: 재난문자 수집(매 1분) → 사건/비사건 분류 → 같은 시군구·시간 창 안의 후보 이벤트 검색 → 임베딩 유사도와 필요 시 LLM 판정으로 병합 또는 새 이벤트 생성.
+병합 기준은 [`CLUSTERING_CRITERIA.md`](specs/001-event-clustering-pipeline/CLUSTERING_CRITERIA.md)에 있습니다.
 
 ## 프로젝트 구조
 
 ```
 disaster-alert-archive/
-├── backend/                  # Spring Boot REST API (모든 엔드포인트는 /api/v1/*)
-│   └── src/main/java/…/
-│       ├── domain/
-│       │   ├── auth/         # JWT, OAuth2 소셜 로그인 (자체 구현)
-│       │   ├── member/       # 회원, 관심 지역
-│       │   ├── disasteralert/# 재난 문자 수집·조회·통계
-│       │   ├── event/        # 이벤트 클러스터링 (AI)
-│       │   ├── weather/      # 기상 데이터 수집·일별 집계
-│       │   ├── notification/ # FCM 알림
-│       │   ├── community/    # 커뮤니티 게시판 (공지·자유)
-│       │   ├── comment/      # 재난 문자·사용자 제보에 달리는 댓글
-│       │   ├── useralert/    # 사용자가 직접 작성하는 재난 제보 알림
-│       │   ├── openapi/      # 공개 OpenAPI (토큰·JSON/CSV)
-│       │   ├── legaldistrict/# 법정동 코드
-│       │   └── common/       # 도메인 공통 예외
-│       ├── global/           # 보안·예외·공통 응답 포맷·번역·LogTrace 등 공통 관심사
-│       ├── scheduler/        # 재난 문자 수집 스케줄러
-│       └── api/              # 외부 Open API 클라이언트
-├── frontend/                 # Next.js (App Router)
-│   └── src/
-│       ├── app/               # 라우트별 페이지
-│       ├── components/        # 공통·도메인 컴포넌트
-│       ├── store/             # Zustand 스토어
-│       ├── hooks/             # 커스텀 훅
-│       ├── lib/queries, mutations/  # React Query 훅
-│       ├── constants/         # i18n 리소스 등 상수
-│       ├── ui/                # 재난 유형·등급·시도 표시용 매핑 테이블
-│       └── api/               # axios 기반 API 클라이언트
-├── specs/                    # 서브시스템별 as-built 명세 (spec.md / plan.md)
-└── docs/                     # PRD·TRD·API/데이터 모델 문서, 시스템 구성도
+├── backend/        # Spring Boot REST API (/api/v1/*) — domain/* 도메인별 controller→service→repository
+├── frontend/       # Next.js (App Router)
+├── specs/          # 서브시스템별 명세 (spec.md / plan.md)
+└── docs/           # PRD·TRD·API/데이터 모델 문서, 시스템 구성도
 ```
 
-> 실종자 전용 백엔드 도메인은 없다. 실종자는 재난 문자에서 파생되는 개념이라
-> `domain/event`의 동일 인물 판정(`MissingPersonIdentity`)과 `domain/disasteralert` 조회 필터로 구현되어 있다.
+## 로컬 실행
 
----
-
-## 로컬 개발 환경 설정
-
-### 사전 요구사항
-
-- Java 17+
-- Node.js 20+
-- Docker + Docker Compose
-
-### 백엔드
+사전 요구사항: Java 17+, Node.js 20+, Docker
 
 ```bash
-# Docker로 PostgreSQL(pgvector) + Redis 실행 (레포 루트에서, --profile docker 불필요)
+# Postgres(pgvector) + Redis
 docker compose -f docker-compose.dev.yml up postgres redis
 
-# 레포 루트의 .env.example을 .env.dev로 복사해 값을 채운다
-cp .env.example .env.dev
+# 백엔드 (http://localhost:8080, Swagger: /swagger-ui.html)
+cp .env.example .env.dev          # 값 채우기
+cd backend && ./gradlew bootRun
 
-cd backend
-./gradlew bootRun
-```
-
-> 백엔드/프론트엔드는 `docker-compose.dev.yml`의 `docker` 프로필에도 정의돼 있지만, 로컬 개발 시에는 Postgres/Redis만 컨테이너로 띄우고 백엔드·프론트엔드는 위처럼 직접 실행하는 것을 권장한다.
-
-### 프론트엔드
-
-```bash
-cd frontend
-
-# 패키지 설치
-npm install
-
-# 환경 변수 설정
-cp .env.local.example .env.local   # 값을 채운다
-
-# 개발 서버 실행 (http://localhost:3000, Turbopack)
+# 프론트엔드 (http://localhost:3000)
+cd frontend && npm install
+cp .env.local.example .env.local  # 값 채우기
 npm run dev
 ```
 
----
-
-## 환경 변수
-
-주요 환경 변수 목록입니다. 전체 목록/템플릿은 루트 `.env.example`(백엔드)과 `frontend/.env.local.example`(프론트엔드)를 참고하세요.
-
-| 변수 | 설명 |
-|------|------|
-| `POSTGRES_DB` / `POSTGRES_USER` / `POSTGRES_PASSWORD` | PostgreSQL 접속 정보 |
-| `REDIS_HOST` / `REDIS_PORT` | Redis 접속 정보 |
-| `JWT_SECRET` | JWT 서명 키 |
-| `DISASTER_ALERT_SERVICE_KEY` | 행안부 Open API 키 |
-| `KMA_ASOS_API_KEY` | 기상청 Open API 키 |
-| `OPENAI_API_KEY` | Spring AI — 임베딩·LLM 판정·번역 공용 키 |
-| `GOOGLE_OAUTH_CLIENT_ID` / `_SECRET` | Google OAuth2 |
-| `KAKAO_OAUTH_CLIENT_ID` / `_SECRET` | Kakao OAuth2 |
-| `NAVER_OAUTH_CLIENT_ID` / `_SECRET` | Naver OAuth2 |
-| `GMAIL_USERNAME` / `GMAIL_PASSWORD` | 메일 발송(SMTP) 계정 |
-
-> FCM 발송용 서비스 계정 키는 환경변수가 아니라 클래스패스 파일로 읽는다 —
-> `backend/src/main/resources/firebase-service-account.json` 에 두어야 알림 발송이 동작한다.
-
----
-
-## API 문서
-
-로컬 실행 후 아래 URL에서 Swagger UI를 확인할 수 있습니다. 모든 엔드포인트는 `/api/v1/*` 아래에 있습니다.
-
-```
-http://localhost:8080/swagger-ui.html
-```
-
----
+환경 변수 전체 목록은 `.env.example`(백엔드)과 `frontend/.env.local.example`에 있습니다. FCM 서비스 계정 키만은 환경 변수가 아니라 `backend/src/main/resources/firebase-service-account.json` 파일로 읽습니다.
+외부 API 키 없이 개발하는 방법은 [CONTRIBUTING.md](CONTRIBUTING.md#외부-api-키가-없을-때)를 참고하세요.
 
 ## 테스트
 
 ```bash
-cd backend  && ./gradlew test    # realApi 태그 제외 전체 테스트
-cd frontend && npm test          # Jest
+cd backend  && ./gradlew test   # 실제 OpenAI 를 부르는 @Tag("realApi") 는 제외
+cd frontend && npm test
 ```
 
-`@Tag("realApi")` 가 붙은 테스트는 실제 OpenAI API를 호출해 요금이 발생하고 응답이 결정적이지 않으므로
-기본 `test` 태스크에서 제외돼 있다. 필요할 때만 `./gradlew realApiTest` 로 따로 실행한다.
+DB에 붙는 통합 테스트(`@IntegrationTest`)는 위 docker Postgres 가 떠 있어야 합니다.
 
-DB에 붙는 통합 테스트는 `@IntegrationTest`(= `@SpringBootTest` + `test` 프로파일 + `backend/.env.test` 로딩)를
-사용하므로, dev docker-compose와 동일한 구성의 Postgres에 접속 가능해야 한다.
+## 기여하기 (PR 가이드)
 
----
+PR 은 언제든 환영합니다. 한국어·영어 모두 괜찮습니다.
+
+1. **이슈를 먼저 열어 주세요.** [버그 제보 / 기능 제안](https://github.com/lshlsh3690/disaster-alert-archive/issues/new/choose)으로 무엇을 왜 바꾸려는지 적고, 메인테이너의 답을 받은 뒤 작업을 시작합니다. 오타 수정은 이슈 없이 바로 PR 을 보내도 됩니다.
+2. 저장소를 fork 하고 **`develop` 에서** 브랜치를 만듭니다 (`main` 은 쓰지 않습니다). 예: `fix/123-guest-push`
+3. 로직을 바꿨다면 테스트를 함께 추가하고 `./gradlew test` / `npm test` 가 통과하는지 확인합니다.
+4. 커밋 메시지는 `type(scope): 설명` 형식입니다. 예: `fix(notification): 시도 전체 관심 지역 게스트에게 푸시가 안 가던 문제를 고친다`
+5. **base 를 `develop` 으로** PR 을 열고 본문에 `Closes #이슈번호` 를 적습니다. CodeRabbit 자동 리뷰 후 메인테이너가 머지합니다.
+
+키·`.env*` 파일은 절대 커밋하지 마세요. 보안 취약점은 공개 이슈 대신 **Security → Report a vulnerability** 로 비공개 제보해 주세요.
+코드 컨벤션, 키 없이 개발하는 방법, 클러스터링 변경 시 필요한 근거 등 자세한 내용은 [CONTRIBUTING.md](CONTRIBUTING.md)에 있습니다.
 
 ## 문서
 
 | 문서 | 내용 |
 |------|------|
-| [`specs/001-event-clustering-pipeline/`](specs/001-event-clustering-pipeline/) | 이벤트 클러스터링 파이프라인 as-built 명세 + 유형별 병합·분리 기준([`CLUSTERING_CRITERIA.md`](specs/001-event-clustering-pipeline/CLUSTERING_CRITERIA.md)) |
-| [`specs/003-fcm-notification/`](specs/003-fcm-notification/) | FCM 푸시 알림 |
-| [`specs/004-legal-district-matching/`](specs/004-legal-district-matching/) | 법정동 코드 기반 지역 매칭 |
-| [`specs/005-translation-pipeline/`](specs/005-translation-pipeline/) | 다국어 번역 파이프라인 |
-| [`specs/006-clustering-evaluation/`](specs/006-clustering-evaluation/) | 이벤트 클러스터링 평가·검증 — 같은 사건 정답, 라벨 셋, 지표, 운영 검증. 평가 결과·읽는 법 문서 포함 |
-| [`docs/`](docs/) | PRD·TRD·API 명세·데이터 모델·테스트 케이스 |
-| [`backend/evaluation/README.md`](backend/evaluation/README.md) | 백필·평가 실행 명령어 모음 |
-| [`CLAUDE.md`](CLAUDE.md) | 저장소 작업 가이드(아키텍처 요약·팀 컨벤션·함정) |
-
----
+| [`specs/`](specs/) | 서브시스템별 명세 — 이벤트 클러스터링(001), FCM 알림(003), 법정동 매칭(004), 번역(005), 클러스터링 평가(006) |
+| [`docs/`](docs/) | PRD·TRD·API 명세·데이터 모델 |
+| [`CONTRIBUTING.md`](CONTRIBUTING.md) | 기여 가이드 |
+| [`CLAUDE.md`](CLAUDE.md) | 아키텍처 요약·팀 컨벤션·알려진 함정 |
 
 ## 라이선스
 
