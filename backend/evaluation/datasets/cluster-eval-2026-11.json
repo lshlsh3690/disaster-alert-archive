@@ -1881,7 +1881,7 @@
   },
   {
     "q": 106,
-    "label": "DIFF",
+    "label": "SAME",
     "relation": "같은 시군구",
     "gap": "2일 3시간",
     "a": {
@@ -2181,7 +2181,7 @@
   },
   {
     "q": 122,
-    "label": "SAME",
+    "label": "UNSURE",
     "relation": "같은 시군구",
     "gap": "1일 5시간",
     "a": {
@@ -3141,7 +3141,7 @@
   },
   {
     "q": 180,
-    "label": "SAME",
+    "label": "UNSURE",
     "relation": "같은 시군구",
     "gap": "3일 13시간",
     "a": {
@@ -4801,7 +4801,7 @@
   },
   {
     "q": 275,
-    "label": "SAME",
+    "label": "DIFF",
     "relation": "같은 시군구",
     "gap": "3일 0시간",
     "a": {

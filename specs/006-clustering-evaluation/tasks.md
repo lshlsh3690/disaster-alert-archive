@@ -82,8 +82,8 @@ description: "006 이벤트 클러스터링 평가·검증 작업 목록"
 - [x] T014 [US2] `{main}/domain/event/evaluation/EvaluationRunTool.java`에 `--eval.recheck=<규칙 목록>` 모드를 더한다 — 272쌍(`backend/evaluation/datasets/cluster-eval-2026-11.json`)은 쌍 단위, 5월 B-cubed(`bcubed-2026-05.labels.json`)는 알림 단위(그 알림이 든 정답 사건 전체)로 후보를 내고, 알림 id·발송 시각·유형·발신 기관·본문·현재 라벨을 출력한다(쌍 번호만 내지 않음)
 - [x] T015 [US2] `specs/006-clustering-evaluation/quickstart.md` "구현 후 검증 시나리오"의 재확인 명령을 실제 옵션·출력 경로에 맞게 고친다
 - [x] T016 [US2] 평가 사본(운영 아님)에서 `--eval.recheck=D,E,G,I`를 실행해 규칙별 후보 수를 사용자에게 보고한다(2026-11-13 추정: 다지역 89, 인천 18, 시군구가 아닌 기관 약 21)
-- [ ] T017 ⛔ [US2] **사용자가 후보를 다시 판정한다.** Claude는 판정 화면·목록 준비만 돕고 라벨을 정하지 않는다
-- [ ] T018 [US2] 사용자 판정 결과를 `backend/evaluation/datasets/cluster-eval-2026-11.json`·`bcubed-2026-05.labels.json`에 반영하고, `backend/evaluation/datasets/cluster-eval-2026-11.rubric.md` "라벨 결과" 절에 바뀐 항목·이유·전후 점수(분모 포함)를 적고, 두 셋의 기준 시점을 2026-11-13으로 기록한다(FR-006, FR-008)
+- [ ] T017 ⛔ [US2] **사용자가 후보를 다시 판정한다.** Claude는 판정 화면·목록 준비만 돕고 라벨을 정하지 않는다 — 2026-11-17 272쌍 후보(55쌍)는 판정 완료, 5월 B-cubed 후보 묶음 판정이 남음
+- [ ] T018 [US2] 사용자 판정 결과를 `backend/evaluation/datasets/cluster-eval-2026-11.json`·`bcubed-2026-05.labels.json`에 반영하고, `backend/evaluation/datasets/cluster-eval-2026-11.rubric.md` "라벨 결과" 절에 바뀐 항목·이유·전후 점수(분모 포함)를 적고, 두 셋의 기준 시점을 2026-11-13으로 기록한다(FR-006, FR-008) — 2026-11-17 272쌍 쪽 반영 완료(55쌍 중 2쌍 + 원칙 3 의심 3쌍 중 2쌍), 5월 B-cubed 묶음 재확인은 판정 화면이 없어 남음
 
 **체크포인트**: 라벨 셋이 새 기준 시점으로 맞춰졌다. 판사 일치율을 잴 수 있다.
 
@@ -97,13 +97,13 @@ description: "006 이벤트 클러스터링 평가·검증 작업 목록"
 
 ### 판사 (plan.md 3절)
 
-- [ ] T019 [US5] `{main}/domain/event/judge/JudgeVerdict.java`(`SAME`/`DIFF`/`UNSURE`/`FORMAT_FAILURE`)와 `{main}/domain/event/judge/ClusteringJudge.java` 뼈대를 만든다 — 응답 해석 메서드는 항상 `UNSURE`를, 버전별 일치율 조회는 빈 값을 돌려준다
-- [ ] T020 [US5] `{test}/domain/event/judge/ClusteringJudgeTest.java`에 핵심 동작 2~3개만 Red로 쓴다: (1) 응답이 정확히 `SAME`이면 `SAME` (2) 한 단어가 아닌 응답은 `UNSURE`가 아니라 `FORMAT_FAILURE` (3) 프롬프트에 시스템 설정값·배정(이벤트 id)이 들어가지 않는다
-- [ ] T021 [US5] 단언 실패를 확인하고 `commit-message` 스킬로 커밋한다
-- [ ] T022 ⛔ [US5] **멈춘다.** 사용자 Red 확인을 기다린다
-- [ ] T023 [US5] `{main}/domain/event/judge/ClusteringJudge.java`를 구현한다 — `CLUSTERING_CRITERIA.md` 1절(원칙 1~3, A~G·I, 적용 순서)을 옮긴 프롬프트, 두 문자 정보 + `AlertPlaceFacts` 사실 블록("규칙으로 계산한 값이며 판정이 아니다" 명시, I는 "모름"), Spring AI `ChatModel` + `OpenAiChatOptions`로 `gpt-4o`·온도 0·최대 토큰 5, 정확한 한 단어만 받기, 프롬프트 버전 문자열과 버전별 일치율 상수(분자/분모)
-- [ ] T024 [US5] `{main}/domain/event/evaluation/JudgeAgreementRunner.java`와 `EvaluationRunTool`의 `--eval.judge-agreement` 모드를 만든다 — 같은 `ClusteringJudge`로 272쌍(UNSURE 라벨 제외)을 판정해 교차표, 같은 사건/다른 사건 일치율(분자/분모), 형식 실패 수, 토큰 수를 리포트로 낸다
-- [ ] T025 ⛔ [US5] **유료 — 실행 전 승인.** 사용자에게 비용(약 $0.32)을 알리고 명시적 "진행해"를 받은 뒤에만 T024 모드를 실행한다. 결과를 보고하고, 사용자가 정한 대로 `ClusteringJudge`의 버전 일치율 상수를 갱신한다
+- [x] T019 [US5] `{main}/domain/event/judge/JudgeVerdict.java`(`SAME`/`DIFF`/`UNSURE`/`FORMAT_FAILURE`)와 `{main}/domain/event/judge/ClusteringJudge.java` 뼈대를 만든다 — 응답 해석 메서드는 항상 `UNSURE`를, 버전별 일치율 조회는 빈 값을 돌려준다
+- [x] T020 [US5] `{test}/domain/event/judge/ClusteringJudgeTest.java`에 핵심 동작 2~3개만 Red로 쓴다: (1) 응답이 정확히 `SAME`이면 `SAME` (2) 한 단어가 아닌 응답은 `UNSURE`가 아니라 `FORMAT_FAILURE` (3) 프롬프트에 시스템 설정값·배정(이벤트 id)이 들어가지 않는다
+- [x] T021 [US5] 단언 실패를 확인하고 `commit-message` 스킬로 커밋한다
+- [x] T022 ⛔ [US5] **멈춘다.** 사용자 Red 확인을 기다린다
+- [x] T023 [US5] `{main}/domain/event/judge/ClusteringJudge.java`를 구현한다 — `CLUSTERING_CRITERIA.md` 1절(원칙 1~3, A~G·I, 적용 순서)을 옮긴 프롬프트, 두 문자 정보 + `AlertPlaceFacts` 사실 블록("규칙으로 계산한 값이며 판정이 아니다" 명시, I는 "모름"), Spring AI `ChatModel` + `OpenAiChatOptions`로 `gpt-4o`·온도 0·최대 토큰 5, 정확한 한 단어만 받기, 프롬프트 버전 문자열과 버전별 일치율 상수(분자/분모)
+- [x] T024 [US5] `{main}/domain/event/evaluation/JudgeAgreementRunner.java`와 `EvaluationRunTool`의 `--eval.judge-agreement` 모드를 만든다 — 같은 `ClusteringJudge`로 272쌍(UNSURE 라벨 제외)을 판정해 교차표, 같은 사건/다른 사건 일치율(분자/분모), 형식 실패 수, 토큰 수를 리포트로 낸다
+- [x] T025 ⛔ [US5] **유료 — 실행 전 승인.** 사용자에게 비용(약 $0.32)을 알리고 명시적 "진행해"를 받은 뒤에만 T024 모드를 실행한다. 결과를 보고하고, 사용자가 정한 대로 `ClusteringJudge`의 버전 일치율 상수를 갱신한다
 
 ### 일일 채점 (plan.md 4·5절)
 
