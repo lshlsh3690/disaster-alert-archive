@@ -241,7 +241,7 @@ public class ClusteringJudge {
      * 판사가 사람보다 잘게 나누는 쪽(사람 같은 사건·판사 다른 사건이 대부분)이라 일일 점수의 과병합은 실제보다 많게 나올 수 있다.
      * 온도 0이어도 답이 매번 같지는 않아 다시 재면 한두 쌍은 달라질 수 있다.
      */
-    static Optional<Agreement> agreementOf(String promptVersion) {
+    public static Optional<Agreement> agreementOf(String promptVersion) {
         return switch (promptVersion) {
             case "v1" -> Optional.of(new Agreement(124, 142, 77, 80));
             default -> Optional.empty();

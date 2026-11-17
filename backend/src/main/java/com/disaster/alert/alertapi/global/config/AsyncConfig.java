@@ -39,4 +39,17 @@ public class AsyncConfig {
         executor.initialize();
         return executor;
     }
+
+    // 클러스터링 일일 채점 전용. 하루치 판정이 순차 LLM 호출 수백 번이라 오래 걸려, 가벼운 일일 검사 풀과 나눠
+    // 서로 밀리지 않게 한다. 하루 한 번이라 스레드 1개면 충분하다.
+    @Bean(name = "clusteringScoreExecutor")
+    public Executor clusteringScoreExecutor() {
+        ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
+        executor.setCorePoolSize(1);
+        executor.setMaxPoolSize(1);
+        executor.setQueueCapacity(1);
+        executor.setThreadNamePrefix("clustering-score-");
+        executor.initialize();
+        return executor;
+    }
 }

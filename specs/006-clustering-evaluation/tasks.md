@@ -107,13 +107,13 @@ description: "006 이벤트 클러스터링 평가·검증 작업 목록"
 
 ### 일일 채점 (plan.md 4·5절)
 
-- [ ] T026 [US5] `backend/src/main/resources/db/migration/V{작성 시점 다음 번호, 현재 V139}__create_clustering_daily_score.sql`로 `clustering_daily_score`(score_date PK 등 plan.md 5절 컬럼)와 `clustering_daily_score_pair`(유일 제약 `score_date, alert_a, alert_b`, `alert_a < alert_b` 체크)를 만든다
-- [ ] T027 [P] [US5] `{main}/domain/event/model/ClusteringDailyScore.java`·`ClusteringDailyScorePair.java` 엔티티와 `{main}/domain/event/repository/ClusteringDailyScoreRepository.java`를 만든다(상태 변경은 엔티티 메서드로만)
-- [ ] T028 [US5] `{main}/domain/event/service/ClusteringDailyScoreService.java`를 만든다 — 그날 사건 알림 X마다 앞선 168시간 안의 Y 중 ①같은 이벤트 ②같은 유형·같은/이웃 시군구·다른 이벤트를 모으고, 판사 판정을 라벨로 `PairCounter.count()`에 넣어 점수를 얻고, UNSURE·형식 실패는 분모에서 빼 따로 세고, 쌍별 판정·당시 이벤트 id·불일치 종류(`OVER_MERGED`/`MISSED`)를 저장한다. 판사 버전에 일치율 상수가 없으면 채점하지 않고 warn. 날짜별 요약 한 줄은 info, 채점 실패는 error
-- [ ] T029 [US5] `{main}/domain/event/scheduler/ClusteringDailyScoreScheduler.java`를 `ClusteringDailyCheckScheduler`와 같은 모양으로 만든다 — 매일 01:00 KST, `{main}/global/config/AsyncConfig.java`의 별도 실행기, 최근 7일 중 기록 없는 날만 채점하되 채점 시작일(도입일) 설정 이전은 찾지 않는다(R7). 시작일 설정 키를 추가하면 `application.yml`과 루트 `.env.example`을 같이 갱신한다
-- [ ] T030 [US5] `{test}/domain/event/service/ClusteringDailyScoreServiceTest.java`에 `@IntegrationTest`로 판사를 목킹한 채 하루치 채점이 두 테이블에 저장되는지 확인한다(DB 필요 — 로컬 docker compose Postgres)
-- [ ] T031 [US5] `code-reviewer`에 `git diff`와 변경 줄 범위를 넣어 검토받고 결과를 사용자에게 보고한다(로직·마이그레이션 변경, 100줄 이상)
-- [ ] T032 ⛔ [US5] **유료 — 운영 도입 승인(FR-019).** 매일 약 $0.01~0.05임을 알리고 승인을 받은 뒤 PR(develop 대상, `pr-message` 스킬) → 머지 → 배포한다. 푸시와 CodeRabbit 요청은 작업 단위 끝에 한 번만
+- [x] T026 [US5] `backend/src/main/resources/db/migration/V{작성 시점 다음 번호, 현재 V139}__create_clustering_daily_score.sql`로 `clustering_daily_score`(score_date PK 등 plan.md 5절 컬럼)와 `clustering_daily_score_pair`(유일 제약 `score_date, alert_a, alert_b`, `alert_a < alert_b` 체크)를 만든다
+- [x] T027 [P] [US5] `{main}/domain/event/model/ClusteringDailyScore.java`·`ClusteringDailyScorePair.java` 엔티티와 `{main}/domain/event/repository/ClusteringDailyScoreRepository.java`를 만든다(상태 변경은 엔티티 메서드로만)
+- [x] T028 [US5] `{main}/domain/event/service/ClusteringDailyScoreService.java`를 만든다 — 그날 사건 알림 X마다 앞선 168시간 안의 Y 중 ①같은 이벤트 ②같은 유형·같은/이웃 시군구·다른 이벤트를 모으고, 판사 판정을 라벨로 `PairCounter.count()`에 넣어 점수를 얻고, UNSURE·형식 실패는 분모에서 빼 따로 세고, 쌍별 판정·당시 이벤트 id·불일치 종류(`OVER_MERGED`/`MISSED`)를 저장한다. 판사 버전에 일치율 상수가 없으면 채점하지 않고 warn. 날짜별 요약 한 줄은 info, 채점 실패는 error
+- [x] T029 [US5] `{main}/domain/event/scheduler/ClusteringDailyScoreScheduler.java`를 `ClusteringDailyCheckScheduler`와 같은 모양으로 만든다 — 매일 01:00 KST, `{main}/global/config/AsyncConfig.java`의 별도 실행기, 최근 7일 중 기록 없는 날만 채점하되 채점 시작일(도입일) 설정 이전은 찾지 않는다(R7). 시작일 설정 키를 추가하면 `application.yml`과 루트 `.env.example`을 같이 갱신한다
+- [x] T030 [US5] `{test}/domain/event/service/ClusteringDailyScoreServiceTest.java`에 `@IntegrationTest`로 판사를 목킹한 채 하루치 채점이 두 테이블에 저장되는지 확인한다(DB 필요 — 로컬 docker compose Postgres)
+- [x] T031 [US5] `code-reviewer`에 `git diff`와 변경 줄 범위를 넣어 검토받고 결과를 사용자에게 보고한다(로직·마이그레이션 변경, 100줄 이상)
+- [ ] T032 ⛔ [US5] **유료 — 운영 도입 승인(FR-019).** 비용(조용한 날 약 $0.06, 큰 사건 날 수십 달러 — 2025-03-25 산불 기준 약 $46, 상한 없음. plan.md 기술 컨텍스트 "규모/범위")을 알리고 승인을 받은 뒤 PR(develop 대상, `pr-message` 스킬) → 머지 → 배포한다. 푸시와 CodeRabbit 요청은 작업 단위 끝에 한 번만
 
 **체크포인트**: 운영에서 매일 01:00 점수가 쌓이고, 불일치 쌍을 quickstart의 SQL 한 번으로 본다.
 
