@@ -71,17 +71,17 @@ description: "006 이벤트 클러스터링 평가·검증 작업 목록"
 
 ### 사용자 스토리 2 테스트 (Red) ⚠️
 
-- [ ] T009 [US2] `{main}/domain/event/evaluation/RecheckCandidateFinder.java`에 뼈대를 만든다 — 입력: 규칙 목록 + 쌍(또는 알림)별 `AlertPlaceFacts` 결과, 출력: 규칙별 걸린 항목. 빈 목록을 돌려준다
-- [ ] T010 [US2] `{test}/domain/event/evaluation/RecheckCandidateFinderTest.java`에 핵심 동작 2~3개만 Red로 쓴다: (1) 한쪽 수신 시군구가 2개 이상인 쌍은 D 후보 (2) 한쪽 발신 기관이 시군구가 아니면 I 후보 (3) 조건에 하나도 안 걸리는 쌍은 어느 목록에도 없다
-- [ ] T011 [US2] 단언 실패를 확인하고 `commit-message` 스킬로 커밋한다
-- [ ] T012 ⛔ [US2] **멈춘다.** 사용자 Red 확인을 기다린다
+- [x] T009 [US2] `{main}/domain/event/evaluation/RecheckCandidateFinder.java`에 뼈대를 만든다 — 입력: 규칙 목록 + 쌍(또는 알림)별 `AlertPlaceFacts` 결과, 출력: 규칙별 걸린 항목. 빈 목록을 돌려준다
+- [x] T010 [US2] `{test}/domain/event/evaluation/RecheckCandidateFinderTest.java`에 핵심 동작 2~3개만 Red로 쓴다: (1) 한쪽 수신 시군구가 2개 이상인 쌍은 D 후보 (2) 한쪽 발신 기관이 시군구가 아니면 I 후보 (3) 조건에 하나도 안 걸리는 쌍은 어느 목록에도 없다
+- [x] T011 [US2] 단언 실패를 확인하고 `commit-message` 스킬로 커밋한다
+- [x] T012 ⛔ [US2] **멈춘다.** 사용자 Red 확인을 기다린다
 
 ### 사용자 스토리 2 구현 (Green)
 
-- [ ] T013 [US2] `{main}/domain/event/evaluation/RecheckCandidateFinder.java`에 plan.md 2절 규칙-조건 표(D: 수신 시군구 2개 이상, E: 인천 옛 구청, G: 같은 시설 후보, I: 시군구가 아닌 기관)를 구현한다
-- [ ] T014 [US2] `{main}/domain/event/evaluation/EvaluationRunTool.java`에 `--eval.recheck=<규칙 목록>` 모드를 더한다 — 272쌍(`backend/evaluation/datasets/cluster-eval-2026-11.json`)은 쌍 단위, 5월 B-cubed(`bcubed-2026-05.labels.json`)는 알림 단위(그 알림이 든 정답 사건 전체)로 후보를 내고, 알림 id·발송 시각·유형·발신 기관·본문·현재 라벨을 출력한다(쌍 번호만 내지 않음)
-- [ ] T015 [US2] `specs/006-clustering-evaluation/quickstart.md` "구현 후 검증 시나리오"의 재확인 명령을 실제 옵션·출력 경로에 맞게 고친다
-- [ ] T016 [US2] 평가 사본(운영 아님)에서 `--eval.recheck=D,E,G,I`를 실행해 규칙별 후보 수를 사용자에게 보고한다(2026-11-13 추정: 다지역 89, 인천 18, 시군구가 아닌 기관 약 21)
+- [x] T013 [US2] `{main}/domain/event/evaluation/RecheckCandidateFinder.java`에 plan.md 2절 규칙-조건 표(D: 수신 시군구 2개 이상, E: 인천 옛 구청, G: 같은 시설 후보, I: 시군구가 아닌 기관)를 구현한다
+- [x] T014 [US2] `{main}/domain/event/evaluation/EvaluationRunTool.java`에 `--eval.recheck=<규칙 목록>` 모드를 더한다 — 272쌍(`backend/evaluation/datasets/cluster-eval-2026-11.json`)은 쌍 단위, 5월 B-cubed(`bcubed-2026-05.labels.json`)는 알림 단위(그 알림이 든 정답 사건 전체)로 후보를 내고, 알림 id·발송 시각·유형·발신 기관·본문·현재 라벨을 출력한다(쌍 번호만 내지 않음)
+- [x] T015 [US2] `specs/006-clustering-evaluation/quickstart.md` "구현 후 검증 시나리오"의 재확인 명령을 실제 옵션·출력 경로에 맞게 고친다
+- [x] T016 [US2] 평가 사본(운영 아님)에서 `--eval.recheck=D,E,G,I`를 실행해 규칙별 후보 수를 사용자에게 보고한다(2026-11-13 추정: 다지역 89, 인천 18, 시군구가 아닌 기관 약 21)
 - [ ] T017 ⛔ [US2] **사용자가 후보를 다시 판정한다.** Claude는 판정 화면·목록 준비만 돕고 라벨을 정하지 않는다
 - [ ] T018 [US2] 사용자 판정 결과를 `backend/evaluation/datasets/cluster-eval-2026-11.json`·`bcubed-2026-05.labels.json`에 반영하고, `backend/evaluation/datasets/cluster-eval-2026-11.rubric.md` "라벨 결과" 절에 바뀐 항목·이유·전후 점수(분모 포함)를 적고, 두 셋의 기준 시점을 2026-11-13으로 기록한다(FR-006, FR-008)
 

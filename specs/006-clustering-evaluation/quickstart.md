@@ -148,14 +148,15 @@ GROUP BY a.event_id ORDER BY dist LIMIT 3;
 
 ## 구현 후 검증 시나리오 ([plan.md](plan.md), 아직 구현 전)
 
-아래 모드와 스케줄러는 2026-11-13 계획 단계이며 아직 없다. 구현하면 이 절을 실제 옵션·출력에 맞게 고치고 "실행" 절로 옮긴다.
+재확인 후보 추출은 2026-11-17 구현됐다. 판사 일치율 측정과 일일 채점은 2026-11-13 계획 단계이며 아직 없다 — 구현하면 실제 옵션·출력에 맞게 고친다.
 
-**재확인 후보 추출** (`--eval.recheck`, 무료)
+**재확인 후보 추출** (`--eval.recheck`, 무료 — 2026-11-17 구현)
 ```
 ./gradlew bootRun --args='--spring.profiles.active=eval --spring.datasource.url=jdbc:postgresql://localhost:5432/disaster_alert_eval_v5 --server.port=0 --eval.labels=evaluation/datasets/cluster-eval-2026-11.json --eval.bcubed=evaluation/datasets/bcubed-2026-05.labels.json --eval.recheck=D,E,G,I --eval.report=<후보 목록 경로>'
 ```
-- 기대: 규칙별 후보 목록. 272쌍은 쌍마다, 5월 B-cubed는 알림마다 알림 id·발송 시각·유형·발신 기관·본문·현재 라벨이 나온다. 규칙과 조건의 대응은 plan.md 설계 2절.
-- 확인: 인천 옛 구청 문자(E)와 다지역 발송 문자(D)가 빠짐없이 잡히는지, 2026-11-13 추정치(다지역 89쪽, 인천 18쪽, 시군구가 아닌 기관 약 21쪽)와 크게 어긋나지 않는지.
+- `--eval.recheck` 를 주면 채점하지 않고 후보 목록만 낸다. `--eval.bcubed` 는 선택(주면 B-cubed 절이 붙음). 수신 시군구 코드는 라벨 JSON 에 없어 사본 DB 의 `disaster_alert_region` 에서 읽는다.
+- 출력: 규칙별 건수 요약 → 규칙별 후보. 272쌍은 쌍마다 두 알림의 id·발송 시각·유형·발신 기관(종류)·수신 시군구 수·본문과 현재 라벨(G 는 같은 시설 후보 이름도). B-cubed 는 걸린 알림이 든 묶음(정답 사건 / 혼자 알림 / 분류 불가) 전체를 알림 줄로 내고 걸린 알림에 **걸림** 표시, G 는 걸린 쌍(`a(묶음) ↔ b(묶음) · 같은 시설 후보`)도 낸다. B-cubed 의 D·E·I 는 알림 하나로, G 는 같은 유형 알림끼리의 쌍으로 판정하며, 분류 불가 알림도 판정한다(새 기준으로는 나뉠 수 있어서).
+- 2026-11-17 첫 실행(`backend/evaluation/reports/recheck-2026-11-17.md`): 272쌍 중 D 31 · E 6 · G 15 · I 24쌍(겹침 빼면 55쌍), B-cubed 알림 250건(분류 불가 20 포함) 중 D 36 · E 4 · G 28 · I 53건(묶음 18 · 4 · 17 · 24개). G 에는 "인천" 같은 도시 이름 후보가 섞인다(받아들인 한계).
 
 **판사 일치율 측정** (`--eval.judge-agreement`, **유료 약 $0.32 — 실행 전 승인**)
 - 대상: 재확인을 마친 272쌍(UNSURE 제외).

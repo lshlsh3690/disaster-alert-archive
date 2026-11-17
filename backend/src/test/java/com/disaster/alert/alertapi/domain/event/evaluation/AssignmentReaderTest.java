@@ -68,6 +68,21 @@ class AssignmentReaderTest {
                 .hasMessageContaining("9000000999");
     }
 
+    // 재확인 후보 추출은 라벨 JSON 에 없는 수신 시군구 코드를 DB 에서 읽어 판정 사실 계산기에 넣는다.
+    @Test
+    void 알림_한_건의_값과_수신_시군구_코드를_읽는다() {
+        // 같은 시군구(99001)의 읍면동 두 곳으로 보낸 문자 — 시군구는 하나로 세야 D(다지역 발송)를 잘못 걸지 않는다
+        link(A1, "9900110200");
+
+        AssignmentReader.AlertSnapshot a1 = reader.findAlert(A1);
+
+        assertThat(a1.type()).isEqualTo("산불");
+        assertThat(a1.message()).isEqualTo("테스트 본문");
+        assertThat(a1.sentAt()).isEqualTo(java.time.LocalDateTime.of(2026, 10, 1, 10, 0));
+        assertThat(a1.sigunguCodes()).containsExactly("99001");
+        assertThatThrownBy(() -> reader.findAlert(9_000_000_999L)).isInstanceOf(IllegalStateException.class);
+    }
+
     // 쌍의 사실 4개(유형, 같은 시군구, 간격, 본문 거리)를 DB 값으로 계산한다. 거리는 pgvector 의 <=> 로 DB 에서 구한다.
     // Red 단계: 뼈대는 빈 유형, sameSigungu=false, 간격 0, 거리 null 을 돌려줘 모든 기대에서 실패한다.
     @Test
