@@ -1,0 +1,635 @@
+{
+ "basis": "CLUSTERING_CRITERIA.md 2026-11-13",
+ "source": "backend/evaluation/reports/recheck-2026-11-17.md",
+ "exportedAt": "2026-11-17T04:49:31.414Z",
+ "judged": 55,
+ "total": 55,
+ "items": [
+  {
+   "q": 3,
+   "a": 21402,
+   "b": 21325,
+   "rules": [
+    "D",
+    "E"
+   ],
+   "oldLabel": "DIFF",
+   "newLabel": "DIFF",
+   "note": "수신 지역이 다르고 둘다 오늘 화재 발생인데 4일 차이임. 그리고 그 두개의 사건이 이어져있는지 단서가 보이지 않음."
+  },
+  {
+   "q": 23,
+   "a": 12569,
+   "b": 12777,
+   "rules": [
+    "D",
+    "I"
+   ],
+   "oldLabel": "SAME",
+   "newLabel": "SAME",
+   "note": "일단 하루차이로 교통사고로 재난유형과 시간이 비슷하고 지역도 비슷하지만, 1호선이라는 단서가 있기 때문에 하나의 사건으로 묶어도 될듯 "
+  },
+  {
+   "q": 48,
+   "a": 26778,
+   "b": 25290,
+   "rules": [
+    "D",
+    "I"
+   ],
+   "oldLabel": "UNSURE",
+   "newLabel": "UNSURE",
+   "note": "경상북도 의성군으로 지역이 일치하고 의성지역 산불이라서 같은 사건 단서도 있지만 한쪽은 산불 대피명령이고, 다른 쪽은 운행 재개쪽이라 잘 모르겠음 같은 사건으로 봐도 될거 같기도 하고 다른 사건인거 같기도 함."
+  },
+  {
+   "q": 54,
+   "a": 1886,
+   "b": 1887,
+   "rules": [
+    "D"
+   ],
+   "oldLabel": "SAME",
+   "newLabel": "SAME",
+   "note": "둘다 오늘 목내동 공장 화재 라는 키워드, 안산시라는 지역, 28일이라는 시간 때문에 같은 사건"
+  },
+  {
+   "q": 62,
+   "a": 21036,
+   "b": 18202,
+   "rules": [
+    "D",
+    "I"
+   ],
+   "oldLabel": "SAME",
+   "newLabel": "SAME",
+   "note": "둘다 같은 날짜 같은 범일동 55 보급창 화재 발생이라는 단서로 같은 사건"
+  },
+  {
+   "q": 84,
+   "a": 10606,
+   "b": 12801,
+   "rules": [
+    "D",
+    "E"
+   ],
+   "oldLabel": "SAME",
+   "newLabel": "SAME",
+   "note": ""
+  },
+  {
+   "q": 87,
+   "a": 7677,
+   "b": 8247,
+   "rules": [
+    "D",
+    "I"
+   ],
+   "oldLabel": "DIFF",
+   "newLabel": "DIFF",
+   "note": "실종자의 신원이 다름"
+  },
+  {
+   "q": 91,
+   "a": 19698,
+   "b": 18020,
+   "rules": [
+    "D",
+    "I"
+   ],
+   "oldLabel": "SAME",
+   "newLabel": "SAME",
+   "note": "아마셀 코리아 라는 단서가 있으므로 같은 사건"
+  },
+  {
+   "q": 107,
+   "a": 31881,
+   "b": 32704,
+   "rules": [
+    "D"
+   ],
+   "oldLabel": "SAME",
+   "newLabel": "SAME",
+   "note": ""
+  },
+  {
+   "q": 115,
+   "a": 46487,
+   "b": 49565,
+   "rules": [
+    "D"
+   ],
+   "oldLabel": "DIFF",
+   "newLabel": "DIFF",
+   "note": ""
+  },
+  {
+   "q": 123,
+   "a": 1853,
+   "b": 1677,
+   "rules": [
+    "D",
+    "I"
+   ],
+   "oldLabel": "DIFF",
+   "newLabel": "DIFF",
+   "note": "신원정보가 다름"
+  },
+  {
+   "q": 125,
+   "a": 24869,
+   "b": 23092,
+   "rules": [
+    "D"
+   ],
+   "oldLabel": "DIFF",
+   "newLabel": "DIFF",
+   "note": ""
+  },
+  {
+   "q": 146,
+   "a": 14229,
+   "b": 14231,
+   "rules": [
+    "D",
+    "E",
+    "G"
+   ],
+   "oldLabel": "SAME",
+   "newLabel": "SAME",
+   "note": ""
+  },
+  {
+   "q": 148,
+   "a": 49393,
+   "b": 50551,
+   "rules": [
+    "D",
+    "I"
+   ],
+   "oldLabel": "SAME",
+   "newLabel": "SAME",
+   "note": ""
+  },
+  {
+   "q": 155,
+   "a": 21426,
+   "b": 21721,
+   "rules": [
+    "D"
+   ],
+   "oldLabel": "DIFF",
+   "newLabel": "DIFF",
+   "note": ""
+  },
+  {
+   "q": 180,
+   "a": 26032,
+   "b": 25214,
+   "rules": [
+    "D",
+    "I"
+   ],
+   "oldLabel": "SAME",
+   "newLabel": "UNSURE",
+   "note": "같은 산불인지에 대한 단서가 없음 시간도 3일 13시간이라 같은 사건으로 보기에 애매함 그러나 정황상 2025년 3월 말에 경상북도 산불이 대규모로 일어났기 때문에 같은 사건일 확률이 있지만 이건 이 문자로만 보고 판단을 못함."
+  },
+  {
+   "q": 188,
+   "a": 17054,
+   "b": 21447,
+   "rules": [
+    "D",
+    "E"
+   ],
+   "oldLabel": "SAME",
+   "newLabel": "SAME",
+   "note": ""
+  },
+  {
+   "q": 192,
+   "a": 45175,
+   "b": 45430,
+   "rules": [
+    "D"
+   ],
+   "oldLabel": "SAME",
+   "newLabel": "SAME",
+   "note": ""
+  },
+  {
+   "q": 205,
+   "a": 23372,
+   "b": 21514,
+   "rules": [
+    "D"
+   ],
+   "oldLabel": "SAME",
+   "newLabel": "SAME",
+   "note": ""
+  },
+  {
+   "q": 206,
+   "a": 50106,
+   "b": 49067,
+   "rules": [
+    "D"
+   ],
+   "oldLabel": "DIFF",
+   "newLabel": "DIFF",
+   "note": ""
+  },
+  {
+   "q": 219,
+   "a": 42792,
+   "b": 35872,
+   "rules": [
+    "D"
+   ],
+   "oldLabel": "DIFF",
+   "newLabel": "DIFF",
+   "note": ""
+  },
+  {
+   "q": 221,
+   "a": 16777,
+   "b": 14259,
+   "rules": [
+    "D"
+   ],
+   "oldLabel": "SAME",
+   "newLabel": "SAME",
+   "note": ""
+  },
+  {
+   "q": 226,
+   "a": 18816,
+   "b": 18572,
+   "rules": [
+    "D",
+    "I"
+   ],
+   "oldLabel": "DIFF",
+   "newLabel": "DIFF",
+   "note": ""
+  },
+  {
+   "q": 229,
+   "a": 38272,
+   "b": 36241,
+   "rules": [
+    "D"
+   ],
+   "oldLabel": "DIFF",
+   "newLabel": "DIFF",
+   "note": ""
+  },
+  {
+   "q": 231,
+   "a": 45403,
+   "b": 45269,
+   "rules": [
+    "D",
+    "I"
+   ],
+   "oldLabel": "SAME",
+   "newLabel": "SAME",
+   "note": ""
+  },
+  {
+   "q": 234,
+   "a": 79055,
+   "b": 83506,
+   "rules": [
+    "D"
+   ],
+   "oldLabel": "DIFF",
+   "newLabel": "DIFF",
+   "note": ""
+  },
+  {
+   "q": 236,
+   "a": 20168,
+   "b": 22425,
+   "rules": [
+    "D",
+    "G"
+   ],
+   "oldLabel": "SAME",
+   "newLabel": "SAME",
+   "note": ""
+  },
+  {
+   "q": 240,
+   "a": 11212,
+   "b": 11426,
+   "rules": [
+    "D"
+   ],
+   "oldLabel": "DIFF",
+   "newLabel": "DIFF",
+   "note": ""
+  },
+  {
+   "q": 262,
+   "a": 30938,
+   "b": 30997,
+   "rules": [
+    "D",
+    "E",
+    "G"
+   ],
+   "oldLabel": "SAME",
+   "newLabel": "SAME",
+   "note": ""
+  },
+  {
+   "q": 267,
+   "a": 19549,
+   "b": 20869,
+   "rules": [
+    "D",
+    "I"
+   ],
+   "oldLabel": "DIFF",
+   "newLabel": "DIFF",
+   "note": ""
+  },
+  {
+   "q": 288,
+   "a": 23940,
+   "b": 26781,
+   "rules": [
+    "D"
+   ],
+   "oldLabel": "DIFF",
+   "newLabel": "DIFF",
+   "note": ""
+  },
+  {
+   "q": 284,
+   "a": 34512,
+   "b": 37351,
+   "rules": [
+    "E"
+   ],
+   "oldLabel": "SAME",
+   "newLabel": "SAME",
+   "note": ""
+  },
+  {
+   "q": 19,
+   "a": 6783,
+   "b": 6084,
+   "rules": [
+    "G"
+   ],
+   "oldLabel": "SAME",
+   "newLabel": "SAME",
+   "note": ""
+  },
+  {
+   "q": 20,
+   "a": 49579,
+   "b": 47643,
+   "rules": [
+    "G"
+   ],
+   "oldLabel": "SAME",
+   "newLabel": "SAME",
+   "note": ""
+  },
+  {
+   "q": 21,
+   "a": 46691,
+   "b": 49580,
+   "rules": [
+    "G"
+   ],
+   "oldLabel": "SAME",
+   "newLabel": "SAME",
+   "note": ""
+  },
+  {
+   "q": 106,
+   "a": 69028,
+   "b": 71011,
+   "rules": [
+    "G"
+   ],
+   "oldLabel": "DIFF",
+   "newLabel": "SAME",
+   "note": ""
+  },
+  {
+   "q": 144,
+   "a": 3903,
+   "b": 523,
+   "rules": [
+    "G"
+   ],
+   "oldLabel": "SAME",
+   "newLabel": "SAME",
+   "note": ""
+  },
+  {
+   "q": 145,
+   "a": 24927,
+   "b": 24930,
+   "rules": [
+    "G"
+   ],
+   "oldLabel": "SAME",
+   "newLabel": "SAME",
+   "note": ""
+  },
+  {
+   "q": 157,
+   "a": 36237,
+   "b": 40145,
+   "rules": [
+    "G"
+   ],
+   "oldLabel": "SAME",
+   "newLabel": "SAME",
+   "note": ""
+  },
+  {
+   "q": 171,
+   "a": 5638,
+   "b": 7760,
+   "rules": [
+    "G"
+   ],
+   "oldLabel": "SAME",
+   "newLabel": "SAME",
+   "note": ""
+  },
+  {
+   "q": 178,
+   "a": 47985,
+   "b": 49647,
+   "rules": [
+    "G"
+   ],
+   "oldLabel": "SAME",
+   "newLabel": "SAME",
+   "note": ""
+  },
+  {
+   "q": 194,
+   "a": 94065,
+   "b": 95133,
+   "rules": [
+    "G",
+    "I"
+   ],
+   "oldLabel": "SAME",
+   "newLabel": "SAME",
+   "note": ""
+  },
+  {
+   "q": 204,
+   "a": 34009,
+   "b": 35856,
+   "rules": [
+    "G",
+    "I"
+   ],
+   "oldLabel": "SAME",
+   "newLabel": "SAME",
+   "note": ""
+  },
+  {
+   "q": 305,
+   "a": 5235,
+   "b": 7797,
+   "rules": [
+    "G"
+   ],
+   "oldLabel": "SAME",
+   "newLabel": "SAME",
+   "note": ""
+  },
+  {
+   "q": 6,
+   "a": 20000,
+   "b": 19361,
+   "rules": [
+    "I"
+   ],
+   "oldLabel": "DIFF",
+   "newLabel": "DIFF",
+   "note": ""
+  },
+  {
+   "q": 22,
+   "a": 22770,
+   "b": 24914,
+   "rules": [
+    "I"
+   ],
+   "oldLabel": "SAME",
+   "newLabel": "SAME",
+   "note": ""
+  },
+  {
+   "q": 50,
+   "a": 49382,
+   "b": 51018,
+   "rules": [
+    "I"
+   ],
+   "oldLabel": "DIFF",
+   "newLabel": "DIFF",
+   "note": ""
+  },
+  {
+   "q": 138,
+   "a": 1732,
+   "b": 2265,
+   "rules": [
+    "I"
+   ],
+   "oldLabel": "DIFF",
+   "newLabel": "DIFF",
+   "note": ""
+  },
+  {
+   "q": 143,
+   "a": 29776,
+   "b": 32396,
+   "rules": [
+    "I"
+   ],
+   "oldLabel": "SAME",
+   "newLabel": "SAME",
+   "note": ""
+  },
+  {
+   "q": 208,
+   "a": 29918,
+   "b": 30002,
+   "rules": [
+    "I"
+   ],
+   "oldLabel": "SAME",
+   "newLabel": "SAME",
+   "note": ""
+  },
+  {
+   "q": 216,
+   "a": 30088,
+   "b": 30929,
+   "rules": [
+    "I"
+   ],
+   "oldLabel": "SAME",
+   "newLabel": "SAME",
+   "note": ""
+  },
+  {
+   "q": 227,
+   "a": 1734,
+   "b": 1982,
+   "rules": [
+    "I"
+   ],
+   "oldLabel": "DIFF",
+   "newLabel": "DIFF",
+   "note": ""
+  },
+  {
+   "q": 238,
+   "a": 7266,
+   "b": 301,
+   "rules": [
+    "I"
+   ],
+   "oldLabel": "DIFF",
+   "newLabel": "DIFF",
+   "note": ""
+  },
+  {
+   "q": 254,
+   "a": 22244,
+   "b": 23292,
+   "rules": [
+    "I"
+   ],
+   "oldLabel": "SAME",
+   "newLabel": "SAME",
+   "note": ""
+  },
+  {
+   "q": 278,
+   "a": 31476,
+   "b": 32506,
+   "rules": [
+    "I"
+   ],
+   "oldLabel": "SAME",
+   "newLabel": "SAME",
+   "note": ""
+  }
+ ]
+}
