@@ -3,6 +3,7 @@ package com.disaster.alert.alertapi.domain.event.evaluation;
 import com.disaster.alert.alertapi.domain.event.evaluation.AssignmentReader.PairFacts;
 import com.disaster.alert.alertapi.domain.event.evaluation.LabelJson.LabeledPair;
 import com.disaster.alert.alertapi.domain.event.evaluation.PairCounter.Observation;
+import com.disaster.alert.alertapi.domain.event.evaluation.RecheckCandidateFinder.Rule;
 import com.disaster.alert.alertapi.domain.event.evaluation.ReportFormatter.Row;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -24,13 +25,15 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalDouble;
+import java.util.Set;
 
 /**
  * 클러스터링 평가 실행 진입점. 사용법은 specs/006-clustering-evaluation/quickstart.md "실행" 절.
  *
  * <p>{@code --eval.labels}(필수) 라벨 JSON 을 읽어 DB 의 이벤트 배정과 비교하고,
  * {@code --eval.report}(선택) 경로에 마크다운 리포트를 쓴다. {@code --eval.bcubed}(선택)에 B-cubed 정답 JSON 을
- * 주면 알림 단위 점수 절이 리포트 맨 끝에 붙는다.
+ * 주면 알림 단위 점수 절이 리포트 맨 끝에 붙는다. {@code --eval.recheck=D,E,G,I}(선택)를 주면 채점 대신
+ * 재확인 후보 목록({@link RecheckRunner})만 낸다.
  */
 @Slf4j
 @Component
@@ -39,6 +42,7 @@ import java.util.OptionalDouble;
 public class EvaluationRunTool implements ApplicationRunner {
 
     private final AssignmentReader assignmentReader;
+    private final RecheckRunner recheckRunner;
     private final ConfigurableApplicationContext context;
 
     @Override
@@ -53,6 +57,15 @@ public class EvaluationRunTool implements ApplicationRunner {
         List<LabeledPair> pairs = LabelJson.parse(Files.readString(labels, StandardCharsets.UTF_8));
         //    B-cubed 정답(--eval.bcubed)도 같은 이유로 여기서 읽는다. 없으면 null(알림 단위 절을 쓰지 않음)
         BCubedGold bcubedGold = readBCubedGold(args);
+
+        //    --eval.recheck 가 있으면 채점 대신 재확인 후보 목록만 내고 끝낸다(무료, 판정 없음)
+        if (args.containsOption("eval.recheck")) {
+            Set<Rule> rules = RecheckRunner.parseRules(
+                    singleValue(args, "eval.recheck", "--eval.recheck=<규칙 목록, 예: D,E,G,I> 값이 비어 있습니다"));
+            writeReport(recheckRunner.run(datasetName(labels), rules, pairs, bcubedGold), reportPath);
+            System.exit(SpringApplication.exit(context, () -> 0));
+            return;
+        }
 
         // 2) 쌍마다 두 알림의 이벤트 배정을 DB 에서 읽어 관측으로 만들고 센다
         //    pairs → 관측: [Observation(25154, 28106, SAME, assigned=true, sameEvent=false), ...]
@@ -74,13 +87,18 @@ public class EvaluationRunTool implements ApplicationRunner {
         if (bcubedGold != null) {
             report += formatBCubedSection(scoreBCubed(bcubedGold));
         }
+        writeReport(report, reportPath);
+
+        // 5) 끝나면 종료한다. System.exit 로 넘겨야 프로세스 종료 코드가 결과와 같아진다(안 넘기면 정상 실행도 1 로 끝났다)
+        System.exit(SpringApplication.exit(context, () -> 0));
+    }
+
+    // 리포트는 항상 로그로, 경로가 있으면 파일로도 쓴다
+    private static void writeReport(String report, Path reportPath) throws IOException {
         log.info("\n{}", report);
         if (reportPath != null) {
             Files.writeString(reportPath, report, StandardCharsets.UTF_8);
         }
-
-        // 5) 끝나면 종료한다. System.exit 로 넘겨야 프로세스 종료 코드가 결과와 같아진다(안 넘기면 정상 실행도 1 로 끝났다)
-        System.exit(SpringApplication.exit(context, () -> 0));
     }
 
     // 정답에 점수 대상으로 올라간 알림(events + solo)의 이벤트 배정을 DB 에서 읽어 B-cubed 로 계산한다.

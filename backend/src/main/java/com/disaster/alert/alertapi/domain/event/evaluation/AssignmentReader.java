@@ -5,6 +5,7 @@ import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -52,7 +53,34 @@ public class AssignmentReader {
                     + "FROM disaster_alert a, disaster_alert b "
                     + "WHERE a.disaster_alert_id = ? AND b.disaster_alert_id = ?";
 
+    /**
+     * 재확인 후보 목록에 보여 주고 판정 사실 계산기에 넣을 알림 한 건의 값.
+     *
+     * @param sigunguCodes 수신 지역 법정동 코드 앞 5자리(중복 제거). 라벨 JSON 에는 지역 이름만 있어 DB 에서 읽는다
+     */
+    public record AlertSnapshot(long id, LocalDateTime sentAt, String type, String message, List<String> sigunguCodes) {
+    }
+
+    private static final String ALERT_SQL =
+            "SELECT created_at, disaster_type, message FROM disaster_alert WHERE disaster_alert_id = ?";
+
+    private static final String SIGUNGU_CODES_SQL =
+            "SELECT DISTINCT LEFT(legal_district_code, 5) AS code FROM disaster_alert_region "
+                    + "WHERE disaster_alert_id = ? ORDER BY code";
+
     private final JdbcTemplate jdbcTemplate;
+
+    /** 알림 한 건의 발송 시각·유형·본문·수신 시군구. 알림 id 가 DB 에 없으면 라벨 파일과 DB 가 어긋난 것이므로 예외. */
+    public AlertSnapshot findAlert(long alertId) {
+        List<String> codes = jdbcTemplate.queryForList(SIGUNGU_CODES_SQL, String.class, alertId);
+        try {
+            return jdbcTemplate.queryForObject(ALERT_SQL, (rs, i) -> new AlertSnapshot(alertId,
+                    rs.getTimestamp("created_at").toLocalDateTime(), rs.getString("disaster_type"),
+                    rs.getString("message"), codes), alertId);
+        } catch (EmptyResultDataAccessException e) {
+            throw new IllegalStateException("DB 에 없는 알림이 라벨에 있습니다: " + alertId, e);
+        }
+    }
 
     /**
      * 알림이 속한 이벤트 id. 알림은 있지만 이벤트에 배정되지 않았으면 empty.
