@@ -164,22 +164,26 @@ specs/006-clustering-evaluation/
 backend/src/main/java/com/disaster/alert/alertapi/domain/event/
 ├── evaluation/
 │   ├── AlertPlaceFacts            # 1절 사실 계산기 (순수)
+│   ├── PlaceDirectory, PlaceDirectoryBuilder, PlaceDirectoryLoader  # 사실 계산기가 쓰는 기관·시군구·이웃 표
 │   ├── RecheckCandidateFinder     # 2절 규칙-조건 매칭 (순수)
-│   ├── JudgeAgreementRunner       # 3절 일치율 측정 모드
+│   ├── RecheckRunner              # 2절 --eval.recheck 모드
+│   ├── JudgeInputAssembler        # 판사 입력 조립 (일치율 측정·일일 채점 공용)
+│   ├── JudgeAgreementCounter, JudgeAgreementResult  # 3절 일치율 집계 (순수)
+│   ├── JudgeAgreementRunner, JudgeAgreementReport   # 3절 --eval.judge-agreement 모드·리포트
 │   └── EvaluationRunTool          # 모드 2개 추가
 ├── judge/
 │   ├── ClusteringJudge            # 3절 프롬프트 조립·호출·응답 해석, 버전·일치율 상수
 │   └── JudgeVerdict
 ├── model/ClusteringDailyScore, ClusteringDailyScorePair
-├── repository/ClusteringDailyScoreRepository
+├── repository/ClusteringDailyScoreRepository, ClusteringDailyScorePairRepository
 ├── service/ClusteringDailyScoreService     # 4절 대상 쌍 수집·판정·PairCounter·저장
-└── scheduler/ClusteringDailyScoreScheduler # 01:00 KST
+└── scheduler/ClusteringDailyScoreScheduler # 01:00 KST, CLUSTERING_DAILY_SCORE_START_DATE 가 비면 꺼짐
 
-backend/src/main/resources/db/migration/V{다음}__create_clustering_daily_score.sql
+backend/src/main/resources/db/migration/V139__create_clustering_daily_score.sql
 backend/src/test/java/.../domain/event/{evaluation,judge,service}/  # 단위·통합 테스트
 ```
 
-클래스 이름은 구현 때 바뀔 수 있다. 바뀌면 이 표를 고친다.
+2026-11-17 구현에 맞춰 고쳤다. 클래스 이름이 바뀌면 이 표를 고친다.
 
 **구조 결정**: 기존 백엔드 `domain/event` 아래에 둔다. 평가 도구와 일일 채점이 사실 계산기와 판사를 같이 써야 해서 한 모듈에 있어야 한다.
 
