@@ -36,7 +36,6 @@ public class ClusteringJudge {
     // 답은 SAME/DIFF/UNSURE 한 단어다. 이유를 덧붙이려 해도 잘리게 막아 비용을 줄인다(잘린 응답은 형식 실패로 센다).
     private static final int MAX_TOKENS = 5;
 
-
     /**
      * 기준 문서(CLUSTERING_CRITERIA.md 1절)의 원칙·경계 사례·적용 순서를 옮긴 지시문. few-shot 은 두지 않는다.
      * 기준을 바꾸면 이 문장을 고치고 {@link #PROMPT_VERSION} 을 올린다.
@@ -70,7 +69,7 @@ public class ClusteringJudge {
 
     private static final String ANSWER_FORMAT = """
             [답변 형식]
-            SAME(같은 사건), DIFF(다른 사건), UNSURE(판단할 수 없음) 중 정확히 한 단어만 답하라. 이유·설명·문장부호를 덧붙이지 마라.
+            SAME(같은 사건), DIFF(다른 사건), UNSURE(기준끼리 부딪쳐 답이 갈리지 않음) 중 정확히 한 단어만 답하라. 이유·설명·문장부호를 덧붙이지 마라.
             """;
 
     /**
