@@ -1,0 +1,42 @@
+{
+ "basis": "CLUSTERING_CRITERIA.md 2026-11-13",
+ "source": "judge-agreement 2026-11-17 불일치 쌍(원칙 3)",
+ "exportedAt": "2026-11-17T05:22:54.564Z",
+ "judged": 3,
+ "total": 3,
+ "items": [
+  {
+   "q": 295,
+   "a": 1654,
+   "b": 1656,
+   "rules": [
+    "P3"
+   ],
+   "oldLabel": "SAME",
+   "newLabel": "SAME",
+   "note": "국도 43번이고 시간이 9분차이이므로 같은 사건으로 확정"
+  },
+  {
+   "q": 122,
+   "a": 23988,
+   "b": 24008,
+   "rules": [
+    "P3"
+   ],
+   "oldLabel": "SAME",
+   "newLabel": "UNSURE",
+   "note": "같은 수도관인지 모르겠으나 시간 차이가 1일이고 지역이 같음, 잘 모르겟음"
+  },
+  {
+   "q": 275,
+   "a": 23601,
+   "b": 23665,
+   "rules": [
+    "P3"
+   ],
+   "oldLabel": "SAME",
+   "newLabel": "DIFF",
+   "note": "기관이 같지만 같은 계수동이지만 지번이 차이가 나서 다른곳의 화재일 가능성이 있음"
+  }
+ ]
+}

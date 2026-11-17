@@ -2181,7 +2181,7 @@
   },
   {
     "q": 122,
-    "label": "SAME",
+    "label": "UNSURE",
     "relation": "같은 시군구",
     "gap": "1일 5시간",
     "a": {
@@ -4801,7 +4801,7 @@
   },
   {
     "q": 275,
-    "label": "SAME",
+    "label": "DIFF",
     "relation": "같은 시군구",
     "gap": "3일 0시간",
     "a": {
