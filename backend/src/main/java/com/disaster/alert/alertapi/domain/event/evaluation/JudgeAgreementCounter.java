@@ -18,8 +18,14 @@ import java.util.Map;
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
 public final class JudgeAgreementCounter {
 
-    /** 한 쌍의 사람 라벨과 그 쌍에 대한 판사 결과. */
-    public record Judged(Label humanLabel, JudgeResult result) {
+    /**
+     * 한 쌍의 사람 라벨, 판사 결과, 두 알림. 집계는 라벨과 결과만 쓰고, 두 알림은 리포트의 쌍 목록에 보인다
+     * ({@link JudgeAgreementReport}).
+     */
+    public record PairRecord(Label human, JudgeResult result, AlertSnapshot first, AlertSnapshot second) {
+        public JudgeVerdict verdict() {
+            return result.verdict();
+        }
     }
 
     /**
@@ -28,13 +34,13 @@ public final class JudgeAgreementCounter {
      * <p>사람이 UNSURE 로 둔 쌍은 정답이 없어 판사를 채점할 수 없으므로 교차표·일치율·토큰 어디에도 넣지 않는다
      * (실행에서도 그런 쌍은 판정하지 않으니 토큰 합이 실제 요금과 맞는다).
      */
-    public static JudgeAgreementResult count(List<Judged> judged) {
+    public static JudgeAgreementResult count(List<PairRecord> judged) {
         Map<Label, Map<JudgeVerdict, Integer>> crossTab = new EnumMap<>(Label.class);
         int sameNum = 0, sameDen = 0, diffNum = 0, diffDen = 0, judgeUnsure = 0, formatFailures = 0;
         long promptTokens = 0, completionTokens = 0;
 
-        for (Judged j : judged) {
-            Label human = j.humanLabel();
+        for (PairRecord j : judged) {
+            Label human = j.human();
             if (human == Label.UNSURE) {
                 continue; // 1) 사람이 못 정한 쌍은 채점 대상이 아니다
             }

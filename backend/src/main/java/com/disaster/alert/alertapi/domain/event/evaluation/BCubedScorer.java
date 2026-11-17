@@ -29,11 +29,7 @@ public final class BCubedScorer {
     private record EventRef(long id, boolean solo) {
     }
 
-    // (정답 사건 키, 시스템 이벤트) 쌍 — 두 집합의 교집합 크기를 세는 키
-    private record Cell(long goldKey, EventRef event) {
-    }
-
-    // 점수 대상 알림 한 건: 정답 사건 키와 (실제 또는 혼자인) 시스템 이벤트
+    // 점수 대상 알림 한 건의 (정답 사건 키, 시스템 이벤트). 같은 값끼리 같으므로 두 집합의 교집합 크기를 세는 키로도 쓴다
     private record Target(long goldKey, EventRef event) {
     }
 
@@ -75,18 +71,18 @@ public final class BCubedScorer {
         // 3) 알림마다 집합을 다시 만들면 O(N²) 라, 정답 사건별·이벤트별·(사건,이벤트) 쌍별 대상 수를 한 번씩만 센다
         Map<Long, Integer> goldSize = new HashMap<>();
         Map<EventRef, Integer> eventSize = new HashMap<>();
-        Map<Cell, Integer> overlap = new HashMap<>();
+        Map<Target, Integer> overlap = new HashMap<>();
         for (Target t : targets) {
             goldSize.merge(t.goldKey(), 1, Integer::sum);
             eventSize.merge(t.event(), 1, Integer::sum);
-            overlap.merge(new Cell(t.goldKey(), t.event()), 1, Integer::sum);
+            overlap.merge(t, 1, Integer::sum);
         }
 
         // 4) 알림마다 두 비율(교집합 ÷ 이벤트 크기, 교집합 ÷ 정답 사건 크기)을 구해 더하고 평균한다
         double precisionSum = 0;
         double completenessSum = 0;
         for (Target t : targets) {
-            int both = overlap.get(new Cell(t.goldKey(), t.event()));
+            int both = overlap.get(t);
             precisionSum += (double) both / eventSize.get(t.event());
             completenessSum += (double) both / goldSize.get(t.goldKey());
         }

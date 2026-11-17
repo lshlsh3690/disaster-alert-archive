@@ -1,6 +1,7 @@
 package com.disaster.alert.alertapi.domain.event.evaluation;
 
-import com.disaster.alert.alertapi.domain.event.evaluation.AssignmentReader.AlertSnapshot;
+import com.disaster.alert.alertapi.domain.event.evaluation.JudgeAgreementCounter.PairRecord;
+
 import com.disaster.alert.alertapi.domain.event.evaluation.LabelJson.Label;
 import com.disaster.alert.alertapi.domain.event.judge.ClusteringJudge;
 import com.disaster.alert.alertapi.domain.event.judge.ClusteringJudge.Agreement;
@@ -24,10 +25,6 @@ final class JudgeAgreementReport {
     private static final double OUTPUT_USD_PER_MILLION = 10.00;
     private static final int BODY_EXCERPT_LENGTH = 100;
     private static final DateTimeFormatter AT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
-
-    /** 쌍 하나의 측정 기록 - 목록 절에 보여 줄 두 알림과 사람 라벨·판사 판정. */
-    record PairRecord(Label human, JudgeVerdict verdict, String rawResponse, AlertSnapshot first, AlertSnapshot second) {
-    }
 
     /** 판사 호출이 예외로 끝난 쌍(형식 실패와 별개). */
     record CallFailure(long alertA, long alertB, String reason) {
@@ -105,8 +102,8 @@ final class JudgeAgreementReport {
                     .append(" · 사람 ").append(p.human()).append(" · 판사 ").append(p.verdict()).append('\n');
             if (p.verdict() == JudgeVerdict.FORMAT_FAILURE) {
                 // 무엇이 왔는지(문장부호·소문자·잘린 설명·빈 응답) 보이게 원응답을 그대로 적는다
-                sb.append("- 판사 원응답: ").append(p.rawResponse() == null ? "(응답 없음)"
-                        : "\"" + p.rawResponse().replace("\n", "\\n").replace("`", "'") + "\"").append('\n');
+                sb.append("- 판사 원응답: ").append(p.result().rawResponse() == null ? "(응답 없음)"
+                        : "\"" + p.result().rawResponse().replace("\n", "\\n").replace("`", "'") + "\"").append('\n');
             }
             sb.append(alertLine(p.first())).append(alertLine(p.second()));
         }

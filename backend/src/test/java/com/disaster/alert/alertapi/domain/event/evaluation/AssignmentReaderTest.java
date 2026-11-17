@@ -74,7 +74,7 @@ class AssignmentReaderTest {
         // 같은 시군구(99001)의 읍면동 두 곳으로 보낸 문자 — 시군구는 하나로 세야 D(다지역 발송)를 잘못 걸지 않는다
         link(A1, "9900110200");
 
-        AssignmentReader.AlertSnapshot a1 = reader.findAlert(A1);
+        AlertSnapshot a1 = reader.findAlert(A1);
 
         assertThat(a1.type()).isEqualTo("산불");
         assertThat(a1.message()).isEqualTo("테스트 본문");

@@ -2,7 +2,6 @@ package com.disaster.alert.alertapi.domain.event.evaluation;
 
 import com.disaster.alert.alertapi.domain.event.evaluation.AlertPlaceFacts.AgencyKind;
 import com.disaster.alert.alertapi.domain.event.evaluation.AlertPlaceFacts.AlertFacts;
-import com.disaster.alert.alertapi.domain.event.evaluation.AlertPlaceFacts.AlertInput;
 import com.disaster.alert.alertapi.domain.event.evaluation.AlertPlaceFacts.PairFacts;
 import com.disaster.alert.alertapi.domain.event.evaluation.AlertPlaceFacts.SigunguRelation;
 import org.junit.jupiter.api.Test;
@@ -75,8 +74,9 @@ class AlertPlaceFactsTest {
     private final AlertPlaceFacts facts =
             new AlertPlaceFacts(new PlaceDirectory(NAME_ENTRIES, SIDO_BY_ALIAS, ADJACENT_IDS));
 
-    private static AlertInput alert(String body, LocalDateTime sentAt, String type, String... receivedCodes) {
-        return new AlertInput(body, sentAt, type, List.of(receivedCodes));
+    private static AlertSnapshot alert(String body, LocalDateTime sentAt, String type, String... receivedCodes) {
+        // 사실 계산기는 알림 id 를 쓰지 않는다
+        return new AlertSnapshot(0L, sentAt, type, body, List.of(receivedCodes));
     }
 
     // D: 발신 기관이 시군구 소속이면 부서 이름이 붙어도 시군구 기관이고, 그 시군구의 문자로 본다.
@@ -84,7 +84,7 @@ class AlertPlaceFactsTest {
     @Test
     void 시군구_부서_이름이_붙은_기관도_시군구_기관이고_그_시군구의_문자다() {
         // 준비: 본문 끝 [ ] 안이 "산청군" + 부서명. 수신 지역은 산청 한 곳
-        AlertInput input = alert("신안면 일부 지역 단수 중입니다. 양해 바랍니다. [산청군상하수도과]",
+        AlertSnapshot input = alert("신안면 일부 지역 단수 중입니다. 양해 바랍니다. [산청군상하수도과]",
                 LocalDateTime.of(2025, 8, 6, 10, 0), "수도", SANCHEONG);
 
         // 실행: 문자 하나에서 사실을 뽑는다
@@ -101,7 +101,7 @@ class AlertPlaceFactsTest {
     @Test
     void 시군구가_아닌_기관의_문자는_시군구를_모름으로_둔다() {
         // 준비: 발신 기관이 철도공사. 본문에는 장소(경부선 구간)가 있지만 시군구 이름은 없다
-        AlertInput input = alert("경부선 열차 운행이 지연되고 있습니다. [한국철도공사]",
+        AlertSnapshot input = alert("경부선 열차 운행이 지연되고 있습니다. [한국철도공사]",
                 LocalDateTime.of(2025, 8, 6, 10, 0), "교통", SANCHEONG);
 
         // 실행
@@ -119,7 +119,7 @@ class AlertPlaceFactsTest {
     @Test
     void 인천_옛_구청은_새_구로_쪼개지_않고_옛_구청_하나의_시군구로_본다() {
         // 준비: 발신 기관은 옛 서구청, 수신 코드는 새 구 두 개(검단구·서해구)
-        AlertInput input = alert("서구 일부 도로가 침수되어 통제합니다. [인천서구청]",
+        AlertSnapshot input = alert("서구 일부 도로가 침수되어 통제합니다. [인천서구청]",
                 LocalDateTime.of(2025, 8, 6, 10, 0), "호우", GEOMDAN, SEOHAE);
 
         // 실행
@@ -136,7 +136,7 @@ class AlertPlaceFactsTest {
     @Test
     void 시도_표기_없는_구_이름은_수신_지역의_시도로_고른다() {
         // 준비: 발신 기관이 "북구" 하나뿐이라 시도 단서가 없고, 수신 지역은 부산(26) 코드
-        AlertInput input = alert("북구 일부 지역 단수 중입니다. [북구]",
+        AlertSnapshot input = alert("북구 일부 지역 단수 중입니다. [북구]",
                 LocalDateTime.of(2025, 8, 6, 10, 0), "수도", BUSAN_BUK);
 
         // 실행
@@ -153,7 +153,7 @@ class AlertPlaceFactsTest {
     @Test
     void 광역_단위_기관은_시군구_기관이_아니다() {
         // 준비: 발신 기관이 "부산시", 수신 지역은 부산 구 하나(서구)
-        AlertInput input = alert("부산 전역에 호우주의보가 발효되었습니다. [부산시]",
+        AlertSnapshot input = alert("부산 전역에 호우주의보가 발효되었습니다. [부산시]",
                 LocalDateTime.of(2025, 8, 6, 10, 0), "호우", BUSAN_SEO);
 
         // 실행
@@ -171,7 +171,7 @@ class AlertPlaceFactsTest {
     @Test
     void 이름이_하나뿐이어도_수신_시도의_시도_이름이면_광역_기관으로_본다() {
         // 준비: 발신 기관 "광주시", 수신 지역은 광주권 구(광산구, 시도 12) — 경기(41)가 아니다
-        AlertInput input = alert("광산구 상가 화재 발생, 인근 주민은 창문을 닫아 주십시오. [광주시]",
+        AlertSnapshot input = alert("광산구 상가 화재 발생, 인근 주민은 창문을 닫아 주십시오. [광주시]",
                 LocalDateTime.of(2025, 8, 6, 10, 0), "화재", GWANGSAN);
 
         // 실행
@@ -188,7 +188,7 @@ class AlertPlaceFactsTest {
     @Test
     void 특례시_표기의_기관도_시_이름으로_찾아_시군구_기관으로_본다() {
         // 준비: 발신 기관 "수원특례시", 수신 지역은 수원의 구(영통구) — 이름 항목은 시 코드(41110)의 "수원시"
-        AlertInput input = alert("수원시 일부 지역 정전이 발생했습니다. [수원특례시]",
+        AlertSnapshot input = alert("수원시 일부 지역 정전이 발생했습니다. [수원특례시]",
                 LocalDateTime.of(2025, 8, 6, 10, 0), "정전", SUWON_YEONGTONG);
 
         // 실행
@@ -205,8 +205,8 @@ class AlertPlaceFactsTest {
     void 이웃_시군구가_같은_다리_이름을_쓰면_같은_시설_후보로_잡는다() {
         // 준비: 함양과 산청이 4분 간격으로 같은 다리(임천교) 통행제한 해제를 알린 실제 사례(기준 문서 G)
         LocalDateTime hamyangAt = LocalDateTime.of(2025, 8, 7, 14, 0);
-        AlertInput hamyang = alert("임천교(유림면~화계리) 통행제한 해제 [함양군]", hamyangAt, "교통통제", HAMYANG);
-        AlertInput sancheong = alert("임천교(금서면 화계리~유림면 화촌리) 통행제한 해제 [산청군]",
+        AlertSnapshot hamyang = alert("임천교(유림면~화계리) 통행제한 해제 [함양군]", hamyangAt, "교통통제", HAMYANG);
+        AlertSnapshot sancheong = alert("임천교(금서면 화계리~유림면 화촌리) 통행제한 해제 [산청군]",
                 hamyangAt.plusMinutes(4), "교통통제", SANCHEONG);
 
         // 실행: 두 문자를 견준다
@@ -223,7 +223,7 @@ class AlertPlaceFactsTest {
     @Test
     void 발신_기관이_본문_맨_앞에_있어도_시군구_기관으로_읽는다() {
         // 준비: 대괄호가 맨 앞에만 있고 끝에는 없는 본문
-        AlertInput input = alert("[세종시청] 오늘 9시 2분경 연동면 도로에 토사가 유출되어 통제 중입니다.",
+        AlertSnapshot input = alert("[세종시청] 오늘 9시 2분경 연동면 도로에 토사가 유출되어 통제 중입니다.",
                 LocalDateTime.of(2025, 8, 6, 9, 5), "교통통제", SEJONG);
 
         // 실행

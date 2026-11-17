@@ -1,10 +1,8 @@
 package com.disaster.alert.alertapi.domain.event.evaluation;
 
 import com.disaster.alert.alertapi.domain.event.evaluation.AlertPlaceFacts.AlertFacts;
-import com.disaster.alert.alertapi.domain.event.evaluation.AlertPlaceFacts.AlertInput;
 import com.disaster.alert.alertapi.domain.event.evaluation.AlertPlaceFacts.PairFacts;
 import com.disaster.alert.alertapi.domain.event.evaluation.AlertPlaceFacts.SigunguRelation;
-import com.disaster.alert.alertapi.domain.event.evaluation.AssignmentReader.AlertSnapshot;
 import com.disaster.alert.alertapi.domain.event.evaluation.LabelJson.Label;
 import com.disaster.alert.alertapi.domain.event.evaluation.LabelJson.LabeledPair;
 import com.disaster.alert.alertapi.domain.event.evaluation.RecheckCandidateFinder.PairInput;
@@ -183,19 +181,15 @@ public class RecheckRunner {
 
     private PairInput pairInput(long a, long b, AlertPlaceFacts facts, Map<Long, AlertSnapshot> snapshots) {
         return new PairInput(a, b, analyze(a, facts, snapshots), analyze(b, facts, snapshots),
-                facts.compare(input(snapshot(a, snapshots)), input(snapshot(b, snapshots))));
+                facts.compare(snapshot(a, snapshots), snapshot(b, snapshots)));
     }
 
     private AlertFacts analyze(long id, AlertPlaceFacts facts, Map<Long, AlertSnapshot> snapshots) {
-        return facts.analyze(input(snapshot(id, snapshots)));
+        return facts.analyze(snapshot(id, snapshots));
     }
 
     private AlertSnapshot snapshot(long id, Map<Long, AlertSnapshot> snapshots) {
         return snapshots.computeIfAbsent(id, assignmentReader::findAlert);
-    }
-
-    private static AlertInput input(AlertSnapshot s) {
-        return new AlertInput(s.message(), s.sentAt(), s.type(), s.sigunguCodes());
     }
 
     // 알림 한 줄: id · 발송 시각 · 유형 · 발신 기관(종류) · 수신 시군구 수 · 본문

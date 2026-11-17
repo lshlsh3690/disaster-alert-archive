@@ -1,7 +1,5 @@
 package com.disaster.alert.alertapi.domain.event.evaluation;
 
-import com.disaster.alert.alertapi.domain.event.evaluation.AlertPlaceFacts.AlertInput;
-import com.disaster.alert.alertapi.domain.event.evaluation.AssignmentReader.AlertSnapshot;
 import com.disaster.alert.alertapi.domain.event.judge.ClusteringJudge.JudgeAlert;
 import com.disaster.alert.alertapi.domain.event.judge.ClusteringJudge.JudgeInput;
 import lombok.RequiredArgsConstructor;
@@ -44,19 +42,13 @@ public class JudgeInputAssembler {
 
         /** 판사 입력: 두 알림의 값 + 규칙으로 계산한 사실. */
         public JudgeInput toInput(AlertSnapshot first, AlertSnapshot second) {
-            AlertInput inputA = input(first);
-            AlertInput inputB = input(second);
-            return new JudgeInput(judgeAlert(first, inputA), judgeAlert(second, inputB), facts.compare(inputA, inputB));
+            return new JudgeInput(judgeAlert(first), judgeAlert(second), facts.compare(first, second));
         }
 
-        private JudgeAlert judgeAlert(AlertSnapshot s, AlertInput input) {
+        private JudgeAlert judgeAlert(AlertSnapshot s) {
             // 이름 표에 없는 코드는 코드 그대로 보인다 - 이름을 지어내는 것보다 낫다
             List<String> names = s.sigunguCodes().stream().map(code -> regionNames.getOrDefault(code, code)).toList();
-            return new JudgeAlert(s.sentAt(), s.type(), names, s.message(), facts.analyze(input));
-        }
-
-        private static AlertInput input(AlertSnapshot s) {
-            return new AlertInput(s.message(), s.sentAt(), s.type(), s.sigunguCodes());
+            return new JudgeAlert(s.sentAt(), s.type(), names, s.message(), facts.analyze(s));
         }
     }
 }

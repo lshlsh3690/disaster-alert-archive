@@ -55,13 +55,6 @@ public class AssignmentReader {
                     + "FROM disaster_alert a, disaster_alert b "
                     + "WHERE a.disaster_alert_id = ? AND b.disaster_alert_id = ?";
 
-    /**
-     * 재확인 후보 목록에 보여 주고 판정 사실 계산기에 넣을 알림 한 건의 값.
-     *
-     * @param sigunguCodes 수신 지역 법정동 코드 앞 5자리(중복 제거). 라벨 JSON 에는 지역 이름만 있어 DB 에서 읽는다
-     */
-    public record AlertSnapshot(long id, LocalDateTime sentAt, String type, String message, List<String> sigunguCodes) {
-    }
 
     private static final String ALERT_SQL =
             "SELECT created_at, disaster_type, message FROM disaster_alert WHERE disaster_alert_id = ?";
