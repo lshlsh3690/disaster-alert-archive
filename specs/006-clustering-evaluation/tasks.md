@@ -82,7 +82,7 @@ description: "006 이벤트 클러스터링 평가·검증 작업 목록"
 - [x] T014 [US2] `{main}/domain/event/evaluation/EvaluationRunTool.java`에 `--eval.recheck=<규칙 목록>` 모드를 더한다 — 272쌍(`backend/evaluation/datasets/cluster-eval-2026-11.json`)은 쌍 단위, 5월 B-cubed(`bcubed-2026-05.labels.json`)는 알림 단위(그 알림이 든 정답 사건 전체)로 후보를 내고, 알림 id·발송 시각·유형·발신 기관·본문·현재 라벨을 출력한다(쌍 번호만 내지 않음)
 - [x] T015 [US2] `specs/006-clustering-evaluation/quickstart.md` "구현 후 검증 시나리오"의 재확인 명령을 실제 옵션·출력 경로에 맞게 고친다
 - [x] T016 [US2] 평가 사본(운영 아님)에서 `--eval.recheck=D,E,G,I`를 실행해 규칙별 후보 수를 사용자에게 보고한다(2026-11-13 추정: 다지역 89, 인천 18, 시군구가 아닌 기관 약 21)
-- [x] T017 ⛔ [US2] **사용자가 후보를 다시 판정한다.** Claude는 판정 화면·목록 준비만 돕고 라벨을 정하지 않는다
+- [ ] T017 ⛔ [US2] **사용자가 후보를 다시 판정한다.** Claude는 판정 화면·목록 준비만 돕고 라벨을 정하지 않는다 — 2026-11-17 272쌍 후보(55쌍)는 판정 완료, 5월 B-cubed 후보 묶음 판정이 남음
 - [ ] T018 [US2] 사용자 판정 결과를 `backend/evaluation/datasets/cluster-eval-2026-11.json`·`bcubed-2026-05.labels.json`에 반영하고, `backend/evaluation/datasets/cluster-eval-2026-11.rubric.md` "라벨 결과" 절에 바뀐 항목·이유·전후 점수(분모 포함)를 적고, 두 셋의 기준 시점을 2026-11-13으로 기록한다(FR-006, FR-008) — 2026-11-17 272쌍 쪽 반영 완료(55쌍 중 2쌍 + 원칙 3 의심 3쌍 중 2쌍), 5월 B-cubed 묶음 재확인은 판정 화면이 없어 남음
 
 **체크포인트**: 라벨 셋이 새 기준 시점으로 맞춰졌다. 판사 일치율을 잴 수 있다.
