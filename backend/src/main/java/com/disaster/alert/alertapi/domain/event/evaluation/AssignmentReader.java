@@ -6,7 +6,9 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDateTime;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 
@@ -68,6 +70,10 @@ public class AssignmentReader {
             "SELECT DISTINCT LEFT(legal_district_code, 5) AS code FROM disaster_alert_region "
                     + "WHERE disaster_alert_id = ? ORDER BY code";
 
+    // 시도·시군구·구 행은 뒤 5자리가 00000 이다. 앞 5자리(시군구 코드)가 곧 키이고 이름은 "충청북도 청주시 상당구" 처럼 시도부터 전체다.
+    private static final String SIGUNGU_NAMES_SQL =
+            "SELECT code, name FROM legal_district WHERE code LIKE '%00000'";
+
     private final JdbcTemplate jdbcTemplate;
 
     /** 알림 한 건의 발송 시각·유형·본문·수신 시군구. 알림 id 가 DB 에 없으면 라벨 파일과 DB 가 어긋난 것이므로 예외. */
@@ -111,5 +117,17 @@ public class AssignmentReader {
         } catch (EmptyResultDataAccessException e) {
             throw new IllegalStateException("DB 에 없는 알림이 라벨에 있습니다: " + alertA + ", " + alertB, e);
         }
+    }
+
+    /**
+     * 시군구 코드(앞 5자리) → 사람이 읽는 전체 이름. 판사 프롬프트의 "수신 지역" 칸에 쓴다.
+     * 수백 행이라 실행 시작 때 한 번 읽어 두고 쓴다.
+     */
+    public Map<String, String> findSigunguNames() {
+        Map<String, String> names = new HashMap<>();
+        jdbcTemplate.query(SIGUNGU_NAMES_SQL, rs -> {
+            names.putIfAbsent(rs.getString("code").substring(0, 5), rs.getString("name"));
+        });
+        return names;
     }
 }

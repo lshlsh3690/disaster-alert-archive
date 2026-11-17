@@ -33,7 +33,8 @@ import java.util.Set;
  * <p>{@code --eval.labels}(필수) 라벨 JSON 을 읽어 DB 의 이벤트 배정과 비교하고,
  * {@code --eval.report}(선택) 경로에 마크다운 리포트를 쓴다. {@code --eval.bcubed}(선택)에 B-cubed 정답 JSON 을
  * 주면 알림 단위 점수 절이 리포트 맨 끝에 붙는다. {@code --eval.recheck=D,E,G,I}(선택)를 주면 채점 대신
- * 재확인 후보 목록({@link RecheckRunner})만 낸다.
+ * 재확인 후보 목록({@link RecheckRunner})만 낸다. {@code --eval.judge-agreement}(선택, 값 없음)를 주면 채점 대신
+ * 판사(LLM)가 라벨 쌍을 판정해 사람 라벨과의 일치율 리포트({@link JudgeAgreementRunner})만 낸다 - <b>유료 호출</b>이라 실행 전 승인이 필요하다.
  */
 @Slf4j
 @Component
@@ -43,6 +44,7 @@ public class EvaluationRunTool implements ApplicationRunner {
 
     private final AssignmentReader assignmentReader;
     private final RecheckRunner recheckRunner;
+    private final JudgeAgreementRunner judgeAgreementRunner;
     private final ConfigurableApplicationContext context;
 
     @Override
@@ -58,11 +60,22 @@ public class EvaluationRunTool implements ApplicationRunner {
         //    B-cubed 정답(--eval.bcubed)도 같은 이유로 여기서 읽는다. 없으면 null(알림 단위 절을 쓰지 않음)
         BCubedGold bcubedGold = readBCubedGold(args);
 
+        //    두 모드를 같이 주면 한쪽이 조용히 빠지므로 막는다
+        if (args.containsOption("eval.recheck") && args.containsOption("eval.judge-agreement")) {
+            throw new IllegalArgumentException("--eval.recheck 와 --eval.judge-agreement 는 함께 쓸 수 없습니다");
+        }
         //    --eval.recheck 가 있으면 채점 대신 재확인 후보 목록만 내고 끝낸다(무료, 판정 없음)
         if (args.containsOption("eval.recheck")) {
             Set<Rule> rules = RecheckRunner.parseRules(
                     singleValue(args, "eval.recheck", "--eval.recheck=<규칙 목록, 예: D,E,G,I> 값이 비어 있습니다"));
             writeReport(recheckRunner.run(datasetName(labels), rules, pairs, bcubedGold), reportPath);
+            System.exit(SpringApplication.exit(context, () -> 0));
+            return;
+        }
+
+        //    --eval.judge-agreement 가 있으면 채점 대신 판사 일치율만 잰다(유료: 판사를 실제로 호출한다). 라벨 파일은 위에서 이미 검증됐다
+        if (args.containsOption("eval.judge-agreement")) {
+            writeReport(judgeAgreementRunner.run(datasetName(labels), pairs), reportPath);
             System.exit(SpringApplication.exit(context, () -> 0));
             return;
         }

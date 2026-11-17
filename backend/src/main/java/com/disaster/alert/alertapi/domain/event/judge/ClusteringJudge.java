@@ -30,7 +30,7 @@ public class ClusteringJudge {
     public static final String PROMPT_VERSION = "v1";
 
     // 기준을 읽고 따지는 일이라 분류용 mini 가 아니라 gpt-4o 를 쓴다. 일치율은 이 모델로 재므로 고정한다.
-    private static final String MODEL = "gpt-4o";
+    public static final String MODEL = "gpt-4o";
     // 같은 쌍은 같은 답이 나와야 프롬프트 버전끼리 점수를 비교할 수 있어 온도 0.
     private static final double TEMPERATURE = 0.0;
     // 답은 SAME/DIFF/UNSURE 한 단어다. 이유를 덧붙이려 해도 잘리게 막아 비용을 줄인다(잘린 응답은 형식 실패로 센다).
@@ -87,7 +87,11 @@ public class ClusteringJudge {
     }
 
     /** 판정과 비용 확인용 토큰 수. */
-    public record JudgeResult(JudgeVerdict verdict, int promptTokens, int completionTokens) {
+    public record JudgeResult(JudgeVerdict verdict, int promptTokens, int completionTokens, String rawResponse) {
+        /** 원응답을 남기지 않는 판정(테스트·집계용). */
+        public JudgeResult(JudgeVerdict verdict, int promptTokens, int completionTokens) {
+            this(verdict, promptTokens, completionTokens, null);
+        }
     }
 
     /**
@@ -120,14 +124,15 @@ public class ClusteringJudge {
             return new JudgeResult(JudgeVerdict.FORMAT_FAILURE, 0, 0);
         }
 
-        // 3) 정확히 한 단어일 때만 판정으로 받는다
-        JudgeVerdict verdict = parseResponse(response.getResult().getOutput().getText());
+        // 3) 정확히 한 단어일 때만 판정으로 받는다. 원응답은 형식 실패가 무엇이었는지 리포트에서 보려고 같이 넘긴다
+        String raw = response.getResult().getOutput().getText();
+        JudgeVerdict verdict = parseResponse(raw);
 
         // 4) usage 가 비어 오는 응답도 있어 없으면 0 으로 둔다(비용 집계만 빠질 뿐 판정은 유효)
         Usage usage = response.getMetadata() == null ? null : response.getMetadata().getUsage();
         int promptTokens = usage == null || usage.getPromptTokens() == null ? 0 : usage.getPromptTokens();
         int completionTokens = usage == null || usage.getCompletionTokens() == null ? 0 : usage.getCompletionTokens();
-        return new JudgeResult(verdict, promptTokens, completionTokens);
+        return new JudgeResult(verdict, promptTokens, completionTokens, raw);
     }
 
     /**
