@@ -82,10 +82,10 @@ description: "006 이벤트 클러스터링 평가·검증 작업 목록"
 - [x] T014 [US2] `{main}/domain/event/evaluation/EvaluationRunTool.java`에 `--eval.recheck=<규칙 목록>` 모드를 더한다 — 272쌍(`backend/evaluation/datasets/cluster-eval-2026-11.json`)은 쌍 단위, 5월 B-cubed(`bcubed-2026-05.labels.json`)는 알림 단위(그 알림이 든 정답 사건 전체)로 후보를 내고, 알림 id·발송 시각·유형·발신 기관·본문·현재 라벨을 출력한다(쌍 번호만 내지 않음)
 - [x] T015 [US2] `specs/006-clustering-evaluation/quickstart.md` "구현 후 검증 시나리오"의 재확인 명령을 실제 옵션·출력 경로에 맞게 고친다
 - [x] T016 [US2] 평가 사본(운영 아님)에서 `--eval.recheck=D,E,G,I`를 실행해 규칙별 후보 수를 사용자에게 보고한다(2026-11-13 추정: 다지역 89, 인천 18, 시군구가 아닌 기관 약 21)
-- [ ] T017 ⛔ [US2] **사용자가 후보를 다시 판정한다.** Claude는 판정 화면·목록 준비만 돕고 라벨을 정하지 않는다 — 2026-11-17 272쌍 후보(55쌍)는 판정 완료, 5월 B-cubed 후보 묶음 판정이 남음
-- [ ] T018 [US2] 사용자 판정 결과를 `backend/evaluation/datasets/cluster-eval-2026-11.json`·`bcubed-2026-05.labels.json`에 반영하고, `backend/evaluation/datasets/cluster-eval-2026-11.rubric.md` "라벨 결과" 절에 바뀐 항목·이유·전후 점수(분모 포함)를 적고, 두 셋의 기준 시점을 2026-11-13으로 기록한다(FR-006, FR-008) — 2026-11-17 272쌍 쪽 반영 완료(55쌍 중 2쌍 + 원칙 3 의심 3쌍 중 2쌍), 5월 B-cubed 묶음 재확인은 판정 화면이 없어 남음
+- [x] T017 ⛔ [US2] **사용자가 후보를 다시 판정한다.** Claude는 판정 화면·목록 준비만 돕고 라벨을 정하지 않는다 — 2026-11-17 272쌍 후보(55쌍)는 판정 완료. 5월 B-cubed 후보 묶음은 다시 판정하지 않기로 했다(2026-11-17 사용자 결정) — 그 셋의 라벨은 2026-11-10(A~C 기준) 그대로다
+- [x] T018 [US2] 사용자 판정 결과를 `backend/evaluation/datasets/cluster-eval-2026-11.json`·`bcubed-2026-05.labels.json`에 반영하고, `backend/evaluation/datasets/cluster-eval-2026-11.rubric.md` "라벨 결과" 절에 바뀐 항목·이유·전후 점수(분모 포함)를 적고, 셋마다 기준 시점을 기록한다(FR-006, FR-008) — 2026-11-17 결과: **272쌍은 2026-11-13 기준**으로 반영 완료(55쌍 중 2쌍 + 원칙 3 의심 3쌍 중 2쌍), **5월 B-cubed 는 재확인하지 않아 2026-11-10(A~C) 기준 그대로**(2026-11-17 사용자 결정)
 
-**체크포인트**: 라벨 셋이 새 기준 시점으로 맞춰졌다. 판사 일치율을 잴 수 있다.
+**체크포인트**: 272쌍이 새 기준 시점(2026-11-13)으로 맞춰졌다(5월 B-cubed 는 2026-11-10 기준 유지). 판사 일치율을 잴 수 있다(일치율은 272쌍만 쓴다).
 
 ---
 
@@ -113,7 +113,7 @@ description: "006 이벤트 클러스터링 평가·검증 작업 목록"
 - [x] T029 [US5] `{main}/domain/event/scheduler/ClusteringDailyScoreScheduler.java`를 `ClusteringDailyCheckScheduler`와 같은 모양으로 만든다 — 매일 01:00 KST, `{main}/global/config/AsyncConfig.java`의 별도 실행기, 최근 7일 중 기록 없는 날만 채점하되 채점 시작일(도입일) 설정 이전은 찾지 않는다(R7). 시작일 설정 키를 추가하면 `application.yml`과 루트 `.env.example`을 같이 갱신한다
 - [x] T030 [US5] `{test}/domain/event/service/ClusteringDailyScoreServiceTest.java`에 `@IntegrationTest`로 판사를 목킹한 채 하루치 채점이 두 테이블에 저장되는지 확인한다(DB 필요 — 로컬 docker compose Postgres)
 - [x] T031 [US5] `code-reviewer`에 `git diff`와 변경 줄 범위를 넣어 검토받고 결과를 사용자에게 보고한다(로직·마이그레이션 변경, 100줄 이상)
-- [ ] T032 ⛔ [US5] **유료 — 운영 도입 승인(FR-019).** 비용(조용한 날 약 $0.06, 큰 사건 날 수십 달러 — 2025-03-25 산불 기준 약 $46, 상한 없음. plan.md 기술 컨텍스트 "규모/범위")을 알리고 승인을 받은 뒤 PR(develop 대상, `pr-message` 스킬) → 머지 → 배포한다. 푸시와 CodeRabbit 요청은 작업 단위 끝에 한 번만
+- [ ] T032 ⛔ [US5] **유료 — 운영 도입 승인(FR-019).** 비용(조용한 날 약 $0.06, 큰 사건 날 수십 달러 — 2025-03-25 산불 기준 약 $46, 상한 없음. plan.md 기술 컨텍스트 "규모/범위")을 알리고 승인을 받은 뒤 PR(develop 대상, `pr-message` 스킬) → 머지 → 배포한다. 푸시와 CodeRabbit 요청은 작업 단위 끝에 한 번만 — 2026-11-17 사용자 승인: PR #335 머지일(2026-11-17)부터 운영에서 켠다. `application-prod.yml` 의 시작일 기본값으로 켜고 운영 .env 는 건드리지 않는다. 승인·PR(#336)까지 됐고, 머지·배포 뒤 기동 로그 "켜짐: 시작일 2026-11-17"을 확인하면 완료로 표시한다
 
 **체크포인트**: 운영에서 매일 01:00 점수가 쌓이고, 불일치 쌍을 quickstart의 SQL 한 번으로 본다.
 
@@ -121,8 +121,8 @@ description: "006 이벤트 클러스터링 평가·검증 작업 목록"
 
 ## Phase 6: 마무리
 
-- [ ] T033 [P] `specs/006-clustering-evaluation/plan.md` 소스 구조 표를 실제 클래스 이름에 맞게 고친다(바뀐 경우)
-- [ ] T034 [P] `CLAUDE.md` 이벤트 클러스터링 절에 일일 채점(01:00, 판사·일치율 표시)을 한 줄로 더하고 상세는 `specs/006-clustering-evaluation/`을 가리킨다(기준·수치를 다시 쓰지 않음)
+- [x] T033 [P] `specs/006-clustering-evaluation/plan.md` 소스 구조 표를 실제 클래스 이름에 맞게 고친다(바뀐 경우)
+- [x] T034 [P] `CLAUDE.md` 이벤트 클러스터링 절에 일일 채점(01:00, 판사·일치율 표시)을 한 줄로 더하고 상세는 `specs/006-clustering-evaluation/`을 가리킨다(기준·수치를 다시 쓰지 않음)
 - [ ] T035 배포 다음 날 운영 DB를 읽기 전용으로 조회해 `clustering_daily_score` 첫 줄과 불일치 쌍 SQL(quickstart)을 확인하고 보고한다
 - [ ] T036 ⛔ 8월 B-cubed 라벨링 재개 여부는 사용자가 정한다(FR-010). 재개 전에 G 예외의 비이행성(PR #329 리뷰, 후속으로 미룸)을 정한다
 
@@ -172,7 +172,7 @@ tdd-developer 단계: RED — ClusteringJudge 응답 해석 (T019~T021)
 ### 점진적 전달
 
 1. US1 → 사실 계산기
-2. US2 → 후보 목록 → **사람이 재판정** → 라벨 셋 기준 시점 2026-11-13
+2. US2 → 후보 목록 → **사람이 재판정** → 272쌍 기준 시점 2026-11-13(5월 B-cubed 는 재확인하지 않아 2026-11-10 유지)
 3. US5 판사 → **승인 후** 일치율 측정 → 버전 상수
 4. US5 일일 채점 → **도입 승인** → 배포 → 다음 날 확인
 5. 8월 라벨링 재개는 사용자 판단
