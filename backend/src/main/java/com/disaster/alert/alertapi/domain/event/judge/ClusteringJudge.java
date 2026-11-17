@@ -233,10 +233,18 @@ public class ClusteringJudge {
     }
 
     /**
-     * 프롬프트 버전의 272쌍 일치율. v1 은 아직 측정 전이라 비어 있다(= 채점하지 않음).
-     * 측정하면 버전별 값을 여기에 추가한다.
+     * 프롬프트 버전의 272쌍 일치율. 값이 없는 버전은 비어 있다(= 일일 채점을 하지 않음).
+     * 프롬프트를 바꿔 버전을 올리면 다시 재서 그 버전 값을 여기에 추가한다. 옛 버전 값은 비교 기준으로 남긴다.
+     *
+     * <p>v1: 2026-11-17 {@code --eval.judge-agreement} 실행(227쌍, $0.864) 판정을 같은 날 라벨 재확인 두 번
+     * (D·E·G·I 55쌍, 원칙 3 의심 3쌍) 반영 뒤 라벨로 다시 센 값. 근거는 {@code evaluation/reports/judge-agreement-2026-11-17.md}.
+     * 판사가 사람보다 잘게 나누는 쪽(사람 같은 사건·판사 다른 사건이 대부분)이라 일일 점수의 과병합은 실제보다 많게 나올 수 있다.
+     * 온도 0이어도 답이 매번 같지는 않아 다시 재면 한두 쌍은 달라질 수 있다.
      */
     static Optional<Agreement> agreementOf(String promptVersion) {
-        return Optional.empty();
+        return switch (promptVersion) {
+            case "v1" -> Optional.of(new Agreement(124, 142, 77, 80));
+            default -> Optional.empty();
+        };
     }
 }
