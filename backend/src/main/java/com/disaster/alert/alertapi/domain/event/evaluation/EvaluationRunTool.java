@@ -64,6 +64,11 @@ public class EvaluationRunTool implements ApplicationRunner {
         if (args.containsOption("eval.recheck") && args.containsOption("eval.judge-agreement")) {
             throw new IllegalArgumentException("--eval.recheck 와 --eval.judge-agreement 는 함께 쓸 수 없습니다");
         }
+        //    --eval.judge-agreement 는 값 없는 플래그다. containsOption 은 값을 보지 않아 =false 를 줘도 유료 호출이 돌므로 값이 있으면 막는다
+        if (args.containsOption("eval.judge-agreement") && !args.getOptionValues("eval.judge-agreement").isEmpty()) {
+            throw new IllegalArgumentException("--eval.judge-agreement 는 값 없이 씁니다(받은 값: "
+                    + args.getOptionValues("eval.judge-agreement") + ")");
+        }
         //    --eval.recheck 가 있으면 채점 대신 재확인 후보 목록만 내고 끝낸다(무료, 판정 없음)
         if (args.containsOption("eval.recheck")) {
             Set<Rule> rules = RecheckRunner.parseRules(
