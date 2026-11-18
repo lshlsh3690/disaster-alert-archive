@@ -7,13 +7,13 @@ import java.time.LocalDate;
  *
  * <p>{@code specs/001-event-clustering-pipeline/CLUSTERING_CRITERIA.md} 를 바꾸면 이 값도 바꾼다 —
  * 불일치 쌍 사람 라벨은 이 날짜를 기준 시점으로 함께 저장하므로, 기준이 바뀐 뒤에 매긴 라벨과 이전 라벨을 구분할 수 있다.
- *
- * <p>Red 단계 뼈대 — 값은 Green 에서 정한다.
  */
 public final class ClusteringCriteria {
 
-    // Red 단계 뼈대 — 구현은 Green 에서
-    public static final LocalDate VERSION_DATE = LocalDate.MIN;
+    /**
+     * 2026-11-13 — 기준 문서의 경계 사례를 마지막으로 바꾼 날. 문서를 다시 바꾸면 이 날짜를 그날로 올린다.
+     */
+    public static final LocalDate VERSION_DATE = LocalDate.of(2026, 11, 13);
 
     private ClusteringCriteria() {
     }
