@@ -6,6 +6,8 @@ import ReactQueryProvider from "@/lib/reactQueryProvider";
 import Footer from "@/components/layout/Footer";
 import NotificationPermissionBanner from "@/components/notification/NotificationPermissionBannerLoader";
 import I18nSync from "@/components/providers/I18nSync";
+import GoogleAnalytics from "@/components/analytics/GoogleAnalytics";
+import MicrosoftClarity from "@/components/analytics/MicrosoftClarity";
 
 
 const geistSans = Geist({
@@ -20,10 +22,20 @@ const geistMono = Geist_Mono({
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://www.disaster-alert-archive.co.kr";
 
+// 구글 서치콘솔·네이버 서치어드바이저 소유 확인 메타 태그. 값이 없으면 태그를 넣지 않는다
+// (서치콘솔을 DNS TXT 로 확인했다면 구글 쪽은 비워 둬도 된다).
+const GOOGLE_SITE_VERIFICATION = process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION || undefined;
+const NAVER_SITE_VERIFICATION = process.env.NEXT_PUBLIC_NAVER_SITE_VERIFICATION || undefined;
+
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   title: "재난 안전문자 아카이브",
   description: "과거 재난문자 다시보기와 지역별 재난 안전문자 내역을 누구나 쉽게 확인하고, 관심지역 맞춤 알림을 받을 수 있는 재난 안전문자 아카이브 서비스",
+
+  verification: {
+    google: GOOGLE_SITE_VERIFICATION,
+    other: NAVER_SITE_VERIFICATION ? { "naver-site-verification": NAVER_SITE_VERIFICATION } : undefined,
+  },
 
   manifest: "/manifest.json",
   themeColor: "#3867e8",
@@ -270,6 +282,8 @@ export default function RootLayout({
           </div>
           <NotificationPermissionBanner />
         </ReactQueryProvider>
+        <GoogleAnalytics />
+        <MicrosoftClarity />
       </body>
     </html>
   );
