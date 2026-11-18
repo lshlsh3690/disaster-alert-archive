@@ -92,8 +92,6 @@ export default function LoginPage() {
         </div>
         <div className="space-y-2.5">
           <OAuthButton provider="google" />
-          <OAuthButton provider="kakao" />
-          <OAuthButton provider="naver" />
         </div>
       </div>
     </main>

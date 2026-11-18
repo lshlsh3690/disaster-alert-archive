@@ -131,8 +131,6 @@ export const i18n = {
 
     oauth: {
       google: "Google 계정으로 로그인",
-      kakao: "카카오 계정으로 로그인",
-      naver: "네이버 계정으로 로그인",
     },
 
     form: {
@@ -654,8 +652,6 @@ export const i18n = {
 
     oauth: {
       google: "Continue with Google",
-      kakao: "Continue with Kakao",
-      naver: "Continue with Naver",
     },
 
     form: {
@@ -1107,8 +1103,6 @@ export const i18n = {
 
     oauth: {
       google: "Googleアカウントでログイン",
-      kakao: "カカオアカウントでログイン",
-      naver: "ネイバーアカウントでログイン",
     },
 
     form: {
@@ -1560,8 +1554,6 @@ export const i18n = {
 
     oauth: {
       google: "使用Google账号登录",
-      kakao: "使用Kakao账号登录",
-      naver: "使用Naver账号登录",
     },
 
     form: {
