@@ -22,7 +22,6 @@
 
 - `clustering_daily_score_pair`(V139): `score_date`, `alert_a`, `alert_b`, `judge_verdict`, `system_same_event`, `event_a/b`, `disagreement`. 라벨과 `(alert_a, alert_b)` 로 이어진다.
 - `clustering_daily_score`(V139): `score_date` → `judge_version`. 쌍의 판사 버전을 정한다(R6).
-- `disaster_alert`: 내보내기 항목의 원문·시각·유형. `DisasterAlertService.findAlertSummaries` 를 거친다(008 과 같음).
 
 ## 순수 규칙 (`DisagreementGrading`)
 
@@ -49,23 +48,10 @@
 - 같은 두 알림이 여러 날 불일치로 나오면(드묾) 날짜마다 한 번씩 센다 — 날짜마다 판사가 따로 판정했기 때문이다.
 - 결과 순서는 `JudgeVersionCatalog` 순서(최신 먼저), 목록에 없는 버전은 뒤.
 
-### 회귀 셋 항목 (`ExportItem`)
+### 평가용 라벨 묶음 (`PairLabelSnapshot`, `evaluation` 패키지)
 
-`cluster-eval-2026-11.json` 과 같은 모양 + 사람이 보는 필드:
-
-```json
-{
-  "q": 1,
-  "label": "DIFF",
-  "criteriaDate": "2026-11-13",
-  "scoreDate": "2026-11-19",
-  "kind": "OVER_MERGED",
-  "judgeVerdict": "DIFF",
-  "a": { "id": 101, "at": "2026-11-19 09:00", "type": "호우", "message": "..." },
-  "b": { "id": 205, "at": "2026-11-19 12:00", "type": "호우", "message": "..." }
-}
-```
-
-- `LabelJson.parse` 는 `a.id`·`b.id`·`label` 만 읽는다. 나머지는 무시된다.
-- 같은 쌍이 여러 날 불일치였어도 파일에는 한 번만(가장 최근 날짜 기준) 넣는다 — `LabelJson` 이 중복 쌍을 오류로 거절하기 때문이다.
-- 원문이 없는 알림은 `message: null`, `at`·`type` 도 null.
+- 입력: 저장된 라벨 행 `(alert_a, alert_b, label, updated_at)` 목록, 기준 시각.
+- 출력: `LabelJson.LabeledPair(alertA, alertB, label)` 목록 — 평가 도구가 라벨 파일에서 읽던 것과 같은 모양이라 이후 채점·리포트가 그대로 돈다.
+- 규칙: `updated_at ≤ 기준 시각` 인 행만, `(alert_a, alert_b)` 오름차순. UNSURE 도 포함한다(채점에서 빠지는 것은 기존 평가 규칙 그대로).
+- 0개면 평가 도구가 채점하지 않고 멈춘다(spec FR-014).
+- 덮어쓰기 구조라 기준 시각 뒤에 고친 라벨은 빠진다(research R11).

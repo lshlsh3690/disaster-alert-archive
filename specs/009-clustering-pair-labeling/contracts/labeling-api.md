@@ -70,17 +70,16 @@
 - 분모 0 이면 `percent: null`.
 - 버전 순서는 판사 버전 목록 순(최신 먼저). 목록에 없는 버전은 뒤, `model: null`.
 
-## 4. 회귀 셋 내보내기 — `GET /disagreement-labels/export`
+## 4. 평가 도구 — DB 라벨 모드 (HTTP 아님)
 
-응답 `data`:
-
-```json
-{
-  "fileName": "disagreement-labels-2026-11-19.json",
-  "items": [ /* data-model.md "회귀 셋 항목" 모양, q 는 1부터 */ ]
-}
+```bash
+./gradlew bootRun --args="--spring.profiles.active=eval \
+  --spring.datasource.url=$EVAL_DB --server.port=0 \
+  --eval.pair-labels-as-of=2026-11-25T00:00 \
+  --eval.report=evaluation/reports/<새 리포트 이름>.md"
 ```
 
-- `items` 가 비면 화면은 파일을 만들지 않고 "내보낼 라벨 없음"을 보인다.
-- 같은 쌍은 한 번만(가장 최근 날짜 기준).
-- 프론트는 `items` 배열만 파일에 쓴다(최상위가 배열이어야 평가 도구가 읽는다).
+- `--eval.pair-labels-as-of`: ISO 시각(KST). 이 시각까지 저장·수정된 불일치 쌍 사람 라벨만 쓴다. `--eval.labels`(파일)와 함께 주면 오류.
+- 리포트 머리의 데이터셋 이름: `불일치 쌍 사람 라벨(DB, 기준 2026-11-25T00:00, N쌍)`.
+- 라벨이 0개면 채점하지 않고 오류 종료(0 이 아닌 종료 코드).
+- 파일로 내보내는 HTTP 엔드포인트는 없다(research R8).

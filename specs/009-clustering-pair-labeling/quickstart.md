@@ -20,19 +20,21 @@
    - spec 스토리 2 의 예시(같은 사건 3·다른 사건 1·모르겠음 1)로 라벨링하면 판사 2/4, 시스템 2/4, 모르겠음 1.
    - 라벨링 전후로 판사 버전 이력의 272쌍 일치율과 일일 채점 점수가 같다(SC-003).
    - 라벨이 하나도 없으면 "아직 라벨 없음".
-4. **내보내기**(spec 스토리 3)
-   - "라벨 파일 내보내기" → `disagreement-labels-YYYY-MM-DD.json` 저장. 쌍 수·라벨이 화면과 같다.
-   - 그 파일을 기존 평가 도구에 넣어 `LabelJson` 형식 오류 없이 읽히는지 확인한다(평가 도구 실행 방법은 `backend/evaluation/README.md`).
-   - 라벨이 없으면 파일이 만들어지지 않고 안내만 보인다.
+4. **평가 도구 DB 라벨 모드**(spec 스토리 3)
+   - 라벨이 든 DB(로컬이면 같은 DB, 운영 라벨이면 운영 덤프로 새로 만든 평가 사본)에서 `--eval.pair-labels-as-of=<지금>` 으로 평가한다(실행 예시는 [contracts/labeling-api.md](contracts/labeling-api.md) 4절).
+   - 리포트 머리에 출처·기준 시각·라벨 수가 있고, 라벨 수가 저장한 라벨 수와 같다.
+   - 라벨 하나를 고친 뒤 고치기 전 시각으로 다시 돌리면 그 쌍이 빠지고 라벨 수가 하나 준다.
+   - 같은 기준 시각으로 두 번 돌린 리포트는 `git diff --no-index` 로 차이가 없다.
+   - 라벨이 없는 기준 시각(예: 아주 옛날)으로 돌리면 오류로 끝난다.
 5. **하지 않는 것 확인**
    - 라벨을 저장해도 `disaster_events`·`disaster_alert.event_id` 가 바뀌지 않는다(SC-006).
-   - 라벨링·집계·내보내기 동안 OpenAI 호출 로그가 없다.
+   - 라벨링·집계·DB 라벨 평가 동안 OpenAI 호출 로그가 없다.
 
 ## 테스트 명령
 
 ```bash
 cd backend
-./gradlew test --tests "*DisagreementGradingTest"          # 순수 판정·집계
-./gradlew test --tests "*ClusteringAdminLabelingTest"      # 저장·권한·성적·내보내기(로컬 Postgres 필요)
+./gradlew test --tests "*DisagreementGradingTest" --tests "*PairLabelSnapshotTest"   # 순수 판정·집계·라벨 묶음
+./gradlew test --tests "*ClusteringAdminLabelingTest"      # 저장·권한·성적(로컬 Postgres 필요)
 cd ../frontend && npm test && npm run lint && npm run build
 ```

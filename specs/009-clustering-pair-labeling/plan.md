@@ -6,7 +6,7 @@
 
 ## 요약
 
-008 관리자 대시보드의 불일치 쌍 표에서 관리자가 쌍마다 사람 라벨(같은 사건/다른 사건/모르겠음)을 저장하게 한다. 백엔드는 `domain/event` 에 사람 라벨 테이블 하나(새 마이그레이션)와 008 컨트롤러에 엔드포인트 세 개(라벨 저장, 어려운 쌍 판사 성적, 회귀 셋 내보내기)를 더하고, 불일치 쌍 응답에 현재 라벨·누가 틀렸는지·"라벨 없는 쌍만" 필터를 더한다. 누가 틀렸는지 판정과 판사 버전별 집계는 순수 클래스에 둔다. 내보내기는 기존 평가 도구의 라벨 파일 형식(`LabelJson`)을 그대로 따른다. 운영 이벤트·클러스터링 규칙·판사 프롬프트는 건드리지 않고, LLM 호출도 없다.
+008 관리자 대시보드의 불일치 쌍 표에서 관리자가 쌍마다 사람 라벨(같은 사건/다른 사건/모르겠음)을 저장하게 한다. 백엔드는 `domain/event` 에 사람 라벨 테이블 하나(새 마이그레이션)와 008 컨트롤러에 엔드포인트 두 개(라벨 저장, 어려운 쌍 판사 성적)를 더하고, 불일치 쌍 응답에 현재 라벨·누가 틀렸는지·"라벨 없는 쌍만" 필터를 더한다. 평가 도구(`EvaluationRunTool`)는 라벨 파일 대신 이 테이블을 기준 시각까지 읽어 채점하는 방식을 더한다 — 라벨의 원본은 DB 한 곳이고 파일 내보내기는 두지 않는다(2026-11-18 사용자 결정). 누가 틀렸는지 판정·판사 버전별 집계·평가용 라벨 묶음 만들기는 순수 클래스에 둔다. 운영 이벤트·클러스터링 규칙·판사 프롬프트는 건드리지 않고, LLM 호출도 없다.
 
 ## 기술 컨텍스트
 
@@ -16,13 +16,13 @@
 
 **저장소**: PostgreSQL — 새 테이블 `clustering_pair_label`(V140). 기존 `clustering_daily_score`·`clustering_daily_score_pair`·`disaster_alert` 는 읽기만
 
-**테스트**: JUnit 5 — 판정·집계 순수 클래스는 단위 테스트(Red-Green), 라벨 저장·권한·집계·내보내기 API 는 `@IntegrationTest`(Red-Green). 프론트는 Jest + ui-checker. 프론트 TDD 여부는 tasks 의 확인 단계에서 사용자가 정한다
+**테스트**: JUnit 5 — 판정·집계·평가용 라벨 묶음 순수 클래스는 단위 테스트(Red-Green), 라벨 저장·권한·집계 API 는 `@IntegrationTest`(Red-Green). 프론트는 Jest + ui-checker. 프론트 TDD 여부는 tasks 의 확인 단계에서 사용자가 정한다
 
 **대상 플랫폼**: 기존 운영(맥북 셀프호스팅 Docker Compose), 관리자 데스크톱 브라우저 위주
 
 **프로젝트 유형**: web-service(backend + frontend)
 
-**성능 목표**: 라벨 저장 1초 안에 표에 반영. 집계·내보내기는 라벨 수(수십~수백) 규모라 단순 조회로 충분
+**성능 목표**: 라벨 저장 1초 안에 표에 반영. 집계·DB 라벨 평가는 라벨 수(수십~수백) 규모라 단순 조회로 충분
 
 **제약사항**: ADMIN 만 쓰기, 쓰기는 라벨 저장 하나뿐, 새 LLM·유료 호출 없음, 272쌍 일치율·운영 이벤트 불변
 
@@ -37,12 +37,12 @@ develop 의 헌법(v1.1.0) 원칙 I~V 와, 개정 중인 v1.2.0 의 VI(도메인
 | 원칙 | 판정 | 근거 |
 |---|---|---|
 | I. 가독성과 단순성 | 통과 | 테이블 하나·엔드포인트 세 개·008 화면에 버튼과 영역 하나씩. 라벨 이력 테이블·평가자 간 일치도는 만들지 않음 |
-| II. 계층형 아키텍처 | 통과 | controller → service → repository. 응답은 `ApiResponse`(내보내기도 `data` 안에 라벨 배열), 오류는 `CustomException`+`ErrorCode`, 요청 DTO 는 `@Valid`. 라벨 변경은 엔티티 메서드(`relabel`)로만 |
+| II. 계층형 아키텍처 | 통과 | controller → service → repository. 응답은 `ApiResponse`, 오류는 `CustomException`+`ErrorCode`, 요청 DTO 는 `@Valid`. 라벨 변경은 엔티티 메서드(`relabel`)로만 |
 | III. 검증 가능한 변경 | 통과 | 판정·집계 순수 클래스 Red → 사용자 확인 → Green, API 통합 테스트 Red → 사용자 확인 → Green |
 | IV. 정직한 문서화 | 통과 | 어려운 쌍 성적을 "불일치 쌍 기준"으로 밝혀 272쌍 일치율과 구분(spec FR-009). 008 spec FR-011 을 고쳐 쓰기 범위를 문서에 반영 |
 | V. 한글 커밋 컨벤션 | 통과 | commit-message 스킬 |
-| VI. 도메인 규칙은 순수 클래스(취지) | 통과 | 누가 틀렸는지 판정·판사 버전별 집계·내보내기 항목 조립은 JPA·Spring 을 import 하지 않는 클래스(`DisagreementGrading`)에. 기준 시점 상수도 순수 클래스 한 곳 |
-| VII. 맥락 경계(취지) | 통과 | 라벨·채점 테이블은 `event` 맥락 소유. 내보내기에 필요한 알림 원문은 008 과 같이 `DisasterAlertService.findAlertSummaries` 를 거친다 |
+| VI. 도메인 규칙은 순수 클래스(취지) | 통과 | 누가 틀렸는지 판정·판사 버전별 집계(`DisagreementGrading`)와 평가용 라벨 묶음(`PairLabelSnapshot`)은 JPA·Spring 을 import 하지 않는 클래스에. 기준 시점 상수도 순수 클래스 한 곳 |
+| VII. 맥락 경계(취지) | 통과 | 라벨·채점 테이블과 평가 도구가 모두 `event` 맥락 소유라 평가 도구가 라벨 저장소를 직접 읽는다. 다른 맥락 테이블은 새로 읽지 않는다 |
 
 위반 없음 → 복잡도 추적 절 생략.
 
@@ -61,6 +61,7 @@ develop 의 헌법(v1.1.0) 원칙 I~V 와, 개정 중인 v1.2.0 의 VI(도메인
 - 불일치 쌍에서는 둘 중 정확히 하나만 맞는다 → `WrongSide` = JUDGE / SYSTEM. 라벨이 UNSURE 면 판정 없음(null).
 - 판사 버전별 집계: 버전마다 판사가 맞은 쌍/라벨 쌍(UNSURE 제외), 시스템이 맞은 쌍/라벨 쌍, UNSURE 수. 비율은 008 의 `ClusteringDashboardMetrics.ratio` 를 그대로 쓴다(분모 0 → 백분율 없음).
 - 지금 불일치로 남아 있는 쌍만 센다(spec 예외 상황: 재채점으로 불일치가 아니게 된 쌍의 라벨은 남기되 집계에서 뺀다).
+- 평가용 라벨 묶음(`PairLabelSnapshot`, `evaluation` 패키지): 저장된 라벨 행 중 `updated_at ≤ 기준 시각` 인 것만 골라 `(alert_a, alert_b)` 순으로 정렬해 `LabelJson.LabeledPair` 목록을 만든다. 순서가 늘 같아야 두 리포트의 틀린 쌍 표를 비교할 수 있다(006 FR-013).
 - 기준 시점 상수 `ClusteringCriteria.VERSION_DATE = 2026-11-13`(경계 사례 마지막 변경일). `CLUSTERING_CRITERIA.md` 를 바꿀 때 이 상수도 바꾼다고 그 문서 머리와 상수 javadoc 에 적는다.
 
 ### 3. 백엔드 API (`ClusteringAdminController` 에 추가)
@@ -70,21 +71,21 @@ develop 의 헌법(v1.1.0) 원칙 I~V 와, 개정 중인 v1.2.0 의 VI(도메인
 - `PUT /api/v1/admin/clustering/disagreement-labels` — `{alertA, alertB, label}`. 순서는 서버가 작은 id 를 a 로 맞춘다. 그 쌍이 불일치 쌍으로 기록돼 있지 않으면 404(`CLUSTERING_PAIR_NOT_FOUND`). 회원 id 는 `@AuthenticationPrincipal(expression = "id")`.
 - `GET /api/v1/admin/clustering/disagreements` (008) — 쌍마다 `humanLabel`·`criteriaDate`·`wrongSide` 추가, 파라미터 `unlabeledOnly`(기본 false) 추가.
 - `GET /api/v1/admin/clustering/hard-pair-grades` — 판사 버전별 어려운 쌍 성적.
-- `GET /api/v1/admin/clustering/disagreement-labels/export` — `data` 안에 `fileName` 과 `LabelJson` 형식 배열(`items`). 라벨이 없으면 `items` 가 빈 배열이고 화면이 "내보낼 라벨 없음"을 보인다(빈 파일을 만들지 않음).
 - 008 spec FR-011 을 "쓰기는 사람 라벨 저장만 허용"으로 고친다(spec FR-015).
 
-### 4. 회귀 셋 파일 형식
+### 4. 평가 도구가 DB 라벨을 읽음 (`EvaluationRunTool`)
 
-- 최상위 배열, 항목마다 `q`(1부터), `label`, `a`·`b`(`id`·`at`·`type`·`message`) — 기존 `cluster-eval-2026-11.json` 과 같은 모양이라 `LabelJson.parse` 가 그대로 읽는다(평가 도구는 `a.id`·`b.id`·`label` 만 읽고 나머지는 사람이 보는 필드).
-- 항목마다 `criteriaDate`·`scoreDate`·`kind`·`judgeVerdict` 를 더한다(파서는 무시). 기준 시점이 섞여 있으면 항목별로 보인다(spec FR-013).
-- 파일 이름 `disagreement-labels-YYYY-MM-DD.json`(내보낸 날짜, KST). 관리자가 받아 `backend/evaluation/datasets/` 에 넣는다.
+- 새 옵션 `--eval.pair-labels-as-of=<ISO 시각>`. `--eval.labels`(파일) 대신 주며 둘을 함께 주면 오류. 주면 평가 사본의 `clustering_pair_label` 을 읽어 `PairLabelSnapshot` 으로 라벨 목록을 만든 뒤, 나머지 채점·리포트는 파일 모드와 똑같이 돈다.
+- 리포트 이름 자리(데이터셋 이름)에 "불일치 쌍 사람 라벨(DB, 기준 시각 …, N쌍)"을 쓴다(spec FR-013).
+- 기준 시각까지 라벨이 0개면 채점하지 않고 오류로 끝낸다(spec FR-014).
+- 덮어쓰기 구조라 기준 시각 뒤에 고친 라벨은 옛 값으로 돌아가지 않고 빠진다(research R11). 리포트의 라벨 수가 이전 리포트와 다르면 그 차이를 감안해 비교한다.
+- `backend/evaluation/README.md` 클러스터링 평가 절에 DB 라벨 모드 실행 예시를 더한다.
 
 ### 5. 프론트엔드 (`app/admin/clustering/_sections.tsx`)
 
 - 불일치 쌍 표: 쌍마다 같은 사건 / 다른 사건 / 모르겠음 버튼(현재 라벨 강조), "판사가 틀림"/"시스템이 틀림" 표시, "라벨 없는 쌍만" 체크.
 - 저장은 `useMutation`, 낙관적 업데이트 없이 성공 후 불일치 쌍·판사 성적 쿼리를 무효화(팀 컨벤션). 실패하면 이유를 보이고 이전 라벨 유지.
 - 판사 버전 이력 아래에 "어려운 쌍(불일치 쌍 사람 라벨 기준) 판사 성적" 표. 라벨이 없으면 "아직 라벨 없음".
-- 불일치 쌍 영역에 "라벨 파일 내보내기" 버튼 — 응답의 `items` 를 JSON 파일로 저장. 비어 있으면 안내만.
 
 ### 6. 하지 않는 것
 
@@ -121,22 +122,27 @@ backend/src/main/java/com/disaster/alert/alertapi/
 │   ├── repository/ClusteringPairLabelRepository.java
 │   ├── repository/ClusteringDailyScorePairRepository.java  # 라벨 없는 쌍만·라벨된 불일치 쌍 조회 추가
 │   ├── evaluation/ClusteringCriteria.java              # 기준 시점 상수(순수)
-│   ├── dashboard/DisagreementGrading.java              # 누가 틀렸는지·버전별 집계·내보내기 항목(순수)
+│   ├── dashboard/DisagreementGrading.java              # 누가 틀렸는지·버전별 집계(순수)
+│   ├── evaluation/PairLabelSnapshot.java               # 기준 시각까지 라벨 → 평가용 라벨 목록(순수)
+│   ├── evaluation/EvaluationRunTool.java               # --eval.pair-labels-as-of 옵션 추가
 │   ├── service/ClusteringPairLabelService.java         # 라벨 저장
-│   ├── service/ClusteringDashboardService.java         # 불일치 쌍 응답 확장·성적·내보내기
-│   ├── controller/ClusteringAdminController.java       # 엔드포인트 3개 추가, 불일치 쌍 파라미터 추가
+│   ├── service/ClusteringDashboardService.java         # 불일치 쌍 응답 확장·성적
+│   ├── controller/ClusteringAdminController.java       # 엔드포인트 2개 추가, 불일치 쌍 파라미터 추가
 │   └── dto/                                            # 요청 1개, 응답 2개, 불일치 쌍 응답 필드 추가
 └── domain/common/exception/ErrorCode.java              # CLUSTERING_PAIR_NOT_FOUND
 
 backend/src/test/java/.../domain/event/
 ├── dashboard/DisagreementGradingTest.java              # 순수 단위(Red-Green)
-└── controller/ClusteringAdminLabelingTest.java         # @IntegrationTest: 저장·권한·성적·내보내기
+├── evaluation/PairLabelSnapshotTest.java               # 순수 단위(Red-Green)
+└── controller/ClusteringAdminLabelingTest.java         # @IntegrationTest: 저장·권한·성적
 
 frontend/src/
-├── api/clusteringAdminApi.ts                           # 저장·성적·내보내기 함수, 타입 추가
+├── api/clusteringAdminApi.ts                           # 저장·성적 함수, 타입 추가
 ├── lib/queries/useClusteringAdmin.ts                   # 성적 훅
 ├── lib/mutations/useSaveDisagreementLabel.ts           # 라벨 저장
-└── app/admin/clustering/_sections.tsx                  # 라벨 버튼·필터·성적 표·내보내기
+└── app/admin/clustering/_sections.tsx                  # 라벨 버튼·필터·성적 표
+
+backend/evaluation/README.md                            # DB 라벨 모드 실행 예시
 ```
 
 **구조 결정**: 라벨은 채점 결과에 붙는 사람 판단이라 채점 테이블과 같은 `event` 맥락에 둔다. 저장(쓰기) service 는 008 의 조회 service 와 나눠, 조회 service 가 읽기 전용(`@Transactional(readOnly = true)`)으로 남게 한다.
@@ -145,10 +151,10 @@ frontend/src/
 
 | 단계 | 내용 | 승인 지점 |
 |---|---|---|
-| 1 | `DisagreementGrading` + `ClusteringCriteria` 순수 판정·집계 — Red | **사용자 Red 확인** |
+| 1 | `DisagreementGrading` + `ClusteringCriteria` + `PairLabelSnapshot` 순수 판정·집계·라벨 묶음 — Red | **사용자 Red 확인** |
 | 2 | 1의 Green | — |
-| 3 | 마이그레이션·엔티티 뼈대 + 라벨 저장·권한·불일치 쌍 확장·성적·내보내기 통합 테스트 — Red | **사용자 Red 확인** |
-| 4 | 3의 Green(service·저장소·DTO·ErrorCode) | 코드 리뷰(100줄 이상) |
-| 5 | 프론트 라벨 버튼·필터·성적·내보내기 | 프론트 TDD 여부 **사용자 확인** |
+| 3 | 마이그레이션·엔티티 뼈대 + 라벨 저장·권한·불일치 쌍 확장·성적 통합 테스트 — Red | **사용자 Red 확인** |
+| 4 | 3의 Green(service·저장소·DTO·ErrorCode) + 평가 도구 DB 라벨 모드·README | 코드 리뷰(100줄 이상) |
+| 5 | 프론트 라벨 버튼·필터·성적 | 프론트 TDD 여부 **사용자 확인** |
 | 6 | 008 spec FR-011 수정, CLUSTERING_CRITERIA.md 머리에 기준 시점 상수 안내 | — |
-| 7 | 운영 배포 후 불일치 쌍이 생기면 라벨링·내보내기 확인 | 사용자 확인 |
+| 7 | 운영 배포 후 불일치 쌍이 생기면 라벨링 확인, 평가 사본에서 DB 라벨 평가 확인 | 사용자 확인 |
