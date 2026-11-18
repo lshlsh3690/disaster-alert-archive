@@ -13,6 +13,7 @@ import com.disaster.alert.alertapi.domain.event.dashboard.ClusteringDashboardMet
 import com.disaster.alert.alertapi.domain.event.dto.ClusteringDashboardDailyChecksResponse;
 import com.disaster.alert.alertapi.domain.event.dto.ClusteringDashboardDailyScoresResponse;
 import com.disaster.alert.alertapi.domain.event.dto.ClusteringDashboardDisagreementsResponse;
+import com.disaster.alert.alertapi.domain.event.dto.ClusteringDashboardHardPairGradesResponse;
 import com.disaster.alert.alertapi.domain.event.dto.ClusteringDashboardJudgeVersionsResponse;
 import com.disaster.alert.alertapi.domain.event.evaluation.PairCountResult;
 import com.disaster.alert.alertapi.domain.event.judge.JudgeVersionCatalog;
@@ -91,10 +92,11 @@ public class ClusteringDashboardService {
      * 두 알림 원문은 한 페이지분을 한 번에 읽어 채운다.
      *
      * @param kind null 이면 두 종류 모두
+     * @param unlabeledOnly true 면 사람 라벨이 없는 쌍만 (Red 단계 뼈대 - 아직 무시한다)
      * @throws CustomException 범위·page·size 가 잘못되면 400 (범위는 {@code CLUSTERING_DASHBOARD_RANGE_INVALID})
      */
     public ClusteringDashboardDisagreementsResponse disagreements(LocalDate from, LocalDate to, Disagreement kind,
-                                                                  int page, int size) {
+                                                                  boolean unlabeledOnly, int page, int size) {
         // 1) 입력 검증 — size 상한이 없으면 한 번에 수천 쌍(큰 재난 날)을 내려보낼 수 있다
         validateRange(from, to);
         if (page < 0 || size < 1 || size > MAX_PAGE_SIZE) {
@@ -117,10 +119,21 @@ public class ClusteringDashboardService {
                 .map(pair -> new ClusteringDashboardDisagreementsResponse.Pair(
                         pair.getScoreDate(), pair.getDisagreement(), pair.getJudgeVerdict(),
                         summaryOf(pair.getAlertA(), summaries), summaryOf(pair.getAlertB(), summaries),
-                        pair.getEventA(), pair.getEventB()))
+                        pair.getEventA(), pair.getEventB(),
+                        // Red 단계 뼈대 - 사람 라벨 필드는 항상 null (Green 에서 라벨을 읽어 채운다)
+                        null, null, null))
                 .toList();
         return new ClusteringDashboardDisagreementsResponse(
                 page, size, result.getTotalElements(), result.getTotalPages(), pairs);
+    }
+
+    /**
+     * 어려운 쌍 판사 성적 — 지금 불일치인 쌍 중 사람 라벨이 있는 것을 판사 버전별로 센다.
+     *
+     * <p>Red 단계 뼈대 - 항상 빈 결과(labeledPairs 0, versions 빈 목록)를 돌려준다.
+     */
+    public ClusteringDashboardHardPairGradesResponse hardPairGrades() {
+        return new ClusteringDashboardHardPairGradesResponse(0, List.of());
     }
 
     /**
