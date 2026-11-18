@@ -10,6 +10,7 @@ import com.disaster.alert.alertapi.domain.event.dto.EventDetailResponse;
 import com.disaster.alert.alertapi.domain.event.dto.EventListResponse;
 import com.disaster.alert.alertapi.domain.event.dto.EventSearchRequest;
 import com.disaster.alert.alertapi.domain.event.dto.EventTimelineRow;
+import com.disaster.alert.alertapi.domain.event.dto.MajorEventRow;
 import com.disaster.alert.alertapi.domain.event.model.DisasterEvent;
 import com.disaster.alert.alertapi.domain.event.repository.DisasterEventRepository;
 import com.disaster.alert.alertapi.domain.event.repository.DisasterEventTranslationRepository;
@@ -26,6 +27,7 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.ZoneId;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -225,5 +227,30 @@ public class EventQueryService {
             map.computeIfAbsent(alertId, k -> new ArrayList<>()).add(code);
         }
         return map;
+    }
+
+    // ── 기록관(archive)용 조회 — Red 단계 뼈대, 구현은 Green 에서 ─────────────────
+
+    /**
+     * 연도별 주요 사건 — {@code first_alert_at} 이 그 연도 안인 사건 중 제외 유형을 뺀 상위 10개.
+     * 정렬은 포함 알림 수 내림차순.
+     *
+     * @param excludedTypes 빼는 유형(지속형). 유형이 null 인 사건은 지속형이 아니므로 포함한다
+     */
+    // Red 단계 뼈대 — 구현은 Green 에서
+    public List<MajorEventRow> majorEvents(int year, Collection<String> excludedTypes) {
+        return List.of();
+    }
+
+    /** 사건이 존재하는 연도 목록(내림차순). */
+    // Red 단계 뼈대 — 구현은 Green 에서
+    public List<Integer> eventYears() {
+        return List.of();
+    }
+
+    /** 사건의 대표 알림 sn — 가장 먼저 발령된 알림, 같은 시각이면 작은 sn. 알림이 없으면 null. */
+    // Red 단계 뼈대 — 구현은 Green 에서
+    public Long representativeSn(Long eventId) {
+        return null;
     }
 }
