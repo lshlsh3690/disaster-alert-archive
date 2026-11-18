@@ -14,6 +14,7 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 /**
  * 판사의 순수 로직 테스트 — 응답 해석과 프롬프트 조립만 본다. LLM 은 부르지 않는다(실제 호출은 일치율 측정이 그 역할이다).
@@ -84,6 +85,19 @@ class ClusteringJudgeTest {
         assertThat(prompt.lines().anyMatch(line -> line.contains("시군구") && line.contains("모름"))).isTrue();
         // 검증 4: 사실 블록은 규칙으로 계산한 값이며 판정이 아니라고 밝힌다(판사가 사실을 정답으로 오해하지 않게)
         assertThat(prompt).contains("규칙으로 계산한 값");
+    }
+
+    /**
+     * 판사의 모델 상수와 버전 목록(JudgeVersionCatalog)의 같은 버전 모델이 어긋나지 않게 한다 — 모델을 바꾸고 목록을
+     * 안 고치면 대시보드·리포트가 엉뚱한 모델·단가를 보여 준다. 새 버전을 재는 중이라 목록에 아직 없으면 검사하지 않는다
+     * (그 동안 일일 채점은 일치율이 없어 건너뛴다).
+     */
+    @Test
+    void 판사_모델은_버전_목록의_같은_버전_모델과_같다() {
+        Optional<JudgeVersionCatalog.Entry> entry = JudgeVersionCatalog.find(ClusteringJudge.PROMPT_VERSION);
+        assumeTrue(entry.isPresent(), "판사 버전이 아직 목록에 없음(측정 중)");
+
+        assertThat(ClusteringJudge.MODEL).isEqualTo(entry.get().model());
     }
 
     // 뺀 케이스: SAME 외 DIFF/UNSURE 정확한 토큰 → 해당 값(입력 하나에 출력 하나가 자명), 일치율 조회(상수 조회라 값 확인뿐).

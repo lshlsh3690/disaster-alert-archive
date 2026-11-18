@@ -30,9 +30,7 @@ export default function SignupPage() {
             <span className="h-px flex-1 bg-[var(--line)]"></span>
           </div>
           <div className="space-y-2.5">
-            <OAuthButton provider="google" />
-            <OAuthButton provider="kakao" />
-            <OAuthButton provider="naver" />
+            <OAuthButton />
           </div>
         </div>
       </div>

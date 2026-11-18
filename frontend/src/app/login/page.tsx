@@ -39,12 +39,18 @@ export default function LoginPage() {
 
   const { handleSubmit } = formMethods;
 
-  const { mutate: login } = useLogin({
+  const { mutate: login, isPending } = useLogin({
     onSuccessCallback: () => router.push("/"),
     onErrorCallback: (errorMessage) => setError(errorMessage),
   });
 
   const handleLogin = async (value: LoginFormData) => {
+    // 비어 있으면 서버에 보내지 않는다 — 서버 검증 메시지("요청 값 검증에 실패했습니다. - password: ...")는
+    // 첫 번째 필드 오류만 담고 개발자용 문구라 그대로 보여 주기에 맞지 않는다
+    if (!value.email.trim() || !value.password) {
+      setError(t("login.emptyFields"));
+      return;
+    }
     login(value);
   };
 
@@ -56,7 +62,7 @@ export default function LoginPage() {
           <EmailInput<LoginFormData> formMethods={formMethods} />
           <PasswordInput<LoginFormData> formMethods={formMethods} name="password" />
           {error && <p className="text-sm text-[var(--coral)]">{error}</p>}
-          <Button type="submit" fullWidth className="h-11">
+          <Button type="submit" fullWidth className="h-11" isLoading={isPending}>
             {t("login.submit")}
           </Button>
           <Button type="button" variant="secondary" fullWidth className="h-11" onClick={() => router.back()}>
@@ -85,9 +91,7 @@ export default function LoginPage() {
           <span className="h-px flex-1 bg-[var(--line)]"></span>
         </div>
         <div className="space-y-2.5">
-          <OAuthButton provider="google" />
-          <OAuthButton provider="kakao" />
-          <OAuthButton provider="naver" />
+          <OAuthButton />
         </div>
       </div>
     </main>
