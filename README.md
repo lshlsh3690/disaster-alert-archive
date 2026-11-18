@@ -54,11 +54,12 @@ flowchart LR
         K -- "사건" --> S["재난 유형별 묶기"]
         S -- "그 밖의 유형" --> EM["임베딩 계산"]
         EM --> E["같은 시군구<br/>후보 이벤트 검색"]
-        S ~~~ KC["00:30 구조 검사<br/>미배정 · 임베딩 없음"]
         E --> E1{"코사인 거리<br/>≤ 0.15?"}
         E1 -- "LLM 리랭킹" --> RR{"임베딩 후보를<br/>LLM 이 다시 판정"}
         RR -- "같은 사건" --> M["기존 이벤트에 병합"]
         RR -- "다른 사건" --> N["새 이벤트"]
+        H0[" "] ~~~ A
+        H0 ~~~ H1[" "] ~~~ H2[" "] ~~~ H3[" "] ~~~ H4[" "] ~~~ KC["00:30 구조 검사<br/>미배정 · 임베딩 없음"]
     end
 
     subgraph PROD["운영 검증 (매일)"]
@@ -73,6 +74,11 @@ flowchart LR
     M --- JN(( ))
     N --- JN
     JN --> D
+    style H0 fill:none,stroke:none
+    style H1 fill:none,stroke:none
+    style H2 fill:none,stroke:none
+    style H3 fill:none,stroke:none
+    style H4 fill:none,stroke:none
     J -- "버전별 일치율 상수" --> D
 ```
 
