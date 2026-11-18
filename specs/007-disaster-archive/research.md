@@ -14,18 +14,22 @@ Phase 0 결과. 기술 컨텍스트의 미정 사항을 코드로 확인해 결�
 - **근거**: 사건-알림 매핑은 `disaster_alert.event_id` 한 곳에만 있다(V137, `idx_disaster_alert_event` 인덱스 존재). 대표 알림을 컬럼으로 저장하면 클러스터링이 알림을 붙이거나 옮길 때마다 갱신해야 하고, 그 갱신 지점이 `EventClusteringService` 안의 여러 경로에 흩어진다. 조회 시 계산은 인덱스로 사건당 1회 정렬이라 비용이 작다.
 - **기각한 대안**: `disaster_events.representative_sn` 컬럼(갱신 누락 위험, 마이그레이션 필요), 옛 사건→새 사건 매핑 표(명세 가정 절에서 제외).
 
-## R3. "지속형 유형" 목록의 출처
+## R3. 지속형 유형을 주요 사건에서 뺄 것인가 — 빼지 않는다 (2026-11-18 번복)
 
-- **결정**: 클러스터링과 **같은 설정 키** `clustering.sustained-types`(`application.yml:156`, 현재 `폭염,한파,대설,강풍,가축질병`)를 `ArchiveService` 에서 `@Value` 로 읽는다.
-- **근거**: 기록관이 빼는 이유가 "클러스터링이 이 유형을 지속형으로 이어 붙여 알림 수가 커지기 때문"이므로, 클러스터링의 지속형 목록이 바뀌면 기록관 제외 목록도 같이 바뀌어야 맞다. CLAUDE.md 가 밝힌 대로 `clustering.*` 는 `@ConfigurationProperties` 없이 `@Value` 로 흩어 바인딩하는 것이 이 저장소의 관행이다(`EventClusteringService.java:136`).
-- **기각한 대안**: 기록관 전용 키 `archive.excluded-types`(두 목록이 어긋날 수 있음), 상수 하드코딩.
+- **처음 결정(같은 날 번복)**: 클러스터링 설정 `clustering.sustained-types`(폭염·한파·대설·강풍·가축질병)를 읽어 주요 사건에서 뺐다. 근거는 "지속형은 같은 시군구의 알림을 168h 끊김 기준으로 이어 붙이므로 알림 수가 부풀어 목록을 채운다"는 **실측 없는 추론**이었다(A1 커밋 `38e67d01` 까지 이 규칙으로 구현).
+- **실측** (`disaster_alert_eval_v6`, 2023-09-01~2026-10-10, 사건 7,291개):
+  - 지속형 사건 224개(대설 179·한파 18·가축질병 16·강풍 9·폭염 2)의 알림 397건이 전부 `alert_kind=INCIDENT`. 폭염·한파 특보 대부분은 ADVISORY 로 분류돼 2026-10-17 부터 클러스터링 앞단에서 빠지므로, 지속형 사건은 주로 대설 때의 제설·통제 문자로 작다.
+  - 가장 큰 지속형 사건은 알림 13건(대설). 전체 1위는 의성 산불 241건.
+  - 규칙 없이 연도별 상위 10을 뽑아도 지속형 사건은 2023·2024·2025·2026 모두 0개(상위 10 진입선 5·9·23·8건).
+- **결정**: 유형으로 거르지 않는다. 효과가 0이고, 기록적 폭설처럼 실제 사건이 빠지는 대가만 있다. 설정 읽기·제외 조건·연도 목록과의 불일치(A1 리뷰 지적 1)도 함께 사라진다.
+- **교훈**: 선정 규칙을 정하기 전에 같은 데이터로 결과를 먼저 뽑아 봤어야 했다.
 
 ## R4. 주요 사건 쿼리 형태
 
 - **결정**: CTE 로 상위 10개 사건을 먼저 자른 뒤, 그 10개에 대해서만 대표 알림 sn 을 `DISTINCT ON (event_id)` 로 구한다.
-  1. `top AS (SELECT ... FROM disaster_events WHERE first_alert_at >= :start AND first_alert_at < :end AND (primary_disaster_type IS NULL OR primary_disaster_type NOT IN (:excluded)) ORDER BY alert_count DESC, first_alert_at ASC, id ASC LIMIT 10)`
+  1. `top AS (SELECT ... FROM disaster_events WHERE first_alert_at >= :start AND first_alert_at < :end ORDER BY alert_count DESC, first_alert_at ASC, id ASC LIMIT 10)` (유형 제외 조건은 R3 번복으로 없음)
   2. `rep AS (SELECT DISTINCT ON (event_id) event_id, sn FROM disaster_alert WHERE event_id IN (SELECT id FROM top) ORDER BY event_id, created_at, sn)`
-- **근거**: 대표 sn 을 select 목록의 상관 서브쿼리로 넣으면 플래너가 정렬·LIMIT 전에 모든 후보 행에서 계산할 수 있다. CTE 로 나누면 계산 대상이 10행으로 고정된다. `primary_disaster_type` 이 null 인 사건은 지속형이 아니므로 포함한다(`NOT IN` 은 null 을 걸러 버리므로 명시적으로 살린다).
+- **근거**: 대표 sn 을 select 목록의 상관 서브쿼리로 넣으면 플래너가 정렬·LIMIT 전에 모든 후보 행에서 계산할 수 있다. CTE 로 나누면 계산 대상이 10행으로 고정된다.
 - **정렬 마지막 키 `id`**: 알림 수와 첫 알림 시각이 모두 같은 경우의 순서를 고정하기 위한 것이다. 응답에는 `id` 를 내보내지 않는다.
 
 ## R5. 연도 경계와 시간대
@@ -57,8 +61,8 @@ Phase 0 결과. 기술 컨텍스트의 미정 사항을 코드로 확인해 결�
 
 ## R10. 광역(broadcast) 사건
 
-- **결정**: 이번 규칙에서는 제외하지 않는다(명세 FR-011 은 지속형 유형만 제외).
-- **관찰 필요**: 광역 사건도 다지역 알림이 모여 알림 수가 클 수 있다. 구현 뒤 운영 데이터로 연도별 상위 10을 한 번 보고, 광역 사건이 목록을 채우면 사용자에게 보고만 한다(규칙 변경은 사용자 결정).
+- **결정**: 제외하지 않는다(FR-011 은 어떤 유형·경로도 거르지 않는다).
+- **관찰 필요**: 광역 사건도 다지역 알림이 모여 알림 수가 클 수 있다. R3 처럼 추론으로 규칙을 만들지 말고, 운영 데이터로 연도별 상위 10을 뽑아 광역 사건이 목록을 채우는지 먼저 보고한다(규칙 변경은 사용자 결정).
 
 ## R11. 발신 기관을 엔티티로 둘 것인가 (2026-11-18 추가, 스토리 1)
 
@@ -81,7 +85,6 @@ Phase 0 결과. 기술 컨텍스트의 미정 사항을 코드로 확인해 결�
 |---|---|---|
 | `sn` 유일 제약 | `V1` `sn BIGINT NOT NULL UNIQUE`, `DisasterAlert.java:37` | sn → 알림 조회 키 |
 | 사건-알림 매핑 + 인덱스 | `V137` `idx_disaster_alert_event` | 대표 알림 계산 |
-| 지속형 유형 설정 | `application.yml:156` | 제외 목록 |
 | 사건 상세 API | `EventController.java:69`, `EventQueryService.detail` | 해석 후 그대로 재사용 |
 | 사건 상세 화면 | `frontend/src/app/events/[id]/EventDetailClient.tsx` | `eventId` prop 추가로 재사용 |
 | 공개 GET 경로 | `SecurityConfig.java:54` (`/api/v1/events/**`) | `/api/v1/archive/**` GET 을 같은 방식으로 추가 |

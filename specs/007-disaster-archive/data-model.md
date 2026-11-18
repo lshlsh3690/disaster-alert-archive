@@ -24,7 +24,7 @@
 |---|---|---|
 | `id` | `id` | **영구하지 않음.** 응답 내부에서 기존 상세 API 호출용으로만 쓰고 링크·화면에 노출하지 않는다 |
 | `eventTitle` | `event_title` | 사건명 |
-| `primaryDisasterType` | `primary_disaster_type` | 지속형 제외 판정 대상 |
+| `primaryDisasterType` | `primary_disaster_type` | 재난 유형 표시 |
 | `primaryRegionName` | `primary_region_name` | 대표 지역 |
 | `firstAlertAt` | `first_alert_at` | 연도 귀속·정렬 2순위 |
 | `lastAlertAt` | `last_alert_at` | 사건 기간 끝 |
@@ -74,7 +74,7 @@ created_at  TIMESTAMP         created_at TIMESTAMP
 ### 주요 사건 (Major Event)
 
 - **연도 귀속**: `first_alert_at` 이 `[Y-01-01, (Y+1)-01-01)` 안.
-- **제외**: `primary_disaster_type ∈ clustering.sustained-types`. `primary_disaster_type` 이 null 이면 포함.
+- **제외**: 없음 — 유형으로 거르지 않는다(research R3, 2026-11-18 번복).
 - **정렬**: `alert_count` 내림차순 → `first_alert_at` 오름차순 → `id` 오름차순(순서 고정용, 비노출).
 - **개수**: 상위 10.
 - **노출 금지**: 순위 번호, 점수, 등급(FR-013). 목록 순서 자체는 보여주되 "1위" 같은 숫자를 붙이지 않는다.

@@ -38,12 +38,12 @@
 
 | 원칙 | 판정 | 근거 |
 |---|---|---|
-| I. 가독성과 단순성 | 통과 | 새 표·매핑 테이블·캐시 없이 조회 2개로 해결. 기존 사건 상세 화면 재사용(R9). 지속형 목록은 기존 설정 재사용(R3) |
+| I. 가독성과 단순성 | 통과 | 새 표·매핑 테이블·캐시 없이 조회 2개로 해결. 기존 사건 상세 화면 재사용(R9). 유형 제외 규칙 없음(R3 번복) |
 | II. 계층형 아키텍처 | 통과 | `ArchiveController → ArchiveService → (event 맥락) EventQueryService / (disasteralert 맥락) DisasterAlertQueryService → 각 맥락 리포지토리`. 응답은 `ApiResponse`(R7), 예외는 `CustomException(ErrorCode.DISASTER_ALERT_NOT_FOUND)`(R8). DTO 는 응답 형태별 1개, 목록은 내부 중첩(data-model.md) |
 | III. 검증 가능한 변경 | 통과 | 규칙이 SQL 에 있으므로 `@IntegrationTest` 로 핵심 동작 4개 검증(quickstart 1절). Red-Green 은 `tdd-developer` 2회 호출, Red 후 사용자 확인 대기 |
 | IV. 정직한 문서화 | 통과 | 근거를 file:line 으로 남김(research). 광역 사건이 목록을 채울 가능성(R10)과 사건이 쪼개질 때의 한계(spec 예외 상황)를 숨기지 않음 |
 | V. 한글 커밋 컨벤션 | 통과 | 커밋은 `commit-message` 스킬로 |
-| VI. 도메인 규칙은 순수 클래스로 (1.2.0) | 통과(예외 명시) | 표기 추출(`SenderLabel`)은 순수 함수. 주요 사건 선정(지속형 제외·정렬·상위 10)과 대표 알림 결정은 **목록 전체에 대한 조회 규칙이라 SQL 에 둔다** — 사건 전체를 메모리로 올려 거를 수 없기 때문이며 쿼리 주석에 이 이유를 남긴다 |
+| VI. 도메인 규칙은 순수 클래스로 (1.2.0) | 통과(예외 명시) | 표기 추출(`SenderLabel`)은 순수 함수. 주요 사건 선정(정렬·상위 10)과 대표 알림 결정은 **목록 전체에 대한 조회 규칙이라 SQL 에 둔다** — 사건 전체를 메모리로 올려 거를 수 없기 때문이며 쿼리 주석에 이 이유를 남긴다 |
 | VII. 맥락 경계 (1.2.0) | 통과 | `ArchiveService` 는 리포지토리를 주입하지 않고 `EventQueryService`·`DisasterAlertQueryService` 를 거친다. 기관(`Agency`·`AgencyAlias`)은 문자 본문에서 생겨나 문자와 함께 움직이는 개념이라 **disasteralert 맥락 안**에 두고, 같은 맥락이므로 `DisasterAlert → Agency` 객체 참조를 쓴다 |
 
 **설계 후 재검사(Phase 1 이후)**: 헌법 1.2.0 개정(2026-11-18) 뒤 다시 검사했다. 처음 설계의 두 곳을 고쳤다 — ① `ArchiveService` 가 두 맥락의 리포지토리를 직접 주입하던 것을 각 맥락 서비스 경유로, ② 기관을 별도 `domain/agency` 패키지에 두던 것을 `domain/disasteralert` 안으로(별도 패키지면 `@ManyToOne` 이 맥락을 넘어 VII 위반). 대표 알림 쿼리가 `disaster_alert` 표를 읽는 것은 리포지토리 주입이 아니라 SQL 조인이고, 사건-문자 매핑이 `disaster_alert.event_id` 에 있는 기존 구조(V137) 때문이라 이번에 바꾸지 않는다. 기존 `EventController` 의 `ApiResponse` 미사용은 이번 범위에서 고치지 않는다(R7).
@@ -122,7 +122,9 @@ frontend/src/
 |---|---|---|
 | A1 | 리포지토리 쿼리(주요 사건 CTE, 연도 목록, 대표 sn, `findBySn`) + `ArchiveService` 뼈대(틀린 기본값 반환) + 통합 테스트 4개 | **RED** — `tdd-developer` 1회차, 커밋 후 멈춤, 사용자 확인 대기 |
 | A2 | `ArchiveService` 실제 규칙 | **GREEN** — 사용자가 Red 확인 후 2회차 |
-| A3 | `ArchiveController`, DTO, `SecurityConfig`, `EventDetailResponse.representativeSn` | 계층 연결(로직 없음) |
+| A2a | 지속형 제외 규칙 삭제(research R3 번복). A1 리뷰 지적 1(연도 목록과의 불일치)은 규칙이 없어지며 함께 해소 — 그 지적용 Red 커밋 `820d65a0` 은 revert | **RED**: 기존 테스트 1번을 "폭염 사건도 알림 수가 많으면 맨 앞에 포함된다"로 바꿈. 사용자 확인 후 GREEN 에서 `@Value`·제외 조건 삭제 |
+| A2b | (A1 리뷰 지적 2) `resolveEvent` 의 알림 조회와 대표 sn 조회를 한 SQL 로 합쳐 백필 도중 두 문장 사이의 불일치를 없앤다 | 동작 불변 리팩터링 — 기존 테스트 4번(`sn을_현재_사건으로_해석한다`)으로 검증. 경쟁 상태는 테스트로 재현할 수 없음 |
+| A3 | `ArchiveController`, DTO, `SecurityConfig`, `EventDetailResponse.representativeSn`. **`year` 파라미터 범위 검증 필수**(A1 리뷰 지적 3 — 없으면 `?year=300000` 이 500 + `log.error`) | 계층 연결(로직 없음) + 입력 검증 |
 | A4 | 프론트: `archiveApi`, 타입, `/archive`, `/archive/events/[sn]`, `EventDetailClient` prop, `PermalinkCopy` | 프론트도 Red-Green 규칙 적용 대상이나 테스트할 순수 로직이 없어 화면 점검으로 검증 |
 | A5 | quickstart 1~4절 실행, `ui-checker` 점검, 로직 100줄 이상 변경이면 `code-reviewer` | — |
 
@@ -148,7 +150,7 @@ Red 단계 테스트는 핵심 동작 4개만 둔다(경계값·사소한 테스
 
 | 항목 | 내용 | 대응 |
 |---|---|---|
-| 광역 사건이 목록 상위 차지 | 지속형만 빼므로 다지역 광역 사건이 남을 수 있음(R10) | 구현 후 운영 사본으로 연도별 상위 10을 보고. 규칙 변경은 사용자 결정 |
+| 광역 사건이 목록 상위 차지 | 유형·경로로 거르지 않으므로 다지역 광역 사건이 상위에 올 수 있음(R10) | 추론으로 규칙을 더하지 말고 운영 사본으로 연도별 상위 10을 먼저 보고. 규칙 변경은 사용자 결정 |
 | 사건이 쪼개질 때 | 대표 알림 쪽 사건만 보임 | 명세에서 수용한 한계 |
 | 로컬 DB 에 사건 없음 | 재클러스터링 백필은 LLM 비용 발생 | 운영 사본 덤프 사용, 백필은 사용자 승인 후 |
 | `ZEventDetail` 필드 추가 | 백엔드보다 프론트가 먼저 배포되면 파싱 실패 가능 | `.optional()` 로 추가 |

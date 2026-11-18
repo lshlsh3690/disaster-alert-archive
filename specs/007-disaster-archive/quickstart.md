@@ -21,7 +21,7 @@ cd backend
 
 통과해야 하는 핵심 동작(`@IntegrationTest`, 실제 Postgres):
 
-1. 주요 사건에서 지속형 유형 사건이 빠진다.
+1. 주요 사건은 유형으로 거르지 않는다 — 폭염 사건도 알림 수가 많으면 맨 앞에 온다.
 2. 알림 수 내림차순으로 최대 10개가 나온다.
 3. 대표 알림은 사건에서 가장 먼저 발령된 알림이다(같은 시각이면 작은 sn).
 4. sn → 현재 사건 해석: 묶인 알림은 사건 ID 를, 묶이지 않은 알림은 `bound=false` 를 돌려준다.
@@ -35,7 +35,7 @@ curl -s -o /dev/null -w "%{http_code}\n" "localhost:8080/api/v1/archive/events/1
 ```
 
 기대:
-- `events` 길이 ≤ 10, `primaryDisasterType` 에 폭염·한파·대설·강풍·가축질병 없음.
+- `events` 길이 ≤ 10, 알림 수 내림차순, 순위 번호·점수 필드 없음.
 - 해석 결과 `bound=true`, `representativeSn` 이 요청한 sn 과 같음.
 
 ## 3. 영구성 확인 (SC-002 축소판)
