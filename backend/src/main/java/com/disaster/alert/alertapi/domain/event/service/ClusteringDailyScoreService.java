@@ -1,7 +1,7 @@
 package com.disaster.alert.alertapi.domain.event.service;
 
 import com.disaster.alert.alertapi.domain.event.evaluation.AssignmentReader;
-import com.disaster.alert.alertapi.domain.event.evaluation.AssignmentReader.AlertSnapshot;
+import com.disaster.alert.alertapi.domain.event.evaluation.AlertSnapshot;
 import com.disaster.alert.alertapi.domain.event.evaluation.JudgeInputAssembler;
 import com.disaster.alert.alertapi.domain.event.evaluation.JudgeInputAssembler.Session;
 import com.disaster.alert.alertapi.domain.event.evaluation.LabelJson.Label;

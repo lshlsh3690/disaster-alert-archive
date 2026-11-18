@@ -1,7 +1,6 @@
 package com.disaster.alert.alertapi.domain.event.evaluation;
 
 import java.time.Duration;
-import java.time.LocalDateTime;
 import java.util.Comparator;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -21,10 +20,6 @@ import java.util.stream.Collectors;
  * <p>DB 에 의존하지 않도록 시군구 이름 표와 이웃 표는 생성자로 받는다(실제 DB 로더는 별도 작업).
  */
 public class AlertPlaceFacts {
-
-    /** 문자 하나의 입력. 수신 시군구 코드는 disaster_alert_region 의 시군구 코드 목록이다. */
-    public record AlertInput(String body, LocalDateTime sentAt, String disasterType, List<String> receivedSigunguCodes) {
-    }
 
     /** 발신 기관이 시군구 소속인지 (D·I). */
     public enum AgencyKind {
@@ -95,11 +90,11 @@ public class AlertPlaceFacts {
      * <p>시군구는 수신 지역이 아니라 발신 기관 이름으로만 정한다. 다지역 발송(D)이나 개편 전후 코드 차이(E)에서
      * 수신 코드는 한 문자가 여러 시군구로 보이게 만들기 때문이다.
      */
-    public AlertFacts analyze(AlertInput alert) {
-        int receivedCount = (int) alert.receivedSigunguCodes().stream().distinct().count();
+    public AlertFacts analyze(AlertSnapshot alert) {
+        int receivedCount = (int) alert.sigunguCodes().stream().distinct().count();
 
         // 1) 발신 기관을 본문 끝, 없으면 맨 앞에서 뽑는다 — 둘 다 없으면 시군구를 판단할 근거가 없으니 NONE
-        Optional<String> sender = findSender(alert.body());
+        Optional<String> sender = findSender(alert.message());
         if (sender.isEmpty()) {
             return new AlertFacts(Optional.empty(), AgencyKind.NONE, Optional.empty(), receivedCount);
         }
@@ -109,7 +104,7 @@ public class AlertPlaceFacts {
         // "특례시"는 "시"로 바꿔 찾는다 — 법정동 이름은 "수원시"라 공식 표기 "수원특례시"가 안 맞아 시군구 기관이 아닌 것으로
         // 잘못 분류됐다(운영 [수원특례시] 24건·[용인특례시] 6건). 발신 기관 원문(senderAgency)은 그대로 둔다.
         String compact = agency.replaceAll("\\s+", "").replace("특례시", "시");
-        Set<String> receivedSidos = alert.receivedSigunguCodes().stream()
+        Set<String> receivedSidos = alert.sigunguCodes().stream()
                 .map(code -> code.substring(0, 2)).collect(Collectors.toSet());
         Lookup found = resolve(compact, receivedSidos);
 
@@ -167,7 +162,7 @@ public class AlertPlaceFacts {
     /**
      * 두 문자를 견준 사실을 계산한다. 각 문자의 시군구는 {@link #analyze} 와 같은 방식으로 정한다.
      */
-    public PairFacts compare(AlertInput a, AlertInput b) {
+    public PairFacts compare(AlertSnapshot a, AlertSnapshot b) {
         // 1) 시군구 관계 — 하나라도 모르면(시군구가 아닌 기관 등) 같다/다르다를 말하지 않는다
         Optional<String> idA = analyze(a).sigunguId();
         Optional<String> idB = analyze(b).sigunguId();
@@ -186,8 +181,8 @@ public class AlertPlaceFacts {
         Duration gap = Duration.between(a.sentAt(), b.sentAt()).abs();
 
         // 3) 같은 시설 후보 — a 본문의 등장 순서를 유지하며 b 본문에도 있는 것만 남긴다
-        Set<String> inB = facilityTokens(b.body());
-        List<String> shared = facilityTokens(a.body()).stream().filter(inB::contains).toList();
+        Set<String> inB = facilityTokens(b.message());
+        List<String> shared = facilityTokens(a.message()).stream().filter(inB::contains).toList();
         return new PairFacts(relation, gap, shared);
     }
 

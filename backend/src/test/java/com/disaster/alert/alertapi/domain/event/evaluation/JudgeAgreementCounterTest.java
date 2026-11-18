@@ -1,6 +1,6 @@
 package com.disaster.alert.alertapi.domain.event.evaluation;
 
-import com.disaster.alert.alertapi.domain.event.evaluation.JudgeAgreementCounter.Judged;
+import com.disaster.alert.alertapi.domain.event.evaluation.JudgeAgreementCounter.PairRecord;
 import com.disaster.alert.alertapi.domain.event.evaluation.LabelJson.Label;
 import com.disaster.alert.alertapi.domain.event.judge.ClusteringJudge.Agreement;
 import com.disaster.alert.alertapi.domain.event.judge.ClusteringJudge.JudgeResult;
@@ -14,8 +14,13 @@ import static org.assertj.core.api.Assertions.assertThat;
 class JudgeAgreementCounterTest {
 
     // 사람 라벨과 판사 판정(토큰은 이 테스트의 관심사가 아니라 0)을 한 줄로 만드는 도우미.
-    private static Judged judged(Label human, JudgeVerdict verdict) {
-        return new Judged(human, new JudgeResult(verdict, 0, 0));
+    // 집계는 두 알림을 쓰지 않아 비워 둔다(리포트 목록에서만 쓴다)
+    private static PairRecord judged(Label human, JudgeVerdict verdict) {
+        return judged(human, new JudgeResult(verdict, 0, 0));
+    }
+
+    private static PairRecord judged(Label human, JudgeResult result) {
+        return new PairRecord(human, result, null, null);
     }
 
     // 일치율 분모는 "판사가 SAME/DIFF 로 답한 쌍" 뿐이어야 한다. UNSURE·형식 실패를 분모에 넣으면 판사가 모른다고 한 쌍이
@@ -25,7 +30,7 @@ class JudgeAgreementCounterTest {
     void 일치율_분모는_판사가_SAME_DIFF로_답한_쌍만_UNSURE와_형식실패는_따로_센다() {
         // 준비: 사람 SAME 5쌍 — 판사 SAME 2(일치), DIFF 1(불일치), UNSURE 1, 형식 실패 1
         //       사람 DIFF 3쌍 — 판사 DIFF 1(일치), SAME 1(불일치), UNSURE 1
-        List<Judged> input = List.of(
+        List<PairRecord> input = List.of(
                 judged(Label.SAME, JudgeVerdict.SAME),
                 judged(Label.SAME, JudgeVerdict.SAME),
                 judged(Label.SAME, JudgeVerdict.DIFF),
@@ -53,7 +58,7 @@ class JudgeAgreementCounterTest {
     void 교차표는_사람_라벨_행과_판사_판정_열을_세고_사람_UNSURE_쌍은_무시한다() {
         // 준비: 사람 SAME 에 판사 SAME 2·DIFF 1·형식 실패 1, 사람 DIFF 에 판사 SAME 1,
         //       그리고 사람 UNSURE 쌍 1개(판사가 SAME 이라 답했어도 집계에 들어오면 안 됨)
-        List<Judged> input = List.of(
+        List<PairRecord> input = List.of(
                 judged(Label.SAME, JudgeVerdict.SAME),
                 judged(Label.SAME, JudgeVerdict.SAME),
                 judged(Label.SAME, JudgeVerdict.DIFF),
@@ -80,11 +85,11 @@ class JudgeAgreementCounterTest {
     @Test
     void 토큰은_형식_실패를_포함한_모든_판정의_합이고_사람_UNSURE_쌍은_뺀다() {
         // 준비: 정상 판정 2건, 형식 실패 1건, 사람 UNSURE 쌍 1건(합계에서 빠져야 함)
-        List<Judged> input = List.of(
-                new Judged(Label.SAME, new JudgeResult(JudgeVerdict.SAME, 1000, 1)),
-                new Judged(Label.DIFF, new JudgeResult(JudgeVerdict.DIFF, 800, 1)),
-                new Judged(Label.SAME, new JudgeResult(JudgeVerdict.FORMAT_FAILURE, 300, 5)),
-                new Judged(Label.UNSURE, new JudgeResult(JudgeVerdict.SAME, 9999, 9)));
+        List<PairRecord> input = List.of(
+                judged(Label.SAME, new JudgeResult(JudgeVerdict.SAME, 1000, 1)),
+                judged(Label.DIFF, new JudgeResult(JudgeVerdict.DIFF, 800, 1)),
+                judged(Label.SAME, new JudgeResult(JudgeVerdict.FORMAT_FAILURE, 300, 5)),
+                judged(Label.UNSURE, new JudgeResult(JudgeVerdict.SAME, 9999, 9)));
 
         // 실행
         JudgeAgreementResult result = JudgeAgreementCounter.count(input);

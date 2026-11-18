@@ -1,9 +1,7 @@
 package com.disaster.alert.alertapi.domain.event.evaluation;
 
-import com.disaster.alert.alertapi.domain.event.evaluation.AssignmentReader.AlertSnapshot;
-import com.disaster.alert.alertapi.domain.event.evaluation.JudgeAgreementCounter.Judged;
 import com.disaster.alert.alertapi.domain.event.evaluation.JudgeAgreementReport.CallFailure;
-import com.disaster.alert.alertapi.domain.event.evaluation.JudgeAgreementReport.PairRecord;
+import com.disaster.alert.alertapi.domain.event.evaluation.JudgeAgreementCounter.PairRecord;
 import com.disaster.alert.alertapi.domain.event.evaluation.JudgeInputAssembler.Session;
 import com.disaster.alert.alertapi.domain.event.evaluation.LabelJson.Label;
 import com.disaster.alert.alertapi.domain.event.evaluation.LabelJson.LabeledPair;
@@ -49,7 +47,6 @@ public class JudgeAgreementRunner {
         log.info("판사 일치율 측정 시작: 대상 {}쌍(사람 UNSURE {}쌍 제외), 프롬프트 {}, 모델 {}",
                 targets.size(), pairs.size() - targets.size(), ClusteringJudge.PROMPT_VERSION, ClusteringJudge.MODEL);
 
-        List<Judged> judged = new ArrayList<>();
         List<PairRecord> records = new ArrayList<>();
         List<CallFailure> callFailures = new ArrayList<>();
         for (int i = 0; i < targets.size(); i++) {
@@ -59,15 +56,14 @@ public class JudgeAgreementRunner {
             AlertSnapshot second = snapshots.computeIfAbsent(p.alertB(), assignmentReader::findAlert);
             JudgeResult result = callJudge(p, first, second, inputs, callFailures);
             if (result != null) {
-                judged.add(new Judged(p.label(), result));
-                records.add(new PairRecord(p.label(), result.verdict(), result.rawResponse(), first, second));
+                records.add(new PairRecord(p.label(), result, first, second));
             }
             if ((i + 1) % PROGRESS_INTERVAL == 0) {
                 log.info("판사 일치율 측정 진행: {}/{}쌍 (호출 실패 {}쌍)", i + 1, targets.size(), callFailures.size());
             }
         }
         return JudgeAgreementReport.format(datasetName, pairs.size(), pairs.size() - targets.size(),
-                JudgeAgreementCounter.count(judged), records, callFailures);
+                JudgeAgreementCounter.count(records), records, callFailures);
     }
 
     // 판사 호출만 예외를 쌍 단위로 잡는다: 네트워크 오류 한 건 때문에 이미 쓴 요금(앞선 판정)을 통째로 버리지 않으려는 것이다.
