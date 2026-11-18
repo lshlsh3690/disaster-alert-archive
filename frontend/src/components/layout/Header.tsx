@@ -38,6 +38,7 @@ export default function Header() {
     { name: t("nav.dashboard"), href: "/" },
     { name: t("nav.alerts"), href: "/alerts" },
     { name: t("nav.events"), href: "/events" },
+    { name: t("nav.archive"), href: "/archive" },
     { name: t("nav.stats"), href: "/stats" },
     { name: t("nav.community"), href: "/community" },
   ];
