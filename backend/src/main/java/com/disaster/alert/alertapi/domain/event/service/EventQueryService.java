@@ -28,7 +28,6 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.ZoneId;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -233,18 +232,16 @@ public class EventQueryService {
     // ── 기록관(archive)용 조회 ─────────────────────────────────────────
 
     /**
-     * 연도별 주요 사건 — {@code first_alert_at} 이 그 연도 안인 사건 중 제외 유형을 뺀 상위 10개.
+     * 연도별 주요 사건 — {@code first_alert_at} 이 그 연도 안인 사건 중 상위 10개(유형으로 거르지 않는다).
      * 정렬은 포함 알림 수 내림차순(규칙은 {@link DisasterEventRepository#findMajorEventRows} 의 SQL 에 있다).
-     *
-     * @param excludedTypes 빼는 유형(지속형). 유형이 null 인 사건은 지속형이 아니므로 포함한다
      */
-    public List<MajorEventRow> majorEvents(int year, Collection<String> excludedTypes) {
+    public List<MajorEventRow> majorEvents(int year) {
         // 1) 연도 경계는 [year-01-01 00:00, (year+1)-01-01 00:00) — 저장된 시각이 KST 그대로라 변환하지 않는다
         LocalDateTime start = LocalDate.of(year, 1, 1).atStartOfDay();
         LocalDateTime end = start.plusYears(1);
 
         // 2) 쿼리가 반환 열 순서대로 준 행을 record 로 옮긴다 (정렬은 쿼리가 이미 맞춰 둠)
-        return disasterEventRepository.findMajorEventRows(start, end, excludedTypes.toArray(String[]::new))
+        return disasterEventRepository.findMajorEventRows(start, end)
                 .stream()
                 .map(r -> new MajorEventRow(
                         ((Number) r[0]).longValue(),

@@ -8,10 +8,8 @@ import com.disaster.alert.alertapi.domain.disasteralert.dto.AlertSnLookup;
 import com.disaster.alert.alertapi.domain.disasteralert.service.DisasterAlertQueryService;
 import com.disaster.alert.alertapi.domain.event.service.EventQueryService;
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
-import java.util.Arrays;
 import java.util.List;
 
 /**
@@ -28,15 +26,7 @@ public class ArchiveService {
     private final DisasterAlertQueryService disasterAlertQueryService;
 
     /**
-     * 주요 사건에서 뺄 지속형 유형(쉼표 구분). 클러스터링과 <b>같은 설정 키</b>를 읽는다 — 빼는 이유가
-     * "클러스터링이 이 유형을 한 사건에 이어 붙여 알림 수가 부풀기 때문"이라, 그쪽 목록이 바뀌면 여기도 같이 바뀌어야 맞다.
-     * 기본값은 {@code EventClusteringService} 의 기본값과 같게 둔다.
-     */
-    @Value("${clustering.sustained-types:폭염,한파,대설,강풍,가축질병}")
-    private String sustainedTypesCsv;
-
-    /**
-     * 연도별 주요 사건 — 지속형 유형 제외, 포함 알림 수 내림차순 최대 10개.
+     * 연도별 주요 사건 — 포함 알림 수 내림차순 최대 10개. 유형으로 거르지 않는다(지속형 포함).
      *
      * @param year 조회 연도. null 이면 사건이 있는 가장 최근 연도
      * @return 사건이 하나도 없으면 연도·목록이 빈 응답(year 는 null)
@@ -51,8 +41,8 @@ public class ArchiveService {
             return new ArchiveMajorEventsResponse(null, years, List.of());
         }
 
-        // 3) 지속형 제외·정렬·상위 10·대표 sn 은 조회 쿼리가 정한다. 여기서는 응답 모양으로만 옮긴다
-        List<ArchiveMajorEventsResponse.Item> items = eventQueryService.majorEvents(target, sustainedTypes()).stream()
+        // 3) 정렬·상위 10·대표 sn 은 조회 쿼리가 정한다. 여기서는 응답 모양으로만 옮긴다
+        List<ArchiveMajorEventsResponse.Item> items = eventQueryService.majorEvents(target).stream()
                 .map(r -> new ArchiveMajorEventsResponse.Item(
                         r.representativeSn(), r.eventTitle(), r.primaryDisasterType(), r.primaryRegionName(),
                         r.firstAlertAt(), r.lastAlertAt(), r.alertCount()))
@@ -81,13 +71,5 @@ public class ArchiveService {
         //    화면에 보일 영구 링크는 항상 현재 대표 sn 으로 만든다
         Long representativeSn = eventQueryService.representativeSn(alert.eventId());
         return new ArchiveEventResolveResponse(sn, true, alert.eventId(), representativeSn, null);
-    }
-
-    /** 설정값을 쉼표로 쪼개 공백을 걷어 낸 지속형 유형 목록. 빈 항목은 버린다. */
-    private List<String> sustainedTypes() {
-        return Arrays.stream(sustainedTypesCsv.split(","))
-                .map(String::trim)
-                .filter(s -> !s.isEmpty())
-                .toList();
     }
 }
