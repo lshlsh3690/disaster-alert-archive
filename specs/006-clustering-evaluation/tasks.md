@@ -113,7 +113,7 @@ description: "006 이벤트 클러스터링 평가·검증 작업 목록"
 - [x] T029 [US5] `{main}/domain/event/scheduler/ClusteringDailyScoreScheduler.java`를 `ClusteringDailyCheckScheduler`와 같은 모양으로 만든다 — 매일 01:00 KST, `{main}/global/config/AsyncConfig.java`의 별도 실행기, 최근 7일 중 기록 없는 날만 채점하되 채점 시작일(도입일) 설정 이전은 찾지 않는다(R7). 시작일 설정 키를 추가하면 `application.yml`과 루트 `.env.example`을 같이 갱신한다
 - [x] T030 [US5] `{test}/domain/event/service/ClusteringDailyScoreServiceTest.java`에 `@IntegrationTest`로 판사를 목킹한 채 하루치 채점이 두 테이블에 저장되는지 확인한다(DB 필요 — 로컬 docker compose Postgres)
 - [x] T031 [US5] `code-reviewer`에 `git diff`와 변경 줄 범위를 넣어 검토받고 결과를 사용자에게 보고한다(로직·마이그레이션 변경, 100줄 이상)
-- [ ] T032 ⛔ [US5] **유료 — 운영 도입 승인(FR-019).** 비용(조용한 날 약 $0.06, 큰 사건 날 수십 달러 — 2025-03-25 산불 기준 약 $46, 상한 없음. plan.md 기술 컨텍스트 "규모/범위")을 알리고 승인을 받은 뒤 PR(develop 대상, `pr-message` 스킬) → 머지 → 배포한다. 푸시와 CodeRabbit 요청은 작업 단위 끝에 한 번만 — 2026-11-17 사용자 승인: PR #335 머지일(2026-11-17)부터 운영에서 켠다. `application-prod.yml` 의 시작일 기본값으로 켜고 운영 .env 는 건드리지 않는다. 승인·PR(#336)까지 됐고, 머지·배포 뒤 기동 로그 "켜짐: 시작일 2026-11-17"을 확인하면 완료로 표시한다
+- [x] T032 ⛔ [US5] **유료 — 운영 도입 승인(FR-019).** 비용(조용한 날 약 $0.06, 큰 사건 날 수십 달러 — 2025-03-25 산불 기준 약 $46, 상한 없음. plan.md 기술 컨텍스트 "규모/범위")을 알리고 승인을 받은 뒤 PR(develop 대상, `pr-message` 스킬) → 머지 → 배포한다. 푸시와 CodeRabbit 요청은 작업 단위 끝에 한 번만 — 2026-11-17 사용자 승인: PR #335 머지일(2026-11-17)부터 운영에서 켠다. `application-prod.yml` 의 시작일 기본값으로 켜고 운영 .env 는 건드리지 않는다. 승인·PR(#336)까지 됐고, 머지·배포 뒤 기동 로그 "켜짐: 시작일 2026-11-17"을 2026-11-18 확인했다. 같은 날 비용 때문에 판사를 gpt-4o-mini(v2)로 바꿨다
 
 **체크포인트**: 운영에서 매일 01:00 점수가 쌓이고, 불일치 쌍을 quickstart의 SQL 한 번으로 본다.
 
@@ -123,7 +123,7 @@ description: "006 이벤트 클러스터링 평가·검증 작업 목록"
 
 - [x] T033 [P] `specs/006-clustering-evaluation/plan.md` 소스 구조 표를 실제 클래스 이름에 맞게 고친다(바뀐 경우)
 - [x] T034 [P] `CLAUDE.md` 이벤트 클러스터링 절에 일일 채점(01:00, 판사·일치율 표시)을 한 줄로 더하고 상세는 `specs/006-clustering-evaluation/`을 가리킨다(기준·수치를 다시 쓰지 않음)
-- [ ] T035 배포 다음 날 운영 DB를 읽기 전용으로 조회해 `clustering_daily_score` 첫 줄과 불일치 쌍 SQL(quickstart)을 확인하고 보고한다
+- [x] T035 배포 다음 날 운영 DB를 읽기 전용으로 조회해 `clustering_daily_score` 첫 줄과 불일치 쌍 SQL(quickstart)을 확인하고 보고한다 — 2026-11-18 확인: 2026-11-17 분 사건 알림 8 · 판정 6쌍(같은 이벤트 SAME 1, 다른 이벤트 DIFF 5), 불일치 0, 토큰 9,305/12(gpt-4o 약 $0.023)
 - [ ] T036 ⛔ 8월 B-cubed 라벨링 재개 여부는 사용자가 정한다(FR-010). 재개 전에 G 예외의 비이행성(PR #329 리뷰, 후속으로 미룸)을 정한다
 
 ---
