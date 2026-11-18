@@ -24,6 +24,8 @@ export default function Header() {
   const isLoggedIn = useAuthStore((state) => state.user !== null);
   const logout = useAuthStore((state) => state.logout);
   const nickname = useAuthStore((state) => state.user?.nickname);
+  // 관리자 전용 링크(클러스터링 검증 화면). 관리자만 보는 화면이라 문구는 한국어만 둔다
+  const isAdmin = useAuthStore((state) => state.user?.role === "ADMIN");
 
   const language = useLanguageStore((state) => state.language);
   const setLanguage = useLanguageStore((state) => state.setLanguage);
@@ -147,6 +149,11 @@ export default function Header() {
                     <Link href="/user/settings" className="block px-4 py-2.5 text-[var(--text-body)] hover:bg-[var(--blue-soft)] hover:text-[var(--blue)]" onClick={() => setOpen(false)}>
                       {t("nav.settings")}
                     </Link>
+                    {isAdmin && (
+                      <Link href="/admin/clustering" className="block px-4 py-2.5 text-[var(--text-body)] hover:bg-[var(--blue-soft)] hover:text-[var(--blue)]" onClick={() => setOpen(false)}>
+                        클러스터링 검증
+                      </Link>
+                    )}
                     <button onClick={handleLogout} className="w-full text-left px-4 py-2.5 text-[var(--coral)] hover:bg-[var(--coral-soft)]">
                       {t("nav.logout")}
                     </button>
@@ -226,6 +233,11 @@ export default function Header() {
               <Link href="/user/settings" className="block px-3 py-2.5 rounded-[var(--radius-control)] text-[var(--text-body)] hover:bg-[var(--blue-soft)] hover:text-[var(--blue)]" onClick={() => setMobileMenuOpen(false)}>
                 {t("nav.settings")}
               </Link>
+              {isAdmin && (
+                <Link href="/admin/clustering" className="block px-3 py-2.5 rounded-[var(--radius-control)] text-[var(--text-body)] hover:bg-[var(--blue-soft)] hover:text-[var(--blue)]" onClick={() => setMobileMenuOpen(false)}>
+                  클러스터링 검증
+                </Link>
+              )}
               <button
                 onClick={() => { handleLogout(); setMobileMenuOpen(false); }}
                 className="block w-full text-left px-3 py-2.5 rounded-[var(--radius-control)] text-[var(--coral)] hover:bg-[var(--coral-soft)]"
