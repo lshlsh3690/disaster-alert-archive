@@ -41,7 +41,13 @@ public class ArchiveService {
             return new ArchiveMajorEventsResponse(null, years, List.of());
         }
 
-        // 3) 정렬·상위 10·대표 sn 은 조회 쿼리가 정한다. 여기서는 응답 모양으로만 옮긴다
+        // 3) 사건이 있는 연도 목록에 없으면 조회하지 않고 빈 목록으로 답한다 — 공개 API 라 ?year=300000 처럼 터무니없는 값이
+        //    Postgres timestamp 범위(최대 294276년)를 넘어 DB 예외 → 500 + log.error 가 되면 안 된다. 사건 없는 연도와 같은 취급(400 아님)
+        if (!years.contains(target)) {
+            return new ArchiveMajorEventsResponse(target, years, List.of());
+        }
+
+        // 4) 정렬·상위 10·대표 sn 은 조회 쿼리가 정한다. 여기서는 응답 모양으로만 옮긴다
         List<ArchiveMajorEventsResponse.Item> items = eventQueryService.majorEvents(target).stream()
                 .map(r -> new ArchiveMajorEventsResponse.Item(
                         r.representativeSn(), r.eventTitle(), r.primaryDisasterType(), r.primaryRegionName(),
