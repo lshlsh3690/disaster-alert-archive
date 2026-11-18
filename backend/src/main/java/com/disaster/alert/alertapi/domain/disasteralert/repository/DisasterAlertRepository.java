@@ -17,8 +17,29 @@ import java.util.Optional;
 public interface DisasterAlertRepository extends JpaRepository<DisasterAlert, Long>, DisasterAlertRepositoryCustom {
     boolean existsBySn(Long sn);
 
-    /** 원 출처 고유번호(sn, 유일)로 알림 한 건. 기록관 영구 링크 해석용. */
-    Optional<DisasterAlert> findBySn(Long sn);
+    /**
+     * 원 출처 고유번호(sn, 유일)로 알림 한 건 + 그 알림이 속한 사건의 대표 알림 sn. 기록관 영구 링크 해석용.
+     *
+     * <p><b>한 문장으로 읽는 이유</b>: 알림 조회와 대표 sn 조회를 두 번에 나누면, 백필이 그 사이에 사건을 지우고
+     * 다시 만들 때 "옛 사건 ID + 새 사건의 대표 sn" 처럼 서로 다른 시점의 값이 섞인다. 한 SELECT 는 한 스냅샷을 본다.
+     *
+     * <p>대표 알림 = 같은 사건 알림 중 {@code created_at} 오름차순, 같으면 {@code sn} 오름차순 첫 알림
+     * ({@code DisasterEventRepository#findRepresentativeSn} 과 같은 규칙). 사건에 안 묶였으면 null.
+     *
+     * @return 0행 또는 1행. 열 순서: disaster_alert_id, sn, message, created_at, disaster_type, emergency_level,
+     *         event_id, representative_sn
+     */
+    @Query(value = """
+            SELECT a.disaster_alert_id, a.sn, a.message, a.created_at, a.disaster_type, a.emergency_level,
+                   a.event_id,
+                   (SELECT r.sn FROM disaster_alert r
+                    WHERE r.event_id = a.event_id
+                    ORDER BY r.created_at, r.sn
+                    LIMIT 1) AS representative_sn
+            FROM disaster_alert a
+            WHERE a.sn = :sn
+            """, nativeQuery = true)
+    List<Object[]> findSnLookupRows(@org.springframework.data.repository.query.Param("sn") Long sn);
 
     @Query("SELECT d.sn FROM DisasterAlert d WHERE d.sn IN :snList")
     List<Long> findExistingSn(@Param("snList") List<Long> snList);

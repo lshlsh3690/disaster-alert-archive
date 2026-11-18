@@ -68,8 +68,8 @@ public class ArchiveService {
         }
 
         // 3) 묶였으면 그 알림이 대표가 아니어도(사건이 합쳐진 경우) 지금 속한 사건으로 해석한다.
-        //    화면에 보일 영구 링크는 항상 현재 대표 sn 으로 만든다
-        Long representativeSn = eventQueryService.representativeSn(alert.eventId());
-        return new ArchiveEventResolveResponse(sn, true, alert.eventId(), representativeSn, null);
+        //    화면에 보일 영구 링크는 항상 현재 대표 sn 으로 만든다. 대표 sn 은 알림과 같은 조회 문장에서 읽어 왔으므로
+        //    백필 도중이라도 eventId 와 서로 다른 시점의 값이 섞이지 않는다
+        return new ArchiveEventResolveResponse(sn, true, alert.eventId(), alert.representativeSn(), null);
     }
 }
