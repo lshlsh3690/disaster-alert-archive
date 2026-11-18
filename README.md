@@ -52,14 +52,16 @@ flowchart LR
         A["재난문자 수집<br/>공공데이터포털 API"] --> B["새 문자 저장<br/>수신 지역 법정동 코드"]
         B --> K{"사건 / 비사건 분류<br/>(LLM)"}
         K -- "사건" --> S["재난 유형별 묶기"]
-        S -- "그 밖의 유형" --> EM["임베딩 계산"]
-        EM ~~~ HT[" "]
-        EM --> E["같은 시군구<br/>후보 이벤트 검색"]
+        S -- "그 밖의 유형" --> EMB
+        subgraph EMB[" "]
+            direction TB
+            HT["매일 00:30<br/>임베딩 누락·<br/>미배정 검사"] ~~~ EM["임베딩 계산"] -.-> KC["매일 00:30<br/>임베딩 누락·<br/>미배정 검사"]
+        end
+        EMB --> E["같은 시군구<br/>후보 이벤트 검색"]
         E --> E1{"코사인 거리<br/>≤ 0.15?"}
         E1 -- "LLM 리랭킹" --> RR{"임베딩 후보를<br/>LLM 이 다시 판정"}
         RR -- "같은 사건" --> M["기존 이벤트에 병합"]
         RR -- "다른 사건" --> N["새 이벤트"]
-        EM -.-> KC["매일 00:30<br/>임베딩 누락 검사"]
     end
 
     subgraph PROD["운영 검증 (매일)"]
@@ -74,8 +76,9 @@ flowchart LR
     M --- JN(( ))
     N --- JN
     JN --> D
-    style HT fill:none,stroke:none
-    J -- "버전별 일치율 상수" --> D
+    style EMB fill:none,stroke:none
+    style HT fill:none,stroke:none,color:transparent
+    J -- "버전별 일치율 상수" ---> D
 ```
 
 - 같은 사건인지 가르는 기준은 [`CLUSTERING_CRITERIA.md`](specs/001-event-clustering-pipeline/CLUSTERING_CRITERIA.md), 경로별 상세 동작은 [`specs/001-event-clustering-pipeline/`](specs/001-event-clustering-pipeline/)에 있습니다.
