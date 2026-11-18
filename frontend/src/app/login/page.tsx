@@ -45,6 +45,12 @@ export default function LoginPage() {
   });
 
   const handleLogin = async (value: LoginFormData) => {
+    // 비어 있으면 서버에 보내지 않는다 — 서버 검증 메시지("요청 값 검증에 실패했습니다. - password: ...")는
+    // 첫 번째 필드 오류만 담고 개발자용 문구라 그대로 보여 주기에 맞지 않는다
+    if (!value.email.trim() || !value.password) {
+      setError(t("login.emptyFields"));
+      return;
+    }
     login(value);
   };
 
