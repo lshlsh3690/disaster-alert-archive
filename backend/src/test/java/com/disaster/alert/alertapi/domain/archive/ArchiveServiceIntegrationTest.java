@@ -16,7 +16,10 @@ import org.springframework.beans.factory.annotation.Autowired;
 
 import java.time.LocalDateTime;
 
+import java.util.concurrent.atomic.AtomicReference;
+
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 
 /**
  * 재난 기록관의 핵심 규칙 4개를 실제 Postgres 로 검증한다.
@@ -131,6 +134,29 @@ class ArchiveServiceIntegrationTest {
         assertThat(unbound.eventId()).isNull();
         assertThat(unbound.alert()).isNotNull();
         assertThat(unbound.alert().sn()).isEqualTo(3000L);
+    }
+
+    /**
+     * 공개 API 라 로그인 없이 누구나 ?year= 에 아무 숫자나 넣을 수 있다. 사건이 있는 연도 목록에 없는 연도는 DB 를 조회하지 않고
+     * 빈 목록으로 답해야 한다 — 300000 년은 Postgres timestamp 범위(최대 294276년)를 넘어 DB 예외 → 500 + log.error 가 되는데,
+     * 로그 레벨이 유일한 장애 신호라 이런 입력이 error 로그를 쌓으면 안 된다. 예외는 400 도 아니다(데이터 없는 연도와 같은 취급).
+     * 현재 코드는 목록 확인 없이 [300000-01-01, 300001-01-01) 로 조회해 예외가 터지고, 그 예외가 단언(doesNotThrowAnyException)에서 실패로 잡힌다.
+     */
+    @Test
+    @DisplayName("사건이 없는 터무니없는 연도(300000)는 예외 없이 빈 목록으로 답한다")
+    void 범위_밖_연도는_예외_없이_빈_목록() {
+        // 사건이 있는 연도(1999)를 하나 만들어 둔다 — years 는 비어 있지 않고 300000 은 그 안에 없다는 상황
+        saveEventWithAlerts("호우 사건", "호우", LocalDateTime.of(YEAR, 7, 10, 9, 0), 2);
+
+        // 예외가 그대로 터지면 "예외로 실패"가 되어 Red 로 읽기 어렵다 — 감싸서 "예외 없어야 한다"는 단언에서 실패하게 한다
+        AtomicReference<ArchiveMajorEventsResponse> result = new AtomicReference<>();
+        assertThatCode(() -> result.set(archiveService.majorEvents(300_000)))
+                .doesNotThrowAnyException();
+
+        // 응답 year 는 요청값 그대로, 사건이 없으니 events 는 빈 목록, years 는 실제 사건 연도(1999) 그대로
+        assertThat(result.get().year()).isEqualTo(300_000);
+        assertThat(result.get().events()).isEmpty();
+        assertThat(result.get().years()).contains(YEAR);
     }
 
     // ── 테스트 데이터 ───────────────────────────────────────────
