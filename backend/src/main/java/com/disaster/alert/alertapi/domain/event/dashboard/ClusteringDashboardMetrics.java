@@ -9,6 +9,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.OptionalDouble;
 
 /**
  * 관리자 대시보드가 쓰는 순수 계산 모음(JPA·Spring 없음) — 비율, 빈 날짜 채우기, 추정 비용, 판사 버전 기간.
@@ -55,8 +56,20 @@ public final class ClusteringDashboardMetrics {
             return new Ratio(numerator, denominator, null);
         }
         // 2) 분자·분모는 그대로 두고 표시용 백분율만 반올림한다
-        double percent = Math.round(numerator * 1000.0 / denominator) / 10.0;
-        return new Ratio(numerator, denominator, percent);
+        return new Ratio(numerator, denominator, round1(numerator * 100.0 / denominator));
+    }
+
+    /**
+     * 이미 계산된 백분율(예: {@code PairCountResult.score()})을 표시용으로 반올림한다. 비어 있으면 null(계산할 수 없음).
+     * 반올림 규칙을 {@link #ratio} 와 한 곳에 두려고 여기에 둔다.
+     */
+    public static Double roundPercent(OptionalDouble percent) {
+        return percent.isPresent() ? round1(percent.getAsDouble()) : null;
+    }
+
+    // 소수 첫째 자리 반올림 — 판사 일치율 리포트의 %.1f 표기와 맞춘다
+    private static double round1(double percent) {
+        return Math.round(percent * 10) / 10.0;
     }
 
     /**

@@ -5,7 +5,8 @@
 - 권한: ADMIN 만. 비로그인 401, ADMIN 아닌 회원 403(기존 보안 설정·`@PreAuthorize` 그대로).
 - 응답은 공용 `ApiResponse` 로 감싼다. 아래는 `data` 부분.
 - 날짜는 `yyyy-MM-dd`(KST 날짜). 비율 객체는 `{ "numerator": int, "denominator": int, "percent": number|null }` — 분모 0 이면 `percent` 가 null.
-- 범위 오류(시작 > 끝, 366일 초과, 날짜 형식 오류)는 공용 오류 응답(`ErrorCode`).
+- 범위 오류(시작 > 끝, 366일 초과, 날짜 형식 오류)는 공용 오류 응답(`ErrorCode`). 시작 > 끝·366일 초과는 `CD400`, 날짜·`kind` 값 형식 오류와 `page`·`size` 범위 오류는 `C001`(둘 다 400). 권한 없음은 `A108`(403).
+- 기록 없는 날과 계산할 수 없는 값(`score`·`estimatedCostUsd` 등)은 키를 생략한다. 단 비율 객체(`{numerator, denominator, percent}`)는 분모 0 이면 `percent` 키가 `null` 로 내려간다(비율 객체 안에서는 생략하지 않는다).
 
 ## 1. 날짜별 일일 채점
 
