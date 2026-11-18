@@ -133,6 +133,26 @@ class ArchiveServiceIntegrationTest {
         assertThat(unbound.alert().sn()).isEqualTo(3000L);
     }
 
+    /**
+     * 연도 선택지(years)는 "주요 사건이 실제로 나오는 연도"여야 한다. 지금은 지속형 사건까지 세서 연도를 만들기 때문에,
+     * 지속형(폭염·한파) 사건만 있는 연도가 선택지에 들어가고 year 를 생략하면 그 연도가 기본값이 되어 빈 목록이 나온다
+     * (새해 첫 사건이 한파뿐인 경우). Red 단계에서는 연도 조회가 지속형을 거르지 않아 years 에 1998 이 들어 있어 실패한다.
+     */
+    @Test
+    @DisplayName("지속형 유형 사건만 있는 연도는 연도 목록(years)에 나오지 않는다")
+    void 지속형_사건만_있는_연도는_연도_목록에서_빠진다() {
+        // 1998년: 폭염 사건뿐 — 주요 사건 목록에서는 항상 빠지므로 이 연도를 골라도 빈 화면이다
+        saveEventWithAlerts("지속형만 있는 해의 폭염", "폭염", LocalDateTime.of(1998, 7, 1, 9, 0), 3);
+        // 1997년: 호우 사건 — 비교용. 주요 사건이 나오는 연도는 선택지에 남아야 한다
+        saveEventWithAlerts("호우가 있는 해의 호우", "호우", LocalDateTime.of(1997, 7, 1, 9, 0), 1);
+
+        // 조회 연도는 연도 목록 계산과 무관하다 — 어떤 연도로 불러도 years 는 같은 규칙으로 만들어져야 한다
+        ArchiveMajorEventsResponse response = archiveService.majorEvents(YEAR);
+
+        // 1998 이 들어 있으면 실패(지속형 사건만으로 연도를 만든 것), 1997 이 빠지면 규칙을 과하게 좁힌 것
+        assertThat(response.years()).contains(1997).doesNotContain(1998);
+    }
+
     // ── 테스트 데이터 ───────────────────────────────────────────
 
     /** 사건 하나와 알림 {@code alertCount} 건(1분 간격)을 만든다. 사건의 alert_count 도 같은 값이라 실제 데이터와 모순이 없다. */
