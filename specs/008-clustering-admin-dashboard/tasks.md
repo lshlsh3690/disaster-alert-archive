@@ -41,8 +41,8 @@ description: "클러스터링 관리자 대시보드 작업 목록"
 - [ ] T005 [P] [US4] `{test}/domain/event/judge/JudgeVersionCatalogTest.java` 에 핵심 동작만 Red 로 쓴다: v1 = gpt-4o·124/142·77/80, v2 = gpt-4o-mini·127/141·74/81 이고 최신 버전이 먼저 나온다
 - [ ] T006 단언 실패를 확인하고(`./gradlew test --tests "*ClusteringDashboardMetricsTest" --tests "*JudgeVersionCatalogTest"`) 뼈대 커밋과 테스트 커밋을 나눠 `commit-message` 스킬로 커밋한다
 - [ ] T007 ⛔ **멈춘다.** 사용자에게 테스트 파일과 실행 방법을 알리고 Red 확인을 기다린다
-- [ ] T008 [US1] `ClusteringDashboardMetrics` 를 구현한다 — 맞게 묶은 비율·빠짐없이 묶은 비율·점수는 저장된 개수로 `{main}/domain/event/evaluation/PairCountResult` 를 만들어 그 메서드로 계산한다(R4, 정의 중복 금지). 단가는 `JudgeVersionCatalog` 에서 읽는다
-- [ ] T009 [US4] `JudgeVersionCatalog` 를 구현하고, `{main}/domain/event/judge/ClusteringJudge.java` 의 `agreementOf`·`MODEL` 과 `{main}/domain/event/evaluation/JudgeAgreementReport.java` 의 단가 상수가 이 목록을 읽게 바꾼다(동작 동일, R2). `ClusteringJudgeTest`·`JudgeAgreementCounterTest`·`ClusteringDailyScoreServiceTest` 가 그대로 통과하는지 확인한다
+- [ ] T008 [US1] `ClusteringDashboardMetrics` 를 구현한다 — 비율(분모 0 → 백분율 없음)·빈 날짜 채우기·추정 비용·버전 기간. 점수·맞게 묶은 비율은 여기서 정의하지 않는다(T017 에서 `PairCountResult` 로). 비용 식은 `JudgeVersionCatalog.Entry.estimateUsd` 한 곳에 둔다
+- [ ] T009 [US4] `JudgeVersionCatalog` 를 구현하고, `{main}/domain/event/judge/ClusteringJudge.java` 의 `agreementOf` 와 `{main}/domain/event/evaluation/JudgeAgreementReport.java` 의 단가 상수가 이 목록을 읽게 바꾼다(동작 동일, R2). `ClusteringJudgeTest`·`JudgeAgreementCounterTest`·`ClusteringDailyScoreServiceTest` 가 그대로 통과하는지 확인한다
 
 **체크포인트**: 계산 규칙과 버전 목록이 한 곳에 있다. 판사·리포트 동작은 그대로다.
 
@@ -59,7 +59,7 @@ description: "클러스터링 관리자 대시보드 작업 목록"
 - [ ] T014 [P] [US4] 같은 파일에 Red: `judge-versions` 가 버전 목록 값과 채점 기록의 첫날·마지막 날·일수를 낸다
 - [ ] T015 단언 실패를 확인하고 뼈대 커밋과 테스트 커밋을 나눠 커밋한다(DB 가 필요한 통합 테스트 — 로컬 docker Postgres)
 - [ ] T016 ⛔ **멈춘다.** 사용자 Red 확인을 기다린다
-- [ ] T017 [US1] `ClusteringDailyScoreRepository` 에 범위 조회, `ClusteringDashboardService` 에 일일 채점 조회(범위 검증: 시작 ≤ 끝, 366일 이하, 위반 시 `CustomException`)와 `ClusteringDashboardMetrics` 조율을 구현한다
+- [ ] T017 [US1] `ClusteringDailyScoreRepository` 에 범위 조회, `ClusteringDashboardService` 에 일일 채점 조회(범위 검증: 시작 ≤ 끝, 366일 이하, 위반 시 `CustomException`)와 `ClusteringDashboardMetrics` 조율을 구현한다. 맞게 묶은 비율·빠짐없이 묶은 비율·점수는 저장된 개수로 `{main}/domain/event/evaluation/PairCountResult` 를 만들어 그 메서드로 계산한다(R4, 정의 중복 금지)
 - [ ] T018 [US2] `ClusteringDailyScorePairRepository` 에 범위·종류 필터·페이지 조회를 더하고, `{main}/domain/disasteralert/service/DisasterAlertService.java` 에 "id 목록 → (id, 원문, 발송 시각, 유형)" 조회를 더해 그 service 를 거쳐 원문을 붙인다(R5, `event` 맥락이 알림 저장소를 직접 주입하지 않음, 한 페이지를 한 번에 조회)
 - [ ] T019 [US3] `ClusteringDailyCheckRepository` 에 범위 조회를 더하고 구조 검사 조회를 구현한다
 - [ ] T020 [US4] `ClusteringDailyScoreRepository` 에 버전별 첫날·마지막 날·일수 집계를 더하고 판사 버전 이력 조회를 구현한다
