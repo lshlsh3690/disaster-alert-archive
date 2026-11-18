@@ -5,9 +5,11 @@ import com.disaster.alert.alertapi.domain.common.exception.CustomException;
 import com.disaster.alert.alertapi.domain.common.exception.ErrorCode;
 import com.disaster.alert.alertapi.domain.disasteralert.constant.StatsCacheNames;
 import com.disaster.alert.alertapi.domain.disasteralert.dto.*;
+import com.disaster.alert.alertapi.domain.disasteralert.model.Agency;
 import com.disaster.alert.alertapi.domain.disasteralert.model.DisasterAlert;
 import com.disaster.alert.alertapi.domain.disasteralert.model.DisasterLevel;
 import com.disaster.alert.alertapi.domain.disasteralert.model.RegionCodeUnit;
+import com.disaster.alert.alertapi.domain.disasteralert.model.SenderLabel;
 import com.disaster.alert.alertapi.domain.disasteralert.repository.DisasterAlertRepository;
 import com.disaster.alert.alertapi.domain.disasteralert.repository.DisasterAlertTranslationRepository;
 import com.disaster.alert.alertapi.domain.legaldistrict.model.LegalDistrict;
@@ -26,12 +28,16 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -52,6 +58,8 @@ public class DisasterAlertService {
 
     private final DisasterAlertRepository disasterAlertRepository;
     private final DisasterAlertTranslationRepository translationRepository;
+    private final AgencyService agencyService;
+    private final PlatformTransactionManager transactionManager;
 
     private final DisasterOpenApiClient disasterOpenApiClient;
     private final ObjectMapper objectMapper;
@@ -114,6 +122,8 @@ public class DisasterAlertService {
                 return List.of();
             }
 
+            attachAgencies(newAlerts);
+
             // 변경 - 충돌 시 무시
             List<Long> savedIds = new ArrayList<>();
             try {
@@ -136,6 +146,48 @@ public class DisasterAlertService {
         } catch (Exception e) {
             log.error("재난문자 저장 중 오류 발생", e);
             return List.of();
+        }
+    }
+
+    /**
+     * 새 알림들의 발신 기관을 지정한다(specs/007 R11). 배치당 해석 호출 1회, 표기가 없는 알림은 기관 null 로 둔다.
+     *
+     * <p>기관은 부가 정보라 해석이 실패해도 수집을 막지 않는다 — 기관 null 로 저장하고 warn 만 남긴다
+     * (사람이 조치할 장애가 아니므로 error 가 아니다). 해석을 REQUIRES_NEW 로 격리한 이유: 같은 트랜잭션에 합류하면
+     * 해석 안에서 난 예외가 공유 트랜잭션을 rollback-only 로 표시해, 여기서 예외를 삼켜도 saveData 커밋 때
+     * UnexpectedRollbackException 으로 그 회차 알림이 통째로 사라진다. 대가: 바깥이 나중에 롤백돼도 기관·표기는
+     * 남는다(다음 회차가 그대로 재사용하므로 무해), 해석 동안 커넥션을 하나 더 잠깐 쓴다.
+     */
+    private void attachAgencies(List<DisasterAlert> alerts) {
+        try {
+            Map<String, Agency> agencies = resolveAgenciesInNewTransaction(
+                    alerts.stream().map(DisasterAlert::getMessage).toList());
+            for (DisasterAlert alert : alerts) {
+                if (alert.getMessage() == null) continue;
+                SenderLabel.extract(alert.getMessage())
+                        .map(agencies::get)
+                        // 해석 트랜잭션은 이미 끝나 Agency 가 분리 상태다 — id 만으로 이 영속성 컨텍스트의 참조를 만들어 FK 에 쓴다
+                        .map(agency -> entityManager.getReference(Agency.class, agency.getId()))
+                        .ifPresent(alert::assignAgency);
+            }
+        } catch (Exception e) {
+            log.warn("발신 기관 해석 실패 — 이번 배치 {}건은 기관 없이 저장합니다: {}", alerts.size(), e.toString());
+        }
+    }
+
+    /**
+     * 해석을 별도 트랜잭션으로 실행한다. 두 수집 경로가 같은 새 표기를 동시에 등록하면 한쪽이 PK 충돌
+     * (DataIntegrityViolationException)로 롤백되는데, 그때는 상대가 커밋한 표기를 보게 되므로 1회만 다시 시도한다.
+     * 그래도 실패하거나 다른 예외면 호출한 쪽(attachAgencies)이 기관 없이 진행한다.
+     */
+    private Map<String, Agency> resolveAgenciesInNewTransaction(List<String> messages) {
+        TransactionTemplate template = new TransactionTemplate(transactionManager);
+        template.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+        try {
+            return template.execute(status -> agencyService.resolveByMessages(messages));
+        } catch (DataIntegrityViolationException e) {
+            log.info("발신 기관 동시 등록 충돌 — 한 번 다시 시도합니다: {}", e.getMostSpecificCause().getMessage());
+            return template.execute(status -> agencyService.resolveByMessages(messages));
         }
     }
 
