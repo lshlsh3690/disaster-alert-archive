@@ -12,9 +12,13 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 
 public interface DisasterAlertRepository extends JpaRepository<DisasterAlert, Long>, DisasterAlertRepositoryCustom {
     boolean existsBySn(Long sn);
+
+    /** 원 출처 고유번호(sn, 유일)로 알림 한 건. 기록관 영구 링크 해석용. */
+    Optional<DisasterAlert> findBySn(Long sn);
 
     @Query("SELECT d.sn FROM DisasterAlert d WHERE d.sn IN :snList")
     List<Long> findExistingSn(@Param("snList") List<Long> snList);
