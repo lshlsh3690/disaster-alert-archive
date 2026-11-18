@@ -91,7 +91,7 @@ export default function LoginPage() {
           <span className="h-px flex-1 bg-[var(--line)]"></span>
         </div>
         <div className="space-y-2.5">
-          <OAuthButton provider="google" />
+          <OAuthButton />
         </div>
       </div>
     </main>
