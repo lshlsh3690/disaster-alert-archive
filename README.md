@@ -42,46 +42,42 @@ AI 기반 이벤트 클러스터링으로 같은 사건의 알림을 하나로 �
 
 ![System Architecture](docs/system_architecture.png)
 
-### 재난문자 수집·클러스터링 파이프라인
+### 재난문자 수집·클러스터링·검증 파이프라인
 
-```mermaid
-flowchart TD
-    A["매 1분 수집<br/>공공데이터포털 재난문자 API"] --> B["새 문자 저장<br/>수신 지역 법정동 코드"]
-    B --> K{"사건 / 비사건 분류<br/>(LLM)"}
-    K -- "사건" --> S["재난 유형별 묶기"]
-
-    S -- "그 밖의 유형" --> E["임베딩 → 같은 시군구 후보 이벤트 검색"]
-    E --> E1{"코사인 거리<br/>≤ 0.15?"}
-    E1 -- "LLM 리랭킹" --> R{"임베딩 후보를<br/>LLM 이 다시 판정"}
-    R -- "같은 사건" --> M["기존 이벤트에 병합"]
-    R -- "다른 사건" --> N["새 이벤트"]
-```
-
-같은 사건인지 가르는 기준은 [`CLUSTERING_CRITERIA.md`](specs/001-event-clustering-pipeline/CLUSTERING_CRITERIA.md), 경로별 상세 동작은 [`specs/001-event-clustering-pipeline/`](specs/001-event-clustering-pipeline/)에 있습니다.
-
-### 클러스터링 검증 파이프라인
-
-사람 라벨(정답)로 LLM 판사를 검증하고, 검증된 판사가 운영 클러스터링을 매일 채점합니다.
+수집한 재난문자를 사건별로 묶고, 그 결과를 매일 검증합니다. LLM 판사는 사람 라벨로 먼저 검증한 뒤에만 채점에 씁니다.
 
 ```mermaid
 flowchart LR
+    subgraph COL["수집·클러스터링 (매 1분)"]
+        A["재난문자 수집<br/>공공데이터포털 API"] --> B["새 문자 저장<br/>수신 지역 법정동 코드"]
+        B --> K{"사건 / 비사건 분류<br/>(LLM)"}
+        K -- "사건" --> S["재난 유형별 묶기"]
+        S -- "그 밖의 유형" --> E["임베딩 → 같은 시군구<br/>후보 이벤트 검색"]
+        E --> E1{"코사인 거리<br/>≤ 0.15?"}
+        E1 -- "LLM 리랭킹" --> RR{"임베딩 후보를<br/>LLM 이 다시 판정"}
+        RR -- "같은 사건" --> M["기존 이벤트에 병합"]
+        RR -- "다른 사건" --> N["새 이벤트"]
+    end
+
+    subgraph PROD["운영 검증 (매일)"]
+        KC["00:30 구조 검사<br/>미배정 · 임베딩 없음"]
+        D["01:00 일일 채점<br/>전날 알림 쌍 → LLM 판사(gpt-4o-mini)"] --> O["날짜별 점수 + 판사 일치율<br/>불일치 쌍 목록"]
+    end
+
     subgraph OFF["오프라인 검증 (사람 라벨 · 평가 사본 DB)"]
-        L["사람 라벨 272쌍 (정답)<br/>같은 유형 · 7일 이내 · 같은/이웃 시군구인<br/>사건 알림 쌍에서 유형별로 뽑은 표본"]
-        C["같은 사건 판정 기준<br/>CLUSTERING_CRITERIA.md"] -. "기준이 바뀌면" .-> R["재확인 후보<br/>조건에 걸린 라벨만"] -. "사람이 다시 판정" .-> L
+        C["같은 사건 판정 기준<br/>CLUSTERING_CRITERIA.md"] -. "기준이 바뀌면" .-> RC["재확인 후보<br/>조건에 걸린 라벨만"] -. "사람이 다시 판정" .-> L["사람 라벨 272쌍 (정답)<br/>같은 유형 · 7일 이내 · 같은/이웃 시군구인<br/>사건 알림 쌍에서 유형별로 뽑은 표본"]
         L --> J["판사 일치율 측정<br/>LLM 판사 vs 사람 라벨"]
     end
 
+    M --> KC
+    N --> KC
+    M --> D
+    N --> D
     J -- "버전별 일치율 상수" --> D
-
-    subgraph PROD["운영 (매일)"]
-        S["재난문자 수집·클러스터링"] --> K["00:30 구조 검사<br/>미배정 · 임베딩 없음"]
-        S --> D["01:00 일일 채점<br/>전날 알림 쌍 → LLM 판사(gpt-4o-mini)"]
-        D --> O["날짜별 점수 + 판사 일치율<br/>불일치 쌍 목록"]
-    end
 ```
 
-- 사람 라벨만 정답으로 씁니다. LLM 판사는 사람 라벨과의 일치율(현재 같은 사건 90.1% · 다른 사건 91.4%)을 잰 뒤에만 채점에 쓰고, 점수 옆에 그 일치율을 함께 남깁니다.
-- 판사의 프롬프트나 모델을 바꾸면 272쌍으로 일치율을 다시 잽니다. 상세는 [`specs/006-clustering-evaluation/`](specs/006-clustering-evaluation/)에 있습니다.
+- 같은 사건인지 가르는 기준은 [`CLUSTERING_CRITERIA.md`](specs/001-event-clustering-pipeline/CLUSTERING_CRITERIA.md), 경로별 상세 동작은 [`specs/001-event-clustering-pipeline/`](specs/001-event-clustering-pipeline/)에 있습니다.
+- 사람 라벨만 정답으로 씁니다. LLM 판사는 사람 라벨과의 일치율(현재 같은 사건 90.1% · 다른 사건 91.4%)을 잰 뒤에만 채점에 쓰고, 점수 옆에 그 일치율을 함께 남깁니다. 판사의 프롬프트나 모델을 바꾸면 272쌍으로 다시 잽니다. 상세는 [`specs/006-clustering-evaluation/`](specs/006-clustering-evaluation/)에 있습니다.
 
 ## 프로젝트 구조
 
