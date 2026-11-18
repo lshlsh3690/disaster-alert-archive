@@ -1,5 +1,7 @@
 package com.disaster.alert.alertapi.domain.event.evaluation;
 
+import com.disaster.alert.alertapi.domain.disasteralert.model.SenderLabel;
+
 import java.time.Duration;
 import java.util.Comparator;
 import java.util.LinkedHashSet;
@@ -59,13 +61,6 @@ public class AlertPlaceFacts {
     public record PairFacts(SigunguRelation relation, Duration gap, List<String> sharedFacilityNames) {
     }
 
-    // 발신 기관 표시는 본문 맨 끝(뒤 공백 허용)이 기본 형태다(평가 셋 544건 중 517건). 본문 중간의 대괄호는 기관이 아니므로 보지 않는다.
-    private static final Pattern SENDER_AT_END = Pattern.compile("\\[([^\\[\\]]+)]\\s*$");
-
-    // 끝에 없을 때만 보는 맨 앞 형태("[세종시청] 오늘 …", "[서울경찰청]용산구에서 …" — 27건). 괄호 뒤 공백은 있어도 없어도 된다.
-    // 끝을 먼저 보는 이유: 끝 표시가 있던 기존 문자의 결과를 바꾸지 않기 위해서다(둘 다 있는 문자는 평가 셋에 없다).
-    private static final Pattern SENDER_AT_START = Pattern.compile("^\\s*\\[([^\\[\\]]+)]");
-
     // 시설 이름 후보: 한글·숫자 덩어리가 시설 접미사로 "끝나는" 경우만 잡는다. 끝 경계(?![가-힣0-9])가 없으면
     // "교통통제"에서 "교"를 잡는 식으로 일반 낱말이 시설로 오인된다. 앞에 최소 1글자(+)를 요구해 접미사만 홀로 잡히지 않게 한다.
     private static final Pattern FACILITY_TOKEN =
@@ -94,7 +89,8 @@ public class AlertPlaceFacts {
         int receivedCount = (int) alert.sigunguCodes().stream().distinct().count();
 
         // 1) 발신 기관을 본문 끝, 없으면 맨 앞에서 뽑는다 — 둘 다 없으면 시군구를 판단할 근거가 없으니 NONE
-        Optional<String> sender = findSender(alert.message());
+        //    규칙은 기록관 발신 기관 보관과 공유한다(SenderLabel)
+        Optional<String> sender = SenderLabel.extract(alert.message());
         if (sender.isEmpty()) {
             return new AlertFacts(Optional.empty(), AgencyKind.NONE, Optional.empty(), receivedCount);
         }
@@ -184,16 +180,6 @@ public class AlertPlaceFacts {
         Set<String> inB = facilityTokens(b.message());
         List<String> shared = facilityTokens(a.message()).stream().filter(inB::contains).toList();
         return new PairFacts(relation, gap, shared);
-    }
-
-    // 발신 기관 문자열: 끝 대괄호 우선, 없으면 맨 앞 대괄호. 둘 다 없으면 비어 있다.
-    private static Optional<String> findSender(String body) {
-        Matcher atEnd = SENDER_AT_END.matcher(body);
-        if (atEnd.find()) {
-            return Optional.of(atEnd.group(1));
-        }
-        Matcher atStart = SENDER_AT_START.matcher(body);
-        return atStart.find() ? Optional.of(atStart.group(1)) : Optional.empty();
     }
 
     // 본문에서 시설 이름 후보를 등장 순서대로(중복 제거) 뽑는다. 행정구역(…면·…리)은 접미사 목록에 없어 안 잡힌다.
