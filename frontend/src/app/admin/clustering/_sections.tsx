@@ -126,7 +126,7 @@ function AlertCell({ alert }: { alert: ClusteringAlertSummary }) {
 export function DisagreementsSection({ from, to }: { from: string; to: string }) {
   const [kind, setKind] = useState<DisagreementKind | null>(null);
   const [page, setPage] = useState(0);
-  const { data, isLoading, error } = useClusteringDisagreements({ from, to, kind, page, size: 20 });
+  const { data, isLoading, error, isPlaceholderData } = useClusteringDisagreements({ from, to, kind, page, size: 20 });
 
   const changeKind = (value: string) => {
     setKind(value === "" ? null : (value as DisagreementKind));
@@ -191,7 +191,8 @@ export function DisagreementsSection({ from, to }: { from: string; to: string })
           <span className="text-[var(--text-muted)]">{page + 1} / {data.totalPages}</span>
           <button
             onClick={() => setPage((p) => p + 1)}
-            disabled={page + 1 >= data.totalPages}
+            // 이전 응답(placeholder)의 totalPages 로 넘어가면 새 조건에 없는 빈 페이지를 요청하게 된다
+            disabled={isPlaceholderData || page + 1 >= data.totalPages}
             className="px-3 py-1 border border-[var(--line)] rounded-[var(--radius-control)] disabled:opacity-40"
           >
             다음
