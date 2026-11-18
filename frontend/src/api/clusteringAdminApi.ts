@@ -18,7 +18,10 @@ export type DayStatus = "SCORED" | "NO_PAIRS" | "NO_RECORD";
 /** 불일치 쌍 종류. 과병합 = OVER_MERGED, 과소병합 = MISSED. */
 export type DisagreementKind = "OVER_MERGED" | "MISSED";
 
-/** 판사 판정. */
+/**
+ * 불일치 쌍의 판사 판정. 백엔드 enum 에는 FORMAT_FAILURE 도 있지만 불일치(과병합·과소병합)는 판사가 SAME/DIFF 로
+ * 답한 쌍에서만 생겨 이 응답에는 오지 않는다. UNSURE 도 같은 이유로 실제로는 오지 않으나 계약 문서에 맞춰 둔다.
+ */
 export type JudgeVerdict = "SAME" | "DIFF" | "UNSURE";
 
 export type ClusteringJudge = {

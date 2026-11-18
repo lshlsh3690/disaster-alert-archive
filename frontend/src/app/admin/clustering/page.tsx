@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuthStore } from "@/store/authStore";
 import Button from "@/components/ui/Button";
-import { defaultRange } from "./_format";
+import { clampEnd, clampStart, defaultRange } from "./_format";
 import { DailyChecksSection, DailyScoresSection, DisagreementsSection, JudgeVersionsSection } from "./_sections";
 
 // 클러스터링 운영 검증 관리자 화면(specs/008-clustering-admin-dashboard). 읽기 전용이다.
@@ -34,9 +34,11 @@ export default function ClusteringAdminPage() {
   const router = useRouter();
 
   // 이 화면을 보던 중 로그인 상태였다가 user 가 사라지면(로그아웃) 모달 없이 바로 홈으로 보낸다.
-  // 처음부터 로그인 안 한 방문(딥링크)만 아래 안내 모달을 띄운다
+  // 처음부터 로그인 안 한 방문(딥링크)만 아래 안내 모달을 띄운다.
+  // 초기화(서버 확인)가 끝난 뒤의 user 만 센다 — localStorage 에 남은 옛 user 로 세면, 세션 만료로 들어온
+  // 딥링크도 "여기서 로그아웃"으로 오인해 로그인 안내 없이 홈으로 보낸다
   const [seenUser, setSeenUser] = useState(false);
-  if (user && !seenUser) setSeenUser(true);
+  if (!isInitializing && user && !seenUser) setSeenUser(true);
   const loggedOutHere = seenUser && !user;
   useEffect(() => {
     if (loggedOutHere) router.replace("/");
@@ -55,9 +57,9 @@ export default function ClusteringAdminPage() {
     return <RedirectNotice message="관리자만 볼 수 있는 화면입니다." target="/" />;
   }
 
-  // 시작이 끝보다 늦어지지 않게만 막는다(366일 상한은 서버가 400 으로 알린다)
-  const changeFrom = (from: string) => from && setRange((r) => ({ from, to: from > r.to ? from : r.to }));
-  const changeTo = (to: string) => to && setRange((r) => ({ from: to < r.from ? to : r.from, to }));
+  // 바꾼 쪽은 그대로 두고 반대쪽을 맞춘다 — 시작 ≤ 끝, 길이 366일 이하(서버 상한과 같다)
+  const changeFrom = (from: string) => from && setRange((r) => ({ from, to: clampEnd(from, r.to) }));
+  const changeTo = (to: string) => to && setRange((r) => ({ from: clampStart(r.from, to), to }));
 
   return (
     <main className="bg-[var(--canvas)] min-h-[calc(100vh-48px)]">

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { isAxiosError } from "axios";
 import type { ClusteringAlertSummary, DayStatus, DisagreementKind } from "@/api/clusteringAdminApi";
 import {
   useClusteringDailyChecks,
@@ -39,18 +40,20 @@ export function Section({ title, description, children }: { title: string; descr
   );
 }
 
-function QueryState({ isLoading, isError }: { isLoading: boolean; isError: boolean }) {
+// 실패하면 서버가 준 이유(예: 조회 범위 오류)를 함께 보인다. 이유가 없으면 고정 문구만
+function QueryState({ isLoading, error }: { isLoading: boolean; error: unknown }) {
   if (isLoading) return <p className="text-sm text-[var(--text-muted)]">불러오는 중…</p>;
-  if (isError) return <p className="text-sm text-[var(--coral)]">불러오지 못했습니다.</p>;
-  return null;
+  if (!error) return null;
+  const message = isAxiosError(error) ? (error.response?.data as { message?: string } | undefined)?.message : undefined;
+  return <p className="text-sm text-[var(--coral)]">불러오지 못했습니다.{message ? ` (${message})` : ""}</p>;
 }
 
 /** 일일 채점 — 날짜마다 점수와 같은 줄에 그날 판사 버전·일치율을 둔다(점수만 따로 보이지 않게). */
 export function DailyScoresSection({ from, to }: { from: string; to: string }) {
-  const { data, isLoading, isError } = useClusteringDailyScores(from, to);
+  const { data, isLoading, error } = useClusteringDailyScores(from, to);
   return (
     <Section title="일일 채점" description="추정 비용은 프롬프트 캐시 할인을 빼지 않은 상한값입니다.">
-      <QueryState isLoading={isLoading} isError={isError} />
+      <QueryState isLoading={isLoading} error={error} />
       {data && (
         <div className="overflow-x-auto">
           <table className={TABLE}>
@@ -123,7 +126,7 @@ function AlertCell({ alert }: { alert: ClusteringAlertSummary }) {
 export function DisagreementsSection({ from, to }: { from: string; to: string }) {
   const [kind, setKind] = useState<DisagreementKind | null>(null);
   const [page, setPage] = useState(0);
-  const { data, isLoading, isError } = useClusteringDisagreements({ from, to, kind, page, size: 20 });
+  const { data, isLoading, error } = useClusteringDisagreements({ from, to, kind, page, size: 20 });
 
   const changeKind = (value: string) => {
     setKind(value === "" ? null : (value as DisagreementKind));
@@ -146,7 +149,7 @@ export function DisagreementsSection({ from, to }: { from: string; to: string })
         </select>
         {data && <span className="text-[var(--text-muted)]">총 {formatNumber(data.totalElements)}쌍</span>}
       </div>
-      <QueryState isLoading={isLoading} isError={isError} />
+      <QueryState isLoading={isLoading} error={error} />
       {data && data.pairs.length === 0 && <p className="text-sm text-[var(--text-muted)]">이 범위에 불일치 쌍이 없습니다.</p>}
       {data && data.pairs.length > 0 && (
         <div className="overflow-x-auto">
@@ -201,10 +204,10 @@ export function DisagreementsSection({ from, to }: { from: string; to: string })
 
 /** 구조 검사(매일 00:30) — 미배정·임베딩 없음이 있는 날을 강조한다. */
 export function DailyChecksSection({ from, to }: { from: string; to: string }) {
-  const { data, isLoading, isError } = useClusteringDailyChecks(from, to);
+  const { data, isLoading, error } = useClusteringDailyChecks(from, to);
   return (
     <Section title="구조 검사 (매일 00:30)" description="미배정이나 임베딩 없음이 있는 날은 강조됩니다. 검사가 돌지 않은 날은 '기록 없음'입니다.">
-      <QueryState isLoading={isLoading} isError={isError} />
+      <QueryState isLoading={isLoading} error={error} />
       {data && (
         <div className="overflow-x-auto">
           <table className={TABLE}>
@@ -244,10 +247,10 @@ export function DailyChecksSection({ from, to }: { from: string; to: string }) {
 
 /** 판사 버전 이력 — 버전마다 모델·272쌍 일치율과 그 버전으로 채점한 기간. */
 export function JudgeVersionsSection() {
-  const { data, isLoading, isError } = useClusteringJudgeVersions();
+  const { data, isLoading, error } = useClusteringJudgeVersions();
   return (
     <Section title="판사 버전 이력" description="일치율은 사람 라벨 272쌍과 판사 판정을 견준 값입니다.">
-      <QueryState isLoading={isLoading} isError={isError} />
+      <QueryState isLoading={isLoading} error={error} />
       {data && (
         <div className="overflow-x-auto">
           <table className={TABLE}>
