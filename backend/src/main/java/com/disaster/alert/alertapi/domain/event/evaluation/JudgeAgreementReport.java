@@ -20,9 +20,10 @@ import java.util.Locale;
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
 final class JudgeAgreementReport {
 
-    // gpt-4o 단가(USD / 100만 토큰). 모델·단가가 바뀌면 같이 고친다.
-    private static final double INPUT_USD_PER_MILLION = 2.50;
-    private static final double OUTPUT_USD_PER_MILLION = 10.00;
+    // ClusteringJudge.MODEL(gpt-4o-mini) 단가(USD / 100만 토큰). 모델·단가가 바뀌면 같이 고친다 —
+    // 2026-11-18 모델을 바꾸고 첫 측정 때 이 값이 gpt-4o 단가로 남아 리포트 비용이 16배로 찍힌 적이 있다.
+    private static final double INPUT_USD_PER_MILLION = 0.15;
+    private static final double OUTPUT_USD_PER_MILLION = 0.60;
     private static final int BODY_EXCERPT_LENGTH = 100;
     private static final DateTimeFormatter AT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
 

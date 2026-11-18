@@ -26,11 +26,17 @@ import java.util.Optional;
 @Component
 public class ClusteringJudge {
 
-    /** 프롬프트 본문이 바뀌면 올린다. 버전마다 272쌍 일치율이 있어야 채점한다. */
-    public static final String PROMPT_VERSION = "v1";
+    /**
+     * 프롬프트 본문이나 모델이 바뀌면 올린다(일치율은 프롬프트와 모델을 함께 잰 값이다). 버전마다 272쌍 일치율이 있어야 채점한다.
+     * v1 = 지금 프롬프트 + gpt-4o, v2 = 같은 프롬프트 + gpt-4o-mini.
+     */
+    public static final String PROMPT_VERSION = "v2";
 
-    // 기준을 읽고 따지는 일이라 분류용 mini 가 아니라 gpt-4o 를 쓴다. 일치율은 이 모델로 재므로 고정한다.
-    public static final String MODEL = "gpt-4o";
+    // 2026-11-18 gpt-4o 에서 gpt-4o-mini 로 바꿨다. 272쌍 일치율이 전체로 비슷하고(사람과 반대로 판정한 쌍 22 → 21)
+    // 쌍당 비용이 약 1/16 이라서다 — 큰 사건 날 수십 달러가 들던 일일 채점을 그대로 돌리려는 선택이다.
+    // 대신 틀리는 방향이 바뀌었다: 사람 "다른 사건"을 "같은 사건"으로 보는 쌍이 3 → 7 로 늘어 과병합을 조금 더 놓친다.
+    // 모델을 바꾸면 PROMPT_VERSION 을 올리고 272쌍으로 다시 잰다(FR-018).
+    public static final String MODEL = "gpt-4o-mini";
     // 같은 쌍은 같은 답이 나와야 프롬프트 버전끼리 점수를 비교할 수 있어 온도 0.
     private static final double TEMPERATURE = 0.0;
     // 답은 SAME/DIFF/UNSURE 한 단어다. 이유를 덧붙이려 해도 잘리게 막아 비용을 줄인다(잘린 응답은 형식 실패로 센다).
@@ -240,10 +246,16 @@ public class ClusteringJudge {
      * (D·E·G·I 55쌍, 원칙 3 의심 3쌍) 반영 뒤 라벨로 다시 센 값. 근거는 {@code evaluation/reports/judge-agreement-2026-11-17.md}.
      * 판사가 사람보다 잘게 나누는 쪽(사람 같은 사건·판사 다른 사건이 대부분)이라 일일 점수의 과병합은 실제보다 많게 나올 수 있다.
      * 온도 0이어도 답이 매번 같지는 않아 다시 재면 한두 쌍은 달라질 수 있다.
+     *
+     * <p>v2(gpt-4o-mini): 2026-11-18 같은 프롬프트·같은 라벨로 225쌍을 판정한 값($0.051). 근거는
+     * {@code evaluation/reports/judge-agreement-2026-11-18-mini.md}. v1 보다 같은 사건 쌍은 잘 맞추고(87.3% → 90.1%)
+     * 다른 사건 쌍은 덜 맞춘다(96.3% → 91.4%) — 시스템이 잘못 묶은 쌍을 같은 사건으로 보면 그 과병합을 놓치므로,
+     * v2 로 매긴 맞게 묶은 비율은 실제보다 조금 높게 나올 수 있다.
      */
     public static Optional<Agreement> agreementOf(String promptVersion) {
         return switch (promptVersion) {
             case "v1" -> Optional.of(new Agreement(124, 142, 77, 80));
+            case "v2" -> Optional.of(new Agreement(127, 141, 74, 81));
             default -> Optional.empty();
         };
     }
