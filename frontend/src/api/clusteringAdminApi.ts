@@ -4,6 +4,9 @@
 import instance from "./axios";
 
 const BASE = "/api/v1/admin/clustering";
+// 인증이 필요한 요청 표시 — axios 인터셉터는 이 헤더가 있을 때만 401 에 토큰 재발급 후 1회 재시도한다.
+// 없으면 화면을 연 채 access 토큰이 만료됐을 때 기간을 바꾸면 영역에 오류만 남는다
+const AUTH = { "X-Auth-Required": "true" };
 
 /** 비율. 분모가 0 이면 백엔드가 percent 를 null 로 내려보낸다(키는 있다). */
 export type Ratio = {
@@ -124,7 +127,7 @@ export type ClusteringJudgeVersionsResponse = {
 
 /** 날짜별 일일 채점(최신 날짜 먼저). */
 export async function fetchClusteringDailyScores(from: string, to: string): Promise<ClusteringDailyScoresResponse> {
-  const res = await instance.get(`${BASE}/daily-scores`, { params: { from, to } });
+  const res = await instance.get(`${BASE}/daily-scores`, { params: { from, to }, headers: AUTH });
   return res.data.data as ClusteringDailyScoresResponse;
 }
 
@@ -135,18 +138,19 @@ export async function fetchClusteringDisagreements(
   const { from, to, kind, page = 0, size = 20 } = params;
   const res = await instance.get(`${BASE}/disagreements`, {
     params: { from, to, page, size, ...(kind ? { kind } : {}) },
+    headers: AUTH,
   });
   return res.data.data as ClusteringDisagreementsResponse;
 }
 
 /** 날짜별 구조 검사(미배정·임베딩 없음). */
 export async function fetchClusteringDailyChecks(from: string, to: string): Promise<ClusteringDailyChecksResponse> {
-  const res = await instance.get(`${BASE}/daily-checks`, { params: { from, to } });
+  const res = await instance.get(`${BASE}/daily-checks`, { params: { from, to }, headers: AUTH });
   return res.data.data as ClusteringDailyChecksResponse;
 }
 
 /** 판사 버전 이력(최신 버전 먼저). */
 export async function fetchClusteringJudgeVersions(): Promise<ClusteringJudgeVersionsResponse> {
-  const res = await instance.get(`${BASE}/judge-versions`);
+  const res = await instance.get(`${BASE}/judge-versions`, { headers: AUTH });
   return res.data.data as ClusteringJudgeVersionsResponse;
 }
