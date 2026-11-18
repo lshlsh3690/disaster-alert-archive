@@ -119,10 +119,13 @@ public class EventQueryService {
         List<EventTimelineRow> rows = disasterEventRepository.findTimelineRows(id);
         Map<Long, List<String>> regionNamesByAlert = loadRegionNames(rows);
 
+        // 기록관 영구 링크용 대표 알림 sn — 규칙은 findRepresentativeSn 한 곳에 둔다
+        Long representativeSn = representativeSn(id);
+
         Optional<SupportedLanguage> langOpt = SupportedLanguage.fromRequestParam(lang);
         if (langOpt.isEmpty()) {
             List<EventAlertItem> timeline = buildTimeline(rows, regionNamesByAlert, null, null, null, null);
-            return EventDetailResponse.of(event, now, timeline);
+            return EventDetailResponse.of(event, now, timeline, representativeSn);
         }
 
         SupportedLanguage language = langOpt.get();
@@ -149,7 +152,7 @@ public class EventQueryService {
 
         List<EventAlertItem> timeline = buildTimeline(
                 rows, regionNamesByAlert, alertTrMap, alertIdToCodes, codeToTranslated, language.getCode());
-        return EventDetailResponse.of(event, now, timeline, translatedTitle, language.getCode());
+        return EventDetailResponse.of(event, now, timeline, translatedTitle, language.getCode(), representativeSn);
     }
 
     /**
