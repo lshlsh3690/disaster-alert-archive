@@ -24,7 +24,6 @@ import static org.assertj.core.api.Assertions.assertThat;
  * <p>규칙이 SQL 조회에 들어가므로(사건 전체를 메모리로 올려 거를 수 없다) 통합 테스트가 맞다.
  * 데이터는 실제 사건이 없는 1999년으로 넣고 테스트 트랜잭션과 함께 롤백된다 — 운영·개발 데이터와 섞이지 않는다.
  *
- * <p>Red 단계에서는 {@link ArchiveService} 뼈대가 빈 목록 / bound=false 를 돌려줘서 네 테스트가 모두 단언에서 실패한다.
  */
 @IntegrationTest
 @Transactional
@@ -44,23 +43,24 @@ class ArchiveServiceIntegrationTest {
     private long nextSn = 990_000_000L;
 
     /**
-     * 지속형 유형(폭염)은 알림 수가 아무리 많아도 주요 사건에서 빠진다 — 클러스터링이 폭염 알림을 한 사건에
-     * 계속 이어 붙여 알림 수만 부풀리기 때문이다. 뼈대는 빈 목록을 돌려줘 "호우 사건이 있어야 한다" 단언에서 실패한다.
+     * 지속형 유형(폭염)도 유형으로 거르지 않는다 — 처음의 "지속형 제외" 규칙은 실측 근거가 없었고 평가 사본에서
+     * 효과가 0이었다(research.md R3). 폭염 사건의 알림 수가 가장 많으면 목록 맨 앞에 와야 한다.
+     * 현재 코드는 지속형을 SQL 에서 빼므로 폭염이 사라져 ["호우 사건"] 만 나와 순서 단언에서 실패한다.
      */
     @Test
-    @DisplayName("지속형 유형(폭염) 사건은 알림 수가 많아도 주요 사건에서 빠진다")
-    void 지속형_유형은_주요_사건에서_빠진다() {
-        // 폭염 사건: 알림 5건으로 가장 크다 → 제외 규칙이 없으면 1위가 된다
+    @DisplayName("지속형 유형(폭염) 사건도 알림 수가 많으면 주요 사건에 포함된다")
+    void 지속형_유형도_알림_수가_많으면_주요_사건에_포함된다() {
+        // 폭염 사건: 알림 5건으로 가장 크다 → 유형으로 거르지 않으면 1위가 된다
         saveEventWithAlerts("폭염 사건", "폭염", LocalDateTime.of(YEAR, 7, 1, 9, 0), 5);
-        // 호우 사건: 알림 2건. 지속형이 아니므로 남아야 한다
+        // 호우 사건: 알림 2건 → 폭염 뒤 2위
         saveEventWithAlerts("호우 사건", "호우", LocalDateTime.of(YEAR, 7, 10, 9, 0), 2);
 
         ArchiveMajorEventsResponse response = archiveService.majorEvents(YEAR);
 
-        // 폭염은 없고 호우만 남는다. 뼈대(빈 목록)는 여기서 실패한다
+        // 알림 수 내림차순이라 폭염(5) → 호우(2). 폭염이 빠져 있으면(현재 동작) 여기서 실패한다
         assertThat(response.events())
                 .extracting(ArchiveMajorEventsResponse.Item::eventTitle)
-                .containsExactly("호우 사건");
+                .containsExactly("폭염 사건", "호우 사건");
     }
 
     /**
