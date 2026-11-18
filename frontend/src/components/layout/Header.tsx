@@ -91,7 +91,9 @@ export default function Header() {
           <Link href="/" className="flex items-center gap-2">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src="/icons/apple-icon-180.png" alt="logo" className="w-8 h-8 rounded-full" />
-            <span className="text-xl font-bold text-[var(--blue)] tracking-tight">{t("appName")}</span>
+            {/* 좁은 폰에서 "안전문 / 자"처럼 단어 중간이 끊기지 않게 단어 단위로만 줄바꿈(break-keep).
+                360px 미만(iPhone SE)은 단어 단위로 끊으면 세 줄이 돼 한 단계 작은 글자로 두 줄에 맞춘다 */}
+            <span className="text-lg font-bold leading-tight text-[var(--blue)] tracking-tight break-keep min-[360px]:text-xl">{t("appName")}</span>
           </Link>
           <select
             value={language}
