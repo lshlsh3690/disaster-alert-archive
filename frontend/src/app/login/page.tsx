@@ -39,7 +39,7 @@ export default function LoginPage() {
 
   const { handleSubmit } = formMethods;
 
-  const { mutate: login } = useLogin({
+  const { mutate: login, isPending } = useLogin({
     onSuccessCallback: () => router.push("/"),
     onErrorCallback: (errorMessage) => setError(errorMessage),
   });
@@ -62,7 +62,7 @@ export default function LoginPage() {
           <EmailInput<LoginFormData> formMethods={formMethods} />
           <PasswordInput<LoginFormData> formMethods={formMethods} name="password" />
           {error && <p className="text-sm text-[var(--coral)]">{error}</p>}
-          <Button type="submit" fullWidth className="h-11">
+          <Button type="submit" fullWidth className="h-11" isLoading={isPending}>
             {t("login.submit")}
           </Button>
           <Button type="button" variant="secondary" fullWidth className="h-11" onClick={() => router.back()}>
