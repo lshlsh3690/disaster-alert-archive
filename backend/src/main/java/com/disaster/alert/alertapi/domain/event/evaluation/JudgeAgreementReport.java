@@ -6,12 +6,14 @@ import com.disaster.alert.alertapi.domain.event.evaluation.LabelJson.Label;
 import com.disaster.alert.alertapi.domain.event.judge.ClusteringJudge;
 import com.disaster.alert.alertapi.domain.event.judge.ClusteringJudge.Agreement;
 import com.disaster.alert.alertapi.domain.event.judge.JudgeVerdict;
+import com.disaster.alert.alertapi.domain.event.judge.JudgeVersionCatalog;
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
 
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Locale;
+import java.util.Optional;
 
 /**
  * 판사 일치율 측정 결과를 마크다운 리포트로 만든다(순수 문자열 조립, DB·판사 호출 없음).
@@ -20,10 +22,6 @@ import java.util.Locale;
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
 final class JudgeAgreementReport {
 
-    // ClusteringJudge.MODEL(gpt-4o-mini) 단가(USD / 100만 토큰). 모델·단가가 바뀌면 같이 고친다 —
-    // 2026-11-18 모델을 바꾸고 첫 측정 때 이 값이 gpt-4o 단가로 남아 리포트 비용이 16배로 찍힌 적이 있다.
-    private static final double INPUT_USD_PER_MILLION = 0.15;
-    private static final double OUTPUT_USD_PER_MILLION = 0.60;
     private static final int BODY_EXCERPT_LENGTH = 100;
     private static final DateTimeFormatter AT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
 
@@ -73,14 +71,20 @@ final class JudgeAgreementReport {
     }
 
     private static void appendCost(StringBuilder sb, JudgeAgreementResult r) {
-        double usd = r.promptTokens() * INPUT_USD_PER_MILLION / 1_000_000
-                + r.completionTokens() * OUTPUT_USD_PER_MILLION / 1_000_000;
         sb.append("## 토큰·추정 비용\n");
         sb.append("- 프롬프트 ").append(r.promptTokens()).append(" · 완성 ").append(r.completionTokens())
                 .append(" 토큰(형식 실패 포함)\n");
+        // 단가는 카탈로그에서 읽는다. 새 버전을 재는 중이면(아직 카탈로그에 없음) 단가를 몰라 비용을 비워 둔다
+        Optional<JudgeVersionCatalog.Entry> price = JudgeVersionCatalog.find(ClusteringJudge.PROMPT_VERSION);
+        if (price.isEmpty()) {
+            sb.append("- 추정 비용: 알 수 없음(판사 버전 ").append(ClusteringJudge.PROMPT_VERSION)
+                    .append(" 의 단가가 JudgeVersionCatalog 에 아직 없음)\n\n");
+            return;
+        }
+        JudgeVersionCatalog.Entry p = price.get();
         // 프롬프트 캐시가 적용된 토큰도 정가로 셈한다 - 실제 청구액은 이보다 적을 수 있다
         sb.append(String.format(Locale.ROOT, "- 추정 비용(상한, 캐시 할인 미반영) $%.3f (입력 $%.2f/1M, 출력 $%.2f/1M)%n%n",
-                usd, INPUT_USD_PER_MILLION, OUTPUT_USD_PER_MILLION));
+                p.estimateUsd(r.promptTokens(), r.completionTokens()), p.inputUsdPerMillion(), p.outputUsdPerMillion()));
     }
 
     // 사람과 판사가 정반대로 답한 쌍 - 사용자가 판사(프롬프트)와 사람 라벨 중 어느 쪽이 틀렸는지 눈으로 가려내는 목록
