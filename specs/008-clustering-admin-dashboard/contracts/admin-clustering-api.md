@@ -87,6 +87,28 @@
 
 - `attention` = 미배정 > 0 또는 임베딩 없음 > 0.
 
+### 3-1. 그날의 문제 알림 (행 펼치기)
+
+`GET /daily-checks/2026-11-17/alerts` — 구조 검사 표에서 한 날짜 행을 눌렀을 때 쓴다.
+
+```json
+{
+  "date": "2026-11-17",
+  "alerts": [
+    { "id": 9001, "sentAt": "2026-11-17T10:00:00", "type": "화재", "message": "...",
+      "unassigned": true, "noEmbedding": false, "eventId": null, "mergeMethod": null },
+    { "id": 9002, "sentAt": "2026-11-17T11:00:00", "type": "산불", "message": "...",
+      "unassigned": false, "noEmbedding": true, "eventId": 123, "mergeMethod": "REGIONAL_TYPE" }
+  ]
+}
+```
+
+- 대상 = 그날(`created_at` [당일 00:00, 다음날 00:00)) `alert_kind = INCIDENT` 알림 중 이벤트 미배정이거나 임베딩 없음인 것만. 정상 알림·안내(ADVISORY)는 나오지 않는다. 구조 검사 숫자와 같은 조건을 공유한다.
+- 정렬: 발송 시각 오름차순 → 알림 id 오름차순.
+- `unassigned` = 이벤트 없음, `noEmbedding` = 임베딩 없음(둘 다 true 일 수 있고, 그래도 한 번만 나온다). 이벤트에 붙어 있으면 `eventId`·`mergeMethod` 가 있고, 미배정이면 둘 다 null 이다.
+- **숫자는 검사 당시의 저장값이고 목록은 지금 조회한 값이라 다를 수 있다.** 검사 뒤 알림이 배정되거나 임베딩이 채워지면 목록이 숫자보다 짧다. 검사 행이 없는 날도 목록은 조회된다.
+- ADMIN 만 호출할 수 있다(다른 엔드포인트와 동일).
+
 ## 4. 판사 버전 이력
 
 `GET /judge-versions`
