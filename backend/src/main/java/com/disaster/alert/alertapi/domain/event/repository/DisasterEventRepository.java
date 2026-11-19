@@ -101,17 +101,22 @@ public interface DisasterEventRepository extends JpaRepository<DisasterEvent, Lo
      * 따라서 지역 교집합을 필수 조건으로 둔다. 지역이 다른 같은 사건(늑대 대전→광주류)은 드물고
      * 관리자 수동 병합으로 처리.
      *
+     * <p><b>excludedAlertTypes</b>: 이 유형 알림의 임베딩은 거리 계산에서 뺀다. 지역 한정 유형(산불·산사태·홍수·호우)
+     * 경로는 임베딩을 저장만 하고 병합 판단에는 쓰지 않는데, 그 임베딩이 이 검색에 잡히면 화재·교통 같은 다른 유형
+     * 문자가 산불·호우 사건의 후보가 되어 묶음 결과가 바뀐다. 저장 전에는 후보가 아니었으니 그대로 두려고 뺀다
+     * (사용자 결정 2026-11-19). 빈 배열이면 아무것도 빼지 않는다.
+     *
      * <p>반환: {eventId, minDistance} 튜플 0~3 행. distance 0.0=동일, 1.0=직교.
      * top-2/3 는 디버깅·임계값 튜닝 로깅용.
      */
     default List<Object[]> findTopCandidates(String newEmbedding, String[] sigunguCodes, LocalDateTime sinceTime,
                                              String[] excludedAlertTypes) {
-        // Red 단계 뼈대 — excludedAlertTypes 는 아직 거리 계산에 반영하지 않는다. 구현은 Green 에서
+        // 1) 기간 안의 비광역 이벤트를 받고, 2) 그중 같은 시군구 알림(제외 유형 빼고)으로 거리를 잰다
         List<Long> candidates = findRecentEventIds(sinceTime);
         if (candidates.isEmpty()) {
             return List.of();
         }
-        return findClosestEvents(newEmbedding, candidates, sigunguCodes);
+        return findClosestEvents(newEmbedding, candidates, sigunguCodes, excludedAlertTypes);
     }
 
     /** 마지막 알림이 기간 안인 비광역 이벤트(유형 무관). */
@@ -123,7 +128,11 @@ public interface DisasterEventRepository extends JpaRepository<DisasterEvent, Lo
             """)
     List<Long> findRecentEventIds(@Param("since") LocalDateTime since);
 
-    /** 후보 이벤트별로, 주어진 시군구에 속한 알림과 새 알림의 최소 거리. 가까운 순 3개, {eventId, minDistance}. */
+    /**
+     * 후보 이벤트별로, 주어진 시군구에 속한 알림과 새 알림의 최소 거리. 가까운 순 3개, {eventId, minDistance}.
+     * 제외 유형 알림은 거리 계산에서 뺀다 — disaster_type 이 NULL 인 알림은 탈락하면 안 되므로(NULL 은 {@code <> ALL}
+     * 에서 UNKNOWN) 따로 통과시키고, 빈 배열은 {@code <> ALL('{}')} 가 TRUE 라 아무것도 빼지 않는다.
+     */
     @Query(value = """
             SELECT a.event_id,
                    MIN(a.embedding <=> CAST(:newEmbedding AS vector)) AS min_distance
@@ -132,13 +141,15 @@ public interface DisasterEventRepository extends JpaRepository<DisasterEvent, Lo
             WHERE a.event_id IN (:eventIds)
               AND a.embedding IS NOT NULL
               AND LEFT(r.legal_district_code, 5) = ANY(CAST(:sigunguCodes AS varchar[]))
+              AND (a.disaster_type IS NULL OR a.disaster_type <> ALL(CAST(:excludedAlertTypes AS varchar[])))
             GROUP BY a.event_id
             ORDER BY min_distance ASC
             LIMIT 3
             """, nativeQuery = true)
     List<Object[]> findClosestEvents(@Param("newEmbedding") String newEmbedding,
                                      @Param("eventIds") List<Long> eventIds,
-                                     @Param("sigunguCodes") String[] sigunguCodes);
+                                     @Param("sigunguCodes") String[] sigunguCodes,
+                                     @Param("excludedAlertTypes") String[] excludedAlertTypes);
 
     /**
      * 사고성 유형의 인접 시군구 후보 검색 — {@link #findTopCandidates} 와 같은 반환 형태({eventId, minDistance}).
@@ -150,18 +161,21 @@ public interface DisasterEventRepository extends JpaRepository<DisasterEvent, Lo
      * 인접 병합된 이벤트의 primary_region_code 는 첫 알림 지역으로 고정된다.
      *
      * <p>{@link #findTopCandidates} 와 같은 후보 목록을 쓰고, 거리는 이웃 시군구 알림만으로 잰다.
+     * excludedAlertTypes 의미와 이유도 같다(지역 한정 유형 알림의 임베딩은 거리에서 뺀다).
      */
     default List<Object[]> findTopAdjacentCandidates(String newEmbedding, String[] sigunguCodes, LocalDateTime sinceTime,
                                                      String[] excludedAlertTypes) {
-        // Red 단계 뼈대 — excludedAlertTypes 는 아직 거리 계산에 반영하지 않는다. 구현은 Green 에서
         List<Long> candidates = findRecentEventIds(sinceTime);
         if (candidates.isEmpty()) {
             return List.of();
         }
-        return findClosestAdjacentEvents(newEmbedding, candidates, sigunguCodes);
+        return findClosestAdjacentEvents(newEmbedding, candidates, sigunguCodes, excludedAlertTypes);
     }
 
-    /** 후보 이벤트별로, 주어진 시군구의 이웃(region_adjacency)에 속한 알림과 새 알림의 최소 거리. 가까운 순 3개. */
+    /**
+     * 후보 이벤트별로, 주어진 시군구의 이웃(region_adjacency)에 속한 알림과 새 알림의 최소 거리. 가까운 순 3개.
+     * 제외 유형 처리(NULL 통과·빈 배열)는 {@link #findClosestEvents} 와 같다.
+     */
     @Query(value = """
             SELECT a.event_id,
                    MIN(a.embedding <=> CAST(:newEmbedding AS vector)) AS min_distance
@@ -171,13 +185,15 @@ public interface DisasterEventRepository extends JpaRepository<DisasterEvent, Lo
             WHERE a.event_id IN (:eventIds)
               AND a.embedding IS NOT NULL
               AND ra.region_code = ANY(CAST(:sigunguCodes AS varchar[]))
+              AND (a.disaster_type IS NULL OR a.disaster_type <> ALL(CAST(:excludedAlertTypes AS varchar[])))
             GROUP BY a.event_id
             ORDER BY min_distance ASC
             LIMIT 3
             """, nativeQuery = true)
     List<Object[]> findClosestAdjacentEvents(@Param("newEmbedding") String newEmbedding,
                                              @Param("eventIds") List<Long> eventIds,
-                                             @Param("sigunguCodes") String[] sigunguCodes);
+                                             @Param("sigunguCodes") String[] sigunguCodes,
+                                             @Param("excludedAlertTypes") String[] excludedAlertTypes);
 
     /**
      * 지역 한정 유형 머지 대상 검색 — 같은 유형 + 같은 시군구(footprint 교집합) + 윈도우 안의

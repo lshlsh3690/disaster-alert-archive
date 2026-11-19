@@ -734,9 +734,7 @@ public class EventClusteringService {
         }
 
         // 위 false 분기를 모두 통과해야 이 경로가 확정이다 — 인접 산불 병합(mergeIntoAdjacentRegionalEvent)도 REGIONAL.
-        // 임베딩은 저장만 하고 병합 판단에는 쓰지 않는다. 안 남기면 00:30 구조 검사가 "임베딩 없음"을 장애로
-        // 세고, 이 이벤트들이 다른 유형 문자의 임베딩 후보 검색(embedding IS NOT NULL)에서도 빠진다.
-        storeEmbeddingBestEffort(alert);
+        // 1) 병합 판단은 규칙(유형+시군구)만으로 한다 — 임베딩은 판단에 쓰지 않는다
         String[] sigungu = sigunguPrefixes(regionCodes);
         LocalDateTime since = alert.getCreatedAt().minusHours(windowHours);
         Optional<Long> target = disasterEventRepository.findRegionalTypeMergeTarget(
@@ -745,13 +743,14 @@ public class EventClusteringService {
             mergeIntoExisting(target.get(), alert, null, MergeMethod.REGIONAL_TYPE);
             log.info("clusterNewAlert(지역 한정): alertId={} → event={} 유형+시군구 머지({}, window={}h)",
                     alert.getId(), target.get(), alert.getDisasterType(), windowHours);
-        } else if (mergeIntoAdjacentRegionalEvent(alert, sigungu)) {
-            return true;
-        } else {
+        } else if (!mergeIntoAdjacentRegionalEvent(alert, sigungu)) {
             createNewEvent(alert, regionCodes[0], extractFirstRegionName(alert), false);
             log.info("clusterNewAlert(지역 한정): alertId={} → 신규 이벤트({}, window={}h)",
                     alert.getId(), alert.getDisasterType(), windowHours);
         }
+        // 2) 판단이 끝난 뒤 임베딩만 저장한다 — 안 남기면 00:30 구조 검사가 "임베딩 없음"을 장애로 센다.
+        //    다른 유형 문자의 후보 검색에서는 쿼리가 지역 한정 유형 알림 임베딩을 빼 주므로 묶음 결과는 바뀌지 않는다
+        storeEmbeddingBestEffort(alert);
         return true;
     }
 
