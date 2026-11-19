@@ -37,7 +37,8 @@ function kstParts(ms: number) {
 export default function HomeClient() {
   const { t } = useTranslation();
   const { data, dataUpdatedAt } = useDashboardSummary();
-  const [mode, setMode] = useState<MapMode>("sigungu");
+  // 시안대로 시도 보기로 연다 — 지도 위 지역 라벨은 시도 단계에서만 그린다
+  const [mode, setMode] = useState<MapMode>("sido");
 
   const { date: today, stamp } = useMemo(() => kstParts(dataUpdatedAt || Date.now()), [dataUpdatedAt]);
   const segLabels: Record<MapMode, string> = { sido: t("dashboard.segSido"), sigungu: t("dashboard.segSigungu") };
