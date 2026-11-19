@@ -20,7 +20,6 @@ import {
 } from "@/lib/eventsSearchParams";
 import { DISASTER_TYPES } from "@/ui/disasterType";
 import { METROS } from "@/ui/metros";
-import { disasterTypeChipStyle } from "@/ui/disasterTypeColor";
 import { formatEventPeriod } from "@/utils/eventDate";
 import { useTranslation } from "react-i18next";
 import { useLanguageStore } from "@/store/languageStore";
@@ -42,7 +41,7 @@ type ZSearchForm = z.infer<typeof ZSearch>;
 
 export default function EventsClient() {
   return (
-    <Suspense fallback={<main className="p-6">불러오는 중...</main>}>
+    <Suspense fallback={<main className="krds-page krds-page--narrow"><p className="krds-empty">불러오는 중...</p></main>}>
       <EventsClientInner />
     </Suspense>
   );
@@ -174,15 +173,22 @@ function EventsClientInner() {
   const totalPages = data?.totalPages ?? 0;
 
   return (
-    <main className="bg-[var(--canvas)] min-h-[calc(100vh-48px)]">
-      <div className="mx-auto max-w-4xl space-y-4 px-4 py-8 sm:px-6">
+    <main className="krds-page krds-page--narrow">
+      <div className="krds-page-head">
         <div>
-          <h1 className="text-xl font-bold tracking-tight text-[var(--ink)]">{t("events.title")}</h1>
-          <p className="mt-1 text-[13px] text-[var(--text-muted)]">{t("events.description")}</p>
+          <p className="krds-breadcrumb">
+            <Link href="/">{t("events.breadcrumbHome")}</Link>
+            <span aria-hidden="true"> › </span>
+            {t("events.title")}
+          </p>
+          <h1 className="krds-title">{t("events.title")}</h1>
+          <p className="krds-desc">{t("events.description")}</p>
         </div>
+      </div>
 
+      <div className="flex flex-col gap-4">
         {/* 탭 */}
-        <div className="flex gap-1 border-b border-[var(--line)]">
+        <div role="tablist" className="krds-tabs">
           {(["active", "past", "all"] as EventsActiveTab[]).map((tabKey) => {
             const label =
               tabKey === "active"
@@ -193,12 +199,11 @@ function EventsClientInner() {
             return (
               <button
                 key={tabKey}
+                type="button"
+                role="tab"
+                aria-selected={tab === tabKey}
                 onClick={() => handleTabChange(tabKey)}
-                className={`-mb-px border-b-2 px-4 py-2 text-sm font-medium transition-colors ${
-                  tab === tabKey
-                    ? "border-[var(--blue)] text-[var(--blue)]"
-                    : "border-transparent text-[var(--text-muted)] hover:text-[var(--text-body)]"
-                }`}
+                className="krds-tab"
               >
                 {label}
               </button>
@@ -206,19 +211,28 @@ function EventsClientInner() {
           })}
         </div>
 
-        {/* 필터 */}
+        {/* 필터 바: 기존 필터(시도·시군구·유형·기간·키워드)를 한 줄 카드에 감아 배치 */}
         <form
           onSubmit={handleSubmit(onSubmit)}
-          className="grid grid-cols-2 gap-3 rounded-[var(--radius-panel-card)] border border-[var(--line)] bg-[var(--surface)] p-4 shadow-[0_10px_30px_rgba(28,39,60,0.04)] sm:grid-cols-3"
+          className="krds-card flex flex-wrap items-center gap-[10px] px-5 py-4"
         >
-          <select {...register("sido")} className="input">
+          <select
+            {...register("sido")}
+            aria-label={t("events.filter.sido")}
+            className="krds-control min-w-[150px] flex-1 sm:w-auto sm:flex-none"
+          >
             <option value="">{t("events.filter.sido")}</option>
             {METROS.map((m) => (
               <option key={m} value={m}>{t(`metros.${m}`, { defaultValue: m })}</option>
             ))}
           </select>
 
-          <select {...register("sigungu")} className="input disabled:opacity-60" disabled={!watchedSido}>
+          <select
+            {...register("sigungu")}
+            aria-label={t("events.filter.sigungu")}
+            className="krds-control min-w-[150px] flex-1 sm:w-auto sm:flex-none"
+            disabled={!watchedSido}
+          >
             <option value="">{t("events.filter.sigungu")}</option>
             {sigunguList?.map((s) => (
               <option key={s.code} value={s.name}>
@@ -227,48 +241,49 @@ function EventsClientInner() {
             ))}
           </select>
 
-          <select {...register("type")} className="input">
+          <select
+            {...register("type")}
+            aria-label={t("events.filter.type")}
+            className="krds-control min-w-[150px] flex-1 sm:w-auto sm:flex-none"
+          >
             <option value="">{t("events.filter.type")}</option>
             {DISASTER_TYPES.map((dt) => (
               <option key={dt} value={dt}>{t(`disasterTypes.${dt}`, { defaultValue: dt })}</option>
             ))}
           </select>
 
-          <div className="flex flex-col gap-1">
-            <span className="text-xs text-[var(--text-muted)]">{t("events.filter.startDate")}</span>
+          <div className="min-w-[150px] flex-1 sm:flex-none">
             <Controller
               name="startDate"
               control={control}
               render={({ field }) => (
-                <DatePicker value={field.value ?? ""} onChange={field.onChange} locale={LANG_LOCALE[lang] ?? "ko-KR"} clearLabel={t("datePicker.clear")} prevMonthLabel={t("datePicker.prevMonth")} nextMonthLabel={t("datePicker.nextMonth")} />
+                <DatePicker value={field.value ?? ""} onChange={field.onChange} className="krds-control" placeholder={t("events.filter.startDate")} locale={LANG_LOCALE[lang] ?? "ko-KR"} clearLabel={t("datePicker.clear")} prevMonthLabel={t("datePicker.prevMonth")} nextMonthLabel={t("datePicker.nextMonth")} />
               )}
             />
           </div>
-          <div className="flex flex-col gap-1">
-            <span className="text-xs text-[var(--text-muted)]">{t("events.filter.endDate")}</span>
+          <div className="min-w-[150px] flex-1 sm:flex-none">
             <Controller
               name="endDate"
               control={control}
               render={({ field }) => (
-                <DatePicker value={field.value ?? ""} onChange={field.onChange} locale={LANG_LOCALE[lang] ?? "ko-KR"} clearLabel={t("datePicker.clear")} prevMonthLabel={t("datePicker.prevMonth")} nextMonthLabel={t("datePicker.nextMonth")} />
+                <DatePicker value={field.value ?? ""} onChange={field.onChange} className="krds-control" placeholder={t("events.filter.endDate")} locale={LANG_LOCALE[lang] ?? "ko-KR"} clearLabel={t("datePicker.clear")} prevMonthLabel={t("datePicker.prevMonth")} nextMonthLabel={t("datePicker.nextMonth")} />
               )}
             />
           </div>
-          <input type="text" {...register("keyword")} className="input self-end" placeholder={t("events.filter.keyword")} />
 
-          <div className="col-span-2 flex justify-end gap-2 sm:col-span-3">
-            <button
-              type="button"
-              onClick={onReset}
-              className="rounded-[var(--radius-control)] border border-[var(--line)] bg-[var(--surface)] px-3 py-2 text-sm text-[var(--text-body)] transition-colors hover:bg-[var(--blue-soft)]"
-            >
+          <input
+            type="text"
+            {...register("keyword")}
+            aria-label={t("events.filter.keyword")}
+            className="krds-control min-w-[220px] flex-1"
+            placeholder={t("events.filter.keyword")}
+          />
+
+          <div className="flex gap-[10px] max-sm:w-full">
+            <button type="button" onClick={onReset} className="krds-btn krds-btn--secondary max-sm:flex-1">
               {t("alertList.reset")}
             </button>
-            <button
-              type="submit"
-              className="rounded-[var(--radius-control)] bg-[var(--blue)] px-4 py-2 text-sm font-semibold text-white transition hover:brightness-95 disabled:opacity-60"
-              disabled={isFetching}
-            >
+            <button type="submit" className="krds-btn krds-btn--primary px-[22px] max-sm:flex-1" disabled={isFetching}>
               {isFetching ? t("alertList.searching") : t("alertList.search")}
             </button>
           </div>
@@ -276,40 +291,36 @@ function EventsClientInner() {
 
         {/* 목록 */}
         {isLoading ? (
-          <div className="py-8 text-center text-[13px] text-[var(--text-muted)]">{t("loading")}</div>
+          <p className="krds-empty">{t("loading")}</p>
         ) : !data?.content.length ? (
-          <div className="py-8 text-center text-[13px] text-[var(--text-muted)]">{t("events.empty")}</div>
+          <p className="krds-empty">{t("events.empty")}</p>
         ) : (
-          <ul className="space-y-3">
+          <ul className="flex flex-col gap-4">
             {data.content.map((e: Event) => (
               <li key={e.id}>
                 {/* prefetch=false: alerts 목록과 동일한 이유 — 상세(force-dynamic) 프리페치가
                     목록에 보이는 항목만큼 백그라운드 서버 데이터 페칭을 일으키는 걸 방지 */}
                 <Link
                   href={`/events/${e.id}`}
-                  className="block rounded-[var(--radius-panel-card)] border border-[var(--line)] bg-[var(--surface)] p-4 shadow-[0_10px_30px_rgba(28,39,60,0.04)] transition-shadow hover:shadow-[0_12px_28px_rgba(28,39,60,0.08)]"
+                  className="krds-card flex flex-col gap-[10px] px-6 py-5 transition-colors hover:bg-[var(--krds-primary-5)] max-sm:px-5 max-sm:py-4"
                   prefetch={false}
                 >
-                  <div className="flex items-start justify-between gap-2">
-                    <h2 className="flex-1 font-semibold leading-snug text-[var(--ink)]">
+                  <div className="flex items-start justify-between gap-3">
+                    <h2 className="m-0 min-w-0 flex-1 text-[19px] font-bold leading-[1.4] text-[var(--krds-gray-90)]">
                       {e.translatedTitle ?? e.eventTitle}
                     </h2>
-                    <span
-                      className={`shrink-0 rounded-[var(--radius-pill)] px-2 py-0.5 text-xs font-medium ${
-                        e.active ? "bg-[var(--coral-soft)] text-[#c0473b]" : "bg-[#eef1f5] text-[var(--text-muted)]"
-                      }`}
-                    >
+                    <span className={`krds-badge shrink-0 ${e.active ? "krds-badge--danger" : "krds-badge--ended"}`}>
                       {e.active ? t("events.badgeActive") : t("events.badgePast")}
                     </span>
                   </div>
-                  <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
+                  {/* 메타 칩: 유형·지역 칩은 누르면 그 조건 하나로 필터한다(카드 링크로 넘어가지 않게 막음) */}
+                  <div className="flex flex-wrap items-center gap-2 text-[15px]">
                     {e.primaryDisasterType && (
                       <button
                         type="button"
                         onClick={(evt) => { evt.preventDefault(); evt.stopPropagation(); filterByType(e.primaryDisasterType); }}
                         title={t("events.filterByType")}
-                        style={disasterTypeChipStyle(e.primaryDisasterType)}
-                        className="cursor-pointer rounded-[var(--radius-pill)] px-2 py-0.5 font-medium transition hover:brightness-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--blue)]"
+                        className="cursor-pointer rounded-[var(--radius-badge)] bg-[var(--krds-gray-5)] px-2 py-0.5 font-bold text-[var(--krds-gray-70)] transition-colors hover:text-[var(--krds-primary-50)] hover:underline"
                       >
                         {t(`disasterTypes.${e.primaryDisasterType}`, { defaultValue: e.primaryDisasterType })}
                       </button>
@@ -319,22 +330,17 @@ function EventsClientInner() {
                         type="button"
                         onClick={(evt) => { evt.preventDefault(); evt.stopPropagation(); filterByRegion(e); }}
                         title={t("events.filterByRegion")}
-                        className="inline-flex cursor-pointer items-center gap-1 rounded-[var(--radius-pill)] bg-[#eef1f5] px-2 py-0.5 font-medium text-[var(--text-muted)] transition hover:bg-[#e4e8ee] hover:text-[var(--text-body)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--blue-soft)]"
+                        className="cursor-pointer rounded-[var(--radius-badge)] bg-[var(--krds-gray-5)] px-2 py-0.5 text-[var(--krds-gray-70)] transition-colors hover:text-[var(--krds-primary-50)] hover:underline"
                       >
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                          <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0z" />
-                          <circle cx="12" cy="10" r="3" />
-                        </svg>
                         {regionDisplay(e)}
                       </button>
                     )}
-                    <span className="inline-flex items-center gap-1 rounded-[var(--radius-pill)] bg-[#eef1f5] px-2 py-0.5 font-medium text-[var(--text-muted)]">
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                        <path d="M4 4h16v12H7l-3 3V4z" />
-                      </svg>
+                    <span className="rounded-[var(--radius-badge)] bg-[var(--krds-gray-5)] px-2 py-0.5 text-[var(--krds-gray-70)]">
                       {t("events.relatedCount")} {e.alertCount}{t("alertList.countUnit")}
                     </span>
-                    <span className="text-[var(--text-subtle)]">{formatEventPeriod(e.firstAlertAt, e.lastAlertAt, { sameDay: t("events.sameDay"), daysSpan: t("events.daysSpan") })}</span>
+                    <span className="text-[var(--krds-gray-50)]">
+                      {formatEventPeriod(e.firstAlertAt, e.lastAlertAt, { sameDay: t("events.sameDay"), daysSpan: t("events.daysSpan") })}
+                    </span>
                   </div>
                 </Link>
               </li>
@@ -344,25 +350,27 @@ function EventsClientInner() {
 
         {/* 페이지네이션 */}
         {totalPages > 1 && (
-          <div className="flex items-center justify-center gap-2 pt-2">
+          <nav className="krds-pager" aria-label={t("events.title")}>
             <button
+              type="button"
               onClick={() => setPage((p) => Math.max(0, p - 1))}
               disabled={page === 0}
-              className="rounded-[var(--radius-control)] border border-[var(--line)] bg-[var(--surface)] px-3 py-1.5 text-sm text-[var(--text-body)] transition-colors hover:bg-[var(--blue-soft)] disabled:opacity-40 disabled:hover:bg-[var(--surface)]"
+              className="krds-pager__step"
             >
               {t("alertList.prev")}
             </button>
-            <span className="px-3 py-1 text-sm text-[var(--text-muted)]">
-              {page + 1} / {totalPages}
+            <span className="px-3 text-[var(--krds-gray-70)]">
+              <strong className="font-bold text-[var(--krds-gray-90)]">{page + 1}</strong> / {totalPages}
             </span>
             <button
+              type="button"
               onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
               disabled={page >= totalPages - 1}
-              className="rounded-[var(--radius-control)] border border-[var(--line)] bg-[var(--surface)] px-3 py-1.5 text-sm text-[var(--text-body)] transition-colors hover:bg-[var(--blue-soft)] disabled:opacity-40 disabled:hover:bg-[var(--surface)]"
+              className="krds-pager__step"
             >
               {t("alertList.next")}
             </button>
-          </div>
+          </nav>
         )}
       </div>
     </main>
