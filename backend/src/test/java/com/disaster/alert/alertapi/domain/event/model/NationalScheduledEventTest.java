@@ -59,19 +59,20 @@ class NationalScheduledEventTest {
         );
     }
 
-    // 결정: 제목이 곧 "같은 행사" 키다 — 수능은 알림 연도+1 학년도(2026-11 → 2027학년도), 민방위훈련은 알림 연도.
-    //       해마다 열리는 다음 행사와 제목이 달라 서로 병합되지 않는다.
-    // Red: 뼈대 title 이 빈 문자열을 돌려줘 두 단언 모두 실패한다.
+    // 결정: 제목이 곧 "같은 행사" 키다 — 수능·민방위훈련 모두 "{알림 연도} 행사명" 꼴(시험·훈련을 치른 해).
+    //       수능을 "2027학년도"(알림 연도+1)로 쓰면 사용자가 아는 "2026 수능"과 어긋나 2026-11-19 에 시험 해로 정했다.
+    //       해마다 열리는 다음 행사와는 연도가 달라 서로 병합되지 않는다.
+    // Red: 현재 SUNEUNG.title 은 "2027학년도 수능"(알림 연도+1 학년도)을 돌려줘 첫 단언이 실패한다. 민방위훈련 단언은 이미 통과한다.
     @Test
-    @DisplayName("제목은 수능이 '{연도+1}학년도 수능', 민방위훈련이 '{연도} 민방위훈련'이다")
+    @DisplayName("제목은 수능이 '{연도} 수능', 민방위훈련이 '{연도} 민방위훈련'이다")
     void titlesCarryEventAndYear() {
-        // 준비: 수능은 11월 시험이라 알림 연도의 다음 해가 학년도다. 시각은 월 경계가 아닌 임의의 날로 둔다.
+        // 준비: 수능 알림은 11월(시험 해), 민방위훈련 알림은 8월. 시각은 월 경계가 아닌 임의의 날로 둔다.
         LocalDateTime suneungAlert = LocalDateTime.of(2026, 11, 18, 10, 0);
         LocalDateTime drillAlert = LocalDateTime.of(2026, 8, 19, 9, 0);
 
         // 실행 + 검증
         assertAll(
-                () -> assertThat(NationalScheduledEvent.SUNEUNG.title(suneungAlert)).isEqualTo("2027학년도 수능"),
+                () -> assertThat(NationalScheduledEvent.SUNEUNG.title(suneungAlert)).isEqualTo("2026 수능"),
                 () -> assertThat(NationalScheduledEvent.CIVIL_DEFENSE_DRILL.title(drillAlert)).isEqualTo("2026 민방위훈련")
         );
     }
