@@ -34,6 +34,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
@@ -138,6 +139,9 @@ public class ClusteringDashboardService {
      * 판정·집계 규칙은 {@link DisagreementGrading} 에 있고 여기서는 읽은 값을 넘기기만 한다.
      * 라벨이 없으면 labeledPairs 0, versions 빈 목록(화면은 "아직 라벨 없음").
      */
+    // 버전 맵과 라벨 쌍을 같은 스냅샷에서 읽는다 — 일일 채점은 날짜 행과 쌍 행을 따로 커밋해, READ COMMITTED 면 두 조회
+    // 사이에 커밋된 새 날짜의 쌍이 버전 없이(null) 집계될 수 있다(CodeRabbit PR #342)
+    @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
     public ClusteringDashboardHardPairGradesResponse hardPairGrades() {
         // 1) 날짜 → 그날 판사 버전. 쌍의 버전은 그 쌍을 채점한 날의 버전이다(research R6). 날짜당 1행이라 수백 행
         Map<LocalDate, String> versionByDate = scoreRepository.findAllProjectedBy().stream()
