@@ -133,11 +133,18 @@ public class EventClusteringBackfillTool implements ApplicationRunner {
         return values != null && !values.isEmpty() && Boolean.parseBoolean(values.get(0));
     }
 
-    /** {@code --name=yyyy-MM-dd} 를 읽는다. 없으면 null, 형식이 틀리면 엉뚱한 범위를 돌지 않게 바로 실패시킨다. */
+    /**
+     * {@code --name=yyyy-MM-dd} 를 읽는다. 옵션이 없으면 null. 값 없이 {@code --name} 만 주면 빈 목록이 오는데, 이걸 "옵션
+     * 없음"으로 보면 날짜 제한 없는 기본 모드(임베딩 없는 알림 전체를 임베딩·클러스터링)로 넘어가므로 바로 실패시킨다
+     * (CodeRabbit PR #347 지적). 형식이 틀려도 엉뚱한 범위를 돌지 않게 실패한다.
+     */
     private LocalDate parseDate(ApplicationArguments args, String name) {
         List<String> values = args.getOptionValues(name);
-        if (values == null || values.isEmpty()) {
+        if (values == null) {
             return null;
+        }
+        if (values.isEmpty() || values.get(0).isBlank()) {
+            throw new IllegalArgumentException("--" + name + " 에 날짜(yyyy-MM-dd)가 없습니다");
         }
         return LocalDate.parse(values.get(0));
     }
