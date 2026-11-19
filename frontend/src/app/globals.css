@@ -1,37 +1,73 @@
 @import "tailwindcss";
 
+/*
+ * KRDS(디지털 정부 UI/UX 가이드라인) 표준형 토큰. 값의 출처와 용도는 design_handoff_krds_redesign/README.md 의
+ * "Design Tokens" 표를 따른다. 기존 화면이 쓰던 이름(--blue, --line, --ink …)은 그대로 두고 값만 KRDS 로 바꿔
+ * 모든 페이지가 한 번에 같은 색을 쓰게 한다. 새 코드는 --krds-* 이름을 쓴다.
+ */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* KRDS 원본 토큰 */
+  --krds-primary-5: #ecf2fe;
+  --krds-primary-10: #d8e5fd;
+  --krds-primary-30: #86aff9;
+  --krds-primary-50: #256ef4;
+  --krds-primary-60: #0b50d0;
+  --krds-gray-0: #ffffff;
+  --krds-gray-5: #f4f5f6;
+  --krds-gray-10: #e6e8ea;
+  --krds-gray-20: #cdd1d5;
+  --krds-gray-30: #b1b8be;
+  --krds-gray-40: #8a949e;
+  --krds-gray-50: #6d7882;
+  --krds-gray-60: #58616a;
+  --krds-gray-70: #464c53;
+  --krds-gray-90: #1e2124;
+  --krds-secondary-50: #346fb2;
+  --krds-info-5: #e7f4fe;
+  --krds-info-60: #085a98;
+  --krds-warning-5: #fff3db;
+  --krds-warning-60: #8a5c00;
+  --krds-danger-5: #fdefec;
+  --krds-danger-60: #bd2c0f;
+  --krds-success-5: #eaf6ec;
+  --krds-success-60: #228738;
 
-  /* Design System tokens (Vue 레퍼런스 이식, see src/styles/globals.css of the Vue project) */
-  --ink: #172033;
-  --text-body: #354053;
-  --text-muted: #687386;
-  --text-subtle: #838d9f;
-  --canvas: #eef2f7;
-  --panel: rgba(248, 249, 251, 0.94);
-  --surface: #ffffff;
-  --line: #e7eaf0;
-  --blue: #3867e8;
-  --blue-soft: #edf2ff;
-  --coral: #ef7668;
-  --coral-soft: #fff0ed;
-  --success: #31a866;
-  --success-soft: #eaf7ef;
+  --background: var(--krds-gray-5);
+  --foreground: var(--krds-gray-90);
 
-  --radius-control: 9px;
-  --radius-compact: 11px;
-  --radius-card: 16px;
-  --radius-panel-card: 18px;
-  --radius-floating-panel: 24px;
+  /* 기존 화면이 쓰는 이름 → KRDS 값 */
+  --ink: var(--krds-gray-90);
+  --text-body: var(--krds-gray-70);
+  --text-muted: var(--krds-gray-50);
+  --text-subtle: var(--krds-gray-40);
+  --canvas: var(--krds-gray-5);
+  --panel: var(--krds-gray-0);
+  --surface: var(--krds-gray-0);
+  --line: var(--krds-gray-20);
+  --line-soft: var(--krds-gray-10);
+  --blue: var(--krds-primary-50);
+  --blue-strong: var(--krds-primary-60);
+  --blue-soft: var(--krds-primary-5);
+  --coral: var(--krds-danger-60);
+  --coral-soft: var(--krds-danger-5);
+  --success: var(--krds-success-60);
+  --success-soft: var(--krds-success-5);
+
+  --radius-badge: 4px;
+  --radius-control: 6px;
+  --radius-compact: 8px;
+  --radius-card: 12px;
+  --radius-panel-card: 12px;
+  --radius-floating-panel: 12px;
   --radius-pill: 999px;
+
+  --font-krds: "Pretendard GOV", Pretendard, "Noto Sans KR", -apple-system, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
+  --font-sans: var(--font-krds);
   --font-mono: var(--font-geist-mono);
 }
 
@@ -40,42 +76,317 @@ html {
   color-scheme: light;
 }
 
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-krds);
+  font-size: 17px;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* 키보드 초점은 모든 요소에서 같은 모양으로 보인다(KRDS: 2px primary 외곽선) */
+:where(a, button, input, select, textarea, [tabindex]):focus-visible {
+  outline: 2px solid var(--krds-primary-50);
+  outline-offset: 2px;
+}
+
 @layer components {
   .input {
     width: 100%;
-    border: 1px solid var(--line);
+    height: 44px;
+    border: 1px solid var(--krds-gray-40);
     border-radius: var(--radius-control);
     background: var(--surface);
-    padding: 0.5rem 0.75rem;
-    font-size: 15px;
-    color: var(--text-body);
+    padding: 0 12px;
+    font-size: 17px;
+    color: var(--ink);
+  }
+  textarea.input {
+    height: auto;
+    padding: 10px 12px;
   }
   .input::placeholder {
-    color: var(--text-subtle);
+    color: var(--krds-gray-40);
   }
   .input:focus {
-    outline: none;
-    border-color: var(--blue);
-    box-shadow: 0 0 0 2px var(--blue-soft);
+    outline: 2px solid var(--krds-primary-50);
+    outline-offset: 2px;
+    border-color: var(--krds-primary-50);
+  }
+
+  /* ── KRDS 공용 조각 ─────────────────────────────────────────── */
+
+  /* 페이지 머리: 경로(breadcrumb) · 제목 · 설명, 오른쪽에 버튼 */
+  .krds-page {
+    padding: 28px 40px 40px;
+  }
+  .krds-page--narrow {
+    max-width: 1120px; /* 1040px + 좌우 padding 40px */
+    margin: 0 auto;
+  }
+  .krds-page-head {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+    margin-bottom: 20px;
+  }
+  .krds-breadcrumb {
+    margin: 0 0 4px;
+    font-size: 15px;
+    color: var(--krds-gray-50);
+  }
+  .krds-breadcrumb a:hover {
+    color: var(--krds-primary-50);
+  }
+  .krds-title {
+    margin: 0;
+    font-size: 32px;
+    font-weight: 700;
+    letter-spacing: -0.03em;
+    color: var(--krds-gray-90);
+    line-height: 1.3;
+  }
+  .krds-desc {
+    margin: 6px 0 0;
+    font-size: 17px;
+    color: var(--krds-gray-70);
+  }
+  @media (max-width: 640px) {
+    .krds-page {
+      padding: 20px 16px 32px;
+    }
+    .krds-title {
+      font-size: 26px;
+    }
+  }
+
+  /* 카드: 그림자 없이 보더로 구분 */
+  .krds-card {
+    border: 1px solid var(--krds-gray-20);
+    border-radius: var(--radius-card);
+    background: var(--krds-gray-0);
+  }
+
+  /* 버튼 */
+  .krds-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    height: 44px;
+    padding: 0 18px;
+    border-radius: var(--radius-control);
+    font-size: 17px;
+    font-weight: 700;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: background-color 0.15s, border-color 0.15s, color 0.15s;
+  }
+  .krds-btn:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+  }
+  .krds-btn--primary {
+    background: var(--krds-primary-50);
+    color: #fff;
+    border: 1px solid var(--krds-primary-50);
+  }
+  .krds-btn--primary:hover:not(:disabled) {
+    background: var(--krds-primary-60);
+    border-color: var(--krds-primary-60);
+  }
+  .krds-btn--secondary {
+    background: var(--krds-gray-0);
+    color: var(--krds-gray-90);
+    border: 1px solid var(--krds-gray-30);
+  }
+  .krds-btn--secondary:hover:not(:disabled) {
+    border-color: var(--krds-primary-50);
+    color: var(--krds-primary-50);
+  }
+  .krds-btn--sm {
+    height: 40px;
+    padding: 0 16px;
+  }
+
+  /* 입력 라벨과 select / input */
+  .krds-field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--krds-gray-70);
+    min-width: 0;
+  }
+  .krds-control {
+    height: 44px;
+    width: 100%;
+    box-sizing: border-box;
+    padding: 0 12px;
+    border: 1px solid var(--krds-gray-40);
+    border-radius: var(--radius-control);
+    background-color: var(--krds-gray-0);
+    font-size: 17px;
+    font-weight: 400;
+    color: var(--krds-gray-90);
+  }
+  .krds-control::placeholder {
+    color: var(--krds-gray-40);
+  }
+  .krds-control:disabled {
+    background-color: var(--krds-gray-5);
+    color: var(--krds-gray-40);
+  }
+
+  /* 배지: 상태는 색만으로 구분하지 않고 항상 글자를 함께 쓴다 */
+  .krds-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 2px 8px;
+    border-radius: var(--radius-badge);
+    font-size: 14px;
+    font-weight: 700;
+    line-height: 1.5;
+    white-space: nowrap;
+  }
+  .krds-badge--neutral {
+    background: var(--krds-gray-5);
+    color: var(--krds-gray-70);
+  }
+  .krds-badge--outline {
+    background: var(--krds-gray-0);
+    border: 1px solid var(--krds-gray-20);
+    color: var(--krds-gray-60);
+  }
+  .krds-badge--info {
+    background: var(--krds-info-5);
+    color: var(--krds-info-60);
+  }
+  .krds-badge--warning {
+    background: var(--krds-warning-5);
+    color: var(--krds-warning-60);
+  }
+  .krds-badge--danger {
+    background: var(--krds-danger-5);
+    color: var(--krds-danger-60);
+  }
+  .krds-badge--ended {
+    background: var(--krds-gray-5);
+    color: var(--krds-gray-60);
+  }
+
+  /* 밑줄 탭(사건 목록·커뮤니티) */
+  .krds-tabs {
+    display: flex;
+    border-bottom: 1px solid var(--krds-gray-20);
+    font-size: 17px;
+    overflow-x: auto;
+  }
+  .krds-tab {
+    padding: 12px 20px;
+    white-space: nowrap;
+    color: var(--krds-gray-50);
+    font-weight: 400;
+    cursor: pointer;
+  }
+  .krds-tab:hover {
+    color: var(--krds-primary-50);
+  }
+  .krds-tab[aria-selected="true"],
+  .krds-tab--active {
+    color: var(--krds-gray-90);
+    font-weight: 700;
+    box-shadow: inset 0 -3px 0 var(--krds-primary-50);
+  }
+
+  /* 세그먼트(시도|시군구, 7일|30일|1년) */
+  .krds-segment {
+    display: inline-flex;
+    border: 1px solid var(--krds-gray-30);
+    border-radius: var(--radius-control);
+    overflow: hidden;
+    background: var(--krds-gray-0);
+    font-size: 15px;
+    font-weight: 700;
+  }
+  .krds-segment > * {
+    padding: 8px 18px;
+    white-space: nowrap;
+    color: var(--krds-gray-70);
+    cursor: pointer;
+  }
+  .krds-segment > * + * {
+    border-left: 1px solid var(--krds-gray-30);
+  }
+  .krds-segment > [aria-checked="true"],
+  .krds-segment > [aria-pressed="true"],
+  .krds-segment > .is-active {
+    background: var(--krds-primary-50);
+    color: #fff;
+  }
+
+  /* 페이지네이션 */
+  .krds-pager {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    padding: 16px;
+    font-size: 16px;
+    flex-wrap: wrap;
+  }
+  .krds-pager__num {
+    width: 36px;
+    height: 36px;
+    display: grid;
+    place-items: center;
+    border-radius: var(--radius-control);
+    color: var(--krds-gray-70);
+  }
+  .krds-pager__num:hover {
+    color: var(--krds-primary-50);
+  }
+  .krds-pager__num[aria-current="page"] {
+    background: var(--krds-primary-50);
+    color: #fff;
+    font-weight: 700;
+  }
+  .krds-pager__step {
+    padding: 6px 10px;
+    color: var(--krds-gray-70);
+  }
+  .krds-pager__step:disabled {
+    color: var(--krds-gray-40);
+    cursor: default;
+  }
+
+  /* 목록 행 hover */
+  .krds-row {
+    border-bottom: 1px solid var(--krds-gray-10);
+    transition: background-color 0.15s;
+  }
+  .krds-row:hover {
+    background: var(--krds-primary-5);
+  }
+
+  /* 로딩·빈 상태 문구 */
+  .krds-empty {
+    padding: 32px 20px;
+    text-align: center;
+    font-size: 16px;
+    color: var(--krds-gray-50);
   }
 }
 
-
-
 @keyframes widget-added {
-  0%   { outline: 2.5px solid #3b82f6; outline-offset: 0px; box-shadow: 0 0 0 4px #93c5fd88; }
-  60%  { outline: 2.5px solid #3b82f6; outline-offset: 0px; box-shadow: 0 0 0 4px #93c5fd44; }
+  0%   { outline: 2.5px solid var(--krds-primary-50); outline-offset: 0px; box-shadow: 0 0 0 4px #86aff988; }
+  60%  { outline: 2.5px solid var(--krds-primary-50); outline-offset: 0px; box-shadow: 0 0 0 4px #86aff944; }
   100% { outline: 2.5px solid transparent; outline-offset: 0px; box-shadow: none; }
 }
 .widget-added {
   animation: widget-added 1.6s ease-out forwards;
-}
-
-body {
-  background: var(--background);
-  color: var(--foreground);
-  /* OS별 시스템 폰트 차이를 제거하고 웹폰트로 통일 */
-  font-family: var(--font-geist-sans), ui-sans-serif, system-ui, -apple-system, "Segoe UI", "Noto Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", Arial, sans-serif;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
 }
