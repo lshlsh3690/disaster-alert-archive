@@ -86,6 +86,21 @@ class DisasterEventRepositoryRegionalEmbeddingExclusionTest {
         assertThat(eventIds(rows)).contains(EVENT_ID);
     }
 
+    // 대조: 인접 시군구 검색도 지역 한정 유형이 아닌 화재 알림은 그대로 후보로 남긴다. 인접 쿼리가 유형을 가리지 않고 모두
+    // 빼도 위 인접 테스트는 통과하므로, 그 잘못된 구현을 잡는 짝이다(CodeRabbit PR #344 지적).
+    @Test
+    @DisplayName("인접 시군구 검색도 지역 한정 유형이 아닌 화재 알림은 그대로 후보가 된다")
+    void 인접_시군구_검색도_화재_알림은_그대로_후보가_된다() {
+        // 준비: 종로구에 화재 알림 1건만 가진 이벤트. 새 알림은 이웃인 중구에서 들어온다고 본다
+        seedEventWithAlert("화재", SIGUNGU_A);
+
+        // 실행: 중구 기준으로 인접 후보를 찾는다
+        List<Object[]> rows = repository.findTopAdjacentCandidates(embedding(), new String[]{SIGUNGU_B}, SINCE, REGIONAL_TYPES);
+
+        // 검증: 화재는 제외 목록에 없으므로 이웃 알림과 거리 0 으로 후보에 들어온다
+        assertThat(eventIds(rows)).contains(EVENT_ID);
+    }
+
     /** 이벤트 하나와, 그 이벤트에 속하고 임베딩 E 를 가진 알림 1건(해당 시군구의 첫 법정동 코드 지역 행)을 넣는다. */
     private void seedEventWithAlert(String disasterType, String sigunguCode) {
         // 이벤트: 기간(SINCE 이후)·비광역(is_broadcast 기본 false)이라 findRecentEventIds 후보에 든다
