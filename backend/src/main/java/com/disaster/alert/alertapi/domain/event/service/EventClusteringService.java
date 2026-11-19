@@ -9,6 +9,7 @@ import com.disaster.alert.alertapi.domain.event.model.DisasterCooldown;
 import com.disaster.alert.alertapi.domain.event.model.DisasterEvent;
 import com.disaster.alert.alertapi.domain.event.model.MergeMethod;
 import com.disaster.alert.alertapi.domain.event.model.MissingPersonIdentity;
+import com.disaster.alert.alertapi.domain.event.model.NationalScheduledEvent;
 import com.disaster.alert.alertapi.domain.event.repository.AlertEmbeddingRepository;
 import com.disaster.alert.alertapi.domain.event.repository.DisasterEventRepository;
 import com.disaster.alert.alertapi.domain.legaldistrict.model.LegalDistrict;
@@ -46,6 +47,12 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 @Slf4j
 public class EventClusteringService {
+
+    /**
+     * 전국 예정 행사 이벤트에 이어 붙이는 시간 한도 — 마지막 알림 후 72시간. 예고(1~2일 전)부터 당일 문자까지
+     * 한 행사로 이어지되, 제목이 같아도 한참 뒤 문자는 새 이벤트가 되게 끊는다.
+     */
+    private static final int NATIONAL_EVENT_WINDOW_HOURS = 72;
 
     /** 알림 본문 → 벡터(1536차원) 변환. 저장된 임베딩이 없을 때만 OpenAI 를 호출한다. */
     private final EmbeddingModel embeddingModel;
@@ -174,12 +181,6 @@ public class EventClusteringService {
             return;
         }
         DisasterAlert alert = opt.get();
-        // 비사건(ADVISORY)은 이벤트로 묶지 않기로 한 결정이라 임베딩·후보 검색·LLM 폴백보다 앞에서 끊는다.
-        // null(분류 실패·분류 도입 전 기존 알림)은 통과시킨다 — 분류 실패가 사건을 이벤트에서 빼면 안 된다.
-        if (alert.getAlertKind() == AlertKind.ADVISORY) {
-            log.info("clusterNewAlert: alertId={} 비사건(ADVISORY, type={}) — 클러스터링 제외", alertId, alert.getDisasterType());
-            return;
-        }
         // 이미 이벤트에 든 알림은 다시 묶지 않는다 — event_id 가 조용히 덮어써지는 것을 막는다(예전 매핑 표의 alert_id UNIQUE 대신).
         if (alert.getEventId() != null) {
             return;
@@ -190,6 +191,17 @@ public class EventClusteringService {
         }
 
         try {
+            // 전국 예정 행사(수능·민방위훈련)는 비사건 제외보다 앞에서 처리한다 — 행사 문자 대부분이 비사건으로 분류돼
+            // 제외 뒤에 두면 전부 미배정으로 버려진다.
+            if (clusterNationalScheduledEvent(alert)) {
+                return;
+            }
+            // 비사건(ADVISORY)은 이벤트로 묶지 않기로 한 결정이라 임베딩·후보 검색·LLM 폴백보다 앞에서 끊는다.
+            // null(분류 실패·분류 도입 전 기존 알림)은 통과시킨다 — 분류 실패가 사건을 이벤트에서 빼면 안 된다.
+            if (alert.getAlertKind() == AlertKind.ADVISORY) {
+                log.info("clusterNewAlert: alertId={} 비사건(ADVISORY, type={}) — 클러스터링 제외", alertId, alert.getDisasterType());
+                return;
+            }
             doCluster(alert);
         } catch (Exception e) {
             // 한 건 실패가 수집 사이클을 막지 않도록 여기서 잡음.
@@ -215,6 +227,38 @@ public class EventClusteringService {
             alertEmbeddingRepository.updateEmbedding(alertIds.get(i), toVectorText(vectors.get(i)));
         }
         return alertIds.size();
+    }
+
+    /**
+     * 전국 예정 행사(수능·민방위훈련) 알림을 행사 하나의 전국 광역 이벤트로 묶는다.
+     *
+     * <p>사건·비사건 분류와 무관하게 유형(기타·민방공)과 본문 키워드로만 판정하고, 임베딩·LLM 은 쓰지 않는다 —
+     * 행사 종류와 연도가 곧 키라 본문 유사도를 볼 이유가 없다. {@code clusterNewAlert} 의 try/catch 안에서
+     * 불리므로 여기서 던진 예외는 alertId 와 함께 error 로그로 남고 수집 사이클은 계속된다.
+     *
+     * @return 행사 알림으로 처리했으면 true(호출한 쪽은 더 클러스터링하지 않는다), 아니면 false
+     */
+    private boolean clusterNationalScheduledEvent(DisasterAlert alert) {
+        // 1) 행사 문자인지 본다 — 아니면 원래 경로로 보낸다.
+        Optional<NationalScheduledEvent> matched =
+                NationalScheduledEvent.match(alert.getDisasterType(), alert.getMessage());
+        if (matched.isEmpty()) {
+            return false;
+        }
+        String title = matched.get().title(alert.getCreatedAt());
+        // 2) 같은 제목의 광역 이벤트를 72시간 안에서 찾는다. 예고(1~2일 전)부터 당일까지가 한 행사이고,
+        //    제목에 연도가 있어 해마다 다음 행사와 갈린다. 윈도우를 넘겨 이어 붙는 것을 막는 용도라 설정 키는 두지 않았다.
+        Optional<DisasterEvent> target = disasterEventRepository.findLatestNationalScheduledEvent(
+                title, alert.getCreatedAt().minusHours(NATIONAL_EVENT_WINDOW_HOURS));
+        if (target.isPresent()) {
+            mergeIntoExisting(target.get().getId(), alert, null, MergeMethod.NATIONAL_EVENT);
+            log.info("clusterNewAlert(전국 행사): alertId={} → event={} 병합('{}')", alert.getId(), target.get().getId(), title);
+        } else {
+            // 3) 없으면 전국 광역 이벤트를 새로 만든다 — 지역 이벤트로 두면 시군구가 따로 보낸 안내가 붙지 못한다.
+            createNewEvent(alert, null, "전국", true, title);
+            log.info("clusterNewAlert(전국 행사): alertId={} → 신규 전국 이벤트('{}')", alert.getId(), title);
+        }
+        return true;
     }
 
     private void doCluster(DisasterAlert alert) {
@@ -885,6 +929,11 @@ public class EventClusteringService {
     }
 
     private void createNewEvent(DisasterAlert alert, String regionCode, String regionName, boolean broadcast) {
+        createNewEvent(alert, regionCode, regionName, broadcast, null);
+    }
+
+    /** {@code title} 이 null 이 아니면 자동 생성 제목 대신 그 제목으로 정한다(전국 예정 행사용). */
+    private void createNewEvent(DisasterAlert alert, String regionCode, String regionName, boolean broadcast, String title) {
         DisasterEvent event = DisasterEvent.createFromFirstAlert(
                 alert.getDisasterType(),
                 regionCode,
@@ -893,6 +942,9 @@ public class EventClusteringService {
                 alert.getCreatedAt(),
                 broadcast
         );
+        if (title != null) {
+            event.retitle(title);
+        }
         DisasterEvent saved = disasterEventRepository.save(event);
         alert.assignToEvent(saved, 1, null, MergeMethod.SEED);
         // 알림 배정을 즉시 flush 한다 — 머지 경로와 같은 이유(DB 오류를 커밋 시점이 아니라 이 자리에서 alertId 와 함께 남기기 위해).
