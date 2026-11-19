@@ -77,7 +77,7 @@ export default function ClusteringAdminPage() {
           </div>
         </div>
         <DailyScoresSection from={range.from} to={range.to} />
-        <DisagreementsSection key={`${range.from}-${range.to}`} from={range.from} to={range.to} />
+        <DisagreementsSection from={range.from} to={range.to} />
         <DailyChecksSection from={range.from} to={range.to} />
         <JudgeVersionsSection />
         <HardPairGradesSection />

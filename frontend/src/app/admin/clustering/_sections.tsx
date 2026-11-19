@@ -194,6 +194,11 @@ export function DisagreementsSection({ from, to }: { from: string; to: string })
     setPage(0);
   };
 
+  // 기간이 바뀌면 첫 페이지로. 섹션을 key 로 다시 만들지 않는다 — 다시 만들면 진행 중이던 저장의 onError 가 버려져 실패가 안 보인다
+  useEffect(() => {
+    setPage(0);
+  }, [from, to]);
+
   const pairKey = (p: ClusteringDisagreementPair) => `${p.date}-${p.alertA.id}-${p.alertB.id}`;
 
   const saveLabel = (p: ClusteringDisagreementPair, label: HumanLabel) => {
@@ -234,6 +239,10 @@ export function DisagreementsSection({ from, to }: { from: string; to: string })
         </label>
         {data && <span className="text-[var(--text-muted)]">총 {formatNumber(data.totalElements)}쌍</span>}
       </div>
+      {/* 저장에 실패한 쌍이 지금 목록에 없으면(기간·필터·페이지가 바뀜) 그 줄 아래 대신 여기에 알린다 */}
+      {failed && !data?.pairs.some((p) => pairKey(p) === failed.key) && (
+        <p className="text-sm text-[var(--coral)]">라벨 저장 실패({failed.key}): {failed.message}</p>
+      )}
       <QueryState isLoading={isLoading} error={error} />
       {data && data.pairs.length === 0 && (
         <p className="text-sm text-[var(--text-muted)]">{unlabeledOnly ? "이 범위에 라벨 없는 불일치 쌍이 없습니다." : "이 범위에 불일치 쌍이 없습니다."}</p>
