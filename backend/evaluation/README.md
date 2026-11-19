@@ -65,10 +65,26 @@ DB 에 저장된 이벤트 배정을 읽어 라벨과 비교한다. 클러스터
   --eval.report=evaluation/reports/<새 리포트 이름>.md"
 ```
 
-- `--eval.labels`: 필수.
+- `--eval.labels`: 라벨 JSON 파일. 아래 `--eval.pair-labels-as-of` 와 둘 중 정확히 하나가 필요하다(함께 주면 오류).
 - `--eval.report`: 없으면 로그로만 출력한다.
 - 정상이면 종료 코드 0 이다.
 - 튜닝 전후 비교는 두 리포트를 비교하면 된다: `git diff --no-index <이전 리포트>.md <새 리포트>.md`. 틀린 쌍 표는 라벨 파일 순서로 나오므로, `-` 줄은 이번에 사라진 쌍, `+` 줄은 새로 틀린 쌍이다.
+
+### DB 에 저장된 불일치 쌍 사람 라벨로 평가
+
+관리자 대시보드에서 매긴 불일치 쌍 라벨(`clustering_pair_label`)을 파일 없이 바로 정답으로 쓴다. 평가 사본은 운영 덤프로 만들어 라벨 테이블이 함께 들어온다.
+
+```bash
+./gradlew bootRun --args="--spring.profiles.active=eval \
+  --spring.datasource.url=$EVAL_DB --server.port=0 \
+  --eval.pair-labels-as-of=2026-11-25T00:00 \
+  --eval.report=evaluation/reports/<새 리포트 이름>.md"
+```
+
+- `--eval.pair-labels-as-of`: ISO 시각(KST). 이 시각까지 저장·수정된 라벨만 쓴다 — 튜닝 전후 비교가 같은 라벨로 돌도록 매번 같은 시각을 준다. `--eval.labels` 와 함께 주면 오류.
+- 리포트 머리의 데이터셋 이름은 `불일치 쌍 사람 라벨(DB, 기준 <시각>, N쌍)` 이다. 이전 리포트와 N 이 다르면 그사이 라벨이 바뀐 것이다(라벨은 덮어쓰기라 기준 시각 뒤에 고친 라벨은 옛 값으로 돌아가지 않고 빠진다).
+- 라벨이 0개면 채점하지 않고 0 이 아닌 종료 코드로 끝난다.
+- 틀린 쌍 표는 `(알림 A id, 알림 B id)` 오름차순으로 나온다. 채점 이후 `--eval.recheck`·`--eval.judge-agreement` 등은 파일 모드와 똑같이 쓴다.
 
 ## 재클러스터링
 
