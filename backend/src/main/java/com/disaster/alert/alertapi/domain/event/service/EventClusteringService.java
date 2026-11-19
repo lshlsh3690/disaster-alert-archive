@@ -31,6 +31,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 /**
  * 이벤트 클러스터링 핵심 서비스.
@@ -249,7 +250,8 @@ public class EventClusteringService {
         // 2) 같은 제목의 광역 이벤트를 72시간 안에서 찾는다. 예고(1~2일 전)부터 당일까지가 한 행사이고,
         //    제목에 연도가 있어 해마다 다음 행사와 갈린다. 윈도우를 넘겨 이어 붙는 것을 막는 용도라 설정 키는 두지 않았다.
         Optional<DisasterEvent> target = disasterEventRepository.findLatestNationalScheduledEvent(
-                title, alert.getCreatedAt().minusHours(NATIONAL_EVENT_WINDOW_HOURS), alert.getCreatedAt());
+                title, alert.getCreatedAt().minusHours(NATIONAL_EVENT_WINDOW_HOURS),
+                alert.getCreatedAt().plusHours(NATIONAL_EVENT_WINDOW_HOURS));
         if (target.isPresent()) {
             mergeIntoExisting(target.get().getId(), alert, null, MergeMethod.NATIONAL_EVENT);
             log.info("clusterNewAlert(전국 행사): alertId={} → event={} 병합('{}')", alert.getId(), target.get().getId(), title);
@@ -261,10 +263,11 @@ public class EventClusteringService {
         return true;
     }
 
-    /** 이 제목이 알림 시각 기준(올해·지난해) 전국 예정 행사 이벤트 제목인지 — 행사 제목은 연도가 들어가 해가 바뀌면 달라진다. */
-    private boolean isNationalScheduledEventTitle(String title, LocalDateTime alertAt) {
+    /** 알림 시각 기준 올해·지난해 전국 예정 행사 이벤트 제목들 — 행사 제목은 연도가 들어가 해가 바뀌면 달라진다. */
+    private String[] nationalScheduledEventTitles(LocalDateTime alertAt) {
         return Arrays.stream(NationalScheduledEvent.values())
-                .anyMatch(e -> e.title(alertAt).equals(title) || e.title(alertAt.minusYears(1)).equals(title));
+                .flatMap(e -> Stream.of(e.title(alertAt), e.title(alertAt.minusYears(1))))
+                .toArray(String[]::new);
     }
 
     private void doCluster(DisasterAlert alert) {
@@ -690,7 +693,7 @@ public class EventClusteringService {
         // 전국 broadcast(region_code=null) 이벤트만 키로 — broadcast 격리 규칙과 일관(local 과 안 섞임).
         Optional<DisasterEvent> target = disasterEventRepository
                 .findLatestBroadcastNationwide(
-                        type, since);
+                        type, since, new String[0]);
         if (target.isPresent()) {
             mergeIntoExisting(target.get().getId(), alert, null, MergeMethod.GLOBAL_TYPE);
             upgradeGlobalTitleIfNamed(target.get().getId(), type, alert.getMessage());
@@ -983,11 +986,10 @@ public class EventClusteringService {
             if (informative) {
                 // 전국 예정 행사 이벤트(예: "2026 민방위훈련", 유형 민방공)는 일반 광역 병합 대상에서 뺀다 — 행사 키워드가 없는
                 // 실제 전국 민방공 경보가 훈련 이벤트에 묻히면 안 된다(CodeRabbit PR #347 지적). 행사 후속 알림은 키워드로
-                // 행사 경로가 먼저 가져가므로 여기 오지 않는다.
+                // 행사 경로가 먼저 가져가므로 여기 오지 않는다. 제외는 쿼리 안(1건 고르기 전)에서 한다.
                 Optional<DisasterEvent> target = disasterEventRepository
                         .findLatestBroadcastNationwide(
-                                type, since)
-                        .filter(e -> !isNationalScheduledEventTitle(e.getEventTitle(), alert.getCreatedAt()));
+                                type, since, nationalScheduledEventTitles(alert.getCreatedAt()));
                 if (target.isPresent()) {
                     log.info("clusterNewAlert: alertId={} 전국({}시도) → broadcast event={} 유형 머지({})",
                             alert.getId(), sidoSpan, target.get().getId(), type);

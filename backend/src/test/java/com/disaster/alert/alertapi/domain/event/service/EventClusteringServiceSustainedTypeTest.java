@@ -292,7 +292,7 @@ class EventClusteringServiceSustainedTypeTest {
     private void givenNationwideBroadcastTarget() {
         when(disasterEventRepository
                 .findLatestBroadcastNationwide(
-                        anyString(), any(LocalDateTime.class)))
+                        anyString(), any(LocalDateTime.class), any()))
                 .thenReturn(Optional.of(broadcastEvent(EXISTING_EVENT_ID)));
     }
 
@@ -375,7 +375,7 @@ class EventClusteringServiceSustainedTypeTest {
         verifyLocalPathsUntouched();
         verify(disasterEventRepository)
                 .findLatestBroadcastNationwide(
-                        eq("폭염"), eq(now.minusHours(168)));
+                        eq("폭염"), eq(now.minusHours(168)), any());
         assertMergedBroadcast(EXISTING_EVENT_ID);
     }
 
@@ -385,7 +385,7 @@ class EventClusteringServiceSustainedTypeTest {
         alert("폭염", HEAT_WARNING, NATIONWIDE_CODES);
         when(disasterEventRepository
                 .findLatestBroadcastNationwide(
-                        anyString(), any(LocalDateTime.class)))
+                        anyString(), any(LocalDateTime.class), any()))
                 .thenReturn(Optional.empty());
 
         service.clusterNewAlert(1L);
@@ -411,7 +411,7 @@ class EventClusteringServiceSustainedTypeTest {
                         eq("폭염"), eq("11"), eq(now.minusHours(168)));
         verify(disasterEventRepository, never())
                 .findLatestBroadcastNationwide(
-                        anyString(), any(LocalDateTime.class));
+                        anyString(), any(LocalDateTime.class), any());
         assertMergedBroadcast(EXISTING_EVENT_ID);
     }
 
