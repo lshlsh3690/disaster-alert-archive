@@ -45,12 +45,11 @@ export function useClusteringDailyChecks(from: string, to: string) {
   });
 }
 
-// 구조 검사 행을 펼쳤을 때만 부른다(enabled). 펼치지 않은 날은 요청하지 않는다
-export function useClusteringDailyCheckAlerts(date: string, enabled: boolean) {
+// 구조 검사 펼침 칸 안에서만 쓴다 — 칸이 펼친 날에만 그려지므로 펼치지 않은 날은 요청하지 않는다
+export function useClusteringDailyCheckAlerts(date: string) {
   return useQuery({
     queryKey: ["admin", "clustering", "daily-check-alerts", date],
     queryFn: () => fetchClusteringDailyCheckAlerts(date),
-    enabled,
     retry: retryUnlessClientError,
   });
 }

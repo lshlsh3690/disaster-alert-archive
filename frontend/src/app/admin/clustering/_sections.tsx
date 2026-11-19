@@ -232,11 +232,24 @@ export function DailyChecksSection({ from, to }: { from: string; to: string }) {
                     <tr
                       className={`${!d.recorded ? "text-[var(--text-muted)]" : d.attention ? "bg-[var(--coral-soft)] font-medium" : ""} ${expandable ? "cursor-pointer hover:brightness-95" : ""}`}
                       onClick={expandable ? () => setOpenDate(open ? null : d.date) : undefined}
-                      onKeyDown={expandable ? (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setOpenDate(open ? null : d.date); } } : undefined}
-                      tabIndex={expandable ? 0 : undefined}
-                      aria-expanded={expandable ? open : undefined}
                     >
-                      <td className={TD}>{expandable ? (open ? "▾ " : "▸ ") : ""}{d.date}</td>
+                      <td className={TD}>
+                        {expandable ? (
+                          // 키보드·화면 읽기 프로그램은 이 버튼으로 펼친다(행 클릭은 마우스 편의). 클릭이 행으로 번져 두 번 토글되지 않게 막는다
+                          <button
+                            type="button"
+                            aria-expanded={open}
+                            aria-controls={`daily-check-alerts-${d.date}`}
+                            onClick={(e) => { e.stopPropagation(); setOpenDate(open ? null : d.date); }}
+                            className="font-medium hover:underline"
+                          >
+                            <span aria-hidden="true">{open ? "▾ " : "▸ "}</span>
+                            {d.date}
+                          </button>
+                        ) : (
+                          d.date
+                        )}
+                      </td>
                       {d.recorded ? (
                         <>
                           <td className={TD}>{formatNumber(d.incidentCount)}</td>
@@ -248,7 +261,7 @@ export function DailyChecksSection({ from, to }: { from: string; to: string }) {
                       )}
                     </tr>
                     {open && (
-                      <tr>
+                      <tr id={`daily-check-alerts-${d.date}`}>
                         <td colSpan={4} className="px-3 py-3 border-b border-[var(--line)] bg-[var(--canvas)]">
                           <DailyCheckAlerts date={d.date} />
                         </td>
@@ -267,7 +280,7 @@ export function DailyChecksSection({ from, to }: { from: string; to: string }) {
 
 // 구조 검사 행 아래 펼침 — 그날의 문제 알림만(미배정·임베딩 없음). 이벤트 번호는 사건 상세를 새 탭으로 연다
 function DailyCheckAlerts({ date }: { date: string }) {
-  const { data, isLoading, error } = useClusteringDailyCheckAlerts(date, true);
+  const { data, isLoading, error } = useClusteringDailyCheckAlerts(date);
   return (
     <div className="space-y-2 whitespace-normal">
       <p className="text-xs text-[var(--text-muted)]">
@@ -296,7 +309,12 @@ function DailyCheckAlerts({ date }: { date: string }) {
                 )}
                 {a.mergeMethod && <span>묶인 방식 {a.mergeMethod}</span>}
               </div>
-              <div className="text-sm text-[var(--text-body)]">{a.message ?? "원문 없음"}</div>
+              {a.message === null ? (
+                <div className="text-sm text-[var(--text-muted)]">원문 없음</div>
+              ) : (
+                // 공백 없는 긴 URL 이 칸 최소 폭을 늘려 표 전체가 옆으로 밀리지 않게 끊는다
+                <div className="text-sm text-[var(--text-body)] [overflow-wrap:anywhere]">{a.message}</div>
+              )}
             </li>
           ))}
         </ul>
