@@ -80,11 +80,37 @@ GET /api/v1/events/{id}   (기존)
 | `/archive/alerts/{sn}` | 1 | 원문 기록 + 인용문 (이번 계획의 2단계) |
 | `/alerts/{id}` (기존) | 1 | "영구 링크" 표시·복사 추가 → `/archive/alerts/{sn}` |
 
-## 5. 스토리 1·2 에서 추가될 계약 (윤곽만)
+## 5. 원문 기록 — 스토리 1
+
+```
+GET /api/v1/archive/alerts/{sn}
+```
+
+**200**
+
+```json
+{ "success": true, "data": {
+  "sn": 209126, "alertId": 9517,
+  "message": "... [경기남부경찰청]",
+  "createdAt": "2024-01-16T17:27:43", "modifiedDate": "2024-01-16T00:00:00",
+  "disasterType": "기타", "emergencyLevel": "안전안내",
+  "originalRegion": "경기도 수원시 장안구,경기도 수원시 권선구",
+  "inEvent": true,
+  "agency": { "label": "경기남부경찰청", "name": "경기남부경찰청" } } }
+```
+
+**404**: sn 인 알림이 없음 → `DISASTER_ALERT_NOT_FOUND`.
+
+- `agency` 는 본문에 발신 기관 표기가 없으면 `null`. `label` 은 본문 표기 그대로(인용문에 쓴다), `name` 은 표기가 가리키는 기관 이름이며 기관 지정 전이면 `null`.
+- 사건 ID 는 내보내지 않는다. `inEvent` 가 참이면 화면은 같은 sn 으로 `/archive/events/{sn}` 링크를 만든다(지금 속한 사건으로 해석된다).
+- `originalRegion` 은 수집 때 "○○ 전체"의 "전체"와 쉼표 앞뒤 공백만 정리된 값이다. 본문은 원 출처 그대로다.
+- `alertId` 는 기존 상세 화면(`/alerts/{id}`)으로 가는 링크용이다.
+- 숫자가 아닌 sn 은 이 브랜치에서 500 이 난다(타입 불일치 핸들러는 `feature/clustering-admin-dashboard` 의 `3eed25e8` 에 있음). 화면은 숫자가 아니면 호출 전에 404 를 낸다.
+
+## 6. 스토리 2 에서 추가될 계약 (윤곽만)
 
 | 엔드포인트 | 스토리 | 비고 |
 |---|---|---|
-| `GET /api/v1/archive/alerts/{sn}` | 1 | 원문 필드 전체 + 정정 일자 + `agency`(`{ name, label }`, 표기 없으면 null). 인용문은 프론트에서 조립하며 발신 기관은 `label`(본문 표기 그대로)을 쓴다 |
 | `GET /api/v1/archive/events/{sn}/alerts.csv` | 2 | 사건 포함 원문 전체. 열은 `OpenApiAlertCsvRow` 와 맞추고 `archiveUrl` 열 추가. UTF-8 BOM |
 
 상세 계약은 해당 스토리 착수 때 이 문서에 이어 쓴다.
