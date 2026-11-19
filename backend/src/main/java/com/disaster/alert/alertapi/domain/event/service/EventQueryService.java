@@ -117,10 +117,13 @@ public class EventQueryService {
         List<EventTimelineRow> rows = disasterEventRepository.findTimelineRows(id);
         Map<Long, List<String>> regionNamesByAlert = loadRegionNames(rows);
 
+        // 사건 영구 링크(/archive/events/{대표 sn})용 대표 알림 sn — 규칙은 findRepresentativeSn 한 곳에 둔다
+        Long representativeSn = representativeSn(id);
+
         Optional<SupportedLanguage> langOpt = SupportedLanguage.fromRequestParam(lang);
         if (langOpt.isEmpty()) {
             List<EventAlertItem> timeline = buildTimeline(rows, regionNamesByAlert, null, null, null, null);
-            return EventDetailResponse.of(event, now, timeline);
+            return EventDetailResponse.of(event, now, timeline, representativeSn);
         }
 
         SupportedLanguage language = langOpt.get();
@@ -147,7 +150,7 @@ public class EventQueryService {
 
         List<EventAlertItem> timeline = buildTimeline(
                 rows, regionNamesByAlert, alertTrMap, alertIdToCodes, codeToTranslated, language.getCode());
-        return EventDetailResponse.of(event, now, timeline, translatedTitle, language.getCode());
+        return EventDetailResponse.of(event, now, timeline, translatedTitle, language.getCode(), representativeSn);
     }
 
     /**
@@ -225,5 +228,12 @@ public class EventQueryService {
             map.computeIfAbsent(alertId, k -> new ArrayList<>()).add(code);
         }
         return map;
+    }
+
+    // ── 사건 영구 링크용 조회 ─────────────────────────────────────────
+
+    /** 사건의 대표 알림 sn — 가장 먼저 발령된 알림, 같은 시각이면 작은 sn. 알림이 없으면 null. */
+    public Long representativeSn(Long eventId) {
+        return disasterEventRepository.findRepresentativeSn(eventId).orElse(null);
     }
 }

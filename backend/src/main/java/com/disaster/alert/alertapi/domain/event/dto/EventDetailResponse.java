@@ -20,15 +20,18 @@ public record EventDetailResponse(
         int alertCount,
         List<EventAlertItem> timeline,
         String translatedTitle,
-        String language
+        String language,
+        // 기록관 영구 링크(/archive/events/{representativeSn})용 대표 알림 sn. 사건 ID 는 백필 때 바뀌어 링크에 못 쓴다
+        Long representativeSn
 ) {
-    public static EventDetailResponse of(DisasterEvent e, LocalDateTime now, List<EventAlertItem> timeline) {
-        return of(e, now, timeline, null, null);
+    public static EventDetailResponse of(DisasterEvent e, LocalDateTime now, List<EventAlertItem> timeline,
+                                         Long representativeSn) {
+        return of(e, now, timeline, null, null, representativeSn);
     }
 
     /** translatedTitle/language 는 lang=ko(또는 미지원) 시 null. timeline 항목 번역은 EventAlertItem. */
     public static EventDetailResponse of(DisasterEvent e, LocalDateTime now, List<EventAlertItem> timeline,
-                                         String translatedTitle, String language) {
+                                         String translatedTitle, String language, Long representativeSn) {
         return new EventDetailResponse(
                 e.getId(),
                 e.getEventTitle(),
@@ -41,7 +44,8 @@ public record EventDetailResponse(
                 e.getAlertCount(),
                 timeline,
                 translatedTitle,
-                language
+                language,
+                representativeSn
         );
     }
 }

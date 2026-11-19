@@ -388,6 +388,14 @@ export const i18n = {
         endDate: "종료일",
       },
     },
+    archive: {
+      permalink: "영구 링크",
+      copy: "복사",
+      copied: "링크를 복사했습니다.",
+      copyFailed: "복사하지 못했습니다. 주소를 직접 선택해 복사해 주세요.",
+      unbound: "이 재난문자는 현재 어떤 사건으로도 묶여 있지 않습니다. 아래는 원문 기록입니다.",
+      viewAlert: "원문 상세 보기",
+    },
     levels: { 안전안내: "안전안내", 긴급재난: "긴급재난", 위급재난: "위급재난" },
     dashboard: {
       todayAlerts: "오늘 재난문자",
@@ -910,6 +918,14 @@ export const i18n = {
         endDate: "End Date",
       },
     },
+    archive: {
+      permalink: "Permanent link",
+      copy: "Copy",
+      copied: "Link copied.",
+      copyFailed: "Could not copy. Please select the address and copy it manually.",
+      unbound: "This alert is not currently grouped into any event. Below is the original record.",
+      viewAlert: "View original alert",
+    },
     levels: { 안전안내: "Safety Notice", 긴급재난: "Emergency Disaster", 위급재난: "Critical Disaster" },
     dashboard: {
       todayAlerts: "Today's Alerts",
@@ -1361,6 +1377,14 @@ export const i18n = {
         endDate: "終了日",
       },
     },
+    archive: {
+      permalink: "固定リンク",
+      copy: "コピー",
+      copied: "リンクをコピーしました。",
+      copyFailed: "コピーできませんでした。アドレスを選択して手動でコピーしてください。",
+      unbound: "この災害文字は現在どの事案にもまとめられていません。以下は原文の記録です。",
+      viewAlert: "原文の詳細を見る",
+    },
     levels: { 안전안내: "安全案内", 긴급재난: "緊急災害", 위급재난: "危急災害" },
     dashboard: {
       todayAlerts: "本日の災害速報",
@@ -1811,6 +1835,14 @@ export const i18n = {
         startDate: "开始日期",
         endDate: "结束日期",
       },
+    },
+    archive: {
+      permalink: "永久链接",
+      copy: "复制",
+      copied: "已复制链接。",
+      copyFailed: "无法复制，请手动选择地址复制。",
+      unbound: "该灾害短信目前未归入任何事件。以下为原文记录。",
+      viewAlert: "查看原文详情",
     },
     levels: { 안전안내: "安全通知", 긴급재난: "紧急灾害", 위급재난: "危急灾害" },
     dashboard: {

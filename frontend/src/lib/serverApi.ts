@@ -1,5 +1,6 @@
 import { ZAlert, type Alert } from "@/types/alerts";
 import { ZEventDetail, type EventDetail } from "@/types/events";
+import { ZArchiveEventResolve, type ArchiveEventResolve } from "@/types/archive";
 
 const API_BASE = process.env.BASE_API_URL ?? "https://api.disaster-alert-archive.co.kr";
 
@@ -16,6 +17,22 @@ export async function fetchAlertServer(id: string, lang = "ko"): Promise<Alert |
     });
     if (!res.ok) return null;
     return ZAlert.parse(await res.json());
+  } catch {
+    return null;
+  }
+}
+
+/** 사건 영구 링크 해석(서버용). 없는 sn·실패는 null. */
+export async function resolveArchiveEventServer(sn: string): Promise<ArchiveEventResolve | null> {
+  try {
+    const res = await fetch(`${API_BASE}/api/v1/archive/events/${sn}`, {
+      headers: { "X-Auth-Required": "false" },
+      // 재클러스터링으로 사건이 바뀔 수 있어 오래 캐시하지 않는다
+      next: { revalidate: 300 },
+    });
+    if (!res.ok) return null;
+    const body = await res.json();
+    return ZArchiveEventResolve.parse(body.data);
   } catch {
     return null;
   }

@@ -526,4 +526,19 @@ public interface DisasterEventRepository extends JpaRepository<DisasterEvent, Lo
             WHERE a.event_id IN (:eventIds) AND a.event_sequence_no = 1
             """, nativeQuery = true)
     List<Object[]> findRepresentativeMessages(@Param("eventIds") List<Long> eventIds);
+
+    // ── 사건 영구 링크 조회 ────────────────────────────────────────
+
+    /**
+     * 사건의 대표 알림 sn — 가장 먼저 발령된 알림, 같은 시각이면 작은 sn. 알림이 없으면 빈 값.
+     * 대표 알림은 저장하지 않고 조회 때 계산한다(클러스터링이 알림을 옮길 때마다 갱신할 지점이 흩어지므로).
+     * {@code idx_disaster_alert_event} 인덱스로 사건 하나의 알림만 정렬한다.
+     */
+    @Query(value = """
+            SELECT sn FROM disaster_alert
+            WHERE event_id = :eventId
+            ORDER BY created_at, sn
+            LIMIT 1
+            """, nativeQuery = true)
+    Optional<Long> findRepresentativeSn(@Param("eventId") Long eventId);
 }

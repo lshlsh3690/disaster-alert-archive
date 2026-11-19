@@ -85,8 +85,19 @@ public class DisasterAlert {
     @Column(name = "event_added_at")
     private LocalDateTime eventAddedAt;
 
+    /** 발신 기관(본문 대괄호 표기가 가리키는 기관). 표기가 없는 본문이면 null. */
+    @ToString.Exclude
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "agency_id")
+    private Agency agency;
+
     public void classifyAs(AlertKind kind) {
         this.alertKind = kind;
+    }
+
+    /** 발신 기관을 지정한다. 표기가 없는 알림은 호출하지 않아 null 로 남는다. */
+    public void assignAgency(Agency agency) {
+        this.agency = agency;
     }
 
     /** 이벤트에 넣는다. 첫 알림이면 sequenceNo=1, mergeMethod=SEED. */

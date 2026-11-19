@@ -12,15 +12,20 @@ import { disasterTypeChipStyle } from "@/ui/disasterTypeColor";
 import { formatEventPeriod } from "@/utils/eventDate";
 import { REPETITIVE_TYPES } from "@/constants/eventTypes";
 import type { EventAlertItem } from "@/types/events";
+import PermalinkCopy from "@/components/PermalinkCopy";
 
 function splitRegion(name?: string | null) {
   const parts = (name ?? "").trim().split(/\s+/);
   return { sido: parts[0] || "", sigungu: parts.slice(1).join(" ") };
 }
 
-export default function EventDetailClient() {
+/**
+ * @param eventId 기록관(/archive/events/[sn])처럼 주소에 사건 ID 가 없는 곳에서 그릴 때 넘긴다.
+ *                없으면 기존처럼 /events/[id] 의 경로 파라미터를 쓴다.
+ */
+export default function EventDetailClient({ eventId }: { eventId?: number } = {}) {
   const params = useParams<{ id: string }>();
-  const id = Number(params.id);
+  const id = eventId ?? Number(params.id);
   const lang = useLanguageStore((s) => s.language);
   const { t } = useTranslation();
   const { data, isLoading } = useEvent(id, lang);
@@ -129,6 +134,10 @@ export default function EventDetailClient() {
         </div>
         {data.primaryRegionName && (
           <p className="text-xs text-[var(--text-subtle)]">{t("events.approxRegion")}</p>
+        )}
+        {/* 사건 ID 는 백필 때 바뀌므로, 인용·공유용으로는 대표 알림 sn 기반 영구 링크를 보여준다(FR-004) */}
+        {data.representativeSn != null && (
+          <PermalinkCopy path={`/archive/events/${data.representativeSn}`} />
         )}
       </div>
 

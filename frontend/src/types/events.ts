@@ -32,6 +32,8 @@ export type Event = z.infer<typeof ZEvent>;
 
 export const ZEventDetail = ZEvent.extend({
   timeline: z.array(ZEventAlertItem),
+  // 기록관 영구 링크(/archive/events/{representativeSn})용. 백엔드 배포 순서와 무관하게 깨지지 않게 optional
+  representativeSn: z.number().nullable().optional(),
 });
 export type EventDetail = z.infer<typeof ZEventDetail>;
 

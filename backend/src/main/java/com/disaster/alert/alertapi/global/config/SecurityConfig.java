@@ -52,6 +52,8 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/api/v1/community/**").permitAll()
                         .requestMatchers("/api/v1/alerts/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/v1/events/**").permitAll()
+                        // 재난 기록관 — 연구자·기자가 로그인 없이 인용하는 공개 기록(specs/007)
+                        .requestMatchers(HttpMethod.GET, "/api/v1/archive/**").permitAll()
                         .requestMatchers("/api/v1/districts/**").permitAll()
                         // /api/v1/admin/** 은 인증만 여기서 요구하고(anyRequest().authenticated()),
                         // ADMIN 권한 검증은 각 컨트롤러의 @PreAuthorize("hasRole('ADMIN')")에서 수행.
