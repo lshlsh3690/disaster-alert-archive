@@ -27,7 +27,7 @@ description: "불일치 쌍 사람 라벨링 작업 목록"
 
 **목적**: 새 의존성은 없다. 작업 브랜치와 문서만 확인한다.
 
-- [ ] T001 `feature/clustering-dashboard-labeling`(develop 기준)에서 작업하는지 확인하고, `specs/009-clustering-pair-labeling/` 문서(spec·plan·research·data-model·contracts·quickstart·tasks)가 커밋돼 있는지 확인한다
+- [x] T001 `feature/clustering-dashboard-labeling`(develop 기준)에서 작업하는지 확인하고, `specs/009-clustering-pair-labeling/` 문서(spec·plan·research·data-model·contracts·quickstart·tasks)가 커밋돼 있는지 확인한다
 
 ---
 
@@ -35,14 +35,14 @@ description: "불일치 쌍 사람 라벨링 작업 목록"
 
 **목적**: 세 스토리가 함께 쓰는 "누가 틀렸는지" 규칙, 판사 버전별 집계, 평가용 라벨 묶음, 기준 시점 상수. JPA·Spring 을 import 하지 않는다.
 
-- [ ] T002 [US1] `{main}/domain/event/evaluation/ClusteringCriteria.java` 뼈대를 만든다 — `VERSION_DATE`(틀린 기본값, 예: `LocalDate.MIN`). javadoc 에 "`CLUSTERING_CRITERIA.md` 를 바꾸면 이 값도 바꾼다"를 적는다
-- [ ] T003 [US2] `{main}/domain/event/dashboard/DisagreementGrading.java` 뼈대를 만든다 — `enum WrongSide{JUDGE,SYSTEM}`, `wrongSide(label, judgeVerdict, systemSameEvent)`(항상 null), `gradeByVersion(List<GradedPair>)`(빈 결과). 입력·출력 record 는 data-model.md 그대로. 비율은 `ClusteringDashboardMetrics.Ratio` 를 쓴다
-- [ ] T004 [US2] `{test}/domain/event/dashboard/DisagreementGradingTest.java` 에 Red: (1) data-model.md 표의 네 경우 중 판사가 틀린 경우·시스템이 틀린 경우 각 하나와 UNSURE → null, (2) spec 스토리 2 예시(같은 사건 3·다른 사건 1·모르겠음 1)로 버전별 집계가 판사 2/4·시스템 2/4·모르겠음 1. 핵심 2~3개만
-- [ ] T005 [P] [US3] `{main}/domain/event/evaluation/PairLabelSnapshot.java` 뼈대(`select(rows, asOf)` 가 빈 목록)와 `{test}/domain/event/evaluation/PairLabelSnapshotTest.java` Red: 기준 시각 뒤에 고친 행은 빠지고 결과가 `(alert_a, alert_b)` 순이다. 1개만
-- [ ] T006 단언 실패를 확인하고(`./gradlew test --tests "*DisagreementGradingTest" --tests "*PairLabelSnapshotTest"`) 뼈대 커밋과 테스트 커밋을 나눠 커밋한다(commit-message 스킬)
-- [ ] T007 ⛔ **멈춘다.** 사용자에게 테스트 파일과 실행 방법을 알리고 Red 확인을 기다린다
-- [ ] T008 [US2] `DisagreementGrading` 을 구현한다 — data-model.md 규칙(판사 맞음 ⇔ 판정==라벨, 시스템 맞음 ⇔ 같은 이벤트==(라벨==SAME)), 버전별 집계(분모에서 UNSURE 제외, `JudgeVersionCatalog` 순서). `PairLabelSnapshot.select` 를 구현한다(기준 시각 이하·정렬)
-- [ ] T009 [US1] `ClusteringCriteria.VERSION_DATE` 를 `2026-11-13` 으로 둔다
+- [x] T002 [US1] `{main}/domain/event/evaluation/ClusteringCriteria.java` 뼈대를 만든다 — `VERSION_DATE`(틀린 기본값, 예: `LocalDate.MIN`). javadoc 에 "`CLUSTERING_CRITERIA.md` 를 바꾸면 이 값도 바꾼다"를 적는다
+- [x] T003 [US2] `{main}/domain/event/dashboard/DisagreementGrading.java` 뼈대를 만든다 — `enum WrongSide{JUDGE,SYSTEM}`, `wrongSide(label, judgeVerdict, systemSameEvent)`(항상 null), `gradeByVersion(List<GradedPair>)`(빈 결과). 입력·출력 record 는 data-model.md 그대로. 비율은 `ClusteringDashboardMetrics.Ratio` 를 쓴다
+- [x] T004 [US2] `{test}/domain/event/dashboard/DisagreementGradingTest.java` 에 Red: (1) data-model.md 표의 네 경우 중 판사가 틀린 경우·시스템이 틀린 경우 각 하나와 UNSURE → null, (2) spec 스토리 2 예시(같은 사건 3·다른 사건 1·모르겠음 1)로 버전별 집계가 판사 2/4·시스템 2/4·모르겠음 1. 핵심 2~3개만
+- [x] T005 [P] [US3] `{main}/domain/event/evaluation/PairLabelSnapshot.java` 뼈대(`select(rows, asOf)` 가 빈 목록)와 `{test}/domain/event/evaluation/PairLabelSnapshotTest.java` Red: 기준 시각 뒤에 고친 행은 빠지고 결과가 `(alert_a, alert_b)` 순이다. 1개만
+- [x] T006 단언 실패를 확인하고(`./gradlew test --tests "*DisagreementGradingTest" --tests "*PairLabelSnapshotTest"`) 뼈대 커밋과 테스트 커밋을 나눠 커밋한다(commit-message 스킬)
+- [x] T007 ⛔ **멈춘다.** 사용자에게 테스트 파일과 실행 방법을 알리고 Red 확인을 기다린다
+- [x] T008 [US2] `DisagreementGrading` 을 구현한다 — data-model.md 규칙(판사 맞음 ⇔ 판정==라벨, 시스템 맞음 ⇔ 같은 이벤트==(라벨==SAME)), 버전별 집계(분모에서 UNSURE 제외, `JudgeVersionCatalog` 순서). `PairLabelSnapshot.select` 를 구현한다(기준 시각 이하·정렬)
+- [x] T009 [US1] `ClusteringCriteria.VERSION_DATE` 를 `2026-11-13` 으로 둔다
 
 **체크포인트**: 순수 판정·집계·라벨 묶음 테스트 통과.
 
@@ -52,17 +52,17 @@ description: "불일치 쌍 사람 라벨링 작업 목록"
 
 **목적**: 라벨 테이블과 엔드포인트. ADMIN 전용, `ApiResponse`, `CustomException`+`ErrorCode`.
 
-- [ ] T010 뼈대를 만든다: `{mig}/V142__create_clustering_pair_label.sql`(data-model.md 표 그대로, `UNIQUE(alert_a, alert_b)`, `CHECK(alert_a < alert_b)`, label CHECK), `{main}/domain/event/model/ClusteringPairLabel.java`(엔티티 + `relabel` 빈 몸체), `{main}/domain/event/repository/ClusteringPairLabelRepository.java`, `{main}/domain/event/service/ClusteringPairLabelService.java`(아무것도 저장하지 않음), `{main}/domain/event/controller/ClusteringAdminController.java` 에 엔드포인트 2개(`PUT /disagreement-labels`, `GET /hard-pair-grades`)와 `disagreements` 의 `unlabeledOnly` 파라미터, 요청·응답 DTO(`{main}/domain/event/dto/`), 불일치 쌍 응답의 `humanLabel`·`criteriaDate`·`wrongSide` 필드(항상 null), `{main}/domain/common/exception/ErrorCode.java` 에 `CLUSTERING_PAIR_NOT_FOUND`(404)
-- [ ] T011 [US1] `{test}/domain/event/controller/ClusteringAdminLabelingTest.java`(`@IntegrationTest` + MockMvc, 008 `ClusteringAdminControllerTest` 와 같은 테스트 데이터 방식)에 Red: (1) 관리자가 불일치 쌍에 라벨을 저장하고 다시 저장하면 한 행만 남고 마지막 라벨·기준 시점이 보인다, (2) 일반 회원은 403 이고 행이 생기지 않는다, (3) 불일치로 기록되지 않은 쌍은 404
-- [ ] T012 [P] [US1] 같은 파일에 Red: `disagreements` 응답에 라벨·`wrongSide` 가 붙고, `unlabeledOnly=true` 면 라벨된 쌍이 빠진다
-- [ ] T013 [P] [US2] 같은 파일에 Red: `hard-pair-grades` 가 판사 버전별 판사 맞음·시스템 맞음(분자/분모)·모르겠음 수를 돌려준다
-- [ ] T014 단언 실패를 확인하고 뼈대 커밋과 테스트 커밋을 나눠 커밋한다
-- [ ] T015 ⛔ **멈춘다.** 사용자 Red 확인을 기다린다
-- [ ] T016 [US1] `ClusteringPairLabel.relabel`·`ClusteringPairLabelService` 를 구현한다 — 쌍 순서 맞추기, 불일치 쌍 존재 확인(없으면 `CustomException(CLUSTERING_PAIR_NOT_FOUND)`), 찾으면 `relabel`·없으면 새로 저장, UNIQUE 충돌 시 다시 찾아 `relabel`(research R4). 회원 id 는 컨트롤러가 `@AuthenticationPrincipal(expression = "id")` 로 넘긴다
-- [ ] T017 [US1] `{main}/domain/event/repository/ClusteringDailyScorePairRepository.java` 에 라벨 없는 쌍만 거르는 조회를 더하고, `{main}/domain/event/service/ClusteringDashboardService.java` 의 `disagreements` 가 라벨을 한 페이지분 한 번에 읽어 `humanLabel`·`criteriaDate`·`wrongSide`(`DisagreementGrading.wrongSide`)를 채우게 한다
-- [ ] T018 [US2] `ClusteringDashboardService` 에 `hardPairGrades` 를 구현한다 — 지금 불일치인 쌍 중 라벨된 것과 그날 판사 버전을 읽어 `DisagreementGrading.gradeByVersion` 에 넘긴다
-- [ ] T019 [US3] `{main}/domain/event/evaluation/EvaluationRunTool.java` 에 `--eval.pair-labels-as-of=<ISO 시각>` 을 더한다 — `--eval.labels` 와 함께 주면 오류, `ClusteringPairLabelRepository` 로 라벨 행을 읽어 `PairLabelSnapshot.select` 로 목록을 만들고, 0개면 오류로 끝내며, 데이터셋 이름은 `불일치 쌍 사람 라벨(DB, 기준 …, N쌍)`. 이후 채점·리포트는 파일 모드와 같다. `backend/evaluation/README.md` 클러스터링 평가 절에 실행 예시를 더한다(contracts 4절)
-- [ ] T020 통합 테스트·기존 단위 테스트가 모두 통과하는지 확인한다. 로직 변경이 100줄 이상이면 `code-reviewer` 에 `git diff` 와 변경 줄 범위를 넣어 검토받고 결과를 사용자에게 보고한다
+- [x] T010 뼈대를 만든다: `{mig}/V142__create_clustering_pair_label.sql`(data-model.md 표 그대로, `UNIQUE(alert_a, alert_b)`, `CHECK(alert_a < alert_b)`, label CHECK), `{main}/domain/event/model/ClusteringPairLabel.java`(엔티티 + `relabel` 빈 몸체), `{main}/domain/event/repository/ClusteringPairLabelRepository.java`, `{main}/domain/event/service/ClusteringPairLabelService.java`(아무것도 저장하지 않음), `{main}/domain/event/controller/ClusteringAdminController.java` 에 엔드포인트 2개(`PUT /disagreement-labels`, `GET /hard-pair-grades`)와 `disagreements` 의 `unlabeledOnly` 파라미터, 요청·응답 DTO(`{main}/domain/event/dto/`), 불일치 쌍 응답의 `humanLabel`·`criteriaDate`·`wrongSide` 필드(항상 null), `{main}/domain/common/exception/ErrorCode.java` 에 `CLUSTERING_PAIR_NOT_FOUND`(404)
+- [x] T011 [US1] `{test}/domain/event/controller/ClusteringAdminLabelingTest.java`(`@IntegrationTest` + MockMvc, 008 `ClusteringAdminControllerTest` 와 같은 테스트 데이터 방식)에 Red: (1) 관리자가 불일치 쌍에 라벨을 저장하고 다시 저장하면 한 행만 남고 마지막 라벨·기준 시점이 보인다, (2) 일반 회원은 403 이고 행이 생기지 않는다, (3) 불일치로 기록되지 않은 쌍은 404
+- [x] T012 [P] [US1] 같은 파일에 Red: `disagreements` 응답에 라벨·`wrongSide` 가 붙고, `unlabeledOnly=true` 면 라벨된 쌍이 빠진다
+- [x] T013 [P] [US2] 같은 파일에 Red: `hard-pair-grades` 가 판사 버전별 판사 맞음·시스템 맞음(분자/분모)·모르겠음 수를 돌려준다
+- [x] T014 단언 실패를 확인하고 뼈대 커밋과 테스트 커밋을 나눠 커밋한다
+- [x] T015 ⛔ **멈춘다.** 사용자 Red 확인을 기다린다
+- [x] T016 [US1] `ClusteringPairLabel.relabel`·`ClusteringPairLabelService` 를 구현한다 — 쌍 순서 맞추기, 불일치 쌍 존재 확인(없으면 `CustomException(CLUSTERING_PAIR_NOT_FOUND)`), 찾으면 `relabel`·없으면 새로 저장, UNIQUE 충돌 시 다시 찾아 `relabel`(research R4). 회원 id 는 컨트롤러가 `@AuthenticationPrincipal(expression = "id")` 로 넘긴다
+- [x] T017 [US1] `{main}/domain/event/repository/ClusteringDailyScorePairRepository.java` 에 라벨 없는 쌍만 거르는 조회를 더하고, `{main}/domain/event/service/ClusteringDashboardService.java` 의 `disagreements` 가 라벨을 한 페이지분 한 번에 읽어 `humanLabel`·`criteriaDate`·`wrongSide`(`DisagreementGrading.wrongSide`)를 채우게 한다
+- [x] T018 [US2] `ClusteringDashboardService` 에 `hardPairGrades` 를 구현한다 — 지금 불일치인 쌍 중 라벨된 것과 그날 판사 버전을 읽어 `DisagreementGrading.gradeByVersion` 에 넘긴다
+- [x] T019 [US3] `{main}/domain/event/evaluation/EvaluationRunTool.java` 에 `--eval.pair-labels-as-of=<ISO 시각>` 을 더한다 — `--eval.labels` 와 함께 주면 오류, `ClusteringPairLabelRepository` 로 라벨 행을 읽어 `PairLabelSnapshot.select` 로 목록을 만들고, 0개면 오류로 끝내며, 데이터셋 이름은 `불일치 쌍 사람 라벨(DB, 기준 …, N쌍)`. 이후 채점·리포트는 파일 모드와 같다. `backend/evaluation/README.md` 클러스터링 평가 절에 실행 예시를 더한다(contracts 4절)
+- [x] T020 통합 테스트·기존 단위 테스트가 모두 통과하는지 확인한다. 로직 변경이 100줄 이상이면 `code-reviewer` 에 `git diff` 와 변경 줄 범위를 넣어 검토받고 결과를 사용자에게 보고한다
 
 **체크포인트**: 관리자가 API 로 라벨을 저장·수정하고, 불일치 쌍·성적에 반영되며, 평가 도구가 DB 라벨로 채점한다.
 
@@ -72,12 +72,12 @@ description: "불일치 쌍 사람 라벨링 작업 목록"
 
 **목적**: 008 화면에 라벨 버튼·필터·성적 표를 더한다.
 
-- [ ] T021 ⛔ 사용자에게 이번 프론트엔드를 TDD(Red 확인)로 할지 바로 구현할지 묻는다(008 은 사용자 지시로 생략했다). TDD 면 `{fe}/api/clusteringAdminApi.test.ts` 에 라벨 저장 요청 Red 를 쓰고 멈춘다
-- [ ] T022 [US1] `{fe}/api/clusteringAdminApi.ts` 에 `saveDisagreementLabel`·`fetchHardPairGrades` 와 계약의 타입(불일치 쌍의 `humanLabel`·`criteriaDate`·`wrongSide`, `unlabeledOnly`)을 더한다. 요청에 `X-Auth-Required` 헤더
-- [ ] T023 [US1] `{fe}/lib/mutations/useSaveDisagreementLabel.ts` 를 만든다 — 낙관적 업데이트 없이, 성공하면 `["admin","clustering","disagreements"]`·`["admin","clustering","hard-pair-grades"]` 를 무효화
-- [ ] T024 [US1] `{fe}/app/admin/clustering/_sections.tsx` 불일치 쌍 표에 같은 사건/다른 사건/모르겠음 버튼(현재 라벨 강조, 저장 중 비활성, 실패 시 이유 표시), "판사가 틀림"/"시스템이 틀림" 표시, "라벨 없는 쌍만" 체크를 더한다
-- [ ] T025 [P] [US2] `{fe}/lib/queries/useClusteringAdmin.ts` 에 성적 훅을 더하고, `_sections.tsx` 판사 버전 이력 아래에 "어려운 쌍(불일치 쌍 사람 라벨 기준) 판사 성적" 표를 둔다. 라벨이 없으면 "아직 라벨 없음", 272쌍 일치율과 다른 숫자임을 한 줄로 밝힌다
-- [ ] T026 `npm test`·`npm run lint`·`npm run build` 를 통과하고, `ui-checker` 로 데스크톱·모바일에서 버튼·표가 깨지지 않는지 확인한다
+- [x] T021 ⛔ 사용자에게 이번 프론트엔드를 TDD(Red 확인)로 할지 바로 구현할지 묻는다(008 은 사용자 지시로 생략했다). TDD 면 `{fe}/api/clusteringAdminApi.test.ts` 에 라벨 저장 요청 Red 를 쓰고 멈춘다 — 2026-11-19 사용자 결정: TDD 없이 바로 구현
+- [x] T022 [US1] `{fe}/api/clusteringAdminApi.ts` 에 `saveDisagreementLabel`·`fetchHardPairGrades` 와 계약의 타입(불일치 쌍의 `humanLabel`·`criteriaDate`·`wrongSide`, `unlabeledOnly`)을 더한다. 요청에 `X-Auth-Required` 헤더
+- [x] T023 [US1] `{fe}/lib/mutations/useSaveDisagreementLabel.ts` 를 만든다 — 낙관적 업데이트 없이, 성공하면 `["admin","clustering","disagreements"]`·`["admin","clustering","hard-pair-grades"]` 를 무효화
+- [x] T024 [US1] `{fe}/app/admin/clustering/_sections.tsx` 불일치 쌍 표에 같은 사건/다른 사건/모르겠음 버튼(현재 라벨 강조, 저장 중 비활성, 실패 시 이유 표시), "판사가 틀림"/"시스템이 틀림" 표시, "라벨 없는 쌍만" 체크를 더한다
+- [x] T025 [P] [US2] `{fe}/lib/queries/useClusteringAdmin.ts` 에 성적 훅을 더하고, `_sections.tsx` 판사 버전 이력 아래에 "어려운 쌍(불일치 쌍 사람 라벨 기준) 판사 성적" 표를 둔다. 라벨이 없으면 "아직 라벨 없음", 272쌍 일치율과 다른 숫자임을 한 줄로 밝힌다
+- [x] T026 `npm test`·`npm run lint`·`npm run build` 를 통과하고, `ui-checker` 로 데스크톱·모바일에서 버튼·표가 깨지지 않는지 확인한다
 
 **체크포인트**: 관리자가 화면에서 라벨을 매기고, 성적·누가 틀렸는지가 보인다.
 
@@ -85,9 +85,9 @@ description: "불일치 쌍 사람 라벨링 작업 목록"
 
 ## Phase 5: 문서 (구현 순서 6)
 
-- [ ] T027 [P] `specs/008-clustering-admin-dashboard/spec.md` FR-011 을 "쓰기는 사람 라벨 저장만 허용(009)"으로 고친다
-- [ ] T028 [P] `specs/001-event-clustering-pipeline/CLUSTERING_CRITERIA.md` 머리에 "기준을 바꾸면 `ClusteringCriteria.VERSION_DATE` 도 바꾼다(불일치 쌍 라벨의 기준 시점)" 한 줄을 더한다
-- [ ] T029 [P] `specs/009-clustering-pair-labeling/plan.md` 소스 구조 표를 실제 클래스 이름에 맞게 고친다(바뀐 경우)
+- [x] T027 [P] `specs/008-clustering-admin-dashboard/spec.md` FR-011 을 "쓰기는 사람 라벨 저장만 허용(009)"으로 고친다
+- [x] T028 [P] `specs/001-event-clustering-pipeline/CLUSTERING_CRITERIA.md` 머리에 "기준을 바꾸면 `ClusteringCriteria.VERSION_DATE` 도 바꾼다(불일치 쌍 라벨의 기준 시점)" 한 줄을 더한다
+- [x] T029 [P] `specs/009-clustering-pair-labeling/plan.md` 소스 구조 표를 실제 클래스 이름에 맞게 고친다(바뀐 경우)
 
 ---
 
