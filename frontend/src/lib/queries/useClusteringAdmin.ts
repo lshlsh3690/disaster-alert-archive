@@ -1,6 +1,7 @@
 import { useQuery, keepPreviousData } from "@tanstack/react-query";
 import { isAxiosError } from "axios";
 import {
+  fetchClusteringDailyCheckAlerts,
   fetchClusteringDailyChecks,
   fetchClusteringDailyScores,
   fetchClusteringDisagreements,
@@ -40,6 +41,16 @@ export function useClusteringDailyChecks(from: string, to: string) {
   return useQuery({
     queryKey: ["admin", "clustering", "daily-checks", from, to],
     queryFn: () => fetchClusteringDailyChecks(from, to),
+    retry: retryUnlessClientError,
+  });
+}
+
+// 구조 검사 행을 펼쳤을 때만 부른다(enabled). 펼치지 않은 날은 요청하지 않는다
+export function useClusteringDailyCheckAlerts(date: string, enabled: boolean) {
+  return useQuery({
+    queryKey: ["admin", "clustering", "daily-check-alerts", date],
+    queryFn: () => fetchClusteringDailyCheckAlerts(date),
+    enabled,
     retry: retryUnlessClientError,
   });
 }

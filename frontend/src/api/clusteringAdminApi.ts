@@ -149,6 +149,29 @@ export async function fetchClusteringDailyChecks(from: string, to: string): Prom
   return res.data.data as ClusteringDailyChecksResponse;
 }
 
+/** 구조 검사에서 문제가 된 사건 알림 하나(미배정 또는 임베딩 없음). 미배정이면 eventId·mergeMethod 가 null. */
+export type ClusteringDailyCheckAlert = {
+  id: number;
+  sentAt: string;
+  type: string | null;
+  message: string | null;
+  unassigned: boolean;
+  noEmbedding: boolean;
+  eventId: number | null;
+  mergeMethod: string | null;
+};
+
+export type ClusteringDailyCheckAlertsResponse = {
+  date: string;
+  alerts: ClusteringDailyCheckAlert[];
+};
+
+/** 그날의 문제 사건 알림(발송 시각 순). 숫자는 검사 당시 값이고 이 목록은 지금 조회한 값이다. */
+export async function fetchClusteringDailyCheckAlerts(date: string): Promise<ClusteringDailyCheckAlertsResponse> {
+  const res = await instance.get(`${BASE}/daily-checks/${date}/alerts`, { headers: AUTH });
+  return res.data.data as ClusteringDailyCheckAlertsResponse;
+}
+
 /** 판사 버전 이력(최신 버전 먼저). */
 export async function fetchClusteringJudgeVersions(): Promise<ClusteringJudgeVersionsResponse> {
   const res = await instance.get(`${BASE}/judge-versions`, { headers: AUTH });

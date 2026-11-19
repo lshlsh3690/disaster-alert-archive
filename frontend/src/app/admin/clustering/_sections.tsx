@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { Fragment, useState } from "react";
 import { isAxiosError } from "axios";
 import type { ClusteringAlertSummary, DayStatus, DisagreementKind } from "@/api/clusteringAdminApi";
 import {
+  useClusteringDailyCheckAlerts,
   useClusteringDailyChecks,
   useClusteringDailyScores,
   useClusteringDisagreements,
@@ -206,8 +207,10 @@ export function DisagreementsSection({ from, to }: { from: string; to: string })
 /** 구조 검사(매일 00:30) — 미배정·임베딩 없음이 있는 날을 강조한다. */
 export function DailyChecksSection({ from, to }: { from: string; to: string }) {
   const { data, isLoading, error } = useClusteringDailyChecks(from, to);
+  // 펼친 날짜 하나. 강조된(문제 있는) 날만 펼칠 수 있고, 다시 누르면 접힌다
+  const [openDate, setOpenDate] = useState<string | null>(null);
   return (
-    <Section title="구조 검사 (매일 00:30)" description="미배정이나 임베딩 없음이 있는 날은 강조됩니다. 검사가 돌지 않은 날은 '기록 없음'입니다.">
+    <Section title="구조 검사 (매일 00:30)" description="미배정이나 임베딩 없음이 있는 날은 강조되고, 누르면 그날의 문제 알림이 아래에 펼쳐집니다. 검사가 돌지 않은 날은 '기록 없음'입니다.">
       <QueryState isLoading={isLoading} error={error} />
       {data && (
         <div className="overflow-x-auto">
@@ -221,28 +224,84 @@ export function DailyChecksSection({ from, to }: { from: string; to: string }) {
               </tr>
             </thead>
             <tbody>
-              {data.days.map((d) => (
-                <tr
-                  key={d.date}
-                  className={!d.recorded ? "text-[var(--text-muted)]" : d.attention ? "bg-[var(--coral-soft)] font-medium" : ""}
-                >
-                  <td className={TD}>{d.date}</td>
-                  {d.recorded ? (
-                    <>
-                      <td className={TD}>{formatNumber(d.incidentCount)}</td>
-                      <td className={TD}>{formatNumber(d.unassignedCount)}</td>
-                      <td className={TD}>{formatNumber(d.noEmbeddingCount)}</td>
-                    </>
-                  ) : (
-                    <td className={TD} colSpan={3}>기록 없음</td>
-                  )}
-                </tr>
-              ))}
+              {data.days.map((d) => {
+                const expandable = d.recorded && !!d.attention;
+                const open = expandable && openDate === d.date;
+                return (
+                  <Fragment key={d.date}>
+                    <tr
+                      className={`${!d.recorded ? "text-[var(--text-muted)]" : d.attention ? "bg-[var(--coral-soft)] font-medium" : ""} ${expandable ? "cursor-pointer hover:brightness-95" : ""}`}
+                      onClick={expandable ? () => setOpenDate(open ? null : d.date) : undefined}
+                      onKeyDown={expandable ? (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setOpenDate(open ? null : d.date); } } : undefined}
+                      tabIndex={expandable ? 0 : undefined}
+                      aria-expanded={expandable ? open : undefined}
+                    >
+                      <td className={TD}>{expandable ? (open ? "▾ " : "▸ ") : ""}{d.date}</td>
+                      {d.recorded ? (
+                        <>
+                          <td className={TD}>{formatNumber(d.incidentCount)}</td>
+                          <td className={TD}>{formatNumber(d.unassignedCount)}</td>
+                          <td className={TD}>{formatNumber(d.noEmbeddingCount)}</td>
+                        </>
+                      ) : (
+                        <td className={TD} colSpan={3}>기록 없음</td>
+                      )}
+                    </tr>
+                    {open && (
+                      <tr>
+                        <td colSpan={4} className="px-3 py-3 border-b border-[var(--line)] bg-[var(--canvas)]">
+                          <DailyCheckAlerts date={d.date} />
+                        </td>
+                      </tr>
+                    )}
+                  </Fragment>
+                );
+              })}
             </tbody>
           </table>
         </div>
       )}
     </Section>
+  );
+}
+
+// 구조 검사 행 아래 펼침 — 그날의 문제 알림만(미배정·임베딩 없음). 이벤트 번호는 사건 상세를 새 탭으로 연다
+function DailyCheckAlerts({ date }: { date: string }) {
+  const { data, isLoading, error } = useClusteringDailyCheckAlerts(date, true);
+  return (
+    <div className="space-y-2 whitespace-normal">
+      <p className="text-xs text-[var(--text-muted)]">
+        지금 조회한 목록입니다. 위 숫자는 검사 당시 값이라, 그 뒤 배정되거나 임베딩이 채워진 알림은 여기에 없습니다.
+      </p>
+      <QueryState isLoading={isLoading} error={error} />
+      {data && data.alerts.length === 0 && (
+        <p className="text-sm text-[var(--text-muted)]">지금은 문제 알림이 없습니다.</p>
+      )}
+      {data && data.alerts.length > 0 && (
+        <ul className="space-y-2">
+          {data.alerts.map((a) => (
+            <li key={a.id} className="rounded-[var(--radius-compact)] border border-[var(--line)] bg-[var(--surface)] p-3 space-y-1">
+              <div className="flex flex-wrap items-center gap-2 text-xs text-[var(--text-muted)]">
+                <span>#{a.id}</span>
+                <span>{formatDateTime(a.sentAt)}</span>
+                <span>{a.type ?? "-"}</span>
+                {a.unassigned && <span className="rounded-[var(--radius-pill)] bg-[var(--coral-soft)] px-2 py-0.5 text-[var(--coral)]">미배정</span>}
+                {a.noEmbedding && <span className="rounded-[var(--radius-pill)] bg-[var(--blue-soft)] px-2 py-0.5 text-[var(--blue)]">임베딩 없음</span>}
+                {a.eventId !== null ? (
+                  <a href={`/events/${a.eventId}`} target="_blank" rel="noopener noreferrer" className="text-[var(--blue)] hover:underline">
+                    사건 #{a.eventId}
+                  </a>
+                ) : (
+                  <span>사건 없음</span>
+                )}
+                {a.mergeMethod && <span>묶인 방식 {a.mergeMethod}</span>}
+              </div>
+              <div className="text-sm text-[var(--text-body)]">{a.message ?? "원문 없음"}</div>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
   );
 }
 
