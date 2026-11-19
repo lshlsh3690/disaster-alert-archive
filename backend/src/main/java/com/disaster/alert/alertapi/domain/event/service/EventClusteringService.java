@@ -488,6 +488,28 @@ public class EventClusteringService {
     }
 
     /**
+     * 임베딩을 "저장만" 해 두되 실패는 삼킨다 — 규칙으로 병합하는 경로가 부가 작업 때문에 막히면
+     * 알림이 미배정으로 남기 때문이다. 실패한 알림은 임베딩이 비어 남아 00:30 구조 검사가 세어 주므로
+     * 사람이 조치할 장애가 아니라 warn 으로 둔다(error 는 사람이 조치할 것만). 확인할 곳: 이 warn 로그의 alertId.
+     */
+    private void storeEmbeddingBestEffort(DisasterAlert alert) {
+        if (alertEmbeddingRepository.findEmbeddingText(alert.getId()) != null) {
+            return;
+        }
+        // 외부 임베딩 API 실패만 삼킨다. DB 오류까지 삼키면 PostgreSQL 이 그 트랜잭션을 중단시켜 이어지는 병합 저장도
+        // 실패하고 원인이 가려진다 — DB 오류는 다른 경로처럼 그대로 올린다
+        float[] embedding;
+        try {
+            embedding = embeddingModel.embed(alert.getMessage());
+        } catch (RuntimeException e) {
+            log.warn("지역 한정 경로 임베딩 생성 실패 — 규칙 병합은 계속한다: alertId={} reason={}",
+                    alert.getId(), e.toString());
+            return;
+        }
+        alertEmbeddingRepository.updateEmbedding(alert.getId(), toVectorText(embedding));
+    }
+
+    /**
      * 동물 탈출·출몰 클러스터링 — 종(늑대·멧돼지 등)을 하드게이트로 삼아 같은 종의 이벤트만 후보로 올리고,
      * 후보가 있으면 LLM 이 같은 사건인지 고른다. 기준: CLUSTERING_CRITERIA.md 3절 2번.
      *
@@ -711,6 +733,9 @@ public class EventClusteringService {
         }
 
         // 위 false 분기를 모두 통과해야 이 경로가 확정이다 — 인접 산불 병합(mergeIntoAdjacentRegionalEvent)도 REGIONAL.
+        // 임베딩은 저장만 하고 병합 판단에는 쓰지 않는다. 안 남기면 00:30 구조 검사가 "임베딩 없음"을 장애로
+        // 세고, 이 이벤트들이 다른 유형 문자의 임베딩 후보 검색(embedding IS NOT NULL)에서도 빠진다.
+        storeEmbeddingBestEffort(alert);
         String[] sigungu = sigunguPrefixes(regionCodes);
         LocalDateTime since = alert.getCreatedAt().minusHours(windowHours);
         Optional<Long> target = disasterEventRepository.findRegionalTypeMergeTarget(
