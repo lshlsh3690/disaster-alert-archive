@@ -1,5 +1,6 @@
 package com.disaster.alert.alertapi.domain.event.service;
 
+import com.disaster.alert.alertapi.domain.event.dto.ClusteringDashboardDailyCheckAlertsResponse;
 import com.disaster.alert.alertapi.domain.event.model.ClusteringDailyCheck;
 import com.disaster.alert.alertapi.domain.event.repository.ClusteringDailyCheckRepository;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -22,27 +23,29 @@ import java.util.List;
 @Service
 public class ClusteringDailyCheckService {
 
-    // 안내(ADVISORY)는 이벤트에 안 들어가는 게 정상이라 세 쿼리 모두 INCIDENT 만 센다. 하루 한 번 도는 작업이라 쿼리를 합치지 않고 읽기 쉽게 나눈다.
-    private static final String COUNT_INCIDENTS = """
-            SELECT COUNT(*)
-            FROM disaster_alert
-            WHERE created_at >= ? AND created_at < ? AND alert_kind = 'INCIDENT'
-            """;
+    // 숫자 쿼리 3개와 목록 쿼리가 공유하는 공통 조건. 한 곳에 둬야 화면의 숫자와 펼친 목록의 기준이 어긋나지 않는다.
+    // 안내(ADVISORY)는 이벤트에 안 들어가는 게 정상이라 모두 INCIDENT 만 본다. 날짜는 [당일 00:00, 다음날 00:00) 반개구간이라
+    // 자정 정각 알림이 이틀에 중복으로 잡히지 않는다(파라미터 2개: from, to).
+    private static final String INCIDENT_IN_DAY = "created_at >= ? AND created_at < ? AND alert_kind = 'INCIDENT'";
+
+    // 하루 한 번 도는 작업이라 쿼리를 합치지 않고 읽기 쉽게 나눈다.
+    private static final String COUNT_INCIDENTS = "SELECT COUNT(*) FROM disaster_alert WHERE " + INCIDENT_IN_DAY;
 
     // 미배정 = 이벤트가 없는(event_id 가 비어 있는) 사건 알림
-    private static final String COUNT_UNASSIGNED = """
-            SELECT COUNT(*)
-            FROM disaster_alert
-            WHERE created_at >= ? AND created_at < ? AND alert_kind = 'INCIDENT'
-              AND event_id IS NULL
-            """;
+    private static final String COUNT_UNASSIGNED =
+            "SELECT COUNT(*) FROM disaster_alert WHERE " + INCIDENT_IN_DAY + " AND event_id IS NULL";
 
-    private static final String COUNT_NO_EMBEDDING = """
-            SELECT COUNT(*)
-            FROM disaster_alert
-            WHERE created_at >= ? AND created_at < ? AND alert_kind = 'INCIDENT'
-              AND embedding IS NULL
-            """;
+    private static final String COUNT_NO_EMBEDDING =
+            "SELECT COUNT(*) FROM disaster_alert WHERE " + INCIDENT_IN_DAY + " AND embedding IS NULL";
+
+    // 펼친 목록 = 위 미배정 건수와 임베딩 없음 건수가 센 알림의 합집합. 정렬 끝에 id 를 둬 같은 시각 알림의 순서를 고정한다.
+    private static final String SELECT_PROBLEM_ALERTS =
+            "SELECT disaster_alert_id, created_at, disaster_type, message, "
+                    + "(event_id IS NULL) AS unassigned, (embedding IS NULL) AS no_embedding, "
+                    + "event_id, event_merge_method "
+                    + "FROM disaster_alert WHERE " + INCIDENT_IN_DAY
+                    + " AND (event_id IS NULL OR embedding IS NULL) "
+                    + "ORDER BY created_at, disaster_alert_id";
 
     private final JdbcTemplate jdbcTemplate;
     private final ClusteringDailyCheckRepository repository;
@@ -60,9 +63,9 @@ public class ClusteringDailyCheckService {
      */
     @Transactional
     public ClusteringDailyCheck check(LocalDate date) {
-        // 1) 날짜 범위는 [당일 00:00, 다음날 00:00) 반개구간 - 자정 정각 알림이 이틀에 중복으로 잡히지 않는다.
-        LocalDateTime from = date.atStartOfDay();
-        LocalDateTime to = date.plusDays(1).atStartOfDay();
+        // 1) 날짜 범위는 [당일 00:00, 다음날 00:00) 반개구간 - 목록 조회와 같은 계산을 쓴다.
+        LocalDateTime from = startOfDay(date);
+        LocalDateTime to = startOfNextDay(date);
 
         // 2) 세 건수를 각각 센다
         int incident = jdbcTemplate.queryForObject(COUNT_INCIDENTS, Integer.class, from, to);
@@ -78,6 +81,41 @@ public class ClusteringDailyCheckService {
             check.update(incident, unassigned, noEmbedding, checkedAt);
         }
         return repository.save(check);
+    }
+
+    /**
+     * 해당 날짜의 문제 알림(INCIDENT 이면서 이벤트 미배정이거나 임베딩 없음)을 발송 시각 오름차순으로 돌려준다.
+     * 위 건수 쿼리와 같은 공통 조건·날짜 범위를 쓰므로 검사 당시와 같은 데이터라면 숫자와 목록이 일치한다.
+     * 단 숫자는 검사 시점의 저장값이고 목록은 지금 조회한 값이라, 그 뒤 클러스터링·백필로 알림이 배정되면 목록이 더 짧을 수 있다.
+     *
+     * <p>둘 다 해당하는 알림은 한 번만 나오고 두 플래그가 모두 true 다. 해당 알림이 없으면 빈 목록이다.
+     */
+    @Transactional(readOnly = true)
+    public ClusteringDashboardDailyCheckAlertsResponse problemAlerts(LocalDate date) {
+        // 1) 날짜 범위는 건수 쿼리와 같은 헬퍼로 계산한다(맨 아래 파라미터).
+        // 2) 플래그는 SQL 의 IS NULL 판정 그대로 읽는다. 미배정이면 event_id·merge_method 도 null 로 와 그대로 담는다.
+        List<ClusteringDashboardDailyCheckAlertsResponse.Alert> alerts = jdbcTemplate.query(
+                SELECT_PROBLEM_ALERTS,
+                (rs, rowNum) -> new ClusteringDashboardDailyCheckAlertsResponse.Alert(
+                        rs.getLong("disaster_alert_id"),
+                        rs.getObject("created_at", LocalDateTime.class),
+                        rs.getString("disaster_type"),
+                        rs.getString("message"),
+                        rs.getBoolean("unassigned"),
+                        rs.getBoolean("no_embedding"),
+                        // event_id 는 NULL 가능 - getLong 은 NULL 을 0 으로 바꾸므로 getObject 로 읽는다
+                        rs.getObject("event_id", Long.class),
+                        rs.getString("event_merge_method")),
+                startOfDay(date), startOfNextDay(date));
+        return new ClusteringDashboardDailyCheckAlertsResponse(date, alerts);
+    }
+
+    private static LocalDateTime startOfDay(LocalDate date) {
+        return date.atStartOfDay();
+    }
+
+    private static LocalDateTime startOfNextDay(LocalDate date) {
+        return date.plusDays(1).atStartOfDay();
     }
 
     /**

@@ -27,6 +27,7 @@ public enum ErrorCode {
     COMMENT_NOT_FOUND(404, "CM404", "댓글을 찾을 수 없습니다."),
 
     CLUSTERING_DASHBOARD_RANGE_INVALID(400, "CD400", "조회 범위가 올바르지 않습니다."),
+    CLUSTERING_PAIR_NOT_FOUND(404, "CD404", "불일치 쌍으로 기록된 적 없는 쌍입니다."),
 
 
     DUPLICATE_EMAIL(409, "M401", "이미 사용 중인 이메일입니다."),

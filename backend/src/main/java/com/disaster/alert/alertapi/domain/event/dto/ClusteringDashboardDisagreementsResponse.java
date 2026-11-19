@@ -1,5 +1,7 @@
 package com.disaster.alert.alertapi.domain.event.dto;
 
+import com.disaster.alert.alertapi.domain.event.dashboard.DisagreementGrading.WrongSide;
+import com.disaster.alert.alertapi.domain.event.evaluation.LabelJson.Label;
 import com.disaster.alert.alertapi.domain.event.judge.JudgeVerdict;
 import com.disaster.alert.alertapi.domain.event.model.ClusteringDailyScorePair.Disagreement;
 
@@ -15,10 +17,14 @@ import java.util.List;
 public record ClusteringDashboardDisagreementsResponse(int page, int size, long totalElements, int totalPages,
                                                        List<Pair> pairs) {
 
-    /** 불일치 쌍 하나. eventA/eventB 는 채점 시점의 시스템 이벤트 id(미배정이면 null). */
+    /**
+     * 불일치 쌍 하나. eventA/eventB 는 채점 시점의 시스템 이벤트 id(미배정이면 null).
+     * humanLabel·criteriaDate 는 사람이 라벨을 매겼을 때만, wrongSide 는 라벨이 SAME/DIFF 일 때만 채워진다(아니면 null).
+     */
     public record Pair(LocalDate date, Disagreement kind, JudgeVerdict judgeVerdict,
                        AlertSummary alertA, AlertSummary alertB,
-                       Long eventA, Long eventB) {
+                       Long eventA, Long eventB,
+                       Label humanLabel, LocalDate criteriaDate, WrongSide wrongSide) {
     }
 
     /** 알림 요약. 알림을 찾을 수 없으면 id 만 채우고 나머지는 null(화면은 "원문 없음"). */

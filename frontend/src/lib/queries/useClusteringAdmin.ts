@@ -1,10 +1,12 @@
 import { useQuery, keepPreviousData } from "@tanstack/react-query";
 import { isAxiosError } from "axios";
 import {
+  fetchClusteringDailyCheckAlerts,
   fetchClusteringDailyChecks,
   fetchClusteringDailyScores,
   fetchClusteringDisagreements,
   fetchClusteringJudgeVersions,
+  fetchHardPairGrades,
   type ClusteringDisagreementsParams,
 } from "@/api/clusteringAdminApi";
 
@@ -27,10 +29,10 @@ export function useClusteringDailyScores(from: string, to: string) {
 }
 
 export function useClusteringDisagreements(params: ClusteringDisagreementsParams) {
-  const { from, to, kind = null, page = 0, size = 20 } = params;
+  const { from, to, kind = null, page = 0, size = 20, unlabeledOnly = false } = params;
   return useQuery({
-    queryKey: ["admin", "clustering", "disagreements", from, to, kind, page, size],
-    queryFn: () => fetchClusteringDisagreements({ from, to, kind, page, size }),
+    queryKey: ["admin", "clustering", "disagreements", from, to, kind, page, size, unlabeledOnly],
+    queryFn: () => fetchClusteringDisagreements({ from, to, kind, page, size, unlabeledOnly }),
     placeholderData: keepPreviousData, // 페이지를 넘길 때 표가 깜빡이며 비지 않게
     retry: retryUnlessClientError,
   });
@@ -40,6 +42,23 @@ export function useClusteringDailyChecks(from: string, to: string) {
   return useQuery({
     queryKey: ["admin", "clustering", "daily-checks", from, to],
     queryFn: () => fetchClusteringDailyChecks(from, to),
+    retry: retryUnlessClientError,
+  });
+}
+
+// 구조 검사 펼침 칸 안에서만 쓴다 — 칸이 펼친 날에만 그려지므로 펼치지 않은 날은 요청하지 않는다
+export function useClusteringDailyCheckAlerts(date: string) {
+  return useQuery({
+    queryKey: ["admin", "clustering", "daily-check-alerts", date],
+    queryFn: () => fetchClusteringDailyCheckAlerts(date),
+    retry: retryUnlessClientError,
+  });
+}
+
+export function useHardPairGrades() {
+  return useQuery({
+    queryKey: ["admin", "clustering", "hard-pair-grades"],
+    queryFn: () => fetchHardPairGrades(),
     retry: retryUnlessClientError,
   });
 }

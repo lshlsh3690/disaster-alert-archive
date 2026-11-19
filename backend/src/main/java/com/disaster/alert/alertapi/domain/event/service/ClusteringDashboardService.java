@@ -10,9 +10,13 @@ import com.disaster.alert.alertapi.domain.event.dashboard.ClusteringDashboardMet
 import com.disaster.alert.alertapi.domain.event.dashboard.ClusteringDashboardMetrics.DayStatus;
 import com.disaster.alert.alertapi.domain.event.dashboard.ClusteringDashboardMetrics.Ratio;
 import com.disaster.alert.alertapi.domain.event.dashboard.ClusteringDashboardMetrics.VersionPeriod;
+import com.disaster.alert.alertapi.domain.event.dashboard.DisagreementGrading;
+import com.disaster.alert.alertapi.domain.event.dashboard.DisagreementGrading.GradedPair;
+import com.disaster.alert.alertapi.domain.event.dashboard.DisagreementGrading.VersionGrade;
 import com.disaster.alert.alertapi.domain.event.dto.ClusteringDashboardDailyChecksResponse;
 import com.disaster.alert.alertapi.domain.event.dto.ClusteringDashboardDailyScoresResponse;
 import com.disaster.alert.alertapi.domain.event.dto.ClusteringDashboardDisagreementsResponse;
+import com.disaster.alert.alertapi.domain.event.dto.ClusteringDashboardHardPairGradesResponse;
 import com.disaster.alert.alertapi.domain.event.dto.ClusteringDashboardJudgeVersionsResponse;
 import com.disaster.alert.alertapi.domain.event.evaluation.PairCountResult;
 import com.disaster.alert.alertapi.domain.event.judge.JudgeVersionCatalog;
@@ -20,14 +24,17 @@ import com.disaster.alert.alertapi.domain.event.model.ClusteringDailyCheck;
 import com.disaster.alert.alertapi.domain.event.model.ClusteringDailyScore;
 import com.disaster.alert.alertapi.domain.event.model.ClusteringDailyScorePair;
 import com.disaster.alert.alertapi.domain.event.model.ClusteringDailyScorePair.Disagreement;
+import com.disaster.alert.alertapi.domain.event.model.ClusteringPairLabel;
 import com.disaster.alert.alertapi.domain.event.repository.ClusteringDailyCheckRepository;
 import com.disaster.alert.alertapi.domain.event.repository.ClusteringDailyScorePairRepository;
 import com.disaster.alert.alertapi.domain.event.repository.ClusteringDailyScoreRepository;
+import com.disaster.alert.alertapi.domain.event.repository.ClusteringPairLabelRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
@@ -63,6 +70,7 @@ public class ClusteringDashboardService {
     private final ClusteringDailyScoreRepository scoreRepository;
     private final ClusteringDailyScorePairRepository pairRepository;
     private final ClusteringDailyCheckRepository checkRepository;
+    private final ClusteringPairLabelRepository labelRepository;
     private final DisasterAlertService disasterAlertService;
 
     /**
@@ -88,13 +96,14 @@ public class ClusteringDashboardService {
 
     /**
      * 불일치 쌍(과병합·과소병합) 한 페이지. 정렬은 날짜 내림차순 → 쌍 id 오름차순이다.
-     * 두 알림 원문은 한 페이지분을 한 번에 읽어 채운다.
+     * 두 알림 원문과 사람 라벨은 한 페이지분을 한 번에 읽어 채운다.
      *
      * @param kind null 이면 두 종류 모두
+     * @param unlabeledOnly true 면 사람 라벨이 없는 쌍만
      * @throws CustomException 범위·page·size 가 잘못되면 400 (범위는 {@code CLUSTERING_DASHBOARD_RANGE_INVALID})
      */
     public ClusteringDashboardDisagreementsResponse disagreements(LocalDate from, LocalDate to, Disagreement kind,
-                                                                  int page, int size) {
+                                                                  boolean unlabeledOnly, int page, int size) {
         // 1) 입력 검증 — size 상한이 없으면 한 번에 수천 쌍(큰 재난 날)을 내려보낼 수 있다
         validateRange(from, to);
         if (page < 0 || size < 1 || size > MAX_PAGE_SIZE) {
@@ -103,9 +112,11 @@ public class ClusteringDashboardService {
         // 2) kind 생략 = 두 종류. 맞춘 쌍(disagreement null)은 어느 쪽이든 조회에서 빠진다
         Set<Disagreement> kinds = kind == null ? EnumSet.allOf(Disagreement.class) : EnumSet.of(kind);
         Sort sort = Sort.by(Sort.Direction.DESC, "scoreDate").and(Sort.by(Sort.Direction.ASC, "id"));
-        Page<ClusteringDailyScorePair> result = pairRepository.findByScoreDateBetweenAndDisagreementIn(
-                from, to, kinds, PageRequest.of(page, size, sort));
-        // 3) 한 페이지의 알림 id 를 모아 원문을 한 번에 읽는다(쌍마다 읽으면 N+1)
+        PageRequest pageable = PageRequest.of(page, size, sort);
+        Page<ClusteringDailyScorePair> result = unlabeledOnly
+                ? pairRepository.findUnlabeledDisagreements(from, to, kinds, pageable)
+                : pairRepository.findByScoreDateBetweenAndDisagreementIn(from, to, kinds, pageable);
+        // 3) 한 페이지의 알림 id 를 모아 원문과 라벨을 한 번에 읽는다(쌍마다 읽으면 N+1)
         Set<Long> alertIds = new LinkedHashSet<>();
         result.forEach(pair -> {
             alertIds.add(pair.getAlertA());
@@ -113,14 +124,38 @@ public class ClusteringDashboardService {
         });
         Map<Long, AlertSummaryDto> summaries = disasterAlertService.findAlertSummaries(alertIds).stream()
                 .collect(Collectors.toMap(AlertSummaryDto::id, Function.identity()));
+        Map<PairKey, ClusteringPairLabel> labels = labelsOf(alertIds);
         List<ClusteringDashboardDisagreementsResponse.Pair> pairs = result.stream()
-                .map(pair -> new ClusteringDashboardDisagreementsResponse.Pair(
-                        pair.getScoreDate(), pair.getDisagreement(), pair.getJudgeVerdict(),
-                        summaryOf(pair.getAlertA(), summaries), summaryOf(pair.getAlertB(), summaries),
-                        pair.getEventA(), pair.getEventB()))
+                .map(pair -> toPair(pair, summaries, labels.get(new PairKey(pair.getAlertA(), pair.getAlertB()))))
                 .toList();
         return new ClusteringDashboardDisagreementsResponse(
                 page, size, result.getTotalElements(), result.getTotalPages(), pairs);
+    }
+
+    /**
+     * 어려운 쌍 판사 성적 — 지금 불일치인 쌍 중 사람 라벨이 있는 것을 판사 버전별로 센다.
+     *
+     * <p>같은 두 알림이 여러 날 불일치로 나오면 날짜마다 한 번씩 센다 — 날짜마다 판사가 따로 판정했기 때문이다.
+     * 판정·집계 규칙은 {@link DisagreementGrading} 에 있고 여기서는 읽은 값을 넘기기만 한다.
+     * 라벨이 없으면 labeledPairs 0, versions 빈 목록(화면은 "아직 라벨 없음").
+     */
+    // 버전 맵과 라벨 쌍을 같은 스냅샷에서 읽는다 — 일일 채점은 날짜 행과 쌍 행을 따로 커밋해, READ COMMITTED 면 두 조회
+    // 사이에 커밋된 새 날짜의 쌍이 버전 없이(null) 집계될 수 있다(CodeRabbit PR #342)
+    @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
+    public ClusteringDashboardHardPairGradesResponse hardPairGrades() {
+        // 1) 날짜 → 그날 판사 버전. 쌍의 버전은 그 쌍을 채점한 날의 버전이다(research R6). 날짜당 1행이라 수백 행
+        Map<LocalDate, String> versionByDate = scoreRepository.findAllProjectedBy().stream()
+                .collect(Collectors.toMap(ClusteringDailyScoreRepository.DatedVersionView::getScoreDate,
+                        ClusteringDailyScoreRepository.DatedVersionView::getJudgeVersion));
+        // 2) 지금 불일치인 채점 쌍 중 라벨 있는 것을 (판사 버전, 라벨, 판사 판정, 시스템 같은 이벤트)로 바꾼다
+        List<GradedPair> graded = pairRepository.findLabeledDisagreements().stream()
+                .map(row -> new GradedPair(versionByDate.get(row.getScoreDate()), row.getLabel(),
+                        row.getJudgeVerdict(), row.getSystemSameEvent()))
+                .toList();
+        // 3) 버전별 집계는 순수 클래스가 한다. labeledPairs 는 쌍×날짜 수(UNSURE 포함)
+        List<ClusteringDashboardHardPairGradesResponse.Version> versions = DisagreementGrading.gradeByVersion(graded)
+                .stream().map(ClusteringDashboardService::toVersion).toList();
+        return new ClusteringDashboardHardPairGradesResponse(graded.size(), versions);
     }
 
     /**
@@ -225,6 +260,37 @@ public class ClusteringDashboardService {
                 s.getCorrectlyMerged(), s.getOverMerged(), s.getMissed(),
                 s.getUnsureCount(), s.getFormatFailureCount(),
                 purity, completeness, score, judge, s.getPromptTokens(), s.getCompletionTokens(), cost);
+    }
+
+    // 쌍 하나의 응답. 라벨이 없으면 라벨 필드 셋 모두 null
+    private static ClusteringDashboardDisagreementsResponse.Pair toPair(
+            ClusteringDailyScorePair pair, Map<Long, AlertSummaryDto> summaries, ClusteringPairLabel label) {
+        // wrongSide 는 판사·시스템 답이 반대인 불일치 쌍에서만 의미가 있다(이 목록은 불일치 쌍만 담는다). UNSURE 면 null
+        DisagreementGrading.WrongSide wrongSide = label == null ? null
+                : DisagreementGrading.wrongSide(label.getLabel(), pair.getJudgeVerdict(), pair.isSystemSameEvent());
+        return new ClusteringDashboardDisagreementsResponse.Pair(
+                pair.getScoreDate(), pair.getDisagreement(), pair.getJudgeVerdict(),
+                summaryOf(pair.getAlertA(), summaries), summaryOf(pair.getAlertB(), summaries),
+                pair.getEventA(), pair.getEventB(),
+                label == null ? null : label.getLabel(), label == null ? null : label.getCriteriaDate(), wrongSide);
+    }
+
+    // 한 페이지의 알림 id 로 라벨을 한 번에 읽는다. alertA 로만 거르므로 alertB 가 다른 줄은 쌍 키로 구분된다
+    private Map<PairKey, ClusteringPairLabel> labelsOf(Set<Long> alertIds) {
+        if (alertIds.isEmpty()) {
+            return Map.of();
+        }
+        return labelRepository.findByAlertAIn(alertIds).stream()
+                .collect(Collectors.toMap(l -> new PairKey(l.getAlertA(), l.getAlertB()), Function.identity()));
+    }
+
+    private static ClusteringDashboardHardPairGradesResponse.Version toVersion(VersionGrade g) {
+        return new ClusteringDashboardHardPairGradesResponse.Version(
+                g.version(), g.model(), g.judgeRight(), g.systemRight(), g.unsureCount());
+    }
+
+    // (alertA, alertB) — alertA 가 작은 id 라 순서가 이미 정해져 있다
+    private record PairKey(long alertA, long alertB) {
     }
 
     // 알림을 못 찾으면(지워졌거나 아직 없음) id 만 채운다 — 화면이 "원문 없음"을 보인다
