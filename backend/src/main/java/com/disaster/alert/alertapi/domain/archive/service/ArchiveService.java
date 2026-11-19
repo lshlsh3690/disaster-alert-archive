@@ -1,9 +1,11 @@
 package com.disaster.alert.alertapi.domain.archive.service;
 
+import com.disaster.alert.alertapi.domain.archive.dto.ArchiveAlertResponse;
 import com.disaster.alert.alertapi.domain.archive.dto.ArchiveEventResolveResponse;
 import com.disaster.alert.alertapi.domain.archive.dto.ArchiveMajorEventsResponse;
 import com.disaster.alert.alertapi.domain.common.exception.CustomException;
 import com.disaster.alert.alertapi.domain.common.exception.ErrorCode;
+import com.disaster.alert.alertapi.domain.disasteralert.dto.AlertRecord;
 import com.disaster.alert.alertapi.domain.disasteralert.dto.AlertSnLookup;
 import com.disaster.alert.alertapi.domain.disasteralert.service.DisasterAlertQueryService;
 import com.disaster.alert.alertapi.domain.event.service.EventQueryService;
@@ -77,5 +79,21 @@ public class ArchiveService {
         //    화면에 보일 영구 링크는 항상 현재 대표 sn 으로 만든다. 대표 sn 은 알림과 같은 조회 문장에서 읽어 왔으므로
         //    백필 도중이라도 eventId 와 서로 다른 시점의 값이 섞이지 않는다
         return new ArchiveEventResolveResponse(sn, true, alert.eventId(), alert.representativeSn(), null);
+    }
+
+    /**
+     * 원문 기록 — sn 으로 원문 알림 한 건. 재클러스터링·재수집과 무관하게 같은 원문을 가리킨다(스토리 1).
+     *
+     * @throws CustomException 수집된 적 없는 sn (DISASTER_ALERT_NOT_FOUND)
+     */
+    public ArchiveAlertResponse alertRecord(Long sn) {
+        AlertRecord r = disasterAlertQueryService.findRecordBySn(sn)
+                .orElseThrow(() -> new CustomException(ErrorCode.DISASTER_ALERT_NOT_FOUND));
+        // 발신 기관은 본문 표기가 있을 때만 싣는다 — 표기는 있는데 기관이 아직 지정 전이면 이름만 비운다
+        ArchiveAlertResponse.Agency agency = r.agencyLabel() == null
+                ? null
+                : new ArchiveAlertResponse.Agency(r.agencyLabel(), r.agencyName());
+        return new ArchiveAlertResponse(r.sn(), r.alertId(), r.message(), r.createdAt(), r.modifiedDate(),
+                r.disasterType(), r.emergencyLevel(), r.originalRegion(), r.eventId() != null, agency);
     }
 }

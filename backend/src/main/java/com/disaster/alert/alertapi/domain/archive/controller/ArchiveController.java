@@ -1,5 +1,6 @@
 package com.disaster.alert.alertapi.domain.archive.controller;
 
+import com.disaster.alert.alertapi.domain.archive.dto.ArchiveAlertResponse;
 import com.disaster.alert.alertapi.domain.archive.dto.ArchiveEventResolveResponse;
 import com.disaster.alert.alertapi.domain.archive.dto.ArchiveMajorEventsResponse;
 import com.disaster.alert.alertapi.domain.archive.service.ArchiveService;
@@ -30,6 +31,12 @@ public class ArchiveController {
             @RequestParam(required = false) Integer year
     ) {
         return ResponseEntity.ok(ApiResponse.success(archiveService.majorEvents(year)));
+    }
+
+    /** 원문 기록 — sn 으로 원문 알림 한 건(발신 기관 표기 포함). 없는 sn 은 404(DISASTER_ALERT_NOT_FOUND). */
+    @GetMapping("/alerts/{sn}")
+    public ResponseEntity<ApiResponse<ArchiveAlertResponse>> alertRecord(@PathVariable Long sn) {
+        return ResponseEntity.ok(ApiResponse.success(archiveService.alertRecord(sn)));
     }
 
     /** 사건 영구 링크 해석 — sn 알림이 지금 속한 사건. 없는 sn 은 404(DISASTER_ALERT_NOT_FOUND). */

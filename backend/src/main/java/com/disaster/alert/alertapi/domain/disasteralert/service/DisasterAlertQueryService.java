@@ -1,7 +1,9 @@
 package com.disaster.alert.alertapi.domain.disasteralert.service;
 
+import com.disaster.alert.alertapi.domain.disasteralert.dto.AlertRecord;
 import com.disaster.alert.alertapi.domain.disasteralert.dto.AlertSnLookup;
 import com.disaster.alert.alertapi.domain.disasteralert.model.DisasterLevel;
+import com.disaster.alert.alertapi.domain.disasteralert.model.SenderLabel;
 import com.disaster.alert.alertapi.domain.disasteralert.repository.DisasterAlertRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -32,6 +34,28 @@ public class DisasterAlertQueryService {
         return disasterAlertRepository.findSnLookupRows(sn).stream()
                 .findFirst()
                 .map(DisasterAlertQueryService::toLookup);
+    }
+
+    /**
+     * sn 으로 원문 기록을 찾는다(기록관 원문 영구 링크). 수집된 적 없는 sn 이면 빈 값.
+     *
+     * <p>발신 기관은 두 값을 함께 준다 — 인용문은 본문 표기 그대로({@code agencyLabel})를 쓰고, 기관 이름은 정규화 뒤
+     * 표기와 달라질 수 있어 참고용이다. 기관이 지연 로딩이라 이 트랜잭션 안에서 꺼내 옮긴다.
+     */
+    @Transactional(readOnly = true)
+    public Optional<AlertRecord> findRecordBySn(Long sn) {
+        return disasterAlertRepository.findBySn(sn).map(a -> new AlertRecord(
+                a.getId(),
+                a.getSn(),
+                a.getMessage(),
+                a.getCreatedAt(),
+                a.getModifiedDate(),
+                a.getDisasterType(),
+                a.getEmergencyLevel() == null ? null : a.getEmergencyLevel().getDescription(),
+                a.getOriginalRegion(),
+                a.getEventId(),
+                a.getMessage() == null ? null : SenderLabel.extract(a.getMessage()).orElse(null),
+                a.getAgency() == null ? null : a.getAgency().getName()));
     }
 
     /** 네이티브 쿼리 행(열 순서는 {@link DisasterAlertRepository#findSnLookupRows} javadoc)을 요약으로 옮긴다. */

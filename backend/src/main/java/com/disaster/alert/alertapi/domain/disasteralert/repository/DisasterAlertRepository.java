@@ -29,6 +29,9 @@ public interface DisasterAlertRepository extends JpaRepository<DisasterAlert, Lo
      * @return 0행 또는 1행. 열 순서: disaster_alert_id, sn, message, created_at, disaster_type, emergency_level,
      *         event_id, representative_sn
      */
+    /** 원 출처 고유번호(sn, 유일)로 알림 한 건 — 기록관 원문 기록용(발신 기관을 함께 읽는다). */
+    Optional<DisasterAlert> findBySn(Long sn);
+
     @Query(value = """
             SELECT a.disaster_alert_id, a.sn, a.message, a.created_at, a.disaster_type, a.emergency_level,
                    a.event_id,
