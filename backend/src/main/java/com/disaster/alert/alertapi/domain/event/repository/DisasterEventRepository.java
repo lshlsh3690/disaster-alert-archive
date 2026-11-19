@@ -104,7 +104,9 @@ public interface DisasterEventRepository extends JpaRepository<DisasterEvent, Lo
      * <p>반환: {eventId, minDistance} 튜플 0~3 행. distance 0.0=동일, 1.0=직교.
      * top-2/3 는 디버깅·임계값 튜닝 로깅용.
      */
-    default List<Object[]> findTopCandidates(String newEmbedding, String[] sigunguCodes, LocalDateTime sinceTime) {
+    default List<Object[]> findTopCandidates(String newEmbedding, String[] sigunguCodes, LocalDateTime sinceTime,
+                                             String[] excludedAlertTypes) {
+        // Red 단계 뼈대 — excludedAlertTypes 는 아직 거리 계산에 반영하지 않는다. 구현은 Green 에서
         List<Long> candidates = findRecentEventIds(sinceTime);
         if (candidates.isEmpty()) {
             return List.of();
@@ -149,7 +151,9 @@ public interface DisasterEventRepository extends JpaRepository<DisasterEvent, Lo
      *
      * <p>{@link #findTopCandidates} 와 같은 후보 목록을 쓰고, 거리는 이웃 시군구 알림만으로 잰다.
      */
-    default List<Object[]> findTopAdjacentCandidates(String newEmbedding, String[] sigunguCodes, LocalDateTime sinceTime) {
+    default List<Object[]> findTopAdjacentCandidates(String newEmbedding, String[] sigunguCodes, LocalDateTime sinceTime,
+                                                     String[] excludedAlertTypes) {
+        // Red 단계 뼈대 — excludedAlertTypes 는 아직 거리 계산에 반영하지 않는다. 구현은 Green 에서
         List<Long> candidates = findRecentEventIds(sinceTime);
         if (candidates.isEmpty()) {
             return List.of();

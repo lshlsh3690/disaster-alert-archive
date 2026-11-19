@@ -88,7 +88,7 @@ class EventClusteringServiceRegionalEmbeddingTest {
         when(disasterEventRepository.findById(TARGET_EVENT_ID)).thenReturn(Optional.of(targetEvent));
         when(disasterEventRepository.findRegionalTypeMergeTarget(
                 anyString(), any(String[].class), any(LocalDateTime.class))).thenReturn(Optional.of(TARGET_EVENT_ID));
-        when(disasterEventRepository.findTopCandidates(anyString(), any(String[].class), any(LocalDateTime.class)))
+        when(disasterEventRepository.findTopCandidates(anyString(), any(String[].class), any(LocalDateTime.class), any(String[].class)))
                 .thenReturn(List.of());
 
         DisasterAlert alert = DisasterAlert.builder()
@@ -125,7 +125,7 @@ class EventClusteringServiceRegionalEmbeddingTest {
         // Then 2: 병합은 규칙 결과 그대로 - 임베딩 후보 검색(findTopCandidates)으로 판단을 바꾸지 않는다.
         assertMergedByRuleIntoTarget();
         verify(disasterEventRepository, never()).findTopCandidates(
-                anyString(), any(String[].class), any(LocalDateTime.class));
+                anyString(), any(String[].class), any(LocalDateTime.class), any(String[].class));
     }
 
     /**

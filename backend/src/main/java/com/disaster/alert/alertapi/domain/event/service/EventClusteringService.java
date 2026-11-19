@@ -279,7 +279,8 @@ public class EventClusteringService {
         // 후보는 이미 지역 hard 필터(시군구 교집합) 통과한 같은 지역 이벤트들.
         // 코드 granularity 차이(군레벨 4886000000 vs 읍면동 4886036000)를 흡수하려 시군구(앞 5자) 교집합으로 매칭.
         // 같은 시군구·같은 사건이 읍면동 태깅 차이로 갈리던 과소병합(예: 산청 산불 시천면↔군레벨) 차단.
-        List<Object[]> candidates = disasterEventRepository.findTopCandidates(embeddingText, sigunguPrefixes(regionCodes), since);
+        List<Object[]> candidates = disasterEventRepository.findTopCandidates(
+                embeddingText, sigunguPrefixes(regionCodes), since, regionalTypeNames());
 
         // 4. top-3 후보 로깅 (임계값 튜닝 / 디버깅용)
         logCandidates(alert.getId(), candidates);
@@ -330,7 +331,7 @@ public class EventClusteringService {
         }
         LocalDateTime adjacentSince = alert.getCreatedAt().minusHours(adjacentWindowHours);
         List<Object[]> adjacent = disasterEventRepository.findTopAdjacentCandidates(
-                embeddingText, sigunguPrefixes(regionCodes), adjacentSince);
+                embeddingText, sigunguPrefixes(regionCodes), adjacentSince, regionalTypeNames());
         // 실제로 조회한 경우만 기록한다(조기 return 한 비사고성은 null 유지) — 0건이면 빈 목록.
         log.info("clusterNewAlert: alertId={} 인접 시군구 후보 {}건 (윈도우 {}h)",
                 alert.getId(), adjacent.size(), adjacentWindowHours);
@@ -849,6 +850,16 @@ public class EventClusteringService {
         if (type == null) {
             return null;
         }
+        return regionalTypeWindowMap().get(type.trim());
+    }
+
+    /** 지역 한정 유형 이름들 — 임베딩 후보 검색이 이 유형 알림의 임베딩을 거리 계산에서 빼도록 넘긴다. */
+    private String[] regionalTypeNames() {
+        return regionalTypeWindowMap().keySet().toArray(new String[0]);
+    }
+
+    /** regionalTypesCsv 를 1회 파싱해 캐시한다. */
+    private Map<String, Integer> regionalTypeWindowMap() {
         if (regionalTypeWindows == null) {
             Map<String, Integer> m = new HashMap<>();
             for (String pair : regionalTypesCsv.split(",")) {
@@ -863,7 +874,7 @@ public class EventClusteringService {
             }
             regionalTypeWindows = m;
         }
-        return regionalTypeWindows.get(type.trim());
+        return regionalTypeWindows;
     }
 
     /**

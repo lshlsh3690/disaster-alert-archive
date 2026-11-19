@@ -151,7 +151,7 @@ class EventClusteringServiceAnimalTest {
                 new EventLLMDecisionService.Candidate(10L, "대표 본문 10"),
                 new EventLLMDecisionService.Candidate(11L, "대표 본문 11")));
         // 동물 경로를 탄 알림은 임베딩 경로와 사고성 LLM 폴백을 거치지 않는다.
-        verify(disasterEventRepository, never()).findTopCandidates(any(), any(), any());
+        verify(disasterEventRepository, never()).findTopCandidates(any(), any(), any(), any());
         verify(llmDecisionService, never()).pickSameGeneralIncident(any(), any());
 
         // 병합 대상은 LLM 이 고른 11번, 방식은 LLM.

@@ -86,7 +86,7 @@ class EventClusteringServiceRegionalAdjacentTest {
             return e;
         });
         when(alertEmbeddingRepository.findEmbeddingText(1L)).thenReturn("[0.1,0.2]");
-        when(disasterEventRepository.findTopCandidates(anyString(), any(String[].class), any(LocalDateTime.class)))
+        when(disasterEventRepository.findTopCandidates(anyString(), any(String[].class), any(LocalDateTime.class), any(String[].class)))
                 .thenReturn(List.of());
         // 병합 대상 이벤트 둘을 findById 로 돌려준다 - 알림 3건이 쌓였고 마지막 알림은 알림 시각보다 2시간 이르다(순번은 4).
         adjacentEvent = regionalEvent(ADJACENT_EVENT_ID);

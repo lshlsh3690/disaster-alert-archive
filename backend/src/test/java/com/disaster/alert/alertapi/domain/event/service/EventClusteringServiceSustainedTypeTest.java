@@ -91,7 +91,7 @@ class EventClusteringServiceSustainedTypeTest {
             return e;
         });
         when(alertEmbeddingRepository.findEmbeddingText(1L)).thenReturn("[0.1,0.2]");
-        when(disasterEventRepository.findTopCandidates(anyString(), any(String[].class), any(LocalDateTime.class)))
+        when(disasterEventRepository.findTopCandidates(anyString(), any(String[].class), any(LocalDateTime.class), any(String[].class)))
                 .thenReturn(List.of());
         // 병합은 이벤트를 findById 로 읽어 엔티티 메서드(addAlert)로 갱신한다 - 순번은 alertCount 3 → 4 번째.
         existingEvent = DisasterEvent.builder().id(EXISTING_EVENT_ID).primaryDisasterType("폭염")
@@ -144,12 +144,12 @@ class EventClusteringServiceSustainedTypeTest {
         verify(embeddingModel, never()).embed(anyString());
         verify(alertEmbeddingRepository, never()).findEmbeddingText(any());
         verify(disasterEventRepository, never())
-                .findTopCandidates(anyString(), any(String[].class), any(LocalDateTime.class));
+                .findTopCandidates(anyString(), any(String[].class), any(LocalDateTime.class), any(String[].class));
     }
 
     private void verifyEmbeddingPathTaken() {
         verify(disasterEventRepository)
-                .findTopCandidates(anyString(), any(String[].class), any(LocalDateTime.class));
+                .findTopCandidates(anyString(), any(String[].class), any(LocalDateTime.class), any(String[].class));
         verify(disasterEventRepository, never())
                 .findRegionalTypeMergeTarget(anyString(), any(String[].class), any(LocalDateTime.class));
     }
@@ -438,7 +438,7 @@ class EventClusteringServiceSustainedTypeTest {
     void multiRegionSustained_neverWidensLocalEvent() {
         alert("폭염", HEAT_WARNING, SAME_SIDO_CODES);
         givenMergeTarget();
-        when(disasterEventRepository.findTopCandidates(anyString(), any(String[].class), any(LocalDateTime.class)))
+        when(disasterEventRepository.findTopCandidates(anyString(), any(String[].class), any(LocalDateTime.class), any(String[].class)))
                 .thenReturn(java.util.Collections.singletonList(new Object[]{EXISTING_EVENT_ID, 0.01}));
 
         service.clusterNewAlert(1L);
@@ -542,7 +542,7 @@ class EventClusteringServiceSustainedTypeTest {
         verify(disasterEventRepository, never())
                 .findRegionalTypeMergeTarget(anyString(), any(String[].class), any(LocalDateTime.class));
         verify(disasterEventRepository, never())
-                .findTopCandidates(anyString(), any(String[].class), any(LocalDateTime.class));
+                .findTopCandidates(anyString(), any(String[].class), any(LocalDateTime.class), any(String[].class));
         verify(disasterEventRepository).save(any(DisasterEvent.class));
         assertExistingEventUntouched();
     }

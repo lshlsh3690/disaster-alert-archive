@@ -108,7 +108,7 @@ class EventClusteringServiceFireLlmFallbackTest {
         // 거리 0.3796: 임베딩 병합(<=0.15)은 못 하고 LLM 폴백 구간(0.15 초과 ~ 0.40 이내)에 든다
         List<Object[]> rows = new ArrayList<>();
         rows.add(new Object[]{EVENT_ID, 0.3796});
-        when(disasterEventRepository.findTopCandidates(anyString(), any(String[].class), any(LocalDateTime.class)))
+        when(disasterEventRepository.findTopCandidates(anyString(), any(String[].class), any(LocalDateTime.class), any(String[].class)))
                 .thenReturn(rows);
         // LLM 이 첫 후보(index 0)를 같은 사건으로 고른다
         when(llmDecisionService.pickSameGeneralIncident(anyString(), anyList())).thenReturn(0);
