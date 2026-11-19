@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useAuthStore } from "@/store/authStore";
 import Button from "@/components/ui/Button";
 import { clampEnd, clampStart, defaultRange } from "./_format";
-import { DailyChecksSection, DailyScoresSection, DisagreementsSection, JudgeVersionsSection } from "./_sections";
+import { DailyChecksSection, DailyScoresSection, DisagreementsSection, HardPairGradesSection, JudgeVersionsSection } from "./_sections";
 
 // 클러스터링 운영 검증 관리자 화면(specs/008-clustering-admin-dashboard). 읽기 전용이다.
 // ADMIN 이 아니면 안내 모달 뒤 다른 화면으로 보내고 요청을 보내지 않는다 — 영역 컴포넌트는 ADMIN 일 때만 마운트된다.
@@ -80,6 +80,7 @@ export default function ClusteringAdminPage() {
         <DisagreementsSection key={`${range.from}-${range.to}`} from={range.from} to={range.to} />
         <DailyChecksSection from={range.from} to={range.to} />
         <JudgeVersionsSection />
+        <HardPairGradesSection />
       </div>
     </main>
   );

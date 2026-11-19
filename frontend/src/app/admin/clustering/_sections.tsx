@@ -1,9 +1,11 @@
 "use client";
 
-import { Fragment, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import { isAxiosError } from "axios";
-import type { ClusteringAlertSummary, DayStatus, DisagreementKind } from "@/api/clusteringAdminApi";
+import type { ClusteringAlertSummary, ClusteringDisagreementPair, DayStatus, DisagreementKind, HumanLabel, WrongSide } from "@/api/clusteringAdminApi";
+import { useSaveDisagreementLabel } from "@/lib/mutations/useSaveDisagreementLabel";
 import {
+  useHardPairGrades,
   useClusteringDailyCheckAlerts,
   useClusteringDailyChecks,
   useClusteringDailyScores,
@@ -123,15 +125,89 @@ function AlertCell({ alert }: { alert: ClusteringAlertSummary }) {
   );
 }
 
-/** 불일치 쌍 — 판사와 시스템이 다르게 본 쌍을 두 알림 원문과 함께 보여 준다. */
+const HUMAN_LABEL_OPTIONS: { value: HumanLabel; label: string }[] = [
+  { value: "SAME", label: "같은 사건" },
+  { value: "DIFF", label: "다른 사건" },
+  { value: "UNSURE", label: "모르겠음" },
+];
+
+const WRONG_SIDE_LABEL: Record<WrongSide, string> = {
+  JUDGE: "판사가 틀림",
+  SYSTEM: "시스템이 틀림",
+};
+
+// 쌍 하나의 사람 라벨 버튼 3개. 현재 라벨은 강조되고, 저장 중에는 이 쌍의 버튼만 막는다
+function LabelButtons({ pair, saving, onSave }: { pair: ClusteringDisagreementPair; saving: boolean; onSave: (label: HumanLabel) => void }) {
+  return (
+    <div className="space-y-1">
+      <div className="flex gap-1" role="group" aria-label={`#${pair.alertA.id}·#${pair.alertB.id} 사람 라벨`}>
+        {HUMAN_LABEL_OPTIONS.map((o) => {
+          const selected = pair.humanLabel === o.value;
+          return (
+            <button
+              key={o.value}
+              type="button"
+              aria-pressed={selected}
+              disabled={saving}
+              onClick={() => onSave(o.value)}
+              className={`px-2 py-0.5 text-xs rounded-[var(--radius-control)] border disabled:opacity-40 ${
+                selected
+                  ? "border-[var(--blue)] bg-[var(--blue)] text-white"
+                  : "border-[var(--line)] text-[var(--text-body)] hover:bg-[var(--blue-soft)]"
+              }`}
+            >
+              {o.label}
+            </button>
+          );
+        })}
+      </div>
+      {pair.wrongSide && (
+        <span className="inline-block rounded-[var(--radius-pill)] bg-[var(--coral-soft)] px-2 py-0.5 text-xs text-[var(--coral)]">
+          {WRONG_SIDE_LABEL[pair.wrongSide]}
+        </span>
+      )}
+    </div>
+  );
+}
+
+/** 불일치 쌍 — 판사와 시스템이 다르게 본 쌍을 두 알림 원문과 함께 보여 주고, 쌍마다 사람 라벨을 매긴다. */
 export function DisagreementsSection({ from, to }: { from: string; to: string }) {
   const [kind, setKind] = useState<DisagreementKind | null>(null);
+  const [unlabeledOnly, setUnlabeledOnly] = useState(false);
   const [page, setPage] = useState(0);
-  const { data, isLoading, error, isPlaceholderData } = useClusteringDisagreements({ from, to, kind, page, size: 20 });
+  const { data, isLoading, error, isPlaceholderData } = useClusteringDisagreements({ from, to, kind, page, size: 20, unlabeledOnly });
+  const save = useSaveDisagreementLabel();
+  // 저장은 한 번에 하나만 보낸다(저장 중에는 모든 줄의 라벨 버튼을 막음). mutate 호출마다 넘긴 콜백은 마지막 호출 것만
+  // 실행돼, 동시에 여러 쌍을 보내면 앞 쌍의 실패가 사라진다. 실패 이유는 그 쌍 아래에만 보인다
+  const [failed, setFailed] = useState<{ key: string; message: string } | null>(null);
+
+  // 마지막 페이지의 마지막 쌍에 라벨을 매겨 "라벨 없는 쌍만" 목록이 줄면, 없는 페이지에 머물지 않게 마지막 페이지로 당긴다.
+  // 다른 경우는 저장 뒤 지금 페이지를 다시 불러오는 것(invalidate)만으로 당겨진 쌍이 보여 건너뛰는 쌍이 없다
+  useEffect(() => {
+    if (data && !isPlaceholderData && data.totalPages > 0 && page >= data.totalPages) {
+      setPage(data.totalPages - 1);
+    }
+  }, [data, isPlaceholderData, page]);
 
   const changeKind = (value: string) => {
     setKind(value === "" ? null : (value as DisagreementKind));
     setPage(0);
+  };
+
+  const pairKey = (p: ClusteringDisagreementPair) => `${p.date}-${p.alertA.id}-${p.alertB.id}`;
+
+  const saveLabel = (p: ClusteringDisagreementPair, label: HumanLabel) => {
+    const key = pairKey(p);
+    setFailed(null);
+    save.mutate(
+      { alertA: p.alertA.id, alertB: p.alertB.id, label },
+      {
+        onError: (e) => {
+          const message = isAxiosError(e) ? (e.response?.data as { message?: string } | undefined)?.message : undefined;
+          setFailed({ key, message: message ?? "저장하지 못했습니다." });
+        },
+      },
+    );
   };
 
   return (
@@ -148,10 +224,20 @@ export function DisagreementsSection({ from, to }: { from: string; to: string })
           <option value="OVER_MERGED">과병합</option>
           <option value="MISSED">과소병합</option>
         </select>
+        <label className="flex items-center gap-1 text-[var(--text-body)]">
+          <input
+            type="checkbox"
+            checked={unlabeledOnly}
+            onChange={(e) => { setUnlabeledOnly(e.target.checked); setPage(0); }}
+          />
+          라벨 없는 쌍만
+        </label>
         {data && <span className="text-[var(--text-muted)]">총 {formatNumber(data.totalElements)}쌍</span>}
       </div>
       <QueryState isLoading={isLoading} error={error} />
-      {data && data.pairs.length === 0 && <p className="text-sm text-[var(--text-muted)]">이 범위에 불일치 쌍이 없습니다.</p>}
+      {data && data.pairs.length === 0 && (
+        <p className="text-sm text-[var(--text-muted)]">{unlabeledOnly ? "이 범위에 라벨 없는 불일치 쌍이 없습니다." : "이 범위에 불일치 쌍이 없습니다."}</p>
+      )}
       {data && data.pairs.length > 0 && (
         <div className="overflow-x-auto">
           <table className={TABLE}>
@@ -163,17 +249,22 @@ export function DisagreementsSection({ from, to }: { from: string; to: string })
                 <th className={TH}>알림 A</th>
                 <th className={TH}>알림 B</th>
                 <th className={TH}>당시 이벤트 (A / B)</th>
+                <th className={TH}>사람 라벨</th>
               </tr>
             </thead>
             <tbody>
               {data.pairs.map((p) => (
-                <tr key={`${p.date}-${p.alertA.id}-${p.alertB.id}`}>
+                <tr key={pairKey(p)}>
                   <td className={TD}>{p.date}</td>
                   <td className={TD}>{KIND_LABEL[p.kind]}</td>
                   <td className={TD}>{p.judgeVerdict}</td>
                   <td className={TD}><AlertCell alert={p.alertA} /></td>
                   <td className={TD}><AlertCell alert={p.alertB} /></td>
                   <td className={TD}>{p.eventA ?? "미배정"} / {p.eventB ?? "미배정"}</td>
+                  <td className={TD}>
+                    <LabelButtons pair={p} saving={save.isPending} onSave={(label) => saveLabel(p, label)} />
+                    {failed?.key === pairKey(p) && <p className="mt-1 text-xs text-[var(--coral)] whitespace-normal">{failed.message}</p>}
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -320,6 +411,49 @@ function DailyCheckAlerts({ date }: { date: string }) {
         </ul>
       )}
     </div>
+  );
+}
+
+/** 어려운 쌍 판사 성적 — 불일치 쌍에 매긴 사람 라벨로 판사·시스템 중 누가 맞았는지(판사 버전별). */
+export function HardPairGradesSection() {
+  const { data, isLoading, error } = useHardPairGrades();
+  return (
+    <Section
+      title="어려운 쌍 판사 성적 (불일치 쌍 사람 라벨 기준)"
+      description="판사와 시스템이 갈린 어려운 쌍만 모은 값이라 위 272쌍 일치율과 다른 숫자입니다. 모르겠음은 분모에서 뺍니다."
+    >
+      <QueryState isLoading={isLoading} error={error} />
+      {data && data.labeledPairs === 0 && <p className="text-sm text-[var(--text-muted)]">아직 라벨 없음</p>}
+      {data && data.labeledPairs > 0 && (
+        <div className="space-y-2">
+          <p className="text-sm text-[var(--text-muted)]">판정 {formatNumber(data.labeledPairs)}건(같은 쌍이 여러 날 불일치면 날짜마다 셉니다)</p>
+          <div className="overflow-x-auto">
+            <table className={TABLE}>
+              <thead>
+                <tr>
+                  <th className={TH}>판사 버전</th>
+                  <th className={TH}>모델</th>
+                  <th className={TH}>판사 맞음</th>
+                  <th className={TH}>시스템 맞음</th>
+                  <th className={TH}>모르겠음</th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.versions.map((v) => (
+                  <tr key={v.version}>
+                    <td className={TD}>{v.version}</td>
+                    <td className={TD}>{v.model ?? "-"}</td>
+                    <td className={TD}>{formatRatio(v.judgeRight)}</td>
+                    <td className={TD}>{formatRatio(v.systemRight)}</td>
+                    <td className={TD}>{formatNumber(v.unsureCount)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+    </Section>
   );
 }
 

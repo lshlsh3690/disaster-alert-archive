@@ -68,6 +68,12 @@ export type ClusteringAlertSummary = {
   message: string | null;
 };
 
+/** 사람 라벨(정답). 불일치 쌍마다 관리자가 매긴다. */
+export type HumanLabel = "SAME" | "DIFF" | "UNSURE";
+
+/** 사람 라벨을 정답으로 봤을 때 틀린 쪽. */
+export type WrongSide = "JUDGE" | "SYSTEM";
+
 export type ClusteringDisagreementPair = {
   date: string;
   kind: DisagreementKind;
@@ -76,6 +82,9 @@ export type ClusteringDisagreementPair = {
   alertB: ClusteringAlertSummary;
   eventA: number | null;
   eventB: number | null;
+  humanLabel: HumanLabel | null; // 라벨이 없으면 null
+  criteriaDate: string | null; // 라벨을 매길 때의 기준 시점
+  wrongSide: WrongSide | null; // 라벨이 없거나 모르겠음이면 null
 };
 
 export type ClusteringDisagreementsResponse = {
@@ -92,6 +101,7 @@ export type ClusteringDisagreementsParams = {
   kind?: DisagreementKind | null; // 생략하면 두 종류 모두
   page?: number; // 기본 0
   size?: number; // 1~100, 기본 20
+  unlabeledOnly?: boolean; // true 면 사람 라벨이 없는 쌍만
 };
 
 export type ClusteringDailyCheckDay = {
@@ -135,9 +145,9 @@ export async function fetchClusteringDailyScores(from: string, to: string): Prom
 export async function fetchClusteringDisagreements(
   params: ClusteringDisagreementsParams,
 ): Promise<ClusteringDisagreementsResponse> {
-  const { from, to, kind, page = 0, size = 20 } = params;
+  const { from, to, kind, page = 0, size = 20, unlabeledOnly = false } = params;
   const res = await instance.get(`${BASE}/disagreements`, {
-    params: { from, to, page, size, ...(kind ? { kind } : {}) },
+    params: { from, to, page, size, ...(kind ? { kind } : {}), ...(unlabeledOnly ? { unlabeledOnly } : {}) },
     headers: AUTH,
   });
   return res.data.data as ClusteringDisagreementsResponse;
@@ -170,6 +180,42 @@ export type ClusteringDailyCheckAlertsResponse = {
 export async function fetchClusteringDailyCheckAlerts(date: string): Promise<ClusteringDailyCheckAlertsResponse> {
   const res = await instance.get(`${BASE}/daily-checks/${date}/alerts`, { headers: AUTH });
   return res.data.data as ClusteringDailyCheckAlertsResponse;
+}
+
+export type SaveDisagreementLabelRequest = { alertA: number; alertB: number; label: HumanLabel };
+
+export type SaveDisagreementLabelResponse = {
+  alertA: number;
+  alertB: number;
+  label: HumanLabel;
+  criteriaDate: string;
+  updatedAt: string;
+};
+
+/** 불일치 쌍에 사람 라벨을 저장한다(이미 있으면 덮어쓴다). 불일치로 기록된 적 없는 쌍이면 404. */
+export async function saveDisagreementLabel(body: SaveDisagreementLabelRequest): Promise<SaveDisagreementLabelResponse> {
+  const res = await instance.put(`${BASE}/disagreement-labels`, body, { headers: AUTH });
+  return res.data.data as SaveDisagreementLabelResponse;
+}
+
+/** 판사 버전 하나의 어려운 쌍(불일치 쌍 사람 라벨 기준) 성적. 목록에 없는 버전이면 model 이 null. */
+export type HardPairGradeVersion = {
+  version: string;
+  model: string | null;
+  judgeRight: Ratio;
+  systemRight: Ratio;
+  unsureCount: number;
+};
+
+/** labeledPairs 는 서로 다른 쌍 수가 아니라 쌍×날짜 수(같은 쌍이 여러 날 불일치면 날짜마다 판정). */
+export type HardPairGradesResponse = {
+  labeledPairs: number;
+  versions: HardPairGradeVersion[];
+};
+
+export async function fetchHardPairGrades(): Promise<HardPairGradesResponse> {
+  const res = await instance.get(`${BASE}/hard-pair-grades`, { headers: AUTH });
+  return res.data.data as HardPairGradesResponse;
 }
 
 /** 판사 버전 이력(최신 버전 먼저). */
