@@ -116,6 +116,7 @@ export const i18n = {
       signup: "회원가입",
       socialLogin: "간편 로그인",
       unknownError: "알 수 없는 오류가 발생했습니다.",
+      emptyFields: "이메일과 비밀번호를 입력해 주세요.",
     },
 
     signup: {
@@ -130,8 +131,6 @@ export const i18n = {
 
     oauth: {
       google: "Google 계정으로 로그인",
-      kakao: "카카오 계정으로 로그인",
-      naver: "네이버 계정으로 로그인",
     },
 
     form: {
@@ -646,6 +645,7 @@ export const i18n = {
       signup: "Sign Up",
       socialLogin: "Quick Login",
       unknownError: "An unknown error occurred.",
+      emptyFields: "Please enter your email and password.",
     },
 
     signup: {
@@ -660,8 +660,6 @@ export const i18n = {
 
     oauth: {
       google: "Continue with Google",
-      kakao: "Continue with Kakao",
-      naver: "Continue with Naver",
     },
 
     form: {
@@ -1106,6 +1104,7 @@ export const i18n = {
       signup: "会員登録",
       socialLogin: "簡単ログイン",
       unknownError: "不明なエラーが発生しました。",
+      emptyFields: "メールアドレスとパスワードを入力してください。",
     },
 
     signup: {
@@ -1120,8 +1119,6 @@ export const i18n = {
 
     oauth: {
       google: "Googleアカウントでログイン",
-      kakao: "カカオアカウントでログイン",
-      naver: "ネイバーアカウントでログイン",
     },
 
     form: {
@@ -1566,6 +1563,7 @@ export const i18n = {
       signup: "注册",
       socialLogin: "快捷登录",
       unknownError: "发生未知错误。",
+      emptyFields: "请输入邮箱和密码。",
     },
 
     signup: {
@@ -1580,8 +1578,6 @@ export const i18n = {
 
     oauth: {
       google: "使用Google账号登录",
-      kakao: "使用Kakao账号登录",
-      naver: "使用Naver账号登录",
     },
 
     form: {

@@ -33,7 +33,12 @@ export default function useLogin(options: {
     onSuccess: async (response) => {
       const { memberId, nickname, email } = response.data;
 
-      useAuthStore.getState().setUser({ memberId, nickname, email, role: null });
+      // 로그인 응답에는 role 이 없어 내 정보를 한 번 더 읽는다. 실패하면 role 없이 진행한다
+      // (다음 새로고침 때 useInitAuth 가 다시 채운다) — 관리자 메뉴가 새로고침 전까지 안 보이던 문제
+      const role = await getMyInfo()
+        .then((me) => me.data.role ?? null)
+        .catch(() => null);
+      useAuthStore.getState().setUser({ memberId, nickname, email, role });
       options.onSuccessCallback?.();
     },
     onError: (error: AxiosError) => {

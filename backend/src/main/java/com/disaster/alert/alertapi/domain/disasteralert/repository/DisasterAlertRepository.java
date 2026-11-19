@@ -1,5 +1,6 @@
 package com.disaster.alert.alertapi.domain.disasteralert.repository;
 
+import com.disaster.alert.alertapi.domain.disasteralert.dto.AlertSummaryDto;
 import com.disaster.alert.alertapi.domain.disasteralert.dto.LatestAlertResponse;
 import com.disaster.alert.alertapi.domain.disasteralert.model.DisasterAlert;
 import com.disaster.alert.alertapi.domain.disasteralert.model.AlertKind;
@@ -11,6 +12,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -59,6 +61,18 @@ public interface DisasterAlertRepository extends JpaRepository<DisasterAlert, Lo
     @Transactional
     @Query("UPDATE DisasterAlert d SET d.alertKind = :kind WHERE d.id = :id")
     void updateAlertKind(@Param("id") Long id, @Param("kind") AlertKind kind);
+
+    /**
+     * id 목록의 알림 요약(id·원문·발송 시각·유형)을 한 번에. 관리자 불일치 쌍 한 페이지(최대 알림 200건)의 원문을 N+1 없이 읽는 용도다.
+     * 없는 id 는 결과에서 빠진다.
+     */
+    @Query("""
+              SELECT new com.disaster.alert.alertapi.domain.disasteralert.dto.AlertSummaryDto(
+                  d.id, d.message, d.createdAt, d.disasterType)
+              FROM DisasterAlert d
+              WHERE d.id IN :ids
+            """)
+    List<AlertSummaryDto> findSummariesByIds(@Param("ids") Collection<Long> ids);
 
     @Query("SELECT d.legalDistrict.name FROM DisasterAlertRegion d WHERE d.disasterAlert.id = :id")
     List<String> legalDistrictNamesByAlertId(Long id);

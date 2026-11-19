@@ -27,15 +27,16 @@ import java.util.Optional;
 public class ClusteringJudge {
 
     /**
-     * 프롬프트 본문이나 모델이 바뀌면 올린다(일치율은 프롬프트와 모델을 함께 잰 값이다). 버전마다 272쌍 일치율이 있어야 채점한다.
-     * v1 = 지금 프롬프트 + gpt-4o, v2 = 같은 프롬프트 + gpt-4o-mini.
+     * 프롬프트 본문이나 모델이 바뀌면 올린다(일치율은 프롬프트와 모델을 함께 잰 값이다). 버전마다 272쌍 일치율이
+     * {@link JudgeVersionCatalog} 에 있어야 일일 채점을 한다. 올리는 순서: 이 값과 {@link #MODEL} 을 바꾼다 →
+     * {@code --eval.judge-agreement} 로 272쌍을 잰다(카탈로그에 아직 없어도 측정은 돈다) → 잰 값을 카탈로그 맨 앞에 추가한다.
+     * 카탈로그에 없는 동안 일일 채점은 warn 을 남기고 건너뛴다.
      */
     public static final String PROMPT_VERSION = "v2";
 
-    // 2026-11-18 gpt-4o 에서 gpt-4o-mini 로 바꿨다. 272쌍 일치율이 전체로 비슷하고(사람과 반대로 판정한 쌍 22 → 21)
-    // 쌍당 비용이 약 1/16 이라서다 — 큰 사건 날 수십 달러가 들던 일일 채점을 그대로 돌리려는 선택이다.
-    // 대신 틀리는 방향이 바뀌었다: 사람 "다른 사건"을 "같은 사건"으로 보는 쌍이 3 → 7 로 늘어 과병합을 조금 더 놓친다.
-    // 모델을 바꾸면 PROMPT_VERSION 을 올리고 272쌍으로 다시 잰다(FR-018).
+    // 모델은 상수로 둔다 — 카탈로그에서 꺼내면 새 버전을 카탈로그에 넣기 전(=일치율을 재기 전)에는 판사가 뜨지 않아
+    // 측정 자체를 할 수 없다. 카탈로그 항목의 모델과 같은지는 테스트(ClusteringJudgeTest)가 검사한다.
+    // 모델을 고른 이유와 버전별 수치는 카탈로그 javadoc 에 있다.
     public static final String MODEL = "gpt-4o-mini";
     // 같은 쌍은 같은 답이 나와야 프롬프트 버전끼리 점수를 비교할 수 있어 온도 0.
     private static final double TEMPERATURE = 0.0;
@@ -240,23 +241,10 @@ public class ClusteringJudge {
 
     /**
      * 프롬프트 버전의 272쌍 일치율. 값이 없는 버전은 비어 있다(= 일일 채점을 하지 않음).
-     * 프롬프트를 바꿔 버전을 올리면 다시 재서 그 버전 값을 여기에 추가한다. 옛 버전 값은 비교 기준으로 남긴다.
-     *
-     * <p>v1: 2026-11-17 {@code --eval.judge-agreement} 실행(227쌍, $0.864) 판정을 같은 날 라벨 재확인 두 번
-     * (D·E·G·I 55쌍, 원칙 3 의심 3쌍) 반영 뒤 라벨로 다시 센 값. 근거는 {@code evaluation/reports/judge-agreement-2026-11-17.md}.
-     * 판사가 사람보다 잘게 나누는 쪽(사람 같은 사건·판사 다른 사건이 대부분)이라 일일 점수의 과병합은 실제보다 많게 나올 수 있다.
-     * 온도 0이어도 답이 매번 같지는 않아 다시 재면 한두 쌍은 달라질 수 있다.
-     *
-     * <p>v2(gpt-4o-mini): 2026-11-18 같은 프롬프트·같은 라벨로 225쌍을 판정한 값($0.051). 근거는
-     * {@code evaluation/reports/judge-agreement-2026-11-18-mini.md}. v1 보다 같은 사건 쌍은 잘 맞추고(87.3% → 90.1%)
-     * 다른 사건 쌍은 덜 맞춘다(96.3% → 91.4%) — 시스템이 잘못 묶은 쌍을 같은 사건으로 보면 그 과병합을 놓치므로,
-     * v2 로 매긴 맞게 묶은 비율은 실제보다 조금 높게 나올 수 있다.
+     * 값과 측정 근거는 {@link JudgeVersionCatalog} 에 있고, 여기서는 호출부가 쓰던 {@link Agreement} 모양으로만 바꿔 준다.
      */
     public static Optional<Agreement> agreementOf(String promptVersion) {
-        return switch (promptVersion) {
-            case "v1" -> Optional.of(new Agreement(124, 142, 77, 80));
-            case "v2" -> Optional.of(new Agreement(127, 141, 74, 81));
-            default -> Optional.empty();
-        };
+        return JudgeVersionCatalog.find(promptVersion)
+                .map(e -> new Agreement(e.sameNum(), e.sameDen(), e.diffNum(), e.diffDen()));
     }
 }

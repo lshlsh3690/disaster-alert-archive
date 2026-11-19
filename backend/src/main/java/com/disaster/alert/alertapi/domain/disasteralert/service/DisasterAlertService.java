@@ -923,4 +923,18 @@ public class DisasterAlertService {
             alert.setLanguage(language.getCode());
         }
     }
+
+    /**
+     * id 목록의 알림 요약(id, 원문, 발송 시각, 유형)을 한 번에 읽는다. 관리자 클러스터링 대시보드가 불일치 쌍 한 페이지의
+     * 원문을 채울 때 쓴다(다른 맥락이 알림 저장소를 직접 주입하지 않게 이 service 를 거친다).
+     * 없는 알림은 결과에 없다 — 호출한 쪽이 "원문 없음"으로 처리한다. 빈 목록이면 쿼리하지 않는다.
+     */
+    @Transactional(readOnly = true)
+    public List<AlertSummaryDto> findAlertSummaries(Collection<Long> alertIds) {
+        // 1) 빈 IN () 절은 DB 마다 다르게 동작하므로 쿼리 자체를 건너뛴다
+        if (alertIds.isEmpty()) {
+            return List.of();
+        }
+        return disasterAlertRepository.findSummariesByIds(alertIds);
+    }
 }
