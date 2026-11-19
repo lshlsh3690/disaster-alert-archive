@@ -317,6 +317,23 @@ public interface DisasterEventRepository extends JpaRepository<DisasterEvent, Lo
             @Param("lastAlertAt") LocalDateTime lastAlertAt);
 
     /**
+     * 전국 예정 행사 머지 대상 검색 — 광역 이벤트 중 제목이 그 행사 제목이고 마지막 알림이 {@code lastAlertAt}
+     * 이후인 가장 최근 1개. 제목은 {@code NationalScheduledEvent.title} 이 결정적으로 만들므로 SQL 에 정규식을
+     * 두지 않고 제목 일치로 찾는다(행사 종류·연도가 곧 제목).
+     */
+    @Query(value = """
+            SELECT * FROM disaster_events
+            WHERE is_broadcast = true
+              AND event_title = :title
+              AND last_alert_at > :lastAlertAt
+            ORDER BY last_alert_at DESC
+            LIMIT 1
+            """, nativeQuery = true)
+    Optional<DisasterEvent> findLatestNationalScheduledEvent(
+            @Param("title") String title,
+            @Param("lastAlertAt") LocalDateTime lastAlertAt);
+
+    /**
      * 제목 승급 — 현재 제목이 {@code ifTitle}(기본 제목)일 때만 {@code title}로 교체.
      *
      * <p>전국 통합 태풍 이벤트의 첫 알림에 태풍명이 없어 "전국 태풍"으로 생성된 뒤, 이름을 가진
