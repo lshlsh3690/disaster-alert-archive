@@ -1,7 +1,7 @@
 "use client";
 
 import type { HourlyStat } from "@/types/alerts";
-import { DOW_TO_IDX, getWeekdays } from "../_constants";
+import { DOW_TO_IDX, HEAT_RGB, getWeekdays } from "../_constants";
 import { EmptyChart } from "../_charts";
 import { useTranslation } from "react-i18next";
 import { VerticalBar } from "./VerticalBar";
@@ -38,7 +38,7 @@ export function DayOfWeekBar({ data }: { data: HourlyStat[] }) {
   const range = max - min || 1;
   const colored = bars.map(b => ({
     ...b,
-    color: `rgba(37,99,235,${0.15 + ((b.count - min) / range) * 0.75})`,
+    color: `rgba(${HEAT_RGB},${0.15 + ((b.count - min) / range) * 0.75})`,
   }));
   return <VerticalBar data={colored} />;
 }

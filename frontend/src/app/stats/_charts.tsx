@@ -24,7 +24,7 @@ export function EmptyChart() {
   return (
     // flex-1: 부모 컨테이너의 남은 공간을 모두 차지합니다
     // items-center justify-center: 가로·세로 모두 가운데 정렬
-    <div className="flex-1 flex items-center justify-center text-sm text-gray-400">
+    <div className="flex-1 flex items-center justify-center py-8 text-[16px] text-[var(--krds-gray-50)]">
       {t("statsPage.noData")}
     </div>
   );
@@ -34,13 +34,14 @@ export function EmptyChart() {
  * LoadingChart
  *
  * React Query가 서버에서 데이터를 가져오는 동안 차트 자리에 보여주는 스피너입니다.
- * border-t-blue-500: 상단 테두리만 파란색 → CSS 애니메이션과 합쳐져 회전 효과를 냅니다.
+ * 상단 테두리만 primary 색 → CSS 애니메이션과 합쳐져 회전 효과를 냅니다.
  */
 export function LoadingChart() {
+  const { t } = useTranslation();
   return (
-    <div className="flex-1 flex items-center justify-center">
+    <div className="flex-1 flex items-center justify-center" role="status" aria-label={t("statsPage.loading")}>
       {/* animate-spin: Tailwind가 제공하는 무한 회전 애니메이션 클래스입니다 */}
-      <div className="w-6 h-6 rounded-full border-2 border-gray-200 border-t-blue-500 animate-spin" />
+      <div className="w-6 h-6 rounded-full border-2 border-[var(--krds-gray-10)] border-t-[var(--krds-primary-50)] animate-spin" />
     </div>
   );
 }

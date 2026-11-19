@@ -15,27 +15,42 @@ import { z } from "zod";
 import { useRouter, useSearchParams } from "next/navigation";
 import { DISASTER_TYPES } from "@/ui/disasterType";
 import { METROS } from "@/ui/metros";
-import { useTranslation } from "react-i18next";
+import { Trans, useTranslation } from "react-i18next";
 import { useLanguageStore } from "@/store/languageStore";
-import { disasterTypeChipStyle, disasterTypePalette } from "@/ui/disasterTypeColor";
 
 // SVG 좌표 데이터 + 집계 로직이 커서 alerts 페이지 초기 JS에서 분리 (HomeClient 와 동일 패턴).
 const KoreaMap25D = dynamic(() => import("@/components/map/KoreaMap25D"), {
   ssr: false,
-  loading: () => <div className="h-[520px] animate-pulse rounded-lg bg-gray-100" />,
+  loading: () => <div className="h-[520px] animate-pulse bg-[var(--krds-gray-5)]" />,
 });
 
 // <input type="date">의 표시 포맷은 JS 텍스트가 아니라 브라우저가 lang 속성을 보고 렌더링하므로
 // 언어 전환 시 실제로 반영되도록 명시적으로 넘겨준다.
 const LANG_LOCALE: Record<string, string> = { ko: "ko-KR", en: "en-US", zh: "zh-CN", ja: "ja-JP" };
 
-const LEVEL_BADGE: Record<string, { backgroundColor: string; color: string }> = {
-  안전안내: { backgroundColor: "var(--blue-soft)", color: "var(--blue)" },
-  긴급재난: { backgroundColor: "#fff1e3", color: "#c1670c" },
-  위급재난: { backgroundColor: "var(--coral-soft)", color: "#c0473b" },
+// 경보 단계 배지(KRDS 시스템 색): 안전안내=info, 긴급재난=warning, 위급재난=danger. 색만으로 구분하지 않도록 글자를 항상 같이 쓴다.
+const LEVEL_BADGE_CLASS: Record<string, string> = {
+  안전안내: "krds-badge--info",
+  긴급재난: "krds-badge--warning",
+  위급재난: "krds-badge--danger",
 };
-function levelBadgeStyle(text?: string | null) {
-  return LEVEL_BADGE[text ?? ""] ?? { backgroundColor: "#eef1f5", color: "var(--text-muted)" };
+function levelBadgeClass(text?: string | null) {
+  return LEVEL_BADGE_CLASS[text ?? ""] ?? "krds-badge--neutral";
+}
+
+// 오른쪽 요약 카드의 "경보 단계" 3칸. 배경·글자색은 배지와 같은 KRDS 시스템 색을 쓴다.
+const LEVEL_TILES = [
+  { code: "LEVEL_1", key: "안전안내", className: "bg-[var(--krds-info-5)] text-[var(--krds-info-60)]" },
+  { code: "LEVEL_2", key: "긴급재난", className: "bg-[var(--krds-warning-5)] text-[var(--krds-warning-60)]" },
+  { code: "LEVEL_3", key: "위급재난", className: "bg-[var(--krds-danger-5)] text-[var(--krds-danger-60)]" },
+] as const;
+
+// 페이지 번호는 현재 페이지를 가운데 두고 최대 5개만 보여 준다.
+const PAGER_WINDOW = 5;
+function pageWindow(current: number, totalPages: number): number[] {
+  const start = Math.max(0, Math.min(current - Math.floor(PAGER_WINDOW / 2), totalPages - PAGER_WINDOW));
+  const end = Math.min(totalPages, start + PAGER_WINDOW);
+  return Array.from({ length: Math.max(0, end - start) }, (_, i) => start + i);
 }
 
 
@@ -53,7 +68,7 @@ type SearchForm = z.infer<typeof ZSearch>;
 
 export default function AlertsClient() {
   return (
-    <Suspense fallback={<main className="p-6">불러오는 중...</main>}>
+    <Suspense fallback={<main className="krds-page krds-empty">불러오는 중...</main>}>
       <AlertsClientInner />
     </Suspense>
   );
@@ -250,44 +265,52 @@ function AlertsClientInner() {
   if (formState.endDate) statsQs.set("endDate", formState.endDate);
   const statsHref = `/stats${statsQs.toString() ? `?${statsQs.toString()}` : ""}`;
 
+  const currentPage = data?.number ?? page;
+  const totalPages = data?.totalPages ?? 0;
+  const regionScopeLabel = formState.sido
+    ? t(`metros.${formState.sido}`, { defaultValue: formState.sido })
+    : t("alertList.nationwide");
+
   return (
-    <main className="bg-[var(--canvas)] min-h-[calc(100vh-48px)]">
-      <div className="mx-auto max-w-7xl space-y-4 px-4 py-8 sm:px-6 sm:space-y-6">
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+    <main className="min-h-[calc(100vh-64px)] bg-[var(--canvas)]">
+      <div className="krds-page mx-auto max-w-[1440px]">
+        <div className="krds-page-head">
           <div>
-            <h1 className="text-xl font-bold tracking-tight text-[var(--ink)]">{t("alertList.title")}</h1>
-            <p className="mt-1 text-[13px] text-[var(--text-muted)]">{t("alertList.description")}</p>
+            <nav className="krds-breadcrumb" aria-label="breadcrumb">
+              <Link href="/">{t("alertList.breadcrumbHome")}</Link>
+              <span aria-hidden="true"> › </span>
+              <span aria-current="page">{t("nav.alerts")}</span>
+            </nav>
+            <h1 className="krds-title">{t("nav.alerts")}</h1>
+            <p className="krds-desc">{t("alertList.description")}</p>
           </div>
-          <div className="flex items-center gap-2">
-            <Link
-              href={statsHref}
-              className="rounded-[var(--radius-control)] border border-[var(--line)] bg-[var(--surface)] px-3 py-2 text-sm font-semibold text-[var(--text-body)] transition-colors hover:border-[var(--blue)] hover:text-[var(--blue)]"
-            >
-              📊 {t("alertList.viewStats")}
+          <div className="flex flex-wrap items-center gap-2">
+            <Link href={statsHref} className="krds-btn krds-btn--secondary">
+              {t("alertList.viewStats")}
             </Link>
-            <ReportButton />
+            <ReportButton className="krds-btn krds-btn--primary" />
           </div>
         </div>
 
-        <div className="grid grid-cols-1 gap-4 sm:gap-6 xl:grid-cols-[minmax(0,1fr)_340px]">
+        <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_380px]">
           {/* 왼쪽: 검색 폼 + 목록 */}
-          <div className="flex min-w-0 flex-col gap-4 sm:gap-6">
+          <div className="flex min-w-0 flex-col gap-4">
             <form
               onSubmit={handleSubmit(onSubmit)}
-              className="grid grid-cols-1 gap-3 rounded-[var(--radius-panel-card)] border border-[var(--line)] bg-[var(--surface)] p-4 shadow-[0_10px_30px_rgba(28,39,60,0.04)] sm:grid-cols-2 md:grid-cols-4"
+              className="krds-card grid grid-cols-1 gap-3 p-5 sm:grid-cols-2 md:grid-cols-4"
             >
-              <div className="flex flex-col gap-1">
-                <label className="text-xs text-[var(--text-muted)]">{t("alertList.filter.sido")}</label>
-                <select {...register("sido")} className="input">
+              <label className="krds-field">
+                {t("alertList.filterLabel.sido")}
+                <select {...register("sido")} className="krds-control">
                   <option value="">{t("alertList.filter.sido")}</option>
                   {METROS.map((m) => (
                     <option key={m} value={m}>{t(`metros.${m}`)}</option>
                   ))}
                 </select>
-              </div>
-              <div className="flex flex-col gap-1">
-                <label className="text-xs text-[var(--text-muted)]">{t("alertList.filter.sigungu")}</label>
-                <select {...register("sigungu")} className="input disabled:opacity-60" disabled={!watchedSido}>
+              </label>
+              <label className="krds-field">
+                {t("alertList.filterLabel.sigungu")}
+                <select {...register("sigungu")} className="krds-control" disabled={!watchedSido}>
                   <option value="">{t("alertList.filter.sigungu")}</option>
                   {/* 드롭다운 - value는 한국어 이름(검색용), 표시는 번역된 이름 */}
                   {sigunguList?.filter((s) => s.name !== "전체").map((s) => (
@@ -301,83 +324,88 @@ function AlertsClientInner() {
                     <option value={watchedSigungu}>{watchedSigungu}</option>
                   )}
                 </select>
-              </div>
-              <div className="flex flex-col gap-1">
-                <label className="text-xs text-[var(--text-muted)]">{t("alertList.filter.startDate")}</label>
+              </label>
+              {/* 날짜 선택기는 안에 버튼과 달력 팝업이 있어 label 로 감싸지 않는다(팝업 클릭이 label 동작과 섞이지 않게) */}
+              <div className="krds-field">
+                <span>{t("alertList.filter.startDate")}</span>
                 <Controller
                   name="startDate"
                   control={control}
                   render={({ field }) => (
-                    <DatePicker value={field.value ?? ""} onChange={field.onChange} locale={LANG_LOCALE[language] ?? "ko-KR"} clearLabel={t("datePicker.clear")} prevMonthLabel={t("datePicker.prevMonth")} nextMonthLabel={t("datePicker.nextMonth")} />
+                    <DatePicker value={field.value ?? ""} onChange={field.onChange} locale={LANG_LOCALE[language] ?? "ko-KR"} clearLabel={t("datePicker.clear")} prevMonthLabel={t("datePicker.prevMonth")} nextMonthLabel={t("datePicker.nextMonth")} className="krds-control" />
                   )}
                 />
               </div>
-              <div className="flex flex-col gap-1">
-                <label className="text-xs text-[var(--text-muted)]">{t("alertList.filter.endDate")}</label>
+              <div className="krds-field">
+                <span>{t("alertList.filter.endDate")}</span>
                 <Controller
                   name="endDate"
                   control={control}
                   render={({ field }) => (
-                    <DatePicker value={field.value ?? ""} onChange={field.onChange} locale={LANG_LOCALE[language] ?? "ko-KR"} clearLabel={t("datePicker.clear")} prevMonthLabel={t("datePicker.prevMonth")} nextMonthLabel={t("datePicker.nextMonth")} />
+                    <DatePicker value={field.value ?? ""} onChange={field.onChange} locale={LANG_LOCALE[language] ?? "ko-KR"} clearLabel={t("datePicker.clear")} prevMonthLabel={t("datePicker.prevMonth")} nextMonthLabel={t("datePicker.nextMonth")} className="krds-control" />
                   )}
                 />
               </div>
-              <div className="flex flex-col gap-1">
-                <label className="text-xs text-[var(--text-muted)]">{t("alertList.filter.type")}</label>
-                <select {...register("type")} className="input">
+              <label className="krds-field">
+                {t("alertList.filterLabel.type")}
+                <select {...register("type")} className="krds-control">
                   <option value="">{t("alertList.filter.type")}</option>
                   {DISASTER_TYPES.map((type) => (
                     <option key={type} value={type}>{t(`disasterTypes.${type}`)}</option>
                   ))}
                 </select>
-              </div>
-              <div className="flex flex-col gap-1">
-                <label className="text-xs text-[var(--text-muted)]">{t("alertList.filter.level")}</label>
-                <select {...register("levelText")} className="input">
+              </label>
+              <label className="krds-field">
+                {t("alertList.filterLabel.level")}
+                <select {...register("levelText")} className="krds-control">
                   <option value="">{t("alertList.filter.level")}</option>
                   {LEVEL_OPTIONS.map((o) => (
                     <option key={o.code} value={o.text}>{t(`levels.${o.text}`)}</option>
                   ))}
                 </select>
-              </div>
-              <div className="flex flex-col gap-1">
-                <label className="text-xs text-[var(--text-muted)]">{t("alertList.filter.sourceAll")}</label>
-                <select {...register("source")} className="input">
+              </label>
+              <label className="krds-field">
+                {t("alertList.filterLabel.source")}
+                <select {...register("source")} className="krds-control">
                   <option value="ALL">{t("alertList.filter.sourceAll")}</option>
                   <option value="OFFICIAL">{t("alertList.filter.sourceOfficial")}</option>
                   <option value="USER">{t("alertList.filter.sourceUser")}</option>
                 </select>
-              </div>
-              <div className="flex flex-col gap-1 col-span-full sm:col-span-2">
-                <label className="text-xs text-[var(--text-muted)]">{t("alertList.filter.keyword")}</label>
-                <input {...register("keyword")} placeholder={t("alertList.filter.keyword")} className="input" />
-              </div>
-              <div className="col-span-full flex justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={onReset}
-                  className="rounded-[var(--radius-control)] border border-[var(--line)] bg-[var(--surface)] px-3 py-2 text-sm text-[var(--text-body)] transition-colors hover:bg-[var(--blue-soft)]"
-                >
+              </label>
+              <label className="krds-field sm:col-span-2 md:col-span-3">
+                {t("alertList.filterLabel.keyword")}
+                <input {...register("keyword")} placeholder={t("alertList.filter.keyword")} className="krds-control" />
+              </label>
+              <div className="flex items-end gap-2 sm:col-span-2 md:col-span-1">
+                <button type="button" onClick={onReset} className="krds-btn krds-btn--secondary flex-1 px-3 font-normal">
                   {t("alertList.reset")}
                 </button>
-                <button
-                  type="submit"
-                  className="rounded-[var(--radius-control)] bg-[var(--blue)] px-4 py-2 text-sm font-semibold text-white transition hover:brightness-95 disabled:opacity-60"
-                  disabled={isFetching}
-                >
+                <button type="submit" className="krds-btn krds-btn--primary flex-1 px-3" disabled={isFetching}>
                   {isFetching ? t("alertList.searching") : t("alertList.search")}
                 </button>
               </div>
             </form>
 
             {/* 목록 */}
-            <div id="list" className="flex flex-1 flex-col rounded-[var(--radius-panel-card)] border border-[var(--line)] bg-[var(--surface)] p-2 shadow-[0_10px_30px_rgba(28,39,60,0.04)]">
+            <div id="list" className="krds-card flex flex-1 flex-col overflow-hidden">
               {isLoading ? (
-                <div className="p-4 text-[13px] text-[var(--text-muted)]">{t("loading")}</div>
+                <div className="krds-empty">{t("loading")}</div>
               ) : !(data?.content ?? []).length ? (
-                <div className="p-8 text-center text-[13px] text-[var(--text-muted)]">{t("alertList.noData")}</div>
+                <div className="krds-empty">{t("alertList.noData")}</div>
               ) : (
                 <>
+                  <div className="flex items-center justify-between gap-3 border-b border-[var(--krds-gray-10)] px-5 py-3.5 text-[15px] text-[var(--krds-gray-70)]">
+                    <span>
+                      <Trans
+                        t={t}
+                        i18nKey="alertList.listTotal"
+                        values={{ total: (data?.totalElements ?? 0).toLocaleString("ko-KR") }}
+                        components={{ b: <b className="text-[var(--krds-gray-90)]" /> }}
+                      />
+                    </span>
+                    {/* 목록은 항상 최신순(createdAt,desc — buildAlertsListParams)으로만 조회한다. 바꿀 수 있는 정렬이 없어 표시만 한다 */}
+                    <span>{t("alertList.sortLatest")}</span>
+                  </div>
                   <ul>
                     {(data?.content ?? []).map((a: Alert & { source?: "OFFICIAL" | "USER" }) => {
                       const translated = language !== "ko";
@@ -390,33 +418,29 @@ function AlertsClientInner() {
                         || (t(`disasterTypes.${a.disasterType}`, { defaultValue: a.disasterType }));
                       const href = a.source === "USER" ? `/alerts/${a.id}?source=USER` : `/alerts/${a.id}?source=OFFICIAL`;
                       return (
-                        <li key={a.id} className="border-b border-[var(--line)] last:border-0">
+                        <li key={a.id} className="krds-row">
                           {/* prefetch=false: 목록 한 페이지(10건)가 뜰 때마다 상세(force-dynamic)
                               서버 데이터 페칭이 프리페치로 전부 백그라운드 실행되는 걸 방지 */}
-                          <Link href={href} className="group relative block py-3 pl-5 pr-2 transition-colors hover:bg-[var(--blue-soft)]" prefetch={false}>
-                            <span className="absolute left-2 top-[18px] h-1.5 w-1.5 rounded-sm bg-[var(--coral)]" aria-hidden="true" />
-                            <div className="flex items-baseline justify-between gap-3">
-                              <span className="truncate text-[13px] font-semibold text-[var(--ink)]">{regionLabel}</span>
-                              <time className="shrink-0 text-[11px] text-[var(--text-subtle)]">{new Date(a.createdAt).toLocaleString()}</time>
+                          <Link href={href} className="flex flex-col gap-1.5 px-5 py-4 focus-visible:outline-offset-[-2px]" prefetch={false}>
+                            {/* 좁은 화면에서는 날짜를 지역명 아래로 내려 지역명이 몇 글자만 남고 잘리지 않게 한다 */}
+                            <div className="flex flex-col gap-0.5 sm:flex-row sm:items-baseline sm:justify-between sm:gap-3">
+                              <span className="truncate text-[17px] font-bold text-[var(--krds-gray-90)]">{regionLabel}</span>
+                              <time className="shrink-0 whitespace-nowrap text-[15px] text-[var(--krds-gray-50)]">{new Date(a.createdAt).toLocaleString()}</time>
                             </div>
-                            <p className="mt-1 line-clamp-2 text-[13px] leading-relaxed text-[var(--text-body)] transition-colors group-hover:text-[var(--blue)]">
+                            <p className="line-clamp-2 text-[16px] leading-[1.6] text-[var(--krds-gray-70)]">
                               {message}
                             </p>
-                            <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                            <div className="flex flex-wrap items-center gap-1.5">
                               {a.disasterType && (
-                                <span style={disasterTypeChipStyle(a.disasterType)} className="rounded-[var(--radius-pill)] px-2 py-0.5 text-[11px] font-medium">
-                                  {disasterTypeLabel}
-                                </span>
+                                <span className="krds-badge krds-badge--neutral">{disasterTypeLabel}</span>
                               )}
                               {a.emergencyLevelText && (
-                                <span style={levelBadgeStyle(a.emergencyLevelText)} className="rounded-[var(--radius-pill)] px-2 py-0.5 text-[11px] font-medium">
+                                <span className={`krds-badge ${levelBadgeClass(a.emergencyLevelText)}`}>
                                   {t(`levels.${a.emergencyLevelText}`, { defaultValue: a.emergencyLevelText })}
                                 </span>
                               )}
                               {a.source === "USER" && (
-                                <span className="rounded-[var(--radius-pill)] bg-[#eef1f5] px-2 py-0.5 text-[11px] font-medium text-[var(--text-muted)]">
-                                  {t("alertList.filter.sourceUser")}
-                                </span>
+                                <span className="krds-badge krds-badge--outline">{t("alertList.filter.sourceUser")}</span>
                               )}
                             </div>
                           </Link>
@@ -424,111 +448,109 @@ function AlertsClientInner() {
                       );
                     })}
                   </ul>
-                  <div className="mt-auto flex items-center justify-between border-t border-[var(--line)] px-2 pt-3">
+                  <nav className="krds-pager mt-auto" aria-label={t("alertList.pagination")}>
                     <button
-                      className="rounded-[var(--radius-control)] border border-[var(--line)] bg-[var(--surface)] px-3 py-1.5 text-sm text-[var(--text-body)] transition-colors hover:bg-[var(--blue-soft)] disabled:opacity-50 disabled:hover:bg-[var(--surface)]"
+                      type="button"
+                      className="krds-pager__step enabled:hover:text-[var(--krds-primary-50)]"
                       onClick={() => setPage((p) => Math.max(0, p - 1))}
                       disabled={page === 0}
                     >
-                      {t("alertList.prev")}
+                      <span aria-hidden="true">‹ </span>{t("alertList.prev")}
                     </button>
-                    <div className="text-sm text-[var(--text-muted)]">{data ? `${data.number + 1} / ${data.totalPages}` : "-"}</div>
+                    {pageWindow(currentPage, totalPages).map((p) => (
+                      <button
+                        key={p}
+                        type="button"
+                        className="krds-pager__num"
+                        aria-current={p === currentPage ? "page" : undefined}
+                        onClick={() => setPage(p)}
+                      >
+                        {p + 1}
+                      </button>
+                    ))}
                     <button
-                      className="rounded-[var(--radius-control)] border border-[var(--line)] bg-[var(--surface)] px-3 py-1.5 text-sm text-[var(--text-body)] transition-colors hover:bg-[var(--blue-soft)] disabled:opacity-50 disabled:hover:bg-[var(--surface)]"
+                      type="button"
+                      className="krds-pager__step enabled:hover:text-[var(--krds-primary-50)]"
                       onClick={() => setPage((p) => (data ? Math.min(data.totalPages - 1, p + 1) : p))}
                       disabled={!data || data.number + 1 >= data.totalPages}
                     >
-                      {t("alertList.next")}
+                      {t("alertList.next")}<span aria-hidden="true"> ›</span>
                     </button>
-                  </div>
+                  </nav>
                 </>
               )}
             </div>
           </div>
 
-          {/* 오른쪽: 폴리곤 지도 + 통계 */}
+          {/* 오른쪽: 지도 + 통계 요약 */}
           <div className="flex w-full min-w-0 flex-col gap-4">
-            <div className="overflow-hidden rounded-[var(--radius-panel-card)] border border-[var(--line)] bg-[var(--surface)] shadow-[0_10px_30px_rgba(28,39,60,0.04)]">
+            <div className="krds-card overflow-hidden">
               <KoreaMap25D height="520px" todayOnly={false} params={mapParams} countLabel={t("alertList.mapCountLabel")} compact showModeToggle={false} focusSido={watchedSido || undefined} focusSigungu={watchedSigungu || undefined} onRegionSelect={onMapRegionSelect} />
+              <p className="px-4 pb-3 pt-1 text-center text-[14px] text-[var(--krds-gray-50)]">{t("alertList.mapHint")}</p>
             </div>
 
             {/* 재난 통계 요약 */}
-            <div className="space-y-3 rounded-[var(--radius-panel-card)] border border-[var(--line)] bg-[var(--surface)] p-4 shadow-[0_10px_30px_rgba(28,39,60,0.04)]">
-              <div className="space-y-2">
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-[var(--text-muted)]">{t("alertList.totalCount")}</span>
-                  <span className="font-semibold text-[var(--ink)]">
-                    {filteredStats ? filteredStats.totalCount.toLocaleString("ko-KR") + t("alertList.countUnit") : "-"}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-[var(--text-muted)]">{t("alertList.topRegion")}</span>
-                  <span className="font-semibold text-[var(--ink)]">
-                    {maxRegion ? `${t(`metros.${maxRegion.region}`, { defaultValue: maxRegion.region })} (${maxRegion.count.toLocaleString("ko-KR")}${t("alertList.countUnit")})` : "-"}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-[var(--text-muted)]">{t("alertList.topType")}</span>
-                  <span className="font-semibold text-[var(--ink)]">
-                    {topType ? `${t(`disasterTypes.${topType.type}`, { defaultValue: topType.type })} (${topType.count.toLocaleString("ko-KR")}${t("alertList.countUnit")})` : "-"}
-                  </span>
-                </div>
+            <div className="krds-card flex flex-col gap-3 p-5 text-[16px]">
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-[var(--krds-gray-70)]">{t("alertList.totalCount")}</span>
+                <b className="text-right text-[var(--krds-gray-90)]">
+                  {filteredStats ? filteredStats.totalCount.toLocaleString("ko-KR") + t("alertList.countUnit") : "-"}
+                </b>
+              </div>
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-[var(--krds-gray-70)]">{t("alertList.topRegion")}</span>
+                <b className="text-right text-[var(--krds-gray-90)]">
+                  {maxRegion ? `${t(`metros.${maxRegion.region}`, { defaultValue: maxRegion.region })} (${maxRegion.count.toLocaleString("ko-KR")}${t("alertList.countUnit")})` : "-"}
+                </b>
+              </div>
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-[var(--krds-gray-70)]">{t("alertList.topType")}</span>
+                <b className="text-right text-[var(--krds-gray-90)]">
+                  {topType ? `${t(`disasterTypes.${topType.type}`, { defaultValue: topType.type })} (${topType.count.toLocaleString("ko-KR")}${t("alertList.countUnit")})` : "-"}
+                </b>
               </div>
 
-              {/* 재난 유형 분포 */}
-              <div className="border-t border-[var(--line)] pt-2">
-                <h3 className="mb-2 text-sm font-semibold text-[var(--text-body)]">
-                  {t("alertList.typeDistribution")}{formState.sido ? ` · ${t(`metros.${formState.sido}`, { defaultValue: formState.sido })}` : ` · ${t("alertList.nationwide")}`}
-                </h3>
-                {typeDistribution.length === 0 ? (
-                  <p className="py-2 text-center text-xs text-[var(--text-subtle)]">{t("alertList.noData")}</p>
-                ) : (
-                  <ul className="space-y-1.5">
-                    {typeDistribution.map(({ type, count, pct }) => (
-                      <li key={type}>
-                        <div className="mb-0.5 flex justify-between text-xs">
-                          <span className="truncate text-[var(--text-body)]">{t(`disasterTypes.${type}`, { defaultValue: type })}</span>
-                          <span className="ml-2 shrink-0 text-[var(--text-muted)]">{pct}% ({count.toLocaleString("ko-KR")}{t("alertList.countUnit")})</span>
-                        </div>
-                        <div className="h-1.5 w-full overflow-hidden rounded-full bg-[#eef1f5]">
-                          <div
-                            className="h-full rounded-full"
-                            style={{ width: `${pct}%`, backgroundColor: disasterTypePalette(type).text }}
-                          />
-                        </div>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
+              <div className="h-px bg-[var(--krds-gray-10)]" />
 
               {/* 재난 경보 단계별 건수 */}
-              <div className="border-t border-[var(--line)] pt-2">
-                <h3 className="mb-2 text-sm font-semibold text-[var(--text-body)]">
-                  {t("alertList.alertLevel")}{formState.sido ? ` · ${t(`metros.${formState.sido}`, { defaultValue: formState.sido })}` : ` · ${t("alertList.nationwide")}`}
-                </h3>
-                <div className="grid grid-cols-3 gap-2">
-                  {[
-                    { code: "LEVEL_1", key: "안전안내" },
-                    { code: "LEVEL_2", key: "긴급재난" },
-                    { code: "LEVEL_3", key: "위급재난" },
-                  ].map((lvl) => {
-                    const count = filteredStats?.levelStats?.find((l) => l.level === lvl.code)?.count ?? 0;
-                    return (
-                      <div
-                        key={lvl.code}
-                        style={levelBadgeStyle(lvl.key)}
-                        className="flex flex-col items-center gap-0.5 rounded-[var(--radius-compact)] py-1.5"
-                      >
-                        <span className="flex min-h-[2rem] items-center justify-center text-center text-xs font-medium leading-tight">
-                          {t(`levels.${lvl.key}`)}
-                        </span>
-                        <span className="text-sm font-bold">{count.toLocaleString("ko-KR")}{t("alertList.countUnit")}</span>
-                      </div>
-                    );
-                  })}
-                </div>
+              <h3 className="text-[16px] font-bold text-[var(--krds-gray-90)]">
+                {t("alertList.alertLevel")} · {regionScopeLabel}
+              </h3>
+              <div className="grid grid-cols-3 gap-2 text-center">
+                {LEVEL_TILES.map((lvl) => {
+                  const count = filteredStats?.levelStats?.find((l) => l.level === lvl.code)?.count ?? 0;
+                  return (
+                    <div key={lvl.code} className={`flex flex-col items-center justify-center rounded-[var(--radius-control)] px-1 py-2.5 ${lvl.className}`}>
+                      <span className="text-[14px] font-bold leading-tight">{t(`levels.${lvl.key}`)}</span>
+                      <span className="text-[19px] font-extrabold">{count.toLocaleString("ko-KR")}{t("alertList.countUnit")}</span>
+                    </div>
+                  );
+                })}
               </div>
+
+              <div className="h-px bg-[var(--krds-gray-10)]" />
+
+              {/* 재난 유형 분포 — 유형별 색 대신 KRDS primary 막대 한 가지 색만 쓴다 */}
+              <h3 className="text-[16px] font-bold text-[var(--krds-gray-90)]">
+                {t("alertList.typeDistribution")} · {regionScopeLabel}
+              </h3>
+              {typeDistribution.length === 0 ? (
+                <p className="py-2 text-center text-[16px] text-[var(--krds-gray-50)]">{t("alertList.noData")}</p>
+              ) : (
+                <ul className="flex flex-col gap-2.5">
+                  {typeDistribution.map(({ type, count, pct }) => (
+                    <li key={type}>
+                      <div className="mb-1 flex justify-between gap-2 text-[15px]">
+                        <span className="truncate text-[var(--krds-gray-70)]">{t(`disasterTypes.${type}`, { defaultValue: type })}</span>
+                        <span className="shrink-0 text-[var(--krds-gray-50)]">{pct}% ({count.toLocaleString("ko-KR")}{t("alertList.countUnit")})</span>
+                      </div>
+                      <div className="h-1.5 w-full overflow-hidden rounded-full bg-[var(--krds-gray-10)]">
+                        <div className="h-full rounded-full bg-[var(--krds-primary-50)]" style={{ width: `${pct}%` }} />
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
             </div>
           </div>
         </div>

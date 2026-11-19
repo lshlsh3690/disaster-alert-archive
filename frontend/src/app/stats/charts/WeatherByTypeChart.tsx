@@ -148,14 +148,14 @@ export function WeatherByTypeChart({ data }: { data: WeatherTypeStat[] }) {
     <div className="flex flex-col flex-1 min-h-0 gap-1 relative"
       onMouseEnter={() => { isHoveringRef.current = true; startTimer(); }}
       onMouseLeave={() => { isHoveringRef.current = false; stopTimer(); }}>
-      {mode !== "daily" && <p className="text-[10px] text-gray-400 text-right pr-1">{aggModeLabel(mode, t)}</p>}
+      {mode !== "daily" && <p className="text-[10px] text-[#6d7882] text-right pr-1">{aggModeLabel(mode, t)}</p>}
 
       {pinned && pinnedSnap && (
         <div style={{ position: "absolute", top: 8, right: 8, zIndex: 20, ...TT_BOX, minWidth: 180, maxWidth: 220, maxHeight: 260, display: "flex", flexDirection: "column" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4, flexShrink: 0 }}>
             <p style={{ ...TT_LABEL, margin: 0 }}>{pinnedSnap.label}</p>
             <button type="button" onClick={handleClose} aria-label={t("notificationBanner.close")}
-              style={{ background: "none", border: "none", color: "#94a3b8", cursor: "pointer", fontSize: 14, lineHeight: 1, padding: 0, marginLeft: 12 }}>
+              style={{ background: "none", border: "none", color: "#b1b8be", cursor: "pointer", fontSize: 14, lineHeight: 1, padding: 0, marginLeft: 12 }}>
               ✕
             </button>
           </div>
@@ -176,10 +176,10 @@ export function WeatherByTypeChart({ data }: { data: WeatherTypeStat[] }) {
       <div className="flex-1 min-h-0 relative">
         <ResponsiveContainer width="100%" height="100%" className="absolute inset-0">
           <ComposedChart data={pivoted} margin={{ top: 8, right: 36, bottom: 4, left: 4 }}>
-            <CartesianGrid vertical={false} stroke="#f3f4f6" />
+            <CartesianGrid vertical={false} stroke="#e6e8ea" />
             <XAxis dataKey="date" axisLine={false} tickLine={false}
-              tick={{ fontSize: 9, fill: "#9ca3af" }} interval={labelStride - 1} />
-            <YAxis yAxisId="cnt" axisLine={false} tickLine={false} tick={{ fontSize: 9, fill: "#9ca3af" }} width={32} />
+              tick={{ fontSize: 9, fill: "#6d7882" }} interval={labelStride - 1} />
+            <YAxis yAxisId="cnt" axisLine={false} tickLine={false} tick={{ fontSize: 9, fill: "#6d7882" }} width={32} />
             <Tooltip content={<TooltipContent />} wrapperStyle={{ zIndex: 30 }} />
             <Legend wrapperStyle={{ fontSize: 10 }} formatter={(v: string) => translateType(v)} />
             {types.map((type, i) => (

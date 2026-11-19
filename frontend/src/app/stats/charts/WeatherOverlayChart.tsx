@@ -72,7 +72,7 @@ export function WeatherOverlayChart({ data }: { data: WeatherCorrelationStat[] }
     return (
       <div style={TT_BOX}>
         <p style={TT_LABEL}>{row.date}</p>
-        <p style={{ ...TT_VALUE, color: "#60a5fa" }}>{(get("count") ?? 0).toLocaleString(locale)}{t("statsPage.countUnit")}</p>
+        <p style={{ ...TT_VALUE, color: "#86aff9" }}>{(get("count") ?? 0).toLocaleString(locale)}{t("statsPage.countUnit")}</p>
         {row?.primaryType && (
           <p style={{ ...TT_LABEL, marginTop: 4 }}>{t("statsPage.weatherChart.primaryTypeLabel")}: <span style={{ color: "#e2e8f0" }}>{translateType(row.primaryType)}</span></p>
         )}
@@ -80,7 +80,7 @@ export function WeatherOverlayChart({ data }: { data: WeatherCorrelationStat[] }
           <p style={TT_LABEL}>
             {t("statsPage.weatherChart.temperatureLabel")} {row.avgTemp.toFixed(1)}°C
             {row.minTemp != null && row.maxTemp != null && (
-              <span style={{ color: "#94a3b8" }}> ({row.minTemp.toFixed(1)}~{row.maxTemp.toFixed(1)})</span>
+              <span style={{ color: "#b1b8be" }}> ({row.minTemp.toFixed(1)}~{row.maxTemp.toFixed(1)})</span>
             )}
           </p>
         )}
@@ -93,21 +93,21 @@ export function WeatherOverlayChart({ data }: { data: WeatherCorrelationStat[] }
     <div className="flex-1 min-h-0 relative">
       <ResponsiveContainer width="100%" height="100%" className="absolute inset-0">
         <ComposedChart data={chartData} margin={{ top: 8, right: 24, bottom: 4, left: 4 }}>
-          <CartesianGrid vertical={false} stroke="#f3f4f6" />
+          <CartesianGrid vertical={false} stroke="#e6e8ea" />
           <XAxis dataKey="date" axisLine={false} tickLine={false}
-            tick={{ fontSize: 9, fill: "#9ca3af" }}
+            tick={{ fontSize: 9, fill: "#6d7882" }}
             interval={labelStride - 1} />
-          <YAxis yAxisId="cnt" axisLine={false} tickLine={false} tick={{ fontSize: 9, fill: "#9ca3af" }} width={32} />
+          <YAxis yAxisId="cnt" axisLine={false} tickLine={false} tick={{ fontSize: 9, fill: "#6d7882" }} width={32} />
           <YAxis yAxisId="temp" orientation="right" axisLine={false} tickLine={false}
-            tick={{ fontSize: 9, fill: "#f97316" }} width={36} tickFormatter={(v: number) => `${v}°`} />
+            tick={{ fontSize: 9, fill: "#464c53" }} width={36} tickFormatter={(v: number) => `${v}°`} />
           <Tooltip content={<TooltipContent />} wrapperStyle={{ zIndex: 30 }} />
           <Legend wrapperStyle={{ fontSize: 11 }}
             formatter={(v: string) => ({
               count: t("statsPage.weatherChart.occurrenceCountLegend"),
               maxPrecip: t("statsPage.weatherChart.maxPrecipLegend"),
             }[v] ?? v)} />
-          <Bar yAxisId="cnt" dataKey="count" fill="#3b82f6" fillOpacity={0.7} radius={[2, 2, 0, 0]} maxBarSize={20} isAnimationActive={false} />
-          <Line yAxisId="temp" type="monotone" dataKey="maxPrecip" stroke="#06b6d4" strokeWidth={1.5} dot={false} strokeDasharray="4 2" isAnimationActive={false} />
+          <Bar yAxisId="cnt" dataKey="count" fill="#86aff9" radius={[2, 2, 0, 0]} maxBarSize={20} isAnimationActive={false} />
+          <Line yAxisId="temp" type="monotone" dataKey="maxPrecip" stroke="#0b50d0" strokeWidth={1.5} dot={false} strokeDasharray="4 2" isAnimationActive={false} />
         </ComposedChart>
       </ResponsiveContainer>
     </div>

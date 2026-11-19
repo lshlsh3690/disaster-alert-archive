@@ -38,7 +38,7 @@ export const metadata: Metadata = {
   },
 
   manifest: "/manifest.json",
-  themeColor: "#3867e8",
+  themeColor: "#256ef4",
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
@@ -60,6 +60,11 @@ export default function RootLayout({
     <html lang="ko">
       <head>
         <link rel="apple-touch-icon" href="/icons/apple-icon-180.png" />
+        {/* KRDS 기본 서체. 정부 누리집용 자형(Pretendard GOV)으로, 없으면 Pretendard → Noto Sans KR 순으로 떨어진다 */}
+        <link
+          rel="stylesheet"
+          href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard-gov.min.css"
+        />
         <meta name="theme-color" content="#1E3A8A" />
         <link
           rel="apple-touch-startup-image"

@@ -2,6 +2,7 @@
 
 import type { HourlyStat } from "@/types/alerts";
 import { EmptyChart } from "../_charts";
+import { HEAT_RGB } from "../_constants";
 import { useTranslation } from "react-i18next";
 import { VerticalBar } from "./VerticalBar";
 
@@ -30,7 +31,7 @@ export function HourBar({ data }: { data: HourlyStat[] }) {
   const max = Math.max(...bars.map(b => b.count)) || 1;
   const colored = bars.map(b => ({
     ...b,
-    color: `rgba(37,99,235,${0.15 + (b.count / max) * 0.75})`,
+    color: `rgba(${HEAT_RGB},${0.15 + (b.count / max) * 0.75})`,
   }));
   return <VerticalBar data={colored} />;
 }

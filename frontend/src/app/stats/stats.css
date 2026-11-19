@@ -1,31 +1,46 @@
-.header-action { display: inline-flex; height: 44px; align-items: center; gap: 8px; border-width: 1px; border-radius: var(--radius-control); padding: 0 16px; font-size: 14px; font-weight: 600; transition: border-color 140ms ease, color 140ms ease, background-color 140ms ease; }
-.header-action:hover { border-color: var(--blue); color: var(--blue); }
-.header-action:focus-visible, .quick-button:focus-visible, .secondary-button:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
-.field-label { margin-bottom: 6px; display: block; color: var(--text-body); font-size: 13px; font-weight: 600; }
-.quick-button, .secondary-button { height: 40px; border: 1px solid var(--line); border-radius: var(--radius-control); background: white; padding: 0 12px; color: var(--text-muted); font-size: 12px; font-weight: 700; transition: border-color 140ms ease, color 140ms ease, background-color 140ms ease; }
-.secondary-button { padding: 0 16px; font-size: 14px; }
-.quick-button:hover, .secondary-button:hover { border-color: var(--blue); color: var(--blue); background: var(--blue-soft); }
-.stats-grid { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 18px; align-items: start; }
-.stats-chip { border-radius: 999px; background: white; padding: 4px 9px; color: var(--blue); font-size: 12px; font-weight: 700; }
-.stats-kpi { display: flex; min-height: 148px; min-width: 0; flex-direction: column; justify-content: space-between; gap: 14px; overflow: hidden; border: 1px solid var(--line); border-radius: var(--radius-card); background: var(--surface); padding: 16px; box-shadow: 0 12px 32px rgba(28,39,60,.055); }
-.stats-kpi-icon { display: inline-flex; width: 36px; height: 36px; flex: 0 0 auto; align-items: center; justify-content: center; border-radius: var(--radius-control); font-size: 18px; }
-.stats-kpi-label { color: var(--text-muted); font-size: 12px; font-weight: 700; line-height: 1.4; }
-.stats-kpi-value { margin-top: 7px; color: var(--ink); font-size: 30px; font-weight: 750; line-height: 1.2; letter-spacing: -.02em; }
-.stats-kpi-unit { margin-left: 3px; color: var(--text-muted); font-size: 12px; font-weight: 700; }
-.stats-kpi-meta { margin-top: 7px; color: var(--text-subtle); font-size: 12px; line-height: 1.4; }
-.mini-bars { display: flex; height: 28px; align-items: flex-end; gap: 3px; }
-.mini-bars span { min-width: 2px; flex: 1; border-radius: 3px 3px 1px 1px; }
-.stats-progress { height: 6px; overflow: hidden; border-radius: 999px; background: var(--canvas); }
-.stats-progress span { display: block; height: 100%; min-width: 2px; border-radius: inherit; }
-.stats-table { width: 100%; min-width: 560px; color: var(--text-body); font-size: 13px; }
-.stats-table thead { position: sticky; top: 0; z-index: 1; background: #fbfcfe; color: var(--text-muted); }
-.stats-table th { padding: 10px 20px; text-align: left; font-size: 12px; font-weight: 700; }
-.stats-table td { border-top: 1px solid var(--line); padding: 10px 20px; }
-.stats-table tbody tr { transition: background-color 140ms ease; }
-.stats-table tbody tr:hover { background: var(--blue-soft); }
-.stats-table .stats-empty { padding: 28px 20px; text-align: center; color: var(--text-subtle); }
-.stats-chart-empty { display: flex; flex: 1; align-items: center; justify-content: center; color: var(--text-subtle); font-size: 13px; }
+/*
+ * 통계 페이지 전용 스타일. 색·크기는 design_handoff_krds_redesign/README.md "4. 통계"·"Design Tokens" 기준.
+ * 공용 조각(.krds-card, .krds-btn, .krds-segment …)은 globals.css 에 있고, 여기에는 통계에만 쓰는 것만 둔다.
+ */
+
+.stats-grid { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 16px; align-items: start; }
+
+/* KPI 카드: 보더로만 구분(그림자·색 상단 보더·아이콘 없음) */
+.stats-kpi { display: flex; min-width: 0; flex-direction: column; gap: 6px; border: 1px solid var(--krds-gray-20); border-radius: var(--radius-card); background: var(--krds-gray-0); padding: 20px; }
+.stats-kpi-label { color: var(--krds-gray-70); font-size: 16px; line-height: 1.4; }
+.stats-kpi-value { color: var(--krds-gray-90); font-size: 30px; font-weight: 800; line-height: 1.25; letter-spacing: -0.02em; }
+.stats-kpi-meta { color: var(--krds-gray-50); font-size: 14px; line-height: 1.4; }
+
+/* 위젯 머리의 작은 세그먼트(차트 변형·일별/시간별). 공용 .krds-segment 를 위젯 머리에 맞게 줄인다 */
+.stats-segment-sm { font-size: 14px; }
+.stats-segment-sm > * { padding: 4px 10px; }
+
+/* 프리셋 세그먼트: 항목 안에 이름 편집 버튼·입력이 들어간다 */
+.stats-preset > * { display: inline-flex; align-items: center; gap: 6px; }
+
+/* 위젯 머리 아이콘 버튼(PNG 저장·삭제·도움말) */
+.stats-icon-btn { display: inline-flex; width: 32px; height: 32px; flex: 0 0 auto; align-items: center; justify-content: center; border: 1px solid var(--krds-gray-30); border-radius: var(--radius-control); background: var(--krds-gray-0); color: var(--krds-gray-60); transition: border-color 0.15s, color 0.15s; }
+.stats-icon-btn:hover { border-color: var(--krds-primary-50); color: var(--krds-primary-50); }
+
+/* 데이터 요약 표 */
+.stats-table { width: 100%; color: var(--krds-gray-90); font-size: 16px; }
+.stats-table thead { background: var(--krds-gray-5); }
+.stats-table th { padding: 12px 16px; text-align: left; font-size: 15px; font-weight: 700; color: var(--krds-gray-70); border-bottom: 1px solid var(--krds-gray-20); white-space: nowrap; }
+.stats-table td { padding: 12px 16px; border-bottom: 1px solid var(--krds-gray-10); }
+.stats-table .num { text-align: right; }
+.stats-table td.num { font-weight: 700; }
+.stats-table td.muted { color: var(--krds-gray-50); font-weight: 400; }
+.stats-table tbody tr { transition: background-color 0.15s; }
+.stats-table tbody tr:hover { background: var(--krds-primary-5); }
+.stats-table .stats-empty { padding: 32px 16px; text-align: center; font-size: 16px; color: var(--krds-gray-50); }
+.stats-table tbody tr:has(.stats-empty):hover { background: transparent; }
+
+/* 헤더 기간 세그먼트: 좁은 화면에서는 항목 여백을 줄이고, 그래도 넘치면 가로 스크롤 */
+.stats-period { max-width: 100%; overflow-x: auto; }
 
 @media (max-width: 760px) {
   .stats-grid .stats-widget { grid-column: 1 / -1 !important; }
+}
+@media (max-width: 640px) {
+  .stats-period > * { padding: 8px 12px; }
 }

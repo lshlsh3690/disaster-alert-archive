@@ -15,51 +15,31 @@ import { useTranslation } from "react-i18next";
 
 // ─── KPI 카드 ─────────────────────────────────────────────────────────────────
 
-const VARIANT_STYLE = {
-  coral: { border: "var(--coral)", iconBg: "var(--coral-soft)", iconColor: "var(--coral)" },
-  blue: { border: "var(--blue)", iconBg: "var(--blue-soft)", iconColor: "var(--blue)" },
-  purple: { border: "#8069d9", iconBg: "#f1effb", iconColor: "#6d57c6" },
-  green: { border: "var(--success)", iconBg: "var(--success-soft)", iconColor: "var(--success)" },
-} as const;
-
 /**
  * KpiBox
  *
- * 아이콘 + 레이블 + 큰 숫자 + 부가 설명으로 구성된 단순 정보 카드입니다.
+ * 레이블 + 큰 숫자 + 부가 설명으로 구성된 단순 정보 카드입니다.
  * 총 발생 건수, 일 평균, 최다 유형, 최다 지역을 각각 하나씩 표시합니다.
+ * KRDS 강조색 5% 규칙에 따라 카드별 색 상단 보더와 아이콘은 쓰지 않습니다.
  *
- * @param icon    - 이모지 아이콘 (예: "📨")
  * @param label   - 카드 제목 (예: "총 발생 건수")
  * @param value   - 강조 표시할 주요 값 (예: "1,234건")
  * @param sub     - 보조 설명 텍스트 (예: "최근 30일 기준")
- * @param variant - 카드 색상 계열 (coral/blue/purple/green)
  */
 export function KpiBox({
-  icon,
   label,
   value,
   sub,
-  variant = "blue",
 }: {
-  icon: string;
   label: string;
   value: string;
   sub: string;
-  variant?: keyof typeof VARIANT_STYLE;
 }) {
-  const v = VARIANT_STYLE[variant];
   return (
-    <article className="stats-kpi" style={{ borderTop: `3px solid ${v.border}` }}>
-      <div className="flex items-start gap-3">
-        <span className="stats-kpi-icon" style={{ background: v.iconBg, color: v.iconColor }}>
-          {icon}
-        </span>
-        <div className="min-w-0">
-          <p className="stats-kpi-label">{label}</p>
-          <p className="stats-kpi-value truncate">{value}</p>
-          <p className="stats-kpi-meta">{sub}</p>
-        </div>
-      </div>
+    <article className="stats-kpi">
+      <p className="stats-kpi-label">{label}</p>
+      <p className="stats-kpi-value truncate">{value}</p>
+      <p className="stats-kpi-meta">{sub}</p>
     </article>
   );
 }
@@ -70,10 +50,10 @@ export function KpiBox({
  * FilterBanner
  *
  * 재난문자 페이지(/alerts)에서 URL 파라미터로 넘어온 필터 조건을
- * 파란 태그 목록으로 시각화합니다.
+ * 회색 배지 목록으로 시각화합니다.
  *
  * 필터가 하나도 없으면 "전체 데이터" 안내 메시지를 보여줍니다.
- * 필터가 있으면 왼쪽에 파란 세로선 + 태그들, 오른쪽에 필터 변경 링크를 표시합니다.
+ * 필터가 있으면 왼쪽에 태그들, 오른쪽에 필터 변경 링크를 표시합니다.
  *
  * @param sido      - 시·도 이름 (예: "경기도")
  * @param sigungu   - 시·군·구 이름 (예: "수원시")
@@ -133,15 +113,15 @@ export function FilterBanner({
   // 필터가 없으면 전체 데이터 안내
   if (tags.length === 0) {
     return (
-      <div className="bg-[var(--canvas)] border border-[var(--line)] rounded-[var(--radius-card)] px-4 py-3 text-sm text-[var(--text-muted)]">
+      <div className="krds-card px-5 py-4 text-[16px] text-[var(--krds-gray-70)]">
         {t("statsPage.noFilters")}{" "}
         {onFilterOpen ? (
-          <button onClick={onFilterOpen} className="text-[var(--blue)] font-semibold hover:underline">
-            {t("statsPage.setFilters")} →
+          <button onClick={onFilterOpen} className="font-bold text-[var(--krds-primary-50)] hover:underline">
+            {t("statsPage.setFilters")}
           </button>
         ) : (
-          <Link href="/alerts" className="text-[var(--blue)] font-semibold hover:underline">
-            {t("statsPage.changeFilters")} →
+          <Link href="/alerts" className="font-bold text-[var(--krds-primary-50)] hover:underline">
+            {t("statsPage.changeFilters")}
           </Link>
         )}
       </div>
@@ -149,9 +129,9 @@ export function FilterBanner({
   }
 
   return (
-    <div className="bg-[var(--surface)] border-l-4 border-[var(--blue)] rounded-[var(--radius-card)] shadow-[0_10px_30px_rgba(28,39,60,0.04)] px-4 py-2.5 flex items-center gap-2 flex-wrap">
+    <div className="krds-card px-5 py-3 flex items-center gap-2 flex-wrap">
       {/* 필터 적용 중 레이블 */}
-      <span className="text-xs font-bold text-[var(--ink)]">
+      <span className="text-[15px] font-bold text-[var(--krds-gray-90)]">
         {/* 인라인 SVG 깔때기 아이콘 */}
         <svg className="inline mr-1" style={{ verticalAlign: "-2px" }}
           width="13" height="13" viewBox="0 0 14 14" fill="none">
@@ -163,7 +143,7 @@ export function FilterBanner({
 
       {/* 필터 태그들 */}
       {tags.map((tag, i) => (
-        <span key={i} className="stats-chip">
+        <span key={i} className="krds-badge krds-badge--neutral">
           {tag.label}
         </span>
       ))}
@@ -172,12 +152,12 @@ export function FilterBanner({
       <span className="flex-1" />
 
       {onFilterOpen ? (
-        <button onClick={onFilterOpen} className="text-xs text-[var(--blue)] font-semibold hover:underline">
-          ✎ {t("statsPage.changeFilters")}
+        <button onClick={onFilterOpen} className="text-[15px] font-bold text-[var(--krds-primary-50)] hover:underline">
+          {t("statsPage.changeFilters")}
         </button>
       ) : (
-        <Link href={alertsHref} className="text-xs text-[var(--blue)] font-semibold hover:underline">
-          ↗ {t("statsPage.changeFilters")}
+        <Link href={alertsHref} className="text-[15px] font-bold text-[var(--krds-primary-50)] hover:underline">
+          {t("statsPage.changeFilters")}
         </Link>
       )}
     </div>

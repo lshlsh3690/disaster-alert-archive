@@ -56,6 +56,19 @@ export const i18n = {
       countUnit: "건",
       viewStats: "통계 보기",
       mapCountLabel: "재난문자",
+      breadcrumbHome: "홈",
+      mapHint: "지역을 누르면 목록이 그 지역으로 좁혀집니다",
+      listTotal: "총 <b>{total}</b>건",
+      sortLatest: "최신순",
+      pagination: "페이지 이동",
+      filterLabel: {
+        sido: "시도",
+        sigungu: "시군구",
+        type: "재난 유형",
+        level: "경보 단계",
+        source: "출처",
+        keyword: "검색어",
+      },
       filter: {
         sido: "시/도(전체)",
         sigungu: "시/군/구(전체)",
@@ -96,6 +109,12 @@ export const i18n = {
     // 커뮤니티
     community: {
       title: "커뮤니티",
+      breadcrumbHome: "홈",
+      write: "글쓰기",
+      colNo: "번호",
+      colTitle: "제목",
+      colAuthor: "작성자",
+      colDate: "작성일",
     },
 
     // 설정
@@ -361,6 +380,7 @@ export const i18n = {
     },
     events: {
       title: "사건 목록",
+      breadcrumbHome: "홈",
       description: "재난문자 묶음 단위 사건 목록입니다. 유형·지역·기간·키워드로 검색할 수 있어요.",
       tabActive: "진행 중",
       tabPast: "지난 사건",
@@ -397,7 +417,34 @@ export const i18n = {
       viewAlert: "원문 상세 보기",
     },
     levels: { 안전안내: "안전안내", 긴급재난: "긴급재난", 위급재난: "위급재난" },
+    metroShort: {
+      서울특별시: "서울",
+      부산광역시: "부산",
+      대구광역시: "대구",
+      인천광역시: "인천",
+      대전광역시: "대전",
+      울산광역시: "울산",
+      세종특별자치시: "세종",
+      경기도: "경기",
+      강원특별자치도: "강원",
+      충청북도: "충북",
+      충청남도: "충남",
+      전북특별자치도: "전북",
+      경상북도: "경북",
+      경상남도: "경남",
+      제주특별자치도: "제주",
+      전남광주통합특별시: "전남·광주",
+    },
+
     dashboard: {
+      mapTitle: "지역별 재난 문자 지도",
+      asOf: "{time} 기준",
+      summaryAlerts: "오늘 재난문자",
+      summaryUserReports: "사용자 제보",
+      segSido: "시도",
+      segSigungu: "시군구",
+      legendTitle: "오늘 발생 건수",
+      legendMax: "{count}건 이상",
       todayAlerts: "오늘 재난문자",
       mapViewLabel: "보기 단위",
       mapViewSido: "시도별 보기",
@@ -431,6 +478,7 @@ export const i18n = {
 
     statsPage: {
       title: "재난 통계",
+      breadcrumbHome: "홈",
       description: "선택한 기간과 지역의 재난문자 흐름을 한눈에 분석하세요.",
       filter: "필터",
       exportCsv: "CSV 내보내기",
@@ -449,6 +497,8 @@ export const i18n = {
       endDate: "종료일",
       lastDays: "최근 {days}일",
       thisYear: "올해",
+      segDays: "{days}일",
+      segYear: "1년",
       cancel: "취소",
       reset: "초기화",
       apply: "적용",
@@ -589,6 +639,19 @@ export const i18n = {
       countUnit: "",
       viewStats: "View Stats",
       mapCountLabel: "Disaster alerts",
+      breadcrumbHome: "Home",
+      mapHint: "Select a region to narrow the list to it",
+      listTotal: "<b>{total}</b> results",
+      sortLatest: "Newest first",
+      pagination: "Pagination",
+      filterLabel: {
+        sido: "Province",
+        sigungu: "City/District",
+        type: "Disaster type",
+        level: "Alert level",
+        source: "Source",
+        keyword: "Keyword",
+      },
       filter: {
         sido: "Province (All)",
         sigungu: "City/District (All)",
@@ -627,6 +690,12 @@ export const i18n = {
 
     community: {
       title: "Community",
+      breadcrumbHome: "Home",
+      write: "Write",
+      colNo: "No.",
+      colTitle: "Title",
+      colAuthor: "Author",
+      colDate: "Date",
     },
 
     settings: {
@@ -891,6 +960,7 @@ export const i18n = {
 
     events: {
       title: "Event List",
+      breadcrumbHome: "Home",
       description: "Disaster alert clusters grouped by incident. Filter by type, region, period, or keyword.",
       tabActive: "Active",
       tabPast: "Past",
@@ -927,7 +997,34 @@ export const i18n = {
       viewAlert: "View original alert",
     },
     levels: { 안전안내: "Safety Notice", 긴급재난: "Emergency Disaster", 위급재난: "Critical Disaster" },
+    metroShort: {
+      서울특별시: "Seoul",
+      부산광역시: "Busan",
+      대구광역시: "Daegu",
+      인천광역시: "Incheon",
+      대전광역시: "Daejeon",
+      울산광역시: "Ulsan",
+      세종특별자치시: "Sejong",
+      경기도: "Gyeonggi",
+      강원특별자치도: "Gangwon",
+      충청북도: "Chungbuk",
+      충청남도: "Chungnam",
+      전북특별자치도: "Jeonbuk",
+      경상북도: "Gyeongbuk",
+      경상남도: "Gyeongnam",
+      제주특별자치도: "Jeju",
+      전남광주통합특별시: "Jeonnam·Gwangju",
+    },
+
     dashboard: {
+      mapTitle: "Disaster Alerts by Region",
+      asOf: "As of {time}",
+      summaryAlerts: "Alerts today",
+      summaryUserReports: "User reports",
+      segSido: "Province",
+      segSigungu: "District",
+      legendTitle: "Alerts today",
+      legendMax: "{count}+",
       todayAlerts: "Today's Alerts",
       mapViewLabel: "View by",
       mapViewSido: "By province",
@@ -961,10 +1058,11 @@ export const i18n = {
 
     statsPage: {
       title: "Disaster Statistics",
+      breadcrumbHome: "Home",
       description: "Analyze disaster-alert patterns across the selected period and region.",
       filter: "Filters", exportCsv: "Export CSV", manageWidgets: "Manage widgets", presetName: "Preset {number}", editPresetName: "Rename preset",
       province: "Province", district: "District", byProvince: "By province", byDistrict: "By district", disasterType: "Disaster type", alertLevel: "Alert level", period: "Period", all: "All",
-      startDate: "Start date", endDate: "End date", lastDays: "Last {days} days", thisYear: "This year", cancel: "Cancel", reset: "Reset", apply: "Apply",
+      startDate: "Start date", endDate: "End date", lastDays: "Last {days} days", thisYear: "This year", segDays: "{days} days", segYear: "1 year", cancel: "Cancel", reset: "Reset", apply: "Apply",
       noFilters: "Currently analyzing all disaster-alert data.", setFilters: "Set filters", filtersApplied: "Filters applied", typePrefix: "Type", levelPrefix: "Level", changeFilters: "Change filters",
       totalAlerts: "Total alerts", filteredResult: "Current filtered result", dailyAverage: "Daily average", dayBasis: "Based on {days} days", recentThirtyDays: "Based on the last 30 days",
       overviewSection: "Key metrics", analysisSection: "Analysis charts", analysisDescription: "Every chart updates together as filter conditions change.", visibleWidgetCount: "{count} widgets",
@@ -1048,6 +1146,19 @@ export const i18n = {
       countUnit: "件",
       viewStats: "統計を見る",
       mapCountLabel: "災害メッセージ",
+      breadcrumbHome: "ホーム",
+      mapHint: "地域を押すと一覧がその地域に絞り込まれます",
+      listTotal: "全<b>{total}</b>件",
+      sortLatest: "新しい順",
+      pagination: "ページ移動",
+      filterLabel: {
+        sido: "都道府県",
+        sigungu: "市区町村",
+        type: "災害種別",
+        level: "警報段階",
+        source: "出典",
+        keyword: "検索語",
+      },
       filter: {
         sido: "都道府県（全て）",
         sigungu: "市区町村（全て）",
@@ -1086,6 +1197,12 @@ export const i18n = {
 
     community: {
       title: "コミュニティ",
+      breadcrumbHome: "ホーム",
+      write: "投稿する",
+      colNo: "番号",
+      colTitle: "タイトル",
+      colAuthor: "投稿者",
+      colDate: "投稿日",
     },
 
     settings: {
@@ -1350,6 +1467,7 @@ export const i18n = {
 
     events: {
       title: "事案一覧",
+      breadcrumbHome: "ホーム",
       description: "災害速報をまとめた事案単位の一覧です。種別・地域・期間・キーワードで絞り込めます。",
       tabActive: "進行中",
       tabPast: "終了",
@@ -1386,7 +1504,34 @@ export const i18n = {
       viewAlert: "原文の詳細を見る",
     },
     levels: { 안전안내: "安全案内", 긴급재난: "緊急災害", 위급재난: "危急災害" },
+    metroShort: {
+      서울특별시: "ソウル",
+      부산광역시: "釜山",
+      대구광역시: "大邱",
+      인천광역시: "仁川",
+      대전광역시: "大田",
+      울산광역시: "蔚山",
+      세종특별자치시: "世宗",
+      경기도: "京畿",
+      강원특별자치도: "江原",
+      충청북도: "忠北",
+      충청남도: "忠南",
+      전북특별자치도: "全北",
+      경상북도: "慶北",
+      경상남도: "慶南",
+      제주특별자치도: "済州",
+      전남광주통합특별시: "全南·光州",
+    },
+
     dashboard: {
+      mapTitle: "地域別 災害文字マップ",
+      asOf: "{time} 時点",
+      summaryAlerts: "本日の災害文字",
+      summaryUserReports: "ユーザー投稿",
+      segSido: "市道",
+      segSigungu: "市郡区",
+      legendTitle: "本日の発生件数",
+      legendMax: "{count}件以上",
       todayAlerts: "本日の災害速報",
       mapViewLabel: "表示単位",
       mapViewSido: "道・市別",
@@ -1420,10 +1565,11 @@ export const i18n = {
 
     statsPage: {
       title: "災害統計",
+      breadcrumbHome: "ホーム",
       description: "選択した期間と地域の災害アラートの傾向を分析します。",
       filter: "フィルター", exportCsv: "CSV出力", manageWidgets: "ウィジェット管理", presetName: "プリセット {number}", editPresetName: "プリセット名を変更",
       province: "都道府県", district: "市区町村", byProvince: "都道府県別", byDistrict: "市区町村別", disasterType: "災害種別", alertLevel: "警報レベル", period: "期間", all: "すべて",
-      startDate: "開始日", endDate: "終了日", lastDays: "直近{days}日", thisYear: "今年", cancel: "キャンセル", reset: "リセット", apply: "適用",
+      startDate: "開始日", endDate: "終了日", lastDays: "直近{days}日", thisYear: "今年", segDays: "{days}日", segYear: "1年", cancel: "キャンセル", reset: "リセット", apply: "適用",
       noFilters: "現在、すべての災害アラートを分析しています。", setFilters: "フィルター設定", filtersApplied: "フィルター適用中", typePrefix: "種別", levelPrefix: "レベル", changeFilters: "フィルター変更",
       totalAlerts: "総発生件数", filteredResult: "現在のフィルター結果", dailyAverage: "1日平均", dayBasis: "{days}日基準", recentThirtyDays: "直近30日基準",
       overviewSection: "主要指標", analysisSection: "分析チャート", analysisDescription: "フィルター条件に応じて、すべてのチャートが同時に更新されます。", visibleWidgetCount: "{count}個のウィジェット",
@@ -1507,6 +1653,19 @@ export const i18n = {
       countUnit: "件",
       viewStats: "查看统计",
       mapCountLabel: "灾害消息",
+      breadcrumbHome: "首页",
+      mapHint: "点击地区即可将列表筛选到该地区",
+      listTotal: "共<b>{total}</b>条",
+      sortLatest: "最新优先",
+      pagination: "分页",
+      filterLabel: {
+        sido: "省/市",
+        sigungu: "市/区",
+        type: "灾害类型",
+        level: "警报等级",
+        source: "来源",
+        keyword: "关键词",
+      },
       filter: {
         sido: "省/市（全部）",
         sigungu: "市/区（全部）",
@@ -1545,6 +1704,12 @@ export const i18n = {
 
     community: {
       title: "社区",
+      breadcrumbHome: "首页",
+      write: "发帖",
+      colNo: "编号",
+      colTitle: "标题",
+      colAuthor: "作者",
+      colDate: "发布日期",
     },
 
     settings: {
@@ -1809,6 +1974,7 @@ export const i18n = {
 
     events: {
       title: "事件列表",
+      breadcrumbHome: "首页",
       description: "按事件单位归类的灾害预警列表，可按类型、地区、时间段或关键词筛选。",
       tabActive: "进行中",
       tabPast: "已结束",
@@ -1845,7 +2011,34 @@ export const i18n = {
       viewAlert: "查看原文详情",
     },
     levels: { 안전안내: "安全通知", 긴급재난: "紧急灾害", 위급재난: "危急灾害" },
+    metroShort: {
+      서울특별시: "首尔",
+      부산광역시: "釜山",
+      대구광역시: "大邱",
+      인천광역시: "仁川",
+      대전광역시: "大田",
+      울산광역시: "蔚山",
+      세종특별자치시: "世宗",
+      경기도: "京畿",
+      강원특별자치도: "江原",
+      충청북도: "忠北",
+      충청남도: "忠南",
+      전북특별자치도: "全北",
+      경상북도: "庆北",
+      경상남도: "庆南",
+      제주특별자치도: "济州",
+      전남광주통합특별시: "全南·光州",
+    },
+
     dashboard: {
+      mapTitle: "各地区灾害短信地图",
+      asOf: "截至 {time}",
+      summaryAlerts: "今日灾害短信",
+      summaryUserReports: "用户报告",
+      segSido: "市道",
+      segSigungu: "市郡区",
+      legendTitle: "今日发生数",
+      legendMax: "{count}条以上",
       todayAlerts: "今日预警",
       mapViewLabel: "显示单位",
       mapViewSido: "按省/市",
@@ -1879,10 +2072,11 @@ export const i18n = {
 
     statsPage: {
       title: "灾害统计",
+      breadcrumbHome: "首页",
       description: "分析所选时间和地区的灾害预警趋势。",
       filter: "筛选", exportCsv: "导出CSV", manageWidgets: "管理组件", presetName: "预设 {number}", editPresetName: "修改预设名称",
       province: "省级地区", district: "市·区·县", byProvince: "按省级地区", byDistrict: "按市区县", disasterType: "灾害类型", alertLevel: "预警级别", period: "时间范围", all: "全部",
-      startDate: "开始日期", endDate: "结束日期", lastDays: "最近{days}天", thisYear: "今年", cancel: "取消", reset: "重置", apply: "应用",
+      startDate: "开始日期", endDate: "结束日期", lastDays: "最近{days}天", thisYear: "今年", segDays: "{days}天", segYear: "1年", cancel: "取消", reset: "重置", apply: "应用",
       noFilters: "当前正在分析全部灾害预警数据。", setFilters: "设置筛选", filtersApplied: "已应用筛选", typePrefix: "类型", levelPrefix: "级别", changeFilters: "修改筛选",
       totalAlerts: "总发生数", filteredResult: "当前筛选结果", dailyAverage: "日均", dayBasis: "基于{days}天", recentThirtyDays: "基于最近30天",
       overviewSection: "核心指标", analysisSection: "分析图表", analysisDescription: "筛选条件变化时，所有图表会同步更新。", visibleWidgetCount: "{count}个组件",

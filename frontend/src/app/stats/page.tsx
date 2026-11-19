@@ -70,6 +70,24 @@ import "./stats.css";
 const LANG_LOCALE: Record<string, string> = { ko: "ko-KR", en: "en-US", zh: "zh-CN", ja: "ja-JP" };
 type T = TFunction;
 
+// ─── 빠른 기간 ────────────────────────────────────────────────────────────────
+
+// 필터 패널의 빠른 날짜 버튼(기존 선택지)
+const QUICK_PERIODS = [7, 30, 90, "year"] as const;
+// 헤더 기간 세그먼트(KRDS 시안 "7일 | 30일 | 1년"). 1년은 올해가 아니라 오늘 기준 최근 365일
+const HEADER_PERIODS = [7, 30, 365] as const;
+type QuickPeriod = number | "year";
+
+// 빠른 날짜 범위: 오늘 기준 N일 전 ~ 오늘, "year"면 올해 1월 1일 ~ 오늘
+function getQuickRange(days: QuickPeriod): { startDate: string; endDate: string } {
+  const today = new Date();
+  const fmt = (d: Date) => d.toISOString().slice(0, 10);
+  if (days === "year") return { startDate: `${today.getFullYear()}-01-01`, endDate: fmt(today) };
+  const from = new Date(today);
+  from.setDate(from.getDate() - (days - 1));
+  return { startDate: fmt(from), endDate: fmt(today) };
+}
+
 // ─── CSV 다운로드 ─────────────────────────────────────────────────────────────
 
 function buildCsv(opts: {
@@ -256,7 +274,7 @@ function SortableWidgetCard({ id, span, children, ...cardProps }: {
 export default function StatsPage() {
   const { t } = useTranslation();
   return (
-    <Suspense fallback={<main className="p-6">{t("statsPage.loading")}</main>}>
+    <Suspense fallback={<main className="krds-page"><p className="krds-empty">{t("statsPage.loading")}</p></main>}>
       <StatsPageInner />
     </Suspense>
   );
@@ -307,18 +325,9 @@ function StatsPageInner() {
   const setLocalSido = (v: string) =>
     setLocalFilter(f => ({ ...f, sido: v, sigungu: "" }));
 
-  // 빠른 날짜 선택: 오늘 기준 N일 전 ~ 오늘
-  const setQuickDate = (days: number | "year") => {
-    const today = new Date();
-    const fmt = (d: Date) => d.toISOString().slice(0, 10);
-    if (days === "year") {
-      setLocalFilter(f => ({ ...f, startDate: `${today.getFullYear()}-01-01`, endDate: fmt(today) }));
-    } else {
-      const from = new Date(today);
-      from.setDate(from.getDate() - (days - 1));
-      setLocalFilter(f => ({ ...f, startDate: fmt(from), endDate: fmt(today) }));
-    }
-  };
+  // 빠른 날짜 선택(필터 패널): 로컬 필터에만 넣고 적용 버튼을 눌러야 반영됨
+  const setQuickDate = (days: QuickPeriod) =>
+    setLocalFilter(f => ({ ...f, ...getQuickRange(days) }));
 
   // 프리셋에 저장하는 필터 형태 (localFilter와 동일한 편집 가능 필드)
   type StatsFilter = { sido: string; sigungu: string; startDate: string; endDate: string; type: string; levelText: string };
@@ -338,6 +347,24 @@ function StatsPageInner() {
     const query = qs.toString();
     router.push(query ? `${pathname}?${query}` : pathname);
   }, [router, pathname, keyword, source]);
+
+  // 헤더 기간 세그먼트: 적용된 다른 필터는 그대로 두고 기간만 바꿔 바로 반영
+  // (필터 패널의 적용 버튼과 같이 활성 프리셋의 필터로도 저장)
+  const applyQuickPeriod = (days: QuickPeriod) => {
+    const next: StatsFilter = {
+      sido: sido ?? "", sigungu: sigungu ?? "", type: type ?? "", levelText: levelText ?? "",
+      ...getQuickRange(days),
+    };
+    try { localStorage.setItem(`stats-filter-${activePreset}`, JSON.stringify(next)); } catch {}
+    pushFilter(next);
+    if (filterOpen) setLocalFilter(next);
+  };
+
+  // 현재 URL 기간이 헤더 기간 중 하나와 정확히 같으면 그 항목을 선택 상태로 표시
+  const activePeriod = HEADER_PERIODS.find(p => {
+    const r = getQuickRange(p);
+    return r.startDate === startDate && r.endDate === endDate;
+  });
 
   // 적용 버튼: 현재 필터를 활성 프리셋에 저장하고 URL에 반영
   const applyFilter = () => {
@@ -610,25 +637,42 @@ function StatsPageInner() {
   }, [updateLayout]);
 
   return (
-    <main className="p-3 sm:p-6 space-y-4 relative">
-      {/* 페이지 헤더 */}
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+    <main className="krds-page space-y-4 relative">
+      {/* 페이지 헤더: 경로 · 제목 · 설명, 오른쪽에 기간 세그먼트 */}
+      <header className="krds-page-head">
         <div>
-          <h1 className="text-xl font-semibold">{t("statsPage.title")}</h1>
-          <p className="text-sm text-[var(--text-muted)]">{t("statsPage.description")}</p>
+          <p className="krds-breadcrumb">
+            <Link href="/">{t("statsPage.breadcrumbHome")}</Link> › {t("nav.stats")}
+          </p>
+          <h1 className="krds-title">{t("statsPage.title")}</h1>
+          <p className="krds-desc">{t("statsPage.description")}</p>
         </div>
-        <div className="flex gap-2 shrink-0 items-center flex-wrap justify-end">
+        <div className="krds-segment stats-period" role="group" aria-label={t("statsPage.period")}>
+          {HEADER_PERIODS.map(p => (
+            <button key={p} type="button" aria-pressed={activePeriod === p} onClick={() => applyQuickPeriod(p)}>
+              {p === 365 ? t("statsPage.segYear") : t("statsPage.segDays", { days: p })}
+            </button>
+          ))}
+        </div>
+      </header>
+
+      {/* 도구 모음: 필터·프리셋(왼쪽), CSV·위젯 관리(오른쪽) */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-2">
           {/* 필터 토글 버튼 */}
-          <button onClick={openFilter}
-            className={`px-3 py-2 text-sm font-semibold rounded-lg border transition-colors flex items-center gap-1 ${hasActiveFilter ? "border-[var(--blue)] bg-[var(--blue-soft)] text-[var(--blue)]" : "border-[var(--line)] bg-[var(--surface)] text-[var(--text-body)] hover:border-blue-300 hover:text-[var(--blue)]"}`}>
-            🔍 {t("statsPage.filter")}{hasActiveFilter ? " ●" : ""}
+          <button type="button" onClick={openFilter} aria-expanded={filterOpen}
+            className={`krds-btn krds-btn--secondary krds-btn--sm ${hasActiveFilter ? "!border-[var(--krds-primary-50)] !text-[var(--krds-primary-50)]" : ""}`}>
+            <svg width="16" height="16" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+              <path d="M2 3h10l-3.5 4.5V12L5.5 10.5V7.5L2 3z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" />
+            </svg>
+            {t("statsPage.filter")}
+            {hasActiveFilter && <span className="w-2 h-2 rounded-full bg-[var(--krds-primary-50)]" aria-hidden="true" />}
           </button>
           {/* 프리셋 탭 */}
-          <div className="flex border border-[var(--line)] rounded-lg overflow-hidden">
+          <div className="krds-segment stats-preset">
             {([1, 2, 3] as const).map(p => (
               <div key={p}
-                className={`flex items-center gap-1.5 px-3 py-2 text-sm font-semibold transition-colors cursor-pointer
-                  ${activePreset === p ? "bg-[var(--blue)] text-white" : "text-[var(--text-muted)] hover:bg-[var(--canvas)]"}`}
+                className={activePreset === p ? "is-active" : ""}
                 onClick={() => switchPreset(p)}>
                 {editingPreset === p ? (
                   <input
@@ -638,26 +682,31 @@ function StatsPageInner() {
                     onBlur={commitPresetName}
                     onKeyDown={e => { if (e.key === "Enter") commitPresetName(); if (e.key === "Escape") setEditingPreset(null); }}
                     onClick={e => e.stopPropagation()}
-                    className="bg-transparent outline-none w-20 text-white placeholder-blue-200"
+                    className="bg-transparent outline-none w-24 text-white placeholder:text-white/70"
                     maxLength={10}
                   />
                 ) : (
                   <>
                     {presetNames[p]}
                     {activePreset === p && (
-                      <span
+                      <button type="button"
                         onClick={e => { e.stopPropagation(); setEditingPreset(p); setEditingName(presetNames[p]); }}
-                        className="text-blue-200 hover:text-white text-xs leading-none"
-                        title={t("statsPage.editPresetName")}>
-                        ✏️
-                      </span>
+                        className="text-white/80 hover:text-white leading-none"
+                        title={t("statsPage.editPresetName")}
+                        aria-label={t("statsPage.editPresetName")}>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                          <path d="M12 20h9" /><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" />
+                        </svg>
+                      </button>
                     )}
                   </>
                 )}
               </div>
             ))}
           </div>
-          <button onClick={() => {
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <button type="button" onClick={() => {
             const filters: Record<string, string> = {
               [t("statsPage.province")]: sido ?? t("statsPage.all"),
               [t("statsPage.district")]: sigungu ?? t("statsPage.all"),
@@ -672,99 +721,91 @@ function StatsPageInner() {
               weatherStats, weatherTypeStats, weatherRegionStats,
               weatherHourlyStats, weatherHourlyTypeStats, weatherHourlyRegionStats, isShortPeriod });
             downloadCsv(`${t("statsPage.csv.fileName")}_${new Date().toISOString().slice(0, 10)}.csv`, csv);
-          }} className="px-3 py-2 text-sm font-semibold rounded-lg border border-[var(--line)] bg-[var(--surface)] text-[var(--text-body)] hover:border-green-400 hover:text-green-600 transition-colors flex items-center gap-1">
-            ⬇ {t("statsPage.exportCsv")}
+          }} className="krds-btn krds-btn--secondary krds-btn--sm">
+            {t("statsPage.exportCsv")}
           </button>
-          <button onClick={() => setDrawerOpen(true)}
-            className="px-3 py-2 text-sm font-semibold rounded-lg bg-[var(--blue)] text-white flex items-center gap-1">
-            <span className="text-base leading-none">+</span> {t("statsPage.manageWidgets")}
+          <button type="button" onClick={() => setDrawerOpen(true)}
+            className="krds-btn krds-btn--primary krds-btn--sm">
+            <span aria-hidden="true">+</span> {t("statsPage.manageWidgets")}
           </button>
         </div>
       </div>
 
       {/* 접히는 필터 패널 */}
       {filterOpen && (
-        <div className="bg-[var(--surface)] border border-[var(--line)] rounded-xl shadow-sm px-4 py-4 space-y-3">
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+        <div className="krds-card p-5 space-y-4">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             {/* 시·도 */}
-            <div className="flex flex-col gap-1">
-              <label className="text-xs font-semibold text-[var(--text-muted)]">{t("statsPage.province")}</label>
-              <select value={localFilter.sido} onChange={e => setLocalSido(e.target.value)}
-                className="border border-[var(--line)] rounded-lg px-2 py-1.5 text-sm text-[var(--ink)] focus:outline-none focus:border-[var(--blue)]">
+            <label className="krds-field">
+              {t("statsPage.province")}
+              <select value={localFilter.sido} onChange={e => setLocalSido(e.target.value)} className="krds-control">
                 <option value="">{t("statsPage.all")}</option>
                 {METROS.map(m => <option key={m} value={m}>{t(`metros.${m}`, { defaultValue: m })}</option>)}
               </select>
-            </div>
+            </label>
             {/* 시·군·구 */}
-            <div className="flex flex-col gap-1">
-              <label className="text-xs font-semibold text-[var(--text-muted)]">{t("statsPage.district")}</label>
+            <label className="krds-field">
+              {t("statsPage.district")}
               <select value={localFilter.sigungu} onChange={e => setLocalFilter(f => ({ ...f, sigungu: e.target.value }))}
-                disabled={!localFilter.sido}
-                className="border border-[var(--line)] rounded-lg px-2 py-1.5 text-sm text-[var(--ink)] focus:outline-none focus:border-[var(--blue)] disabled:bg-[var(--canvas)] disabled:text-[var(--text-subtle)]">
+                disabled={!localFilter.sido} className="krds-control">
                 <option value="">{t("statsPage.all")}</option>
                 {sigunguList?.filter(s => s.name !== "전체").map(s => (
                   <option key={s.code} value={s.name}>{s.translatedName ?? s.name}</option>
                 ))}
               </select>
-            </div>
+            </label>
             {/* 재난 유형 */}
-            <div className="flex flex-col gap-1">
-              <label className="text-xs font-semibold text-[var(--text-muted)]">{t("statsPage.disasterType")}</label>
-              <select value={localFilter.type} onChange={e => setLocalFilter(f => ({ ...f, type: e.target.value }))}
-                className="border border-[var(--line)] rounded-lg px-2 py-1.5 text-sm text-[var(--ink)] focus:outline-none focus:border-[var(--blue)]">
+            <label className="krds-field">
+              {t("statsPage.disasterType")}
+              <select value={localFilter.type} onChange={e => setLocalFilter(f => ({ ...f, type: e.target.value }))} className="krds-control">
                 <option value="">{t("statsPage.all")}</option>
                 {DISASTER_TYPES.map(dt => <option key={dt} value={dt}>{t(`disasterTypes.${dt}`, { defaultValue: dt })}</option>)}
               </select>
-            </div>
+            </label>
             {/* 경보 단계 */}
-            <div className="flex flex-col gap-1">
-              <label className="text-xs font-semibold text-[var(--text-muted)]">{t("statsPage.alertLevel")}</label>
-              <select value={localFilter.levelText} onChange={e => setLocalFilter(f => ({ ...f, levelText: e.target.value }))}
-                className="border border-[var(--line)] rounded-lg px-2 py-1.5 text-sm text-[var(--ink)] focus:outline-none focus:border-[var(--blue)]">
+            <label className="krds-field">
+              {t("statsPage.alertLevel")}
+              <select value={localFilter.levelText} onChange={e => setLocalFilter(f => ({ ...f, levelText: e.target.value }))} className="krds-control">
                 <option value="">{t("statsPage.all")}</option>
                 <option value="안전안내문자">{t("statsPage.levels.LEVEL_1")}</option>
                 <option value="긴급재난문자">{t("statsPage.levels.LEVEL_2")}</option>
                 <option value="위급재난문자">{t("statsPage.levels.LEVEL_3")}</option>
               </select>
-            </div>
+            </label>
           </div>
 
           {/* 기간 선택 */}
-          <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-semibold text-[var(--text-muted)]">{t("statsPage.period")}</label>
+          <div className="krds-field">
+            {t("statsPage.period")}
             <div className="flex flex-wrap items-center gap-2">
-              <DatePicker value={localFilter.startDate} onChange={v => setLocalFilter(f => ({ ...f, startDate: v }))} locale={locale} clearLabel={t("datePicker.clear")} prevMonthLabel={t("datePicker.prevMonth")} nextMonthLabel={t("datePicker.nextMonth")} className="border border-[var(--line)] rounded-lg px-2 py-1.5 text-sm text-[var(--ink)] focus:outline-none focus:border-[var(--blue)]" />
-              <span className="text-[var(--text-subtle)] text-sm">~</span>
-              <DatePicker value={localFilter.endDate} onChange={v => setLocalFilter(f => ({ ...f, endDate: v }))} locale={locale} clearLabel={t("datePicker.clear")} prevMonthLabel={t("datePicker.prevMonth")} nextMonthLabel={t("datePicker.nextMonth")} className="border border-[var(--line)] rounded-lg px-2 py-1.5 text-sm text-[var(--ink)] focus:outline-none focus:border-[var(--blue)]" />
-              <div className="flex gap-1">
-                {([7, 30, 90] as const).map(d => (
-                  <button key={d} onClick={() => setQuickDate(d)}
-                    className="px-2.5 py-1.5 text-xs font-semibold border border-[var(--line)] rounded-lg text-[var(--text-body)] hover:border-[var(--blue)] hover:text-[var(--blue)] transition-colors">
-                    {t("statsPage.lastDays", { days: d })}
+              <DatePicker value={localFilter.startDate} onChange={v => setLocalFilter(f => ({ ...f, startDate: v }))} locale={locale} clearLabel={t("datePicker.clear")} prevMonthLabel={t("datePicker.prevMonth")} nextMonthLabel={t("datePicker.nextMonth")} className="krds-control min-w-[160px]" />
+              <span className="text-[var(--krds-gray-50)] font-normal">~</span>
+              <DatePicker value={localFilter.endDate} onChange={v => setLocalFilter(f => ({ ...f, endDate: v }))} locale={locale} clearLabel={t("datePicker.clear")} prevMonthLabel={t("datePicker.prevMonth")} nextMonthLabel={t("datePicker.nextMonth")} className="krds-control min-w-[160px]" />
+              <div className="flex flex-wrap gap-2">
+                {QUICK_PERIODS.map(d => (
+                  <button key={d} type="button" onClick={() => setQuickDate(d)}
+                    className="krds-btn krds-btn--secondary krds-btn--sm">
+                    {d === "year" ? t("statsPage.thisYear") : t("statsPage.lastDays", { days: d })}
                   </button>
                 ))}
-                <button onClick={() => setQuickDate("year")}
-                  className="px-2.5 py-1.5 text-xs font-semibold border border-[var(--line)] rounded-lg text-[var(--text-body)] hover:border-[var(--blue)] hover:text-[var(--blue)] transition-colors">
-                  {t("statsPage.thisYear")}
-                </button>
               </div>
             </div>
           </div>
 
           {/* 액션 버튼 */}
-          <div className="flex justify-end gap-2 pt-1">
-            <button onClick={() => setFilterOpen(false)}
-              className="px-4 py-1.5 text-sm font-semibold border border-[var(--line)] rounded-lg text-[var(--text-body)] hover:bg-[var(--canvas)] transition-colors">
+          <div className="flex justify-end gap-2">
+            <button type="button" onClick={() => setFilterOpen(false)}
+              className="krds-btn krds-btn--secondary krds-btn--sm">
               {t("statsPage.cancel")}
             </button>
-            <button onClick={() => {
+            <button type="button" onClick={() => {
               setLocalFilter({ sido: "", sigungu: "", startDate: "", endDate: "", type: "", levelText: "" });
             }}
-              className="px-4 py-1.5 text-sm font-semibold border border-[var(--line)] rounded-lg text-[var(--text-muted)] hover:bg-[var(--canvas)] transition-colors">
+              className="krds-btn krds-btn--secondary krds-btn--sm">
               {t("statsPage.reset")}
             </button>
-            <button onClick={applyFilter}
-              className="px-4 py-1.5 text-sm font-semibold rounded-lg bg-[var(--blue)] text-white hover:brightness-95 transition-colors">
+            <button type="button" onClick={applyFilter}
+              className="krds-btn krds-btn--primary krds-btn--sm">
               {t("statsPage.apply")}
             </button>
           </div>
@@ -776,32 +817,40 @@ function StatsPageInner() {
         type={type} levelText={levelText} keyword={keyword} source={source} onFilterOpen={openFilter} />
 
       {/* KPI */}
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <KpiBox variant="coral" icon="📨" label={t("statsPage.totalAlerts")} value={`${totalCount.toLocaleString(locale)}${t("statsPage.countUnit")}`} sub={t("statsPage.filteredResult")} />
-        <KpiBox variant="blue" icon="📅" label={t("statsPage.dailyAverage")} value={`${dailyAvg}${t("statsPage.countUnit")}`}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <KpiBox label={t("statsPage.totalAlerts")} value={`${totalCount.toLocaleString(locale)}${t("statsPage.countUnit")}`} sub={t("statsPage.filteredResult")} />
+        <KpiBox label={t("statsPage.dailyAverage")} value={`${dailyAvg}${t("statsPage.countUnit")}`}
           sub={startDate && endDate ? t("statsPage.dayBasis", { days: periodDays }) : t("statsPage.recentThirtyDays")} />
-        <KpiBox variant="purple" icon="🌧" label={t("statsPage.topType")} value={topType?.type ? (t(`disasterTypes.${topType.type}`, { defaultValue: topType.type })) : "-"}
+        <KpiBox label={t("statsPage.topType")} value={topType?.type ? (t(`disasterTypes.${topType.type}`, { defaultValue: topType.type })) : "-"}
           sub={topType ? `${topType.count.toLocaleString(locale)}${t("statsPage.countUnit")} · ${Math.round((topType.count / (totalCount || 1)) * 100)}%` : "-"} />
-        <KpiBox variant="green" icon="📍" label={t("statsPage.topRegion")} value={topRegion?.region ? (t(`metros.${topRegion.region}`, { defaultValue: topRegion.region })) : "-"}
+        <KpiBox label={t("statsPage.topRegion")} value={topRegion?.region ? (t(`metros.${topRegion.region}`, { defaultValue: topRegion.region })) : "-"}
           sub={topRegion ? `${topRegion.count.toLocaleString(locale)}${t("statsPage.countUnit")}` : "-"} />
       </div>
 
       {/* 데이터 요약 테이블: 접기/펼치기 */}
-      <div className="bg-[var(--surface)] border border-[var(--line)] rounded-xl shadow-sm overflow-hidden">
+      <div className="krds-card overflow-hidden">
         <button
+          type="button"
           onClick={() => setTableOpen(o => !o)}
-          className="w-full flex items-center justify-between px-4 py-3 text-sm font-semibold text-[var(--text-body)] hover:bg-[var(--canvas)] transition-colors">
-          <span>📋 {t("statsPage.dataSummary")}</span>
-          <span className="text-[var(--text-subtle)] text-xs">{tableOpen ? `▲ ${t("statsPage.collapse")}` : `▼ ${t("statsPage.expand")}`}</span>
+          aria-expanded={tableOpen}
+          className="w-full flex items-center justify-between gap-3 px-5 py-4 text-left hover:bg-[var(--krds-primary-5)] transition-colors">
+          <span className="text-[19px] font-bold text-[var(--krds-gray-90)]">{t("statsPage.dataSummary")}</span>
+          <span className="flex items-center gap-1.5 text-[15px] text-[var(--krds-gray-50)]">
+            {tableOpen ? t("statsPage.collapse") : t("statsPage.expand")}
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+              className={`transition-transform ${tableOpen ? "rotate-180" : ""}`} aria-hidden="true">
+              <path d="m6 9 6 6 6-6" />
+            </svg>
+          </span>
         </button>
 
         {tableOpen && (
-          <div className="border-t border-[var(--line)]">
+          <div className="border-t border-[var(--krds-gray-20)]">
             {/* 탭 */}
-            <div className="flex border-b border-[var(--line)] px-4 gap-4">
+            <div className="krds-tabs px-2" role="tablist">
               {([ ["type", t("statsPage.tableTabs.type")], ["region", t("statsPage.tableTabs.region")], ["level", t("statsPage.tableTabs.level")], ["quarter", t("statsPage.tableTabs.quarter")], ["daily", t("statsPage.tableTabs.daily")] ] as const).map(([key, label]) => (
-                <button key={key} onClick={() => setTableTab(key)}
-                  className={`py-2 text-xs font-semibold border-b-2 transition-colors ${tableTab === key ? "border-[var(--blue)] text-[var(--blue)]" : "border-transparent text-[var(--text-subtle)] hover:text-[var(--text-body)]"}`}>
+                <button key={key} type="button" role="tab" aria-selected={tableTab === key} onClick={() => setTableTab(key)}
+                  className="krds-tab">
                   {label}
                 </button>
               ))}
@@ -809,22 +858,22 @@ function StatsPageInner() {
 
             <div className="overflow-x-auto">
               {tableTab === "type" && (
-                <table className="w-full text-xs">
-                  <thead className="bg-[var(--canvas)]"><tr>
-                    <th className="px-4 py-2 text-left font-semibold text-[var(--text-muted)] w-8">{t("statsPage.rank")}</th>
-                    <th className="px-4 py-2 text-left font-semibold text-[var(--text-muted)]">{t("statsPage.type")}</th>
-                    <th className="px-4 py-2 text-right font-semibold text-[var(--text-muted)]">{t("statsPage.count")}</th>
-                    <th className="px-4 py-2 text-right font-semibold text-[var(--text-muted)]">{t("statsPage.share")}</th>
+                <table className="stats-table">
+                  <thead><tr>
+                    <th className="w-20">{t("statsPage.rank")}</th>
+                    <th>{t("statsPage.type")}</th>
+                    <th className="num">{t("statsPage.count")}</th>
+                    <th className="num">{t("statsPage.share")}</th>
                   </tr></thead>
-                  <tbody className="divide-y divide-gray-50">
+                  <tbody>
                     {typeStats.length === 0
-                      ? <tr><td colSpan={4} className="px-4 py-6 text-center text-[var(--text-subtle)]">{t("statsPage.noData")}</td></tr>
+                      ? <tr><td colSpan={4} className="stats-empty">{t("statsPage.noData")}</td></tr>
                       : typeStats.map((d, i) => (
-                        <tr key={i} className="hover:bg-[var(--canvas)]">
-                          <td className="px-4 py-2 text-[var(--text-subtle)]">{i + 1}</td>
-                          <td className="px-4 py-2 text-[var(--text-body)]">{t(`disasterTypes.${d.type}`, { defaultValue: d.type }) ?? t("statsPage.other")}</td>
-                          <td className="px-4 py-2 text-right font-semibold text-[var(--ink)]">{d.count.toLocaleString(locale)}</td>
-                          <td className="px-4 py-2 text-right text-[var(--text-muted)]">{Math.round((d.count / (totalCount || 1)) * 100)}%</td>
+                        <tr key={i}>
+                          <td className="text-[var(--krds-gray-50)]">{i + 1}</td>
+                          <td>{t(`disasterTypes.${d.type}`, { defaultValue: d.type }) ?? t("statsPage.other")}</td>
+                          <td className="num">{d.count.toLocaleString(locale)}</td>
+                          <td className="num muted">{Math.round((d.count / (totalCount || 1)) * 100)}%</td>
                         </tr>
                     ))}
                   </tbody>
@@ -832,24 +881,24 @@ function StatsPageInner() {
               )}
 
               {tableTab === "region" && (
-                <table className="w-full text-xs">
-                  <thead className="bg-[var(--canvas)]"><tr>
-                    <th className="px-4 py-2 text-left font-semibold text-[var(--text-muted)] w-8">{t("statsPage.rank")}</th>
-                    <th className="px-4 py-2 text-left font-semibold text-[var(--text-muted)]">{t("statsPage.region")}</th>
-                    <th className="px-4 py-2 text-right font-semibold text-[var(--text-muted)]">{t("statsPage.count")}</th>
-                    <th className="px-4 py-2 text-right font-semibold text-[var(--text-muted)]">{t("statsPage.share")}</th>
+                <table className="stats-table">
+                  <thead><tr>
+                    <th className="w-20">{t("statsPage.rank")}</th>
+                    <th>{t("statsPage.region")}</th>
+                    <th className="num">{t("statsPage.count")}</th>
+                    <th className="num">{t("statsPage.share")}</th>
                   </tr></thead>
-                  <tbody className="divide-y divide-gray-50">
+                  <tbody>
                     {regionStats.length === 0
-                      ? <tr><td colSpan={4} className="px-4 py-6 text-center text-[var(--text-subtle)]">{t("statsPage.noData")}</td></tr>
+                      ? <tr><td colSpan={4} className="stats-empty">{t("statsPage.noData")}</td></tr>
                       : regionStats.map((d, i) => {
                         const regionTotal = regionStats.reduce((s, r) => s + r.count, 0) || 1;
                         return (
-                          <tr key={i} className="hover:bg-[var(--canvas)]">
-                            <td className="px-4 py-2 text-[var(--text-subtle)]">{i + 1}</td>
-                            <td className="px-4 py-2 text-[var(--text-body)]">{t(`metros.${d.region}`, { defaultValue: d.region })}</td>
-                            <td className="px-4 py-2 text-right font-semibold text-[var(--ink)]">{d.count.toLocaleString(locale)}</td>
-                            <td className="px-4 py-2 text-right text-[var(--text-muted)]">{Math.round((d.count / regionTotal) * 100)}%</td>
+                          <tr key={i}>
+                            <td className="text-[var(--krds-gray-50)]">{i + 1}</td>
+                            <td>{t(`metros.${d.region}`, { defaultValue: d.region })}</td>
+                            <td className="num">{d.count.toLocaleString(locale)}</td>
+                            <td className="num muted">{Math.round((d.count / regionTotal) * 100)}%</td>
                           </tr>
                         );
                       })}
@@ -860,20 +909,20 @@ function StatsPageInner() {
               {tableTab === "level" && (() => {
                 const levelTotal = levelStats.reduce((s, d) => s + d.count, 0) || 1;
                 return (
-                  <table className="w-full text-xs">
-                    <thead className="bg-[var(--canvas)]"><tr>
-                      <th className="px-4 py-2 text-left font-semibold text-[var(--text-muted)]">{t("statsPage.tableTabs.level")}</th>
-                      <th className="px-4 py-2 text-right font-semibold text-[var(--text-muted)]">{t("statsPage.count")}</th>
-                      <th className="px-4 py-2 text-right font-semibold text-[var(--text-muted)]">{t("statsPage.share")}</th>
+                  <table className="stats-table">
+                    <thead><tr>
+                      <th>{t("statsPage.tableTabs.level")}</th>
+                      <th className="num">{t("statsPage.count")}</th>
+                      <th className="num">{t("statsPage.share")}</th>
                     </tr></thead>
-                    <tbody className="divide-y divide-gray-50">
+                    <tbody>
                       {levelStats.length === 0
-                        ? <tr><td colSpan={3} className="px-4 py-6 text-center text-[var(--text-subtle)]">{t("statsPage.noData")}</td></tr>
+                        ? <tr><td colSpan={3} className="stats-empty">{t("statsPage.noData")}</td></tr>
                         : levelStats.map((d, i) => (
-                          <tr key={i} className="hover:bg-[var(--canvas)]">
-                            <td className="px-4 py-2 text-[var(--text-body)]">{d.level ? (t(`statsPage.levels.${d.level}`, { defaultValue: d.level })) : t("statsPage.other")}</td>
-                            <td className="px-4 py-2 text-right font-semibold text-[var(--ink)]">{d.count.toLocaleString(locale)}</td>
-                            <td className="px-4 py-2 text-right text-[var(--text-muted)]">{Math.round((d.count / levelTotal) * 100)}%</td>
+                          <tr key={i}>
+                            <td>{d.level ? (t(`statsPage.levels.${d.level}`, { defaultValue: d.level })) : t("statsPage.other")}</td>
+                            <td className="num">{d.count.toLocaleString(locale)}</td>
+                            <td className="num muted">{Math.round((d.count / levelTotal) * 100)}%</td>
                           </tr>
                       ))}
                     </tbody>
@@ -884,20 +933,20 @@ function StatsPageInner() {
               {tableTab === "quarter" && (() => {
                 const quarterTotal = quarterStats.reduce((s, d) => s + d.count, 0) || 1;
                 return (
-                  <table className="w-full text-xs">
-                    <thead className="bg-[var(--canvas)]"><tr>
-                      <th className="px-4 py-2 text-left font-semibold text-[var(--text-muted)]">{t("statsPage.quarter")}</th>
-                      <th className="px-4 py-2 text-right font-semibold text-[var(--text-muted)]">{t("statsPage.count")}</th>
-                      <th className="px-4 py-2 text-right font-semibold text-[var(--text-muted)]">{t("statsPage.share")}</th>
+                  <table className="stats-table">
+                    <thead><tr>
+                      <th>{t("statsPage.quarter")}</th>
+                      <th className="num">{t("statsPage.count")}</th>
+                      <th className="num">{t("statsPage.share")}</th>
                     </tr></thead>
-                    <tbody className="divide-y divide-gray-50">
+                    <tbody>
                       {quarterStats.length === 0
-                        ? <tr><td colSpan={3} className="px-4 py-6 text-center text-[var(--text-subtle)]">{t("statsPage.noData")}</td></tr>
+                        ? <tr><td colSpan={3} className="stats-empty">{t("statsPage.noData")}</td></tr>
                         : quarterStats.map((d, i) => (
-                          <tr key={i} className="hover:bg-[var(--canvas)]">
-                            <td className="px-4 py-2 text-[var(--text-body)]">{d.quarter}</td>
-                            <td className="px-4 py-2 text-right font-semibold text-[var(--ink)]">{d.count.toLocaleString(locale)}</td>
-                            <td className="px-4 py-2 text-right text-[var(--text-muted)]">{Math.round((d.count / quarterTotal) * 100)}%</td>
+                          <tr key={i}>
+                            <td>{d.quarter}</td>
+                            <td className="num">{d.count.toLocaleString(locale)}</td>
+                            <td className="num muted">{Math.round((d.count / quarterTotal) * 100)}%</td>
                           </tr>
                       ))}
                     </tbody>
@@ -906,18 +955,18 @@ function StatsPageInner() {
               })()}
 
               {tableTab === "daily" && (
-                <table className="w-full text-xs">
-                  <thead className="bg-[var(--canvas)]"><tr>
-                    <th className="px-4 py-2 text-left font-semibold text-[var(--text-muted)]">{t("statsPage.date")}</th>
-                    <th className="px-4 py-2 text-right font-semibold text-[var(--text-muted)]">{t("statsPage.count")}</th>
+                <table className="stats-table">
+                  <thead><tr>
+                    <th>{t("statsPage.date")}</th>
+                    <th className="num">{t("statsPage.count")}</th>
                   </tr></thead>
-                  <tbody className="divide-y divide-gray-50">
+                  <tbody>
                     {dailyStats.length === 0
-                      ? <tr><td colSpan={2} className="px-4 py-6 text-center text-[var(--text-subtle)]">{t("statsPage.noData")}</td></tr>
+                      ? <tr><td colSpan={2} className="stats-empty">{t("statsPage.noData")}</td></tr>
                       : dailyStats.map((d, i) => (
-                        <tr key={i} className="hover:bg-[var(--canvas)]">
-                          <td className="px-4 py-2 text-[var(--text-body)]">{d.date}</td>
-                          <td className="px-4 py-2 text-right font-semibold text-[var(--ink)]">{d.count.toLocaleString(locale)}</td>
+                        <tr key={i}>
+                          <td>{d.date}</td>
+                          <td className="num">{d.count.toLocaleString(locale)}</td>
                         </tr>
                     ))}
                   </tbody>
@@ -930,21 +979,21 @@ function StatsPageInner() {
 
       {/* 크로스 필터 배지: 차트 클릭으로 유형 필터 활성 시 표시 */}
       {crossFilter.type && (
-        <div className="flex items-center gap-2">
-          <div className="flex items-center gap-2 bg-violet-50 border border-violet-200 rounded-lg px-3 py-1.5 text-sm text-violet-800">
-            <span className="text-xs">{t("statsPage.chartFilter")}</span>
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="flex items-center gap-2 rounded-[var(--radius-control)] border border-[var(--krds-primary-10)] bg-[var(--krds-primary-5)] px-3 py-1.5 text-[15px] text-[var(--krds-primary-60)]">
+            <span>{t("statsPage.chartFilter")}</span>
             <span className="font-bold">{t(`disasterTypes.${crossFilter.type}`, { defaultValue: crossFilter.type })}</span>
-            <button onClick={() => setCrossFilter({})}
-              className="text-violet-400 hover:text-violet-700 font-bold leading-none ml-1">×</button>
+            <button type="button" onClick={() => setCrossFilter({})} aria-label={t("statsPage.clear")}
+              className="ml-1 text-[18px] font-bold leading-none hover:text-[var(--krds-primary-50)]">×</button>
           </div>
-          <span className="text-xs text-[var(--text-subtle)]">{t("statsPage.chartFilterHint")}</span>
+          <span className="text-[14px] text-[var(--krds-gray-50)]">{t("statsPage.chartFilterHint")}</span>
         </div>
       )}
 
       {/* 위젯 그리드 */}
       <DndContext id="stats-widget-dnd" sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
         <SortableContext items={layout.map(w => w.id)} strategy={rectSortingStrategy}>
-          <div className="stats-grid" style={{ display: "grid", gridTemplateColumns: "repeat(12, 1fr)", gap: 12 }}>
+          <div className="stats-grid" style={{ display: "grid", gridTemplateColumns: "repeat(12, 1fr)", gap: 16 }}>
             {layout.map(w => {
               const lib = widgetLibrary.find(x => x.id === w.libId);
               if (!lib) return null;
@@ -988,9 +1037,9 @@ function StatsPageInner() {
       </DndContext>
 
       {/* 안내 */}
-      <div className="bg-[var(--blue-soft)] border border-blue-200 rounded-xl px-4 py-3 text-xs text-blue-800 leading-relaxed">
-        💡 <b>{t("statsPage.connectedNotice")}</b> {t("statsPage.connectedNoticeBody")}
-        <Link href="/alerts" className="ml-2 underline font-semibold">{t("statsPage.openAlerts")} →</Link>
+      <div className="rounded-[var(--radius-card)] bg-[var(--krds-info-5)] px-5 py-4 text-[15px] leading-relaxed text-[var(--krds-gray-70)]">
+        <b className="text-[var(--krds-info-60)]">{t("statsPage.connectedNotice")}</b> {t("statsPage.connectedNoticeBody")}
+        <Link href="/alerts" className="ml-2 font-bold text-[var(--krds-primary-50)] underline">{t("statsPage.openAlerts")}</Link>
       </div>
 
       {/* 위젯 드로어 */}

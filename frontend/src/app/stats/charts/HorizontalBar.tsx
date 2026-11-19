@@ -1,12 +1,12 @@
 "use client";
 
 import {
-  BarChart, Bar, Cell,
+  BarChart, Bar,
   XAxis, YAxis,
   Tooltip,
   ResponsiveContainer,
 } from "recharts";
-import { BAR_COLORS } from "../_constants";
+import { BAR_FILL, CHART_CURSOR } from "../_constants";
 import type { RegionStat } from "../_constants";
 import { EmptyChart } from "../_charts";
 import { useTranslation } from "react-i18next";
@@ -18,6 +18,8 @@ import { LANG_LOCALE, TT_BOX, TT_LABEL, TT_VALUE, TTProps } from "./common";
  *
  * 지역별 재난 건수를 가로 막대로 표현합니다.
  * Recharts의 BarChart에 layout="vertical"을 사용하면 가로 막대가 됩니다.
+ *
+ * 항목마다 다른 색을 쓰지 않고 primary-50 한 색으로 칠합니다(KRDS 강조색 5% 규칙).
  *
  * @param data - { region: 지역명, count: 건수 }[] 배열
  */
@@ -49,16 +51,12 @@ export function HorizontalBar({ data, onBarClick, labelFormatter }: { data: Regi
           {/* type="category": 세로 축이 텍스트(지역명) */}
           {/* interval={0}: 번역된 라벨이 길어져도 Recharts가 겹침 방지를 위해 임의로 건너뛰지 않고 전부 표시 */}
           <YAxis type="category" dataKey="region" width={80} axisLine={false} tickLine={false} interval={0}
-            tick={{ fontSize: 11, fill: "#374151" }} tickFormatter={labelFormatter} />
-          <Tooltip content={<TooltipContent />} cursor={{ fill: "#f3f4f6" }} />
-          <Bar dataKey="count" radius={[0, 3, 3, 0]} barSize={14} isAnimationActive={false}
+            tick={{ fontSize: 11, fill: "#464c53" }} tickFormatter={labelFormatter} />
+          <Tooltip content={<TooltipContent />} cursor={{ fill: CHART_CURSOR }} />
+          <Bar dataKey="count" fill={BAR_FILL} radius={[0, 3, 3, 0]} barSize={14} isAnimationActive={false}
             cursor={onBarClick ? "pointer" : "default"}
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            onClick={onBarClick ? (d: any) => onBarClick(d.region ?? "") : undefined}>
-            {data.map((_, i) => (
-              <Cell key={i} fill={BAR_COLORS[i % BAR_COLORS.length]} />
-            ))}
-          </Bar>
+            onClick={onBarClick ? (d: any) => onBarClick(d.region ?? "") : undefined} />
         </BarChart>
       </ResponsiveContainer>
     </div>

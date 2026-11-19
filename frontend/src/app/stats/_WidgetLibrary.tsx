@@ -16,33 +16,39 @@ export function WidgetLibrary({ open, onClose, layout, onAdd, onRemove }: {
   return (
     <>
       <div className="fixed inset-0 bg-black/30 z-10" onClick={onClose} />
-      <aside className="fixed top-0 right-0 bottom-0 w-80 bg-[var(--surface)] shadow-2xl z-20 flex flex-col" onClick={e => e.stopPropagation()}>
-        <div className="flex items-center gap-2 px-4 py-3.5 border-b border-[var(--line)]">
-          <h3 className="flex-1 text-sm font-bold text-[var(--ink)]">{t("statsPage.widgetLibrary")}</h3>
-          <button onClick={onClose} className="w-7 h-7 border border-[var(--line)] rounded-lg text-[var(--text-subtle)] text-sm" aria-label={t("statsPage.close")}>×</button>
+      <aside className="fixed top-0 right-0 bottom-0 w-[360px] max-w-full bg-[var(--krds-gray-0)] border-l border-[var(--krds-gray-20)] z-20 flex flex-col" onClick={e => e.stopPropagation()}>
+        <div className="flex items-start gap-3 px-5 py-4 border-b border-[var(--krds-gray-20)]">
+          <div className="flex-1 min-w-0">
+            <h3 className="text-[19px] font-bold text-[var(--krds-gray-90)]">{t("statsPage.widgetLibrary")}</h3>
+            <p className="mt-1 text-[15px] text-[var(--krds-gray-50)]">{t("statsPage.widgetLibraryDescription")}</p>
+          </div>
+          <button type="button" onClick={onClose} className="stats-icon-btn" aria-label={t("statsPage.close")}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+              <path d="M6 6l12 12" /><path d="M18 6 6 18" />
+            </svg>
+          </button>
         </div>
-        <div className="flex-1 overflow-auto p-4 space-y-2">
+        <div className="flex-1 overflow-auto p-5 space-y-3">
           {widgetLibrary.map(item => {
             const widgetId = usedMap.get(item.id);
             const added = !!widgetId;
             return (
-              <div key={item.id} className={`flex items-start gap-2.5 p-3 border rounded-lg transition-colors ${added ? "border-blue-200 bg-[var(--blue-soft)]" : "border-[var(--line)] bg-[var(--surface)]"}`}>
-                <span className="text-xl leading-none">{item.icon}</span>
+              <div key={item.id} className="krds-card flex items-start gap-3 p-4">
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-xs font-bold text-[var(--ink)]">{item.title}</span>
-                    {added && <span className="text-xs font-bold text-[var(--blue)] bg-blue-100 px-1.5 py-0.5 rounded">{t("statsPage.visible")}</span>}
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <span className="text-[16px] font-bold text-[var(--krds-gray-90)]">{item.title}</span>
+                    {added && <span className="krds-badge krds-badge--info">{t("statsPage.visible")}</span>}
                   </div>
-                  <div className="text-xs text-[var(--text-subtle)] mt-0.5">{item.desc}</div>
+                  <div className="text-[15px] text-[var(--krds-gray-50)] mt-1">{item.desc}</div>
                 </div>
                 {added ? (
-                  <button onClick={() => onRemove(widgetId!)}
-                    className="shrink-0 px-2 py-1 text-xs font-semibold border border-red-200 text-red-500 rounded hover:bg-red-50 transition-colors">
+                  <button type="button" onClick={() => onRemove(widgetId!)}
+                    className="krds-btn krds-btn--secondary krds-btn--sm shrink-0">
                     {t("statsPage.remove")}
                   </button>
                 ) : (
-                  <button onClick={() => onAdd(item)}
-                    className="shrink-0 px-2 py-1 text-xs font-semibold border border-blue-300 text-[var(--blue)] rounded hover:bg-[var(--blue-soft)] transition-colors">
+                  <button type="button" onClick={() => onAdd(item)}
+                    className="krds-btn krds-btn--secondary krds-btn--sm shrink-0">
                     {t("statsPage.add")}
                   </button>
                 )}

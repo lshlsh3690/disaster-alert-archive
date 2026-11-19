@@ -10,13 +10,13 @@ export const LANG_LOCALE: Record<string, string> = { ko: "ko-KR", en: "en-US", z
 
 // 툴팁 박스 배경·모서리 둥글기 등 컨테이너 스타일
 export const TT_BOX: React.CSSProperties = {
-  background: "#1e293b",  // 어두운 네이비 배경
+  background: "#1e2124",  // KRDS gray-90
   borderRadius: 6,
   padding: "6px 10px",
   border: "none",
 };
 // 툴팁 제목(날짜, 지역명 등) 스타일
-export const TT_LABEL: React.CSSProperties = { color: "#94a3b8", fontSize: 10, margin: "0 0 2px 0" };
+export const TT_LABEL: React.CSSProperties = { color: "#b1b8be", fontSize: 10, margin: "0 0 2px 0" };
 // 툴팁 숫자(건수 등) 스타일
 export const TT_VALUE: React.CSSProperties = { color: "#fff", fontSize: 12, fontWeight: 700, margin: 0 };
 
