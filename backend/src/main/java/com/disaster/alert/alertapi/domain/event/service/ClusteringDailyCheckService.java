@@ -1,5 +1,6 @@
 package com.disaster.alert.alertapi.domain.event.service;
 
+import com.disaster.alert.alertapi.domain.event.dto.ClusteringDashboardDailyCheckAlertsResponse;
 import com.disaster.alert.alertapi.domain.event.model.ClusteringDailyCheck;
 import com.disaster.alert.alertapi.domain.event.repository.ClusteringDailyCheckRepository;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -78,6 +79,17 @@ public class ClusteringDailyCheckService {
             check.update(incident, unassigned, noEmbedding, checkedAt);
         }
         return repository.save(check);
+    }
+
+    /**
+     * 해당 날짜의 문제 알림(INCIDENT 이면서 이벤트 미배정이거나 임베딩 없음)을 발송 시각 오름차순으로 돌려준다.
+     * 위 건수 쿼리와 같은 날짜 범위·조건이어야 화면의 숫자와 목록이 어긋나지 않는다.
+     *
+     * <p>Red 단계 뼈대 - 항상 빈 목록을 돌려준다. 조회는 Green 에서 쓴다.
+     */
+    @Transactional(readOnly = true)
+    public ClusteringDashboardDailyCheckAlertsResponse problemAlerts(LocalDate date) {
+        return new ClusteringDashboardDailyCheckAlertsResponse(date, List.of());
     }
 
     /**

@@ -1,5 +1,6 @@
 package com.disaster.alert.alertapi.domain.event.controller;
 
+import com.disaster.alert.alertapi.domain.event.dto.ClusteringDashboardDailyCheckAlertsResponse;
 import com.disaster.alert.alertapi.domain.event.dto.ClusteringDashboardDailyChecksResponse;
 import com.disaster.alert.alertapi.domain.event.dto.ClusteringDashboardDailyScoresResponse;
 import com.disaster.alert.alertapi.domain.event.dto.ClusteringDashboardDisagreementsResponse;
@@ -8,6 +9,7 @@ import com.disaster.alert.alertapi.domain.event.dto.ClusteringDashboardJudgeVers
 import com.disaster.alert.alertapi.domain.event.dto.ClusteringPairLabelRequest;
 import com.disaster.alert.alertapi.domain.event.dto.ClusteringPairLabelResponse;
 import com.disaster.alert.alertapi.domain.event.model.ClusteringDailyScorePair.Disagreement;
+import com.disaster.alert.alertapi.domain.event.service.ClusteringDailyCheckService;
 import com.disaster.alert.alertapi.domain.event.service.ClusteringDashboardService;
 import com.disaster.alert.alertapi.domain.event.service.ClusteringPairLabelService;
 import com.disaster.alert.alertapi.global.dto.ApiResponse;
@@ -18,6 +20,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -43,6 +46,7 @@ public class ClusteringAdminController {
 
     private final ClusteringDashboardService dashboardService;
     private final ClusteringPairLabelService pairLabelService;
+    private final ClusteringDailyCheckService dailyCheckService;
 
     /** 날짜별 일일 채점. from·to 는 yyyy-MM-dd(양 끝 포함). */
     @GetMapping("/daily-scores")
@@ -88,6 +92,13 @@ public class ClusteringAdminController {
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
         return ResponseEntity.ok(ApiResponse.success(dashboardService.dailyChecks(from, to)));
+    }
+
+    /** 구조 검사 표의 한 날짜 행을 펼쳤을 때 보이는 그날의 문제 알림(미배정 또는 임베딩 없음). date 는 yyyy-MM-dd. */
+    @GetMapping("/daily-checks/{date}/alerts")
+    public ResponseEntity<ApiResponse<ClusteringDashboardDailyCheckAlertsResponse>> dailyCheckAlerts(
+            @PathVariable @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
+        return ResponseEntity.ok(ApiResponse.success(dailyCheckService.problemAlerts(date)));
     }
 
     /** 판사 버전 이력. */
