@@ -37,3 +37,18 @@ export const ZArchiveEventResolve = z.object({
     .nullable(),
 });
 export type ArchiveEventResolve = z.infer<typeof ZArchiveEventResolve>;
+
+/** 원문 기록(스토리 1). 인용·공유 링크는 sn 으로 만든다. agency 는 본문에 발신 기관 표기가 없으면 null. */
+export const ZArchiveAlert = z.object({
+  sn: z.number(),
+  alertId: z.number(),
+  message: z.string(),
+  createdAt: z.string(),
+  modifiedDate: z.string().nullable().optional(),
+  disasterType: z.string().nullable().optional(),
+  emergencyLevel: z.string().nullable().optional(),
+  originalRegion: z.string().nullable().optional(),
+  inEvent: z.boolean(),
+  agency: z.object({ label: z.string(), name: z.string().nullable().optional() }).nullable(),
+});
+export type ArchiveAlert = z.infer<typeof ZArchiveAlert>;

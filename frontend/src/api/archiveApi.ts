@@ -1,5 +1,12 @@
 import instance from "./axios";
-import { ZArchiveEventResolve, ZArchiveMajorEvents, type ArchiveEventResolve, type ArchiveMajorEvents } from "@/types/archive";
+import {
+  ZArchiveAlert,
+  ZArchiveEventResolve,
+  ZArchiveMajorEvents,
+  type ArchiveAlert,
+  type ArchiveEventResolve,
+  type ArchiveMajorEvents,
+} from "@/types/archive";
 
 /** 연도별 주요 사건. year 를 빼면 사건이 있는 가장 최근 연도. 응답은 ApiResponse 로 감싸져 온다. */
 export async function fetchMajorEvents(year?: number | null): Promise<ArchiveMajorEvents> {
@@ -16,4 +23,12 @@ export async function resolveArchiveEvent(sn: number): Promise<ArchiveEventResol
     headers: { "X-Auth-Required": "false" },
   });
   return ZArchiveEventResolve.parse(res.data.data);
+}
+
+/** 원문 기록(/archive/alerts/{sn}). 없는 sn 은 404 로 throw. */
+export async function fetchArchiveAlert(sn: number): Promise<ArchiveAlert> {
+  const res = await instance.get(`/api/v1/archive/alerts/${sn}`, {
+    headers: { "X-Auth-Required": "false" },
+  });
+  return ZArchiveAlert.parse(res.data.data);
 }
