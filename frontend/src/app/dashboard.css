@@ -1,313 +1,130 @@
-.safety-dashboard {
-  --ink: #172033;
-  --muted: #687386;
-  --line: #e7eaf0;
-  --canvas: #f6f7f9;
-  --surface: #ffffff;
-  --blue: #3867e8;
-  --blue-soft: #edf2ff;
-  --coral: #ef7668;
-  min-height: calc(100vh - 48px);
-  overflow: hidden;
-  background: #eef2f7;
-  color: var(--ink);
+/*
+ * 대시보드(3a 표준형): 헤더 아래 전체를 지도 하나로 채운다. 지역 이름·건수는 지도 위에 직접 쓰고(KoreaMap25D showRegionLabels),
+ * 왼쪽 위에 제목 블록, 오른쪽 아래에 범례를 띄운다. 수치는 design_handoff_krds_redesign/README.md "1. 대시보드".
+ */
+.dash {
+  background: url("/bg/krds-contour.png") center / cover no-repeat, var(--krds-gray-5);
+  color: var(--krds-gray-90);
 }
 
-.dashboard-wrap {
+.dash-stage {
+  position: relative;
+  min-height: calc(100vh - 65px);
+  min-height: calc(100dvh - 65px);
+}
+
+/* 지도: 영역 가운데 */
+.dash-map {
+  min-height: inherit;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.dash-map .korea-map {
   width: 100%;
-  margin: 0;
-  padding: 0;
 }
-
-.dashboard-heading {
-  display: flex;
-  min-height: 108px;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 32px;
-  margin-bottom: 0;
+.dash-map .korea-map__svg {
+  /* 1440 화면 기준 높이 800px, 비율 760/740 — 가로는 높이에 맞춰 레터박스 */
+  max-width: 100%;
 }
-
-.dashboard-label {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin: 0 0 7px;
-  color: var(--muted);
-  font-size: 13px;
-  font-weight: 600;
-}
-
-.dashboard-label span {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: var(--coral);
-  box-shadow: 0 0 0 4px rgba(239, 118, 104, 0.12);
-}
-
-.dashboard-heading h1 {
-  margin: 0;
-  font-size: clamp(34px, 2.8vw, 40px);
-  font-weight: 700;
-  line-height: 1.08;
-  letter-spacing: -0.045em;
-}
-
-.dashboard-description {
-  max-width: 680px;
-  margin: 8px 0 0;
-  white-space: pre-line;
-  color: var(--muted);
-  font-size: 14px;
-  line-height: 1.55;
-}
-
-.dashboard-layout {
-  position: relative;
-  display: block;
-  height: calc(100vh - 48px);
-  min-height: 720px;
-}
-
-.dashboard-sidebar {
-  position: absolute;
-  z-index: 10;
-  top: 18px;
-  bottom: 18px;
-  left: 20px;
-  display: grid;
-  width: clamp(460px, 33vw, 520px);
-  min-width: 0;
-  /* auto 트랙은 짧은 뷰포트/2줄로 줄바꿈되는 번역(ja·en 등)에서 콘텐츠 높이가 이 컨테이너의
-     고정 높이(top/bottom 18px)를 넘으면 자기 컨텐츠보다 더 눌려서, 아래쪽 정렬된 h1의
-     윗부분이 overflow:hidden에 잘려 보이는 문제가 있었다(글자 상단이 잘려 탁점이 사라진
-     것처럼 보임). max-content로 고정해 헤딩/통계/TOP3 행은 절대 안 줄어들게 하고, 부족한
-     공간은 유일하게 여유가 있는 feed-card(minmax(220px,1fr)) 행이 흡수하게 한다. */
-  grid-template-rows: max-content max-content minmax(220px, 1fr) max-content;
-  gap: 12px;
-  padding: 18px;
-  /* feed-card가 최소 220px까지 줄어도 여전히 못 들어갈 만큼 짧은 뷰포트에서는(특히 en 처럼
-     원문보다 길어지는 언어) overflow:hidden이면 언어마다 잘리는 양이 달라져 보이는 카드가
-     달라진다. overflow-y:auto로 바꿔 그런 경우 내용이 사라지지 않고 스크롤되게 한다 —
-     border-radius 모서리 클리핑은 overflow-x:hidden으로 그대로 유지된다.
-     당시 실측한 편차 33~98px 는 vi/th 가 지원 언어였을 때의 값이라 지금은 더 좁을 것이다
-     (2026-08-11 EN/JA/ZH 로 축소). 다시 재려면 en 기준으로 볼 것 — ja/zh 는 한자 표기라
-     원문보다 짧아지는 경우가 많아 이 문제를 재현하지 못한다. */
-  overflow-x: hidden;
-  overflow-y: auto;
-  border: 1px solid rgba(224, 228, 236, 0.9);
-  border-radius: 24px;
-  background: rgba(248, 249, 251, 0.94);
-  box-shadow: 0 24px 70px rgba(36, 49, 72, 0.14);
-  backdrop-filter: blur(18px);
-}
-
-.stat-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
-.stat-card {
-  position: relative;
-  display: block;
-  min-width: 0;
-  min-height: 118px;
-  padding: 15px;
-  overflow: hidden;
-  border: 1px solid var(--line);
-  border-radius: 16px;
-  background: var(--surface);
-  color: inherit;
-  text-decoration: none;
-  cursor: pointer;
-  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
-}
-.stat-card:hover {
-  transform: translateY(-2px);
-  border-color: var(--blue, #93b4ff);
-  box-shadow: 0 8px 22px rgba(28, 39, 60, 0.08);
-}
-.stat-card__icon {
-  display: grid;
-  width: 32px;
-  height: 32px;
-  place-items: center;
-  border-radius: 9px;
-}
-.stat-card__icon svg { width: 17px; height: 17px; fill: currentColor; }
-.stat-card--coral .stat-card__icon { background: #fff0ed; color: #df6558; }
-.stat-card--blue .stat-card__icon { background: var(--blue-soft); color: var(--blue); }
-.stat-card--green .stat-card__icon { background: #eaf7ef; color: #269154; }
-.stat-card strong { position: absolute; top: 16px; right: 15px; font-size: 30px; font-weight: 750; line-height: 1; }
-.stat-card p { margin: 20px 0 0; overflow: hidden; color: var(--muted); font-size: 12px; line-height: 1.4; text-overflow: ellipsis; white-space: nowrap; }
-
-.feed-card,
-.region-card,
-.map-card {
-  min-width: 0;
-  overflow: hidden;
-  border: 1px solid var(--line);
-  border-radius: 18px;
-  background: var(--surface);
-  box-shadow: 0 10px 30px rgba(28, 39, 60, 0.04);
-}
-
-.feed-card { display: flex; min-height: 0; flex-direction: column; }
-.card-heading,
-.map-heading {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 20px;
-  padding: 17px 20px;
-  border-bottom: 1px solid var(--line);
-}
-.card-heading p,
-.map-heading p { margin: 0 0 4px; color: #838d9f; font-size: 12px; font-weight: 700; }
-.card-heading h2,
-.map-heading h2 { margin: 0; font-size: 19px; font-weight: 750; letter-spacing: -0.02em; }
-.card-link { display: inline-flex; align-items: center; gap: 9px; color: var(--blue); font-size: 12px; font-weight: 700; white-space: nowrap; }
-.card-link:hover { text-decoration: underline; }
-
-.alert-feed { flex: 1; min-height: 0; overflow-x: hidden; overflow-y: auto; padding: 0 18px; }
-.alert-feed > div { padding: 0; border-radius: 0; background: transparent; box-shadow: none; }
-.alert-feed ul { margin: 0; color: var(--ink); }
-.alert-feed li { position: relative; padding: 13px 0 13px 18px; border-bottom: 1px solid var(--line); }
-.alert-feed li:last-child { border-bottom: 0; }
-.alert-feed li::before { content: ""; position: absolute; top: 18px; left: 0; width: 7px; height: 7px; border-radius: 2px; background: var(--coral); }
-
-.feed-item { display: flex; flex-direction: column; gap: 5px; text-decoration: none; }
-.feed-item__head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
-.feed-item__region { overflow: hidden; color: var(--ink); font-size: 13px; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
-.feed-item__time { flex-shrink: 0; color: #9aa3b2; font-size: 11px; font-variant-numeric: tabular-nums; }
-.feed-item__msg { display: -webkit-box; overflow: hidden; margin: 0; color: #4b5563; font-size: 13px; line-height: 1.5; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
-.feed-item__type { display: inline-block; margin-right: 6px; padding: 1px 7px; border-radius: 6px; background: #fff0ed; color: #d2604f; font-size: 11px; font-weight: 700; line-height: 1.5; vertical-align: middle; }
-.feed-item:hover .feed-item__region { color: var(--blue); }
-
-.feed-state { padding: 16px 0; color: var(--muted); font-size: 13px; }
-.feed-state--error { color: #dc2626; }
-
-.card-heading--compact { padding-top: 13px; padding-bottom: 12px; }
-.region-card { min-height: 184px; }
-.region-list { padding: 5px 16px 10px; }
-.region-row {
-  display: grid;
-  grid-template-columns: 28px minmax(96px, auto) minmax(60px, 1fr) auto;
-  align-items: center;
-  gap: 10px;
-  min-height: 39px;
-  border-bottom: 1px solid var(--line);
-  color: var(--ink);
-  font-size: 12px;
-}
-.region-row:last-child { border-bottom: 0; }
-.region-row:hover .region-name { color: var(--blue); }
-.region-rank { color: #9aa3b2; font-size: 11px; font-weight: 700; }
-.region-name { overflow: hidden; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
-.region-bar { height: 5px; overflow: hidden; border-radius: 999px; background: #edf0f4; }
-.region-bar i { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #f19b8f, var(--coral)); }
-.region-row strong { color: var(--muted); font-size: 12px; }
-.empty-copy { padding: 18px; color: var(--muted); font-size: 12px; }
-
-.map-card {
-  position: relative;
-  display: block;
-  height: 100%;
-  min-height: 0;
-  overflow: hidden;
-  border: 0;
-  border-radius: 0;
-  background: #f5f7fa;
-  box-shadow: none;
-}
-.map-heading {
-  position: absolute;
-  z-index: 5;
-  top: 22px;
-  right: 28px;
-  left: auto;
-  width: clamp(300px, 26vw, 420px);
-  min-height: 66px;
-  padding: 13px 16px;
-  border: 1px solid rgba(224, 228, 236, 0.9);
-  border-radius: 14px;
-  background: rgba(255, 255, 255, 0.88);
-  box-shadow: 0 10px 30px rgba(37, 52, 78, 0.06);
-  backdrop-filter: blur(12px);
-}
-.map-heading__actions { display: flex; align-items: center; gap: 18px; }
-/* 현재 지도 보기 상태(보기 단위 › 확대한 지역). 길면 말줄임, 전체 문구는 title 로 보인다 */
-.map-state { display: block; max-width: 100%; margin-top: 5px; overflow: hidden; color: #4f46e5; font-size: 12px; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
-.map-surface {
-  position: relative;
-  display: flex;
-  width: 100%;
-  height: 100%;
-  min-height: 0;
-  align-items: center;
-  overflow: hidden;
-  padding: 0;
-  background: radial-gradient(circle at 53% 48%, #ffffff 0 28%, #f8fafc 58%, #edf1f6 100%);
-}
-.map-decoration {
-  display: none;
-}
-.map-surface .korea-map { position: relative; z-index: 1; width: 100%; height: 100%; justify-content: center; }
-.map-surface .korea-map {
-  padding-left: clamp(380px, 27vw, 480px);
-}
-.map-surface .korea-map__canvas { width: 100%; }
-.map-surface .korea-map__svg { max-width: none; transform: translateX(4%) scale(1); }
-.map-surface .legend {
-  position: absolute;
-  z-index: 5;
-  right: 28px;
-  bottom: 22px;
-  padding: 9px 12px;
-  border: 1px solid rgba(224, 228, 236, 0.85);
-  border-radius: 11px;
-  background: rgba(255, 255, 255, 0.82);
-  color: #7c8697;
-  font-size: 13px;
-  backdrop-filter: blur(10px);
-}
-.map-footer {
-  position: absolute;
-  z-index: 5;
-  right: 24px;
-  bottom: 20px;
-  left: 24px;
-  display: flex;
-  min-height: 38px;
-  align-items: center;
-  justify-content: space-between;
-  gap: 20px;
-  padding: 9px 14px;
-  border: 1px solid rgba(224, 228, 236, 0.8);
+.dash-map-placeholder {
+  width: min(100%, 820px);
   border-radius: 12px;
-  background: rgba(255, 255, 255, 0.78);
-  color: #929bad;
-  font-size: 9px;
-  backdrop-filter: blur(10px);
-}
-.map-footer span:first-child { color: var(--blue); font-weight: 800; text-transform: uppercase; }
-
-@media (max-width: 1050px) {
-  .dashboard-sidebar { left: 14px; width: clamp(420px, 42vw, 470px); padding: 14px; }
-  .stat-card { padding: 12px; }
-  .stat-card strong { right: 12px; }
-  .map-surface .korea-map { padding-left: clamp(420px, 43vw, 490px); }
+  background: rgba(255, 255, 255, 0.5);
 }
 
-@media (max-width: 760px) {
-  .safety-dashboard { overflow: visible; }
-  .dashboard-wrap { padding: 0; }
-  .dashboard-heading { min-height: auto; align-items: flex-start; }
-  .dashboard-heading h1 { font-size: 32px; }
-  .dashboard-description { display: none; }
-  .dashboard-layout { display: flex; height: auto; min-height: 0; flex-direction: column; }
-  .dashboard-sidebar { position: relative; top: auto; bottom: auto; left: auto; order: 2; width: auto; margin: 12px; padding: 16px 12px 40px; overflow: visible; }
-  .map-card { order: 1; min-height: 680px; }
-  .dashboard-sidebar { grid-template-rows: auto auto auto; }
-  .feed-card { min-height: 430px; }
-  .map-surface { padding: 0 8px; }
-  .map-surface .korea-map { padding-left: 0; }
-  .map-heading { right: 12px; left: 12px; width: auto; }
+/* 범례: 오른쪽 아래(KoreaMap25D 의 .legend 를 띄운다) */
+.dash-map .legend {
+  position: absolute;
+  right: 24px;
+  bottom: 24px;
+  z-index: 3;
+}
+
+/* 제목 블록: 왼쪽 위 */
+.dash-title {
+  position: absolute;
+  left: 40px;
+  top: 32px;
+  z-index: 4;
+  display: flex;
+  flex-direction: column;
+  pointer-events: none;
+}
+.dash-title > * {
+  pointer-events: auto;
+}
+.dash-eyebrow {
+  margin: 0 0 6px;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--krds-primary-50);
+}
+.dash-title h1 {
+  margin: 0;
+  font-size: 32px;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  line-height: 1.3;
+  color: var(--krds-gray-90);
+}
+.dash-summary {
+  margin: 8px 0 0;
+  font-size: 17px;
+  color: var(--krds-gray-70);
+  white-space: nowrap;
+}
+.dash-summary a:hover {
+  color: var(--krds-primary-50);
+}
+.dash-summary b {
+  color: var(--krds-gray-90);
+  font-weight: 700;
+}
+.dash-summary a:hover b {
+  color: inherit;
+}
+.dash-seg {
+  align-self: flex-start;
+  margin-top: 14px;
+}
+.dash-seg > button {
+  border: 0;
+  background: transparent;
+  font: inherit;
+}
+.dash-seg > button[aria-checked="true"] {
+  background: var(--krds-primary-50);
+}
+
+/* 1440 시안보다 좁은 화면: 제목 블록과 지도를 세로로 쌓는다(모바일 시안이 없어 기존처럼 위→아래 흐름 유지) */
+@media (max-width: 1100px) {
+  .dash-stage {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    padding: 20px 16px 24px;
+  }
+  .dash-title {
+    position: static;
+    order: -1;
+  }
+  .dash-summary {
+    white-space: normal;
+    word-break: keep-all;
+  }
+  .dash-map {
+    min-height: 0;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .dash-map .legend {
+    position: static;
+    align-self: flex-end;
+  }
+}
+@media (max-width: 640px) {
+  .dash-title h1 {
+    font-size: 26px;
+  }
 }

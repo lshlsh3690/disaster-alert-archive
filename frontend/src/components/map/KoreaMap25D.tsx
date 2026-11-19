@@ -53,10 +53,29 @@ const RegionLayer = memo(function RegionLayer({
   );
 });
 
-const COLOR_LOW = "#fdeae6"; // 1건
-const COLOR_HIGH = "#ef9d92"; // 최다
-const COLOR_ZERO = "#f7f9fb"; // 0건
-const COLOR_PENDING = "#eef1f5"; // 건수를 아직 모르는 상태(통계 로딩 중) — 0건과 구분해 거짓 0건을 보여주지 않는다
+// KRDS primary 5단계 램프: 0건(흰색) → 1건 … cap 건 이상(primary-60). 1~cap 건은 뒤 네 단계 사이를 보간한다
+const RAMP = ["#ffffff", "#d8e5fd", "#86aff9", "#256ef4", "#0b50d0"] as const;
+const COLOR_ZERO = RAMP[0];
+const COLOR_PENDING = "#f4f5f6"; // 건수를 아직 모르는 상태(통계 로딩 중) — 0건과 구분해 거짓 0건을 보여주지 않는다
+const WALL_COLOR = "#8a949e"; // 지도 두께(입체 벽면)
+/** 오늘 건수 기준 램프 상한. 이 건수 이상이면 가장 진한 색이다(대시보드 범례 "12건 이상") */
+const TODAY_CAP = 12;
+/** 채움이 이 건수 이상이면 라벨을 흰 글자 + 어두운 halo 로 바꾼다 */
+const DARK_LABEL_MIN = 6;
+// 면적이 작은 광역시(서울·부산·대구·대전·울산·세종). 좁은 화면에서는 이웃 도 라벨과 겹쳐 라벨을 숨기고 색·탭 툴팁으로만 보인다
+const SMALL_METROS = new Set(["11", "26", "27", "30", "31", "36"]);
+// 지역 라벨 위치 보정(시도 중심점이 라벨끼리 겹치는 곳만). 경기 라벨이 서울·강원 라벨과 겹치지 않게 북쪽으로 올린다
+const LABEL_POS: Record<string, [number, number]> = {
+  "41": [292, 98],
+  "11": [256, 160],
+  "28": [196, 178],
+  "47": [450, 290],
+  "48": [370, 440],
+  "12": [250, 485],
+  "44": [235, 290],
+  "30": [298, 312],
+  "36": [276, 272],
+};
 
 function hexLerp(a: string, b: string, ratio: number) {
   const pa = [parseInt(a.slice(1, 3), 16), parseInt(a.slice(3, 5), 16), parseInt(a.slice(5, 7), 16)];
@@ -65,10 +84,11 @@ function hexLerp(a: string, b: string, ratio: number) {
   return "#" + c.map((v) => v.toString(16).padStart(2, "0")).join("");
 }
 const darken = (hex: string, f: number) => hexLerp(hex, "#000000", f);
-const colorForCount = (n: number, max: number) => {
+const colorForCount = (n: number, cap: number) => {
   if (!n) return COLOR_ZERO;
-  const ratio = max > 1 ? (n - 1) / (max - 1) : 1;
-  return hexLerp(COLOR_LOW, COLOR_HIGH, Math.pow(ratio, 0.7));
+  const t = (Math.min(1, cap > 1 ? (n - 1) / (cap - 1) : 1)) * 3;
+  const i = Math.min(2, Math.floor(t));
+  return hexLerp(RAMP[i + 1], RAMP[i + 2], t - i);
 };
 
 function todayRange() {
@@ -96,6 +116,11 @@ interface KoreaMap25DProps {
   showModeToggle?: boolean;
   /** 처음 보여 줄 보기 단위. 기본은 시군구별 보기 */
   defaultMode?: MapMode;
+  /** 보기 단위를 바깥에서 쥘 때(대시보드 제목 블록의 시도|시군구 세그먼트). 주면 내부 상태 대신 이 값을 쓴다 */
+  mode?: MapMode;
+  onModeChange?: (mode: MapMode) => void;
+  /** 시도 단계에서 지도 위에 지역 이름과 건수를 직접 쓴다(대시보드) */
+  showRegionLabels?: boolean;
   /**
    * 바깥(예: 알림 목록의 검색 필터)에서 고른 지역으로 지도를 확대한다. 시도명("경기도")과 시군구("수원시 장안구", 읍면동이
    * 붙어 있어도 된다)를 주면 그 시군구의 읍면동까지, 시도만 주면 그 시도의 시군구까지 확대하고, 둘 다 비우면 전체 보기로 돌아간다.
@@ -111,7 +136,7 @@ interface KoreaMap25DProps {
 
 export default function KoreaMap25D({
   height = "560px",
-  depth = 10,
+  depth = 9,
   raise = 16,
   todayOnly = true,
   params,
@@ -121,6 +146,9 @@ export default function KoreaMap25D({
   compact = false,
   showModeToggle = true,
   defaultMode = DEFAULT_MODE,
+  mode: modeProp,
+  onModeChange: onModeChangeProp,
+  showRegionLabels = false,
   focusSido,
   focusSigungu,
   onStatusChange,
@@ -134,7 +162,16 @@ export default function KoreaMap25D({
   const shadowFilterId = `soft-${uid}`;
   const liftShadowId = `lift-${uid}`;
 
-  const [mode, setMode] = useState<MapMode>(defaultMode);
+  const [innerMode, setInnerMode] = useState<MapMode>(defaultMode);
+  const mode = modeProp ?? innerMode;
+  const controlled = modeProp !== undefined;
+  const setMode = useCallback(
+    (next: MapMode) => {
+      if (!controlled) setInnerMode(next);
+      onModeChangeProp?.(next);
+    },
+    [controlled, onModeChangeProp]
+  );
   // 확대 단계: 시도 보기에서 누른 시도(코드 2자리) → 그 시도의 시군구 → 누른 시군구(코드 5자리) → 그 시군구의 읍면동.
   // 시군구 보기는 처음부터 시군구 단계라 drillSido 없이 drillSigungu 만 쓴다.
   const [drillSido, setDrillSido] = useState<string | null>(null);
@@ -182,7 +219,7 @@ export default function KoreaMap25D({
     // 구가 있는 시 전체("수원시")는 단독 경계가 없으니 그 시의 구들을 묶는 코드 앞 4자리로 확대한다.
     const city = match ? null : regions.filter((r) => `${r.n} `.startsWith(`${focusSido} ${focusSigungu} `));
     setDrillSigungu(match ? match.c : city && city.length > 0 ? city[0].c.slice(0, 4) : null);
-  }, [focusSido, focusSigungu, sigunguQuery.data, defaultMode]);
+  }, [focusSido, focusSigungu, sigunguQuery.data, defaultMode, setMode]);
 
   const metroCounts = useMemo(() => groupToMetros(sidoData ?? []), [sidoData]);
 
@@ -276,9 +313,12 @@ export default function KoreaMap25D({
     for (const r of regions) max = Math.max(max, countMap.get(r.key) ?? 0);
     return max;
   }, [regions, countMap]);
+  // 기본(오늘 건수)은 12건을 상한으로 고정해 날마다 같은 색이 같은 건수를 뜻하게 한다. 기간 필터를 준 곳(알림 목록)은
+  // 건수가 훨씬 커질 수 있어 그 기간의 최댓값까지 늘린다.
+  const colorCap = params || !todayOnly ? Math.max(TODAY_CAP, maxCount) : TODAY_CAP;
   const fillFor = useCallback(
-    (key: string) => (statsPending ? COLOR_PENDING : colorForCount(countFor(key), maxCount)),
-    [statsPending, countFor, maxCount]
+    (key: string) => (statsPending ? COLOR_PENDING : colorForCount(countFor(key), colorCap)),
+    [statsPending, countFor, colorCap]
   );
 
   // 시도를 확대할 영역: 그 시도에 속한 시군구 경계 상자들의 합(시도 코드는 시군구 코드 앞 2자리와 같다)
@@ -303,28 +343,6 @@ export default function KoreaMap25D({
   // 배율이 바뀌어도 이미 정해 둔 값이 틀어지지 않는다(처음에는 배율 적용값을 보관해 호버 지역이 거대한 기둥처럼 솟았다).
   const zoom = viewBox.w / BASE_VIEWBOX.w;
 
-  const wallLayers = useMemo(() => {
-    const arr: { y: number; fill: string }[] = [];
-    for (let i = depth; i >= 1; i--) {
-      arr.push({ y: i, fill: hexLerp("#dde2e9", "#bcc3cf", i / depth) });
-    }
-    return arr;
-  }, [depth]);
-
-  const legendBins = useMemo(() => {
-    const max = maxCount;
-    const n = Math.min(5, max);
-    const bins: { label: string; color: string }[] = [];
-    for (let k = 0; k < n; k++) {
-      const lo = Math.floor((k * max) / n) + 1;
-      const hi = Math.floor(((k + 1) * max) / n);
-      bins.push({
-        label: lo === hi ? `${lo}` : `${lo}~${hi}`,
-        color: colorForCount(hi, max),
-      });
-    }
-    return bins;
-  }, [maxCount]);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
@@ -344,7 +362,7 @@ export default function KoreaMap25D({
     [regions, hovered]
   );
   const wallCount = Math.floor(lift);
-  const liftBaseFill = hoveredRegion ? fillFor(hoveredRegion.key) : COLOR_LOW;
+  const liftBaseFill = hoveredRegion ? fillFor(hoveredRegion.key) : RAMP[1];
   const wallFill = useCallback(
     (i: number) => darken(liftBaseFill, 0.1 + 0.26 * (1 - i / raise)),
     [liftBaseFill, raise]
@@ -440,8 +458,21 @@ export default function KoreaMap25D({
       setDrillSigungu(null);
       setMode(next);
     },
-    [onLeave]
+    [onLeave, setMode]
   );
+
+  // 바깥에서 보기 단위를 바꾸면(제어형) 확대 상태를 풀고 새 단위의 전체 보기로 돌아간다
+  const prevModeRef = useRef(mode);
+  useEffect(() => {
+    if (prevModeRef.current === mode) return;
+    prevModeRef.current = mode;
+    if (!controlled) return;
+    onLeave();
+    if (!focusSido) {
+      setDrillSido(null);
+      setDrillSigungu(null);
+    }
+  }, [mode, controlled, onLeave, focusSido]);
 
   // 한 단계 위로: 읍면동 → (시도 보기였다면 그 시도의 시군구, 아니면 시군구 전체) → 시도 전체
   const goBack = useCallback(() => {
@@ -516,7 +547,36 @@ export default function KoreaMap25D({
     return () => cancelAnimationFrame(rafIdRef.current);
   }, []);
 
+  // 지도 위 지역 라벨(시도 단계 전용). 시군구 단계는 구역이 250개라 라벨을 쓰면 지도를 덮는다.
+  // SVG <text> 로 그리면 지도 배율에 따라 글자 크기가 바뀌므로, HTML 로 띄우고 위치만 화면 좌표로 맞춘다.
+  const showLabels = showRegionLabels && level === "sido" && viewBoxSettled;
+  const [labelPos, setLabelPos] = useState<Record<string, { x: number; y: number }>>({});
+  useLayoutEffect(() => {
+    if (!showLabels) return;
+    const svg = svgRef.current;
+    const cont = containerRef.current;
+    if (!svg || !cont || !svg.getScreenCTM) return;
+    const measure = () => {
+      const ctm = svg.getScreenCTM();
+      if (!ctm) return;
+      const rect = cont.getBoundingClientRect();
+      const pt = svg.createSVGPoint();
+      const next: Record<string, { x: number; y: number }> = {};
+      for (const r of skRegions) {
+        [pt.x, pt.y] = LABEL_POS[r.code] ?? r.c;
+        const sp = pt.matrixTransform(ctm);
+        next[r.code] = { x: sp.x - rect.left, y: sp.y - rect.top };
+      }
+      setLabelPos(next);
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(cont);
+    return () => ro.disconnect();
+  }, [showLabels]);
+
   const sidoName = (ko: string) => t(`metros.${ko}`, { defaultValue: ko });
+  const sidoShort = (ko: string) => t(`metroShort.${ko}`, { defaultValue: sidoName(ko) });
   const displayName = (r: RenderRegion) => (level === "sido" ? sidoName(r.label) : r.label);
   const mapLabel = countLabel ?? t("dashboard.todayAlerts");
   const mapUnit = t("dashboard.count");
@@ -562,14 +622,14 @@ export default function KoreaMap25D({
         <div className={`${styles.controls} ${compact ? styles.controlsCompact : ""}`}>
           {/* 보기 단위: 선택지를 접어 두지 않고 항상 펼쳐 보여 준다(드롭다운은 화살표 아래에 뭐가 있는지 알 수 없었다) */}
           {showModeToggle && (
-            <div className={styles.segmented} role="radiogroup" aria-label={t("dashboard.mapViewLabel")}>
+            <div className={`krds-segment ${styles.segmented}`} role="radiogroup" aria-label={t("dashboard.mapViewLabel")}>
               {MAP_MODES.map((m) => (
                 <button
                   key={m}
                   type="button"
                   role="radio"
                   aria-checked={mode === m}
-                  className={`${styles.segment} ${mode === m ? styles.segmentActive : ""}`}
+                  className={styles.segment}
                   onClick={() => onModeChange(m)}
                 >
                   {modeLabels[m]}
@@ -627,8 +687,8 @@ export default function KoreaMap25D({
                 <path key={r.code} d={r.d} />
               ))}
             </g>
-            <filter id={shadowFilterId} x="-20%" y="-20%" width="140%" height="140%">
-              <feGaussianBlur stdDeviation="9" />
+            <filter id={shadowFilterId} x="-20%" y="-20%" width="140%" height="150%">
+              <feDropShadow dx="0" dy="12" stdDeviation="9" floodColor="#1e2124" floodOpacity="0.12" />
             </filter>
             <filter id={liftShadowId} x="-40%" y="-40%" width="180%" height="180%">
               {/* 필터 값은 viewBox 단위라 확대하면 그림자가 수백 px 로 번진다 — 벽·윗면과 같이 zoom 을 곱한다 */}
@@ -636,20 +696,14 @@ export default function KoreaMap25D({
             </filter>
           </defs>
 
-          {/* 확대하지 않은 상태에서만: 바닥 그림자와 지도 두께(회색 벽). 확대하면 평면으로 보여 준다 */}
+          {/* 확대하지 않은 상태에서만: 지도 두께(같은 윤곽을 아래로 내려 칠한 벽면)와 그 그림자. 확대하면 평면으로 보여 준다 */}
           {!zoomed && (
-            <>
-              <use
-                href={`#${landId}`}
-                transform={`translate(8 ${depth + 14})`}
-                fill="#9aa3b2"
-                filter={`url(#${shadowFilterId})`}
-                opacity="0.26"
-              />
-              {wallLayers.map((w) => (
-                <use key={`w${w.y}`} href={`#${landId}`} transform={`translate(0 ${w.y})`} fill={w.fill} />
-              ))}
-            </>
+            <use
+              href={`#${landId}`}
+              transform={`translate(0 ${depth})`}
+              fill={WALL_COLOR}
+              filter={`url(#${shadowFilterId})`}
+            />
           )}
 
           {/* 확대하면 선택한 영역만 보인다 — 나머지 시도/시군구는 흐리게도 그리지 않는다.
@@ -697,6 +751,39 @@ export default function KoreaMap25D({
           ))}
         </svg>
 
+        {/* 지역 라벨: 0건은 약칭만, 건수가 있으면 이름 위·건수 아래. 진한 채움 위는 흰 글자 + 어두운 halo */}
+        {showLabels && (
+          <div className={styles.labels} aria-hidden="true">
+            {skRegions.map((r) => {
+              const p = labelPos[r.code];
+              if (!p || r.code === hovered) return null;
+              const n = countFor(r.code);
+              const metro = SMALL_METROS.has(r.code) || undefined;
+              if (!n || statsPending) {
+                return (
+                  <span key={r.code} className={styles.labelCold} data-small-metro={metro} style={{ left: p.x, top: p.y - 4 }}>
+                    {sidoShort(r.ko)}
+                  </span>
+                );
+              }
+              return (
+                <span
+                  key={r.code}
+                  className={`${styles.labelHot} ${n >= DARK_LABEL_MIN ? styles.labelDark : ""}`}
+                  data-small-metro={metro}
+                  style={{ left: p.x, top: p.y }}
+                >
+                  <span className={styles.labelName}>{sidoShort(r.ko)}</span>
+                  <span className={styles.labelCount}>
+                    {n}
+                    {mapUnit}
+                  </span>
+                </span>
+              );
+            })}
+          </div>
+        )}
+
         {/* 연결선 */}
         {hoveredRegion && (
           <svg key={`line-${hovered}`} className={styles.lead} aria-hidden="true">
@@ -730,18 +817,18 @@ export default function KoreaMap25D({
         )}
       </div>
 
-      {/* 범례: 구간별 색상 */}
+      {/* 범례: 5단계 램프. 상한 건수 이상은 가장 진한 색 */}
       <div className={`${styles.legend} legend`}>
-        <span className={styles.legendItem}>
-          <i className={styles.legendSq} style={{ background: COLOR_ZERO }} />0{mapUnit}
+        <span className={styles.legendTitle}>{countLabel ?? t("dashboard.legendTitle")}</span>
+        <span className={styles.legendRamp}>
+          {RAMP.map((c) => (
+            <i key={c} className={styles.legendSq} style={{ background: c }} />
+          ))}
         </span>
-        {legendBins.map((b) => (
-          <span key={b.label} className={styles.legendItem}>
-            <i className={styles.legendSq} style={{ background: b.color }} />
-            {b.label}
-            {mapUnit}
-          </span>
-        ))}
+        <span className={styles.legendScale}>
+          <span>0{mapUnit}</span>
+          <span>{t("dashboard.legendMax", { count: colorCap })}</span>
+        </span>
       </div>
     </div>
   );
