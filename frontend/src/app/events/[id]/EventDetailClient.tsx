@@ -132,10 +132,7 @@ export default function EventDetailClient({ eventId }: { eventId?: number } = {}
           </span>
           <span className="text-[var(--text-subtle)]">{period}</span>
         </div>
-        {data.primaryRegionName && (
-          <p className="text-xs text-[var(--text-subtle)]">{t("events.approxRegion")}</p>
-        )}
-        {/* 사건 ID 는 백필 때 바뀌므로, 인용·공유용으로는 대표 알림 sn 기반 영구 링크를 보여준다(FR-004) */}
+        {/* 사건 ID 는 백필 때 바뀌므로, 공유용으로는 대표 알림 sn 기반 고정 주소를 복사한다(FR-004) */}
         {data.representativeSn != null && (
           <PermalinkCopy path={`/archive/events/${data.representativeSn}`} />
         )}

@@ -1,58 +1,53 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 /**
- * 기록관 영구 링크 표시 + 복사. path 는 "/archive/events/123" 처럼 사이트 내부 경로로 받고,
- * 화면에 보일 전체 주소는 마운트 뒤 현재 접속 주소(origin)로 만든다 — 서버 렌더와 어긋나지 않게.
+ * "링크 복사" 버튼. path 는 "/archive/events/123" 처럼 사이트 내부 경로로 받고, 누른 순간의 접속 주소(origin)를 붙여 복사한다.
+ * 사건 ID 는 백필 때 바뀌므로 복사되는 주소는 대표 알림 sn 기반 고정 주소다(FR-004) — 화면에는 주소를 보이지 않는다.
  */
 export default function PermalinkCopy({ path }: { path: string }) {
   const { t } = useTranslation();
-  const [url, setUrl] = useState(path);
   const [status, setStatus] = useState<"idle" | "copied" | "failed">("idle");
-
-  useEffect(() => {
-    setUrl(`${window.location.origin}${path}`);
-  }, [path]);
+  const [url, setUrl] = useState("");
 
   const copy = async () => {
+    const full = `${window.location.origin}${path}`;
+    setUrl(full);
     try {
-      await navigator.clipboard.writeText(url);
+      await navigator.clipboard.writeText(full);
       setStatus("copied");
+      window.setTimeout(() => setStatus("idle"), 2000);
     } catch {
-      // http 접속·권한 거부 등으로 클립보드를 못 쓰면 주소를 직접 선택해 복사하도록 안내
+      // http 접속·권한 거부 등으로 클립보드를 못 쓰면 주소를 보여 주고 직접 복사하도록 안내한다(이때는 자동으로 숨기지 않는다)
       setStatus("failed");
     }
-    window.setTimeout(() => setStatus("idle"), 2000);
   };
 
   return (
     <div className="space-y-1">
-      {/* 복사 결과는 라벨 옆에 붙인다 — 아래 줄로 두면 평소에도 빈 줄 높이만큼 카드 하단이 비어 보인다 */}
-      <div className="flex flex-wrap items-baseline gap-x-2 text-xs">
-        <span className="font-medium text-[var(--text-muted)]">{t("archive.permalink")}</span>
-        <span role="status" aria-live="polite" className="text-[var(--text-subtle)]">
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+        <button type="button" onClick={copy} className="krds-btn krds-btn--secondary krds-btn--sm">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M10 13a5 5 0 0 0 7.07 0l3-3a5 5 0 0 0-7.07-7.07l-1.5 1.5" />
+            <path d="M14 11a5 5 0 0 0-7.07 0l-3 3a5 5 0 0 0 7.07 7.07l1.5-1.5" />
+          </svg>
+          {t("archive.copyLink")}
+        </button>
+        <span role="status" aria-live="polite" className="text-[15px] text-[var(--text-muted)]">
           {status === "copied" ? t("archive.copied") : status === "failed" ? t("archive.copyFailed") : ""}
         </span>
       </div>
-      <div className="flex items-center gap-2">
+      {status === "failed" && (
         <input
           readOnly
           value={url}
           onFocus={(e) => e.currentTarget.select()}
-          aria-label={t("archive.permalink")}
-          className="min-h-11 min-w-0 flex-1 rounded-[var(--radius-control)] border border-[var(--line)] bg-[var(--canvas)] px-2 py-1 text-xs text-[var(--text-body)] sm:min-h-0"
+          aria-label={t("archive.copyLink")}
+          className="krds-control text-[15px]"
         />
-        {/* 모바일 터치 타겟 44px 확보, 데스크톱은 원래 크기 */}
-        <button
-          type="button"
-          onClick={copy}
-          className="min-h-11 min-w-11 shrink-0 rounded-[var(--radius-control)] border border-[var(--line)] px-3 py-1 text-xs font-medium text-[var(--blue)] hover:bg-[var(--blue-soft)] sm:min-h-0 sm:min-w-0 sm:px-2.5"
-        >
-          {t("archive.copy")}
-        </button>
-      </div>
+      )}
     </div>
   );
 }
