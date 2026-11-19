@@ -75,8 +75,8 @@ Phase 0 결과. 기술 컨텍스트의 미정 사항을 코드로 확인해 결�
 - **기관 종류(시군구/시군구 아님)는 이번에 저장하지 않는다**: 판정에 법정동 이름 사전(`PlaceDirectory`)이 필요하고 동명 구(`동구`·`중구`) 처리까지 얽힌다. 쓰는 곳이 생길 때 추가한다.
 - **위치(헌법 VII, 2026-11-18 개정 후 수정)**: 처음에는 `domain/agency` 별도 패키지로 잡았으나, 그러면 `DisasterAlert → Agency` `@ManyToOne` 이 맥락을 넘는다. 기관은 문자 본문에서 생겨나는 개념이라 `domain/disasteralert` 안에 둔다.
 - **추출 규칙 공유**: `AlertPlaceFacts.findSender`(private static)의 규칙을 공용 순수 함수 `SenderLabel` 로 옮기고 `AlertPlaceFacts` 도 그 함수를 쓴다. **규칙은 한 글자도 바꾸지 않는다** — `ClusteringJudge` 입력이 이 규칙에서 나오기 때문이다.
-- **수집 경로**: `DisasterAlertService.saveData` 의 `toEntity` 매핑 전에 새 알림들의 표기를 모아 한 번에 해석한다(`INSERT ... ON CONFLICT (label) DO NOTHING` 후 조회). 수집은 `@Scheduled` 단일 스레드지만 백필 도구와 겹칠 수 있어 `agency_alias.label` 유일 제약으로 막는다. 해석 실패 시 기관을 비운 채 저장하고 `warn` 을 남긴다(FR-017, 수집을 막지 않음).
-- **기존 데이터**: Flyway `V140` 에서 SQL 로 백필한다. SQL 정규식은 Java 규칙과 같은 두 패턴(`\[([^\[\]]+)\]\s*$` → `^\s*\[([^\[\]]+)\]`)이며, 2026-11-18 운영 사본에서 이 SQL 로 위 실측치를 냈다.
+- **수집 경로**: `DisasterAlertService.saveData` 가 저장 직전에 새 알림들의 표기를 모아 배치당 한 번 해석한다(`AgencyService.resolveByMessages`). 해석은 `REQUIRES_NEW` 로 수집 트랜잭션과 분리한다 — 같은 트랜잭션에 합류하면 해석 안의 예외가 rollback-only 를 표시해 그 회차 알림 저장이 통째로 롤백됐다(2026-11-18 리뷰, `DisasterAlertSaveAgencyIntegrationTest` 로 재현). 동시 등록으로 `agency_alias.label` PK 가 충돌하면 1회 재시도한다. 해석 실패 시 기관을 비운 채 저장하고 `warn` 을 남긴다(FR-017, 수집을 막지 않음). 수동 초기화의 병렬 페이지에서는 재시도 뒤에도 기관이 비는 페이지가 남을 수 있음을 수용했다.
+- **기존 데이터**: Flyway `V141` 에서 SQL 로 백필한다(스키마는 `V140`). 2026-11-19 운영 사본 62,554건에서 이 SQL 과 `SenderLabel.extract` 결과가 전부 일치함을 대조했다. SQL 정규식은 Java 규칙과 같은 두 패턴(`\[([^\[\]]+)\]\s*$` → `^\s*\[([^\[\]]+)\]`)이며, 2026-11-18 운영 사본에서 이 SQL 로 위 실측치를 냈다.
 - **기각한 대안**: 메서드로만 계산(`DisasterAlert.senderLabel()`, 기관별 조회·집계 불가), 표기 문자열 컬럼(기관 개념 없이 문자열만 중복 저장), 709종을 정리한 사전으로 시작(지금 쓰는 곳 대비 작업이 큼), `@OneToOne`(관계 방향이 틀림).
 
 ## 기존 자산 확인 결과

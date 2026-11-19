@@ -18,7 +18,7 @@
 
 **주요 의존성**: Spring Data JPA(네이티브 쿼리), React Query, zod — 신규 라이브러리 없음
 
-**저장소**: PostgreSQL(pgvector 이미지). 스토리 3은 기존 `disaster_alert`·`disaster_events` 읽기 전용(마이그레이션 없음). 스토리 1은 `V140`(기관 테이블 2개 + `disaster_alert.agency_id` + 백필)
+**저장소**: PostgreSQL(pgvector 이미지). 스토리 3은 기존 `disaster_alert`·`disaster_events` 읽기 전용(마이그레이션 없음). 스토리 1은 `V140`(기관 테이블 2개 + `disaster_alert.agency_id`)과 `V141`(기존 알림 백필)
 
 **테스트**: JUnit 5 + `@IntegrationTest`(실제 Postgres, `.env.test`) — 쿼리 규칙이 핵심이라 통합 테스트가 주력. 프론트는 jest(node) 대상 로직이 없어 `ui-checker` 화면 점검으로 대신
 
@@ -93,7 +93,8 @@ backend/src/main/java/com/disaster/alert/alertapi/
 └── domain/event/evaluation/AlertPlaceFacts.java           # findSender → SenderLabel 호출 (규칙 불변)
 
 backend/src/main/resources/db/migration/
-└── V140__create_agency_and_backfill.sql                   # 스토리 1
+├── V140__create_agency.sql                                # 스토리 1 스키마
+└── V141__backfill_alert_agency.sql                        # 스토리 1 기존 알림 백필
 
 backend/src/test/java/com/disaster/alert/alertapi/domain/archive/
 └── ArchiveServiceIntegrationTest.java      # @IntegrationTest, 핵심 동작 4개
@@ -135,12 +136,12 @@ Red 단계 테스트는 핵심 동작 4개만 둔다(경계값·사소한 테스
 | 순서 | 작업 | Red-Green |
 |---|---|---|
 | B1 | 표기 추출 순수 함수를 `domain/disasteralert/model/SenderLabel` 로 옮기고 `AlertPlaceFacts` 가 호출하도록 변경. **규칙 불변** — 기존 `AlertPlaceFactsTest` 가 그대로 통과해야 함 | 리팩터링(동작 불변, 기존 테스트로 검증) |
-| B2 | `Agency`·`AgencyAlias` 엔티티, 리포지토리, `V140` 마이그레이션(테이블 + 백필), `DisasterAlert.agency` 필드·`assignAgency` | **RED**: 표기 해석(있는 표기 → 기존 기관 / 처음 보는 표기 → 자동 등록 / 표기 없음 → null) 통합 테스트. 사용자 확인 후 GREEN |
+| B2 | `Agency`·`AgencyAlias` 엔티티, 리포지토리, `V140` 마이그레이션(테이블). 백필은 `V141` 로 분리(SQL·Java 표기 추출 일치 대조 후 작성), `DisasterAlert.agency` 필드·`assignAgency` | **RED**: 표기 해석(있는 표기 → 기존 기관 / 처음 보는 표기 → 자동 등록 / 표기 없음 → null) 통합 테스트. 사용자 확인 후 GREEN |
 | B3 | `DisasterAlertService.saveData` 에서 `toEntity` 전에 표기 일괄 해석, 실패 시 기관 null + `warn` | B2 GREEN 에 포함 |
 | B4 | `GET /api/v1/archive/alerts/{sn}`, `/archive/alerts/[sn]` 화면, `/alerts/{id}` 에 영구 링크 | 계층 연결 |
 | B5 | 인용문 조립(프론트, FR-006 형식·"외 N곳" 축약) | 순수 함수라 프론트 단위 테스트(RED → 확인 → GREEN) |
 
-`V140` 은 운영 배포 때 6만여 건을 백필한다. 운영 반영은 사용자가 배포를 결정할 때만 일어난다(운영에 영향을 주는 명령은 Claude 가 직접 실행하지 않음).
+`V141` 은 운영 배포 때 6만여 건을 백필하며, 임베딩 HNSW 인덱스 때문에 약 100초(로컬 사본 실측) 동안 앱 시작이 늦어진다 — 사용자가 적은 시간대에 배포한다(data-model.md 백필 항목). 운영 반영은 사용자가 배포를 결정할 때만 일어난다(운영에 영향을 주는 명령은 Claude 가 직접 실행하지 않음).
 
 ### 단계 C — 스토리 2: 사건 인용문 + CSV (윤곽)
 

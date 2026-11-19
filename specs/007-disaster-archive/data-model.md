@@ -30,7 +30,7 @@
 | `lastAlertAt` | `last_alert_at` | 사건 기간 끝 |
 | `alertCount` | `alert_count` | 포함 알림 수 (정렬 1순위, 화면에 건수로만 표시) |
 
-## 신규 엔티티 — 스토리 1 (Flyway `V140`)
+## 신규 엔티티 — 스토리 1 (Flyway `V140` 스키마 · `V141` 백필)
 
 ```text
 agency (기관)                 agency_alias (본문 표기)            disaster_alert
@@ -50,7 +50,8 @@ created_at  TIMESTAMP         created_at TIMESTAMP
 - **상태 변경**: `DisasterAlert` 는 setter 없이 엔티티 메서드(예: `assignAgency(Agency)`)로만 기관을 바꾼다(팀 컨벤션).
 - **표기 추출 함수**: 본문 → `Optional<String>` 순수 함수(헌법 VI). 위치는 `domain/disasteralert/model/SenderLabel`, `AlertPlaceFacts` 가 같은 함수를 호출한다.
 - **맥락**: `Agency`·`AgencyAlias` 는 disasteralert 맥락에 둔다. 기관은 문자 본문에서 생겨나 문자와 함께 움직이므로 같은 맥락이고, 그래서 `DisasterAlert → Agency` 객체 참조가 헌법 VII 에 맞는다. 다른 맥락(예: 로드맵 4단계 별점)이 기관을 참조할 때는 `agency_id` 로 한다.
-- **백필(V140)**: ① 기존 알림의 서로 다른 표기마다 `agency` 1행 생성 ② 표기 → 기관으로 `agency_alias` 생성 ③ `disaster_alert.agency_id` 갱신. 운영 6만여 건 규모.
+- **백필(V141, 2026-11-19 V140 에서 분리)**: ① 기존 알림의 서로 다른 표기마다 `agency` 1행 생성 ② 표기 → 기관으로 `agency_alias` 생성 ③ `disaster_alert.agency_id` 갱신. 운영 6만여 건 규모. 분리 이유: SQL 정규식과 `SenderLabel` 의 일치를 먼저 대조해야 했고, 적용된 마이그레이션은 고칠 수 없어서다. 대조 결과 운영 사본 62,554건 전부 일치(표기 있음 62,545 · 없음 9 · 709종).
+- **백필 소요(배포 주의)**: 알림 UPDATE 가 임베딩 HNSW 인덱스 재삽입 때문에 로컬 사본에서 약 100초(인덱스 없이는 2초). Flyway 가 앱 시작 전에 돌므로 그동안 백엔드가 내려가고 수집이 멈춘다(다음 회차가 따라잡아 유실 없음, 푸시 최대 약 2분 지연). 2026-11-19 사용자가 이 방식(A)을 택했다 — 사용자가 적은 시간대에 배포한다. 운영 맥북 실측은 하지 않았다.
 
 ## 파생 값
 
