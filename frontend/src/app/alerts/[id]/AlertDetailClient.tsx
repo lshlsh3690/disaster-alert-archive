@@ -10,7 +10,6 @@ import { useLanguageStore } from "@/store/languageStore";
 import { useComments, useCreateComment, useDeleteComment, useInfiniteComments, useUpdateComment } from "@/lib/queries/useComments";
 import { useEffect, useRef, useState } from "react";
 import { disasterTypeChipStyle } from "@/ui/disasterTypeColor";
-import PermalinkCopy from "@/components/PermalinkCopy";
 
 const LEVEL_BADGE: Record<string, { backgroundColor: string; color: string }> = {
   안전안내: { backgroundColor: "var(--blue-soft)", color: "var(--blue)" },
@@ -126,11 +125,6 @@ export default function AlertDetailClient() {
               </div>
             )}
           </dl>
-
-          {/* 공식 문자만 영구 링크가 있다 — 사용자 제보는 원 출처 고유번호(sn)가 없다(FR-004) */}
-          {!isUser && offData?.sn != null && (
-            <PermalinkCopy path={`/archive/alerts/${offData.sn}`} />
-          )}
 
           {!isUser && offData?.eventId && (
             <Link

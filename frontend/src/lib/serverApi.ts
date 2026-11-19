@@ -1,6 +1,6 @@
 import { ZAlert, type Alert } from "@/types/alerts";
 import { ZEventDetail, type EventDetail } from "@/types/events";
-import { ZArchiveAlert, ZArchiveEventResolve, type ArchiveAlert, type ArchiveEventResolve } from "@/types/archive";
+import { ZArchiveEventResolve, type ArchiveEventResolve } from "@/types/archive";
 
 const API_BASE = process.env.BASE_API_URL ?? "https://api.disaster-alert-archive.co.kr";
 
@@ -22,22 +22,7 @@ export async function fetchAlertServer(id: string, lang = "ko"): Promise<Alert |
   }
 }
 
-/** 기록관 원문 기록(서버용, 메타데이터). 없는 sn·실패는 null. 원문은 바뀌지 않으므로 길게 캐시한다. */
-export async function fetchArchiveAlertServer(sn: string): Promise<ArchiveAlert | null> {
-  try {
-    const res = await fetch(`${API_BASE}/api/v1/archive/alerts/${sn}`, {
-      headers: { "X-Auth-Required": "false" },
-      next: { revalidate: 3600 },
-    });
-    if (!res.ok) return null;
-    const body = await res.json();
-    return ZArchiveAlert.parse(body.data);
-  } catch {
-    return null;
-  }
-}
-
-/** 기록관 사건 영구 링크 해석(서버용). 없는 sn·실패는 null. */
+/** 사건 영구 링크 해석(서버용). 없는 sn·실패는 null. */
 export async function resolveArchiveEventServer(sn: string): Promise<ArchiveEventResolve | null> {
   try {
     const res = await fetch(`${API_BASE}/api/v1/archive/events/${sn}`, {
