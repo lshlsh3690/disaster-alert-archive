@@ -89,7 +89,7 @@ class EventClusteringServiceNationalEventTest {
                 .lastAlertAt(LocalDateTime.of(2026, 11, 18, 9, 0)).build();
         ReflectionTestUtils.setField(running, "id", 77L);
         // 병합 대상 조회는 "행사 제목"으로만 한다 — 제목이 어긋나면 이 목은 응답하지 않아 신규 이벤트가 만들어진다.
-        when(disasterEventRepository.findLatestNationalScheduledEvent(eq(SUNEUNG_TITLE), any(LocalDateTime.class)))
+        when(disasterEventRepository.findLatestNationalScheduledEvent(eq(SUNEUNG_TITLE), any(LocalDateTime.class), any(LocalDateTime.class)))
                 .thenReturn(Optional.of(running));
         when(disasterEventRepository.findById(77L)).thenReturn(Optional.of(running));
 
@@ -111,7 +111,7 @@ class EventClusteringServiceNationalEventTest {
     void createsNationalEventWhenNoneIsRunning() {
         // 준비: 72시간 안의 같은 행사 이벤트가 없는 상황(조회가 빈 값을 돌려준다).
         advisorySuneungAlert();
-        when(disasterEventRepository.findLatestNationalScheduledEvent(any(), any())).thenReturn(Optional.empty());
+        when(disasterEventRepository.findLatestNationalScheduledEvent(any(), any(), any())).thenReturn(Optional.empty());
 
         // 실행
         service.clusterNewAlert(1L);

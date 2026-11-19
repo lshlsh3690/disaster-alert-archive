@@ -249,7 +249,7 @@ public class EventClusteringService {
         // 2) 같은 제목의 광역 이벤트를 72시간 안에서 찾는다. 예고(1~2일 전)부터 당일까지가 한 행사이고,
         //    제목에 연도가 있어 해마다 다음 행사와 갈린다. 윈도우를 넘겨 이어 붙는 것을 막는 용도라 설정 키는 두지 않았다.
         Optional<DisasterEvent> target = disasterEventRepository.findLatestNationalScheduledEvent(
-                title, alert.getCreatedAt().minusHours(NATIONAL_EVENT_WINDOW_HOURS));
+                title, alert.getCreatedAt().minusHours(NATIONAL_EVENT_WINDOW_HOURS), alert.getCreatedAt());
         if (target.isPresent()) {
             mergeIntoExisting(target.get().getId(), alert, null, MergeMethod.NATIONAL_EVENT);
             log.info("clusterNewAlert(전국 행사): alertId={} → event={} 병합('{}')", alert.getId(), target.get().getId(), title);

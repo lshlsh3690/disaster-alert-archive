@@ -320,18 +320,24 @@ public interface DisasterEventRepository extends JpaRepository<DisasterEvent, Lo
      * 전국 예정 행사 머지 대상 검색 — 광역 이벤트 중 제목이 그 행사 제목이고 마지막 알림이 {@code lastAlertAt}
      * 이후인 가장 최근 1개. 제목은 {@code NationalScheduledEvent.title} 이 결정적으로 만들므로 SQL 에 정규식을
      * 두지 않고 제목 일치로 찾는다(행사 종류·연도가 곧 제목).
+     *
+     * <p>{@code alertAt} 보다 뒤에 시작한 이벤트는 제외한다 — 백필로 지난 알림을 처리할 때 같은 해 나중 행사가 이미 있으면
+     * (예: 8월 "2026 민방위훈련" 이 있는데 3월 훈련 알림을 처리) 하한 조건만으로는 그 미래 이벤트가 걸려 엉뚱한 행사에
+     * 붙는다(CodeRabbit PR #347 지적). 동물 후보 조회의 {@code first_alert_at <= :untilTime} 과 같은 이유다.
      */
     @Query(value = """
             SELECT * FROM disaster_events
             WHERE is_broadcast = true
               AND event_title = :title
               AND last_alert_at > :lastAlertAt
+              AND first_alert_at <= :alertAt
             ORDER BY last_alert_at DESC
             LIMIT 1
             """, nativeQuery = true)
     Optional<DisasterEvent> findLatestNationalScheduledEvent(
             @Param("title") String title,
-            @Param("lastAlertAt") LocalDateTime lastAlertAt);
+            @Param("lastAlertAt") LocalDateTime lastAlertAt,
+            @Param("alertAt") LocalDateTime alertAt);
 
     /**
      * 제목 승급 — 현재 제목이 {@code ifTitle}(기본 제목)일 때만 {@code title}로 교체.
