@@ -279,7 +279,8 @@ public class EventClusteringService {
         // 후보는 이미 지역 hard 필터(시군구 교집합) 통과한 같은 지역 이벤트들.
         // 코드 granularity 차이(군레벨 4886000000 vs 읍면동 4886036000)를 흡수하려 시군구(앞 5자) 교집합으로 매칭.
         // 같은 시군구·같은 사건이 읍면동 태깅 차이로 갈리던 과소병합(예: 산청 산불 시천면↔군레벨) 차단.
-        List<Object[]> candidates = disasterEventRepository.findTopCandidates(embeddingText, sigunguPrefixes(regionCodes), since);
+        List<Object[]> candidates = disasterEventRepository.findTopCandidates(
+                embeddingText, sigunguPrefixes(regionCodes), since, regionalTypeNames());
 
         // 4. top-3 후보 로깅 (임계값 튜닝 / 디버깅용)
         logCandidates(alert.getId(), candidates);
@@ -330,7 +331,7 @@ public class EventClusteringService {
         }
         LocalDateTime adjacentSince = alert.getCreatedAt().minusHours(adjacentWindowHours);
         List<Object[]> adjacent = disasterEventRepository.findTopAdjacentCandidates(
-                embeddingText, sigunguPrefixes(regionCodes), adjacentSince);
+                embeddingText, sigunguPrefixes(regionCodes), adjacentSince, regionalTypeNames());
         // 실제로 조회한 경우만 기록한다(조기 return 한 비사고성은 null 유지) — 0건이면 빈 목록.
         log.info("clusterNewAlert: alertId={} 인접 시군구 후보 {}건 (윈도우 {}h)",
                 alert.getId(), adjacent.size(), adjacentWindowHours);
@@ -485,6 +486,28 @@ public class EventClusteringService {
             alertEmbeddingRepository.updateEmbedding(alert.getId(), embeddingText);
         }
         return embeddingText;
+    }
+
+    /**
+     * 임베딩을 "저장만" 해 두되 실패는 삼킨다 — 규칙으로 병합하는 경로가 부가 작업 때문에 막히면
+     * 알림이 미배정으로 남기 때문이다. 실패한 알림은 임베딩이 비어 남아 00:30 구조 검사가 세어 주므로
+     * 사람이 조치할 장애가 아니라 warn 으로 둔다(error 는 사람이 조치할 것만). 확인할 곳: 이 warn 로그의 alertId.
+     */
+    private void storeEmbeddingBestEffort(DisasterAlert alert) {
+        if (alertEmbeddingRepository.findEmbeddingText(alert.getId()) != null) {
+            return;
+        }
+        // 외부 임베딩 API 실패만 삼킨다. DB 오류까지 삼키면 PostgreSQL 이 그 트랜잭션을 중단시켜 이어지는 병합 저장도
+        // 실패하고 원인이 가려진다 — DB 오류는 다른 경로처럼 그대로 올린다
+        float[] embedding;
+        try {
+            embedding = embeddingModel.embed(alert.getMessage());
+        } catch (RuntimeException e) {
+            log.warn("지역 한정 경로 임베딩 생성 실패 — 규칙 병합은 계속한다: alertId={} reason={}",
+                    alert.getId(), e.toString());
+            return;
+        }
+        alertEmbeddingRepository.updateEmbedding(alert.getId(), toVectorText(embedding));
     }
 
     /**
@@ -711,6 +734,7 @@ public class EventClusteringService {
         }
 
         // 위 false 분기를 모두 통과해야 이 경로가 확정이다 — 인접 산불 병합(mergeIntoAdjacentRegionalEvent)도 REGIONAL.
+        // 1) 병합 판단은 규칙(유형+시군구)만으로 한다 — 임베딩은 판단에 쓰지 않는다
         String[] sigungu = sigunguPrefixes(regionCodes);
         LocalDateTime since = alert.getCreatedAt().minusHours(windowHours);
         Optional<Long> target = disasterEventRepository.findRegionalTypeMergeTarget(
@@ -719,13 +743,14 @@ public class EventClusteringService {
             mergeIntoExisting(target.get(), alert, null, MergeMethod.REGIONAL_TYPE);
             log.info("clusterNewAlert(지역 한정): alertId={} → event={} 유형+시군구 머지({}, window={}h)",
                     alert.getId(), target.get(), alert.getDisasterType(), windowHours);
-        } else if (mergeIntoAdjacentRegionalEvent(alert, sigungu)) {
-            return true;
-        } else {
+        } else if (!mergeIntoAdjacentRegionalEvent(alert, sigungu)) {
             createNewEvent(alert, regionCodes[0], extractFirstRegionName(alert), false);
             log.info("clusterNewAlert(지역 한정): alertId={} → 신규 이벤트({}, window={}h)",
                     alert.getId(), alert.getDisasterType(), windowHours);
         }
+        // 2) 판단이 끝난 뒤 임베딩만 저장한다 — 안 남기면 00:30 구조 검사가 "임베딩 없음"을 장애로 센다.
+        //    다른 유형 문자의 후보 검색에서는 쿼리가 지역 한정 유형 알림 임베딩을 빼 주므로 묶음 결과는 바뀌지 않는다
+        storeEmbeddingBestEffort(alert);
         return true;
     }
 
@@ -824,6 +849,16 @@ public class EventClusteringService {
         if (type == null) {
             return null;
         }
+        return regionalTypeWindowMap().get(type.trim());
+    }
+
+    /** 지역 한정 유형 이름들 — 임베딩 후보 검색이 이 유형 알림의 임베딩을 거리 계산에서 빼도록 넘긴다. */
+    private String[] regionalTypeNames() {
+        return regionalTypeWindowMap().keySet().toArray(new String[0]);
+    }
+
+    /** regionalTypesCsv 를 1회 파싱해 캐시한다. */
+    private Map<String, Integer> regionalTypeWindowMap() {
         if (regionalTypeWindows == null) {
             Map<String, Integer> m = new HashMap<>();
             for (String pair : regionalTypesCsv.split(",")) {
@@ -838,7 +873,7 @@ public class EventClusteringService {
             }
             regionalTypeWindows = m;
         }
-        return regionalTypeWindows.get(type.trim());
+        return regionalTypeWindows;
     }
 
     /**

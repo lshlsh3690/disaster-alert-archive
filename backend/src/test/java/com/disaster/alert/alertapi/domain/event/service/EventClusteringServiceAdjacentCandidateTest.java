@@ -107,12 +107,12 @@ class EventClusteringServiceAdjacentCandidateTest {
     }
 
     private void sameRegionCandidates(double... distances) {
-        when(disasterEventRepository.findTopCandidates(anyString(), any(String[].class), any(LocalDateTime.class)))
+        when(disasterEventRepository.findTopCandidates(anyString(), any(String[].class), any(LocalDateTime.class), any(String[].class)))
                 .thenReturn(rows(SAME_EVENT_ID, distances));
     }
 
     private void adjacentCandidates(double... distances) {
-        when(disasterEventRepository.findTopAdjacentCandidates(anyString(), any(String[].class), any(LocalDateTime.class)))
+        when(disasterEventRepository.findTopAdjacentCandidates(anyString(), any(String[].class), any(LocalDateTime.class), any(String[].class)))
                 .thenReturn(rows(ADJACENT_EVENT_ID, distances));
     }
 
@@ -190,7 +190,7 @@ class EventClusteringServiceAdjacentCandidateTest {
 
         assertMergedEmbedding(SAME_EVENT_ID);
         verify(disasterEventRepository, never())
-                .findTopAdjacentCandidates(anyString(), any(String[].class), any(LocalDateTime.class));
+                .findTopAdjacentCandidates(anyString(), any(String[].class), any(LocalDateTime.class), any(String[].class));
     }
 
     @Test
@@ -204,7 +204,7 @@ class EventClusteringServiceAdjacentCandidateTest {
 
         // 사고성이므로 인접 조회가 일어나야 한다(Red 에서는 호출 자체가 없어 여기서 실패)
         verify(disasterEventRepository)
-                .findTopAdjacentCandidates(anyString(), any(String[].class), any(LocalDateTime.class));
+                .findTopAdjacentCandidates(anyString(), any(String[].class), any(LocalDateTime.class), any(String[].class));
         verify(llmDecisionService, never()).pickSameGeneralIncident(anyString(), anyList());
         assertNewEventCreated();
     }
@@ -219,7 +219,7 @@ class EventClusteringServiceAdjacentCandidateTest {
         service.clusterNewAlert(1L);
 
         verify(disasterEventRepository, never())
-                .findTopAdjacentCandidates(anyString(), any(String[].class), any(LocalDateTime.class));
+                .findTopAdjacentCandidates(anyString(), any(String[].class), any(LocalDateTime.class), any(String[].class));
         assertNewEventCreated();
     }
 
@@ -234,7 +234,7 @@ class EventClusteringServiceAdjacentCandidateTest {
 
         ArgumentCaptor<LocalDateTime> since = ArgumentCaptor.forClass(LocalDateTime.class);
         verify(disasterEventRepository)
-                .findTopAdjacentCandidates(anyString(), any(String[].class), since.capture());
+                .findTopAdjacentCandidates(anyString(), any(String[].class), since.capture(), any(String[].class));
         assertThat(since.getValue()).isEqualTo(now.minusHours(48));
     }
 

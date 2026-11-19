@@ -89,7 +89,7 @@ class EventClusteringServiceAlwaysOnTest {
 
         when(disasterAlertRepository.findById(1L)).thenReturn(Optional.of(alert));
         when(alertEmbeddingRepository.findEmbeddingText(1L)).thenReturn("[0.1,0.2]");
-        when(disasterEventRepository.findTopCandidates(anyString(), any(String[].class), any(LocalDateTime.class)))
+        when(disasterEventRepository.findTopCandidates(anyString(), any(String[].class), any(LocalDateTime.class), any(String[].class)))
                 .thenReturn(List.<Object[]>of(new Object[]{eventId, 0.30}));
         when(disasterEventRepository.findById(eventId)).thenReturn(Optional.of(event));
         when(llmDecisionService.pickSameGeneralIncident(anyString(), anyList())).thenReturn(null);
