@@ -62,7 +62,9 @@ public class ClusteringPairLabelService {
         ClusteringPairLabel label = existing
                 .or(() -> labelRepository.findByAlertAAndAlertB(alertA, alertB))
                 .orElseThrow(() -> new CustomException(ErrorCode.INTERNAL_SERVER_ERROR));
-        label.relabel(request.label(), ClusteringCriteria.VERSION_DATE, memberId, now);
+        // 수정 시각은 기존 줄을 확보한 뒤 다시 잰다 — 위 now 는 다른 요청의 첫 저장(ON CONFLICT 대기)보다 앞설 수 있어, 그대로 쓰면
+        // 나중 저장인데 updated_at 이 먼저 저장된 줄보다 이른 시각으로 되돌아간다(CodeRabbit PR #342)
+        label.relabel(request.label(), ClusteringCriteria.VERSION_DATE, memberId, LocalDateTime.now());
         return new ClusteringPairLabelResponse(
                 alertA, alertB, label.getLabel(), label.getCriteriaDate(), label.getUpdatedAt());
     }
