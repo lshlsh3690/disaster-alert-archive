@@ -322,6 +322,11 @@ public interface DisasterEventRepository extends JpaRepository<DisasterEvent, Lo
      * <p>전국 이벤트는 특정 시도에 귀속되지 않으므로 {@code primary_region_code = null} 로 저장하고,
      * 시도 키 없이 유형만으로 묶는다(라벨 "전국 {유형}"). 행안부 전국 호우/대설 안내처럼 17개 시도
      * 전체에 발송되는 알림이 시도별로 흩어지지 않게 하나로 통합.
+     *
+     * <p>{@code excludedTitles} 제목의 이벤트는 후보에서 뺀다 — 전국 예정 행사 이벤트("2026 민방위훈련", 유형 민방공)를
+     * 일반 광역 병합이 고르면 행사 키워드 없는 실제 전국 경보가 훈련 이벤트에 묻힌다. 1건만 고르기(LIMIT 1) <b>전에</b>
+     * 빼야 한다 — 고른 뒤에 거르면 가장 최근 이벤트가 훈련일 때 그 아래 실제 경보 이벤트가 후보에 오르지 못해 실제 경보의
+     * 후속 알림이 새 이벤트로 갈라진다. 빈 배열이면 아무것도 빼지 않는다.
      */
     @Query(value = """
             SELECT * FROM disaster_events
@@ -329,12 +334,39 @@ public interface DisasterEventRepository extends JpaRepository<DisasterEvent, Lo
               AND primary_disaster_type = :primaryDisasterType
               AND primary_region_code IS NULL
               AND last_alert_at > :lastAlertAt
+              AND event_title <> ALL(CAST(:excludedTitles AS varchar[]))
             ORDER BY last_alert_at DESC
             LIMIT 1
             """, nativeQuery = true)
     Optional<DisasterEvent> findLatestBroadcastNationwide(
             @Param("primaryDisasterType") String primaryDisasterType,
-            @Param("lastAlertAt") LocalDateTime lastAlertAt);
+            @Param("lastAlertAt") LocalDateTime lastAlertAt,
+            @Param("excludedTitles") String[] excludedTitles);
+
+    /**
+     * 전국 예정 행사 머지 대상 검색 — 광역 이벤트 중 제목이 그 행사 제목이고 마지막 알림이 {@code lastAlertAt}
+     * 이후인 가장 최근 1개. 제목은 {@code NationalScheduledEvent.title} 이 결정적으로 만들므로 SQL 에 정규식을
+     * 두지 않고 제목 일치로 찾는다(행사 종류·연도가 곧 제목).
+     *
+     * <p>{@code startedBy} 보다 뒤에 시작한 이벤트는 제외한다 — 백필로 지난 알림을 처리할 때 같은 해 나중 행사가 이미 있으면
+     * (예: 8월 "2026 민방위훈련" 이 있는데 3월 훈련 알림을 처리) 하한 조건만으로는 그 미래 이벤트가 걸려 엉뚱한 행사에
+     * 붙는다(CodeRabbit PR #347 지적). 호출 측은 상한을 알림 시각이 아니라 알림 시각 + 윈도우로 넘긴다 — 실시간 수집은
+     * 공공 API 응답 순서대로 처리해 같은 행사의 이른 알림이 늦게 처리될 수 있는데, 알림 시각을 상한으로 두면 그 알림이
+     * 먼저 만들어진 이벤트를 못 찾아 행사가 여러 이벤트로 쪼개진다.
+     */
+    @Query(value = """
+            SELECT * FROM disaster_events
+            WHERE is_broadcast = true
+              AND event_title = :title
+              AND last_alert_at > :lastAlertAt
+              AND first_alert_at <= :startedBy
+            ORDER BY last_alert_at DESC
+            LIMIT 1
+            """, nativeQuery = true)
+    Optional<DisasterEvent> findLatestNationalScheduledEvent(
+            @Param("title") String title,
+            @Param("lastAlertAt") LocalDateTime lastAlertAt,
+            @Param("startedBy") LocalDateTime startedBy);
 
     /**
      * 제목 승급 — 현재 제목이 {@code ifTitle}(기본 제목)일 때만 {@code title}로 교체.

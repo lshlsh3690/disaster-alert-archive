@@ -10,6 +10,7 @@ import org.springframework.context.annotation.Profile;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 
@@ -25,6 +26,10 @@ import java.util.Map;
  *   <li>{@code --backfill.embed-only=true}: 임베딩만 <b>배치</b>로 생성·저장 (빠름, 클러스터링 X)</li>
  *   <li>{@code --backfill.recluster=true}: 저장된 임베딩으로 재클러스터링 (임베딩 호출 X, 튜닝용).
  *       단 사고성 유형의 borderline 후보는 LLM 폴백(gpt-4o-mini)을 호출하므로 완전히 공짜는 아니다</li>
+ *   <li>{@code --backfill.unassigned-since=2026-11-18}: 그 날짜(포함) 이후의 <b>미배정</b>(event_id IS NULL) 알림만
+ *       지금 기준으로 다시 클러스터링. 이미 묶인 알림·이벤트는 건드리지 않아 이벤트 id 가 유지된다. 클러스터링 기준을
+ *       바꾼 뒤 최근 알림에만 새 기준을 적용할 때 쓴다(2026-11-19 전국 예정 행사 도입 때 수능 문자 연결용으로 추가).
+ *       이벤트를 비울 필요가 없다. 기준 변경이 이미 묶인 알림의 결과도 바꾸는 경우엔 이 모드로는 부족하다</li>
  * </ul>
  *
  * <p><b>권장 절차 (전체 백필/검증)</b>
@@ -71,11 +76,14 @@ public class EventClusteringBackfillTool implements ApplicationRunner {
             return;
         }
 
-        List<Long> alertIds = fetchAlertIds(limit, recluster);
+        LocalDate unassignedSince = parseDate(args, "backfill.unassigned-since");
+        List<Long> alertIds = unassignedSince != null
+                ? fetchUnassignedSince(unassignedSince)
+                : fetchAlertIds(limit, recluster);
 
-        log.info("EventClusteringBackfillTool 시작: 대상 {}건 (limit={}, recluster={})",
-                alertIds.size(), limit, recluster);
-        if (recluster) {
+        log.info("EventClusteringBackfillTool 시작: 대상 {}건 (limit={}, recluster={}, unassignedSince={})",
+                alertIds.size(), limit, recluster, unassignedSince);
+        if (recluster && unassignedSince == null) {
             log.info("  recluster 모드: 저장된 임베딩 재사용(임베딩 호출 X, borderline 사고성 건은 LLM 폴백 호출). " +
                     "이벤트를 먼저 비웠는지 확인하세요 (disaster_alert 의 event_ 컬럼 NULL → "
                     + "TRUNCATE disaster_event_translation, event_region_impact, region_risk_index → DELETE FROM disaster_events).");
@@ -123,6 +131,29 @@ public class EventClusteringBackfillTool implements ApplicationRunner {
     private boolean parseFlag(ApplicationArguments args, String name) {
         List<String> values = args.getOptionValues(name);
         return values != null && !values.isEmpty() && Boolean.parseBoolean(values.get(0));
+    }
+
+    /**
+     * {@code --name=yyyy-MM-dd} 를 읽는다. 옵션이 없으면 null. 값 없이 {@code --name} 만 주면 빈 목록이 오는데, 이걸 "옵션
+     * 없음"으로 보면 날짜 제한 없는 기본 모드(임베딩 없는 알림 전체를 임베딩·클러스터링)로 넘어가므로 바로 실패시킨다
+     * (CodeRabbit PR #347 지적). 형식이 틀려도 엉뚱한 범위를 돌지 않게 실패한다.
+     */
+    private LocalDate parseDate(ApplicationArguments args, String name) {
+        List<String> values = args.getOptionValues(name);
+        if (values == null) {
+            return null;
+        }
+        if (values.isEmpty() || values.get(0).isBlank()) {
+            throw new IllegalArgumentException("--" + name + " 에 날짜(yyyy-MM-dd)가 없습니다");
+        }
+        return LocalDate.parse(values.get(0));
+    }
+
+    /** 그 날짜(포함) 이후의 미배정 알림 — 처리 순서는 {@link #fetchAlertIds} 와 같다(created_at, id 오름차순). */
+    private List<Long> fetchUnassignedSince(LocalDate since) {
+        String sql = "SELECT disaster_alert_id FROM disaster_alert WHERE event_id IS NULL AND created_at >= ?"
+                + " ORDER BY created_at ASC, disaster_alert_id ASC";
+        return jdbcTemplate.queryForList(sql, Long.class, since.atStartOfDay());
     }
 
     /**

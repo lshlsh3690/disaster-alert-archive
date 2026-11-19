@@ -39,5 +39,11 @@ public enum MergeMethod {
      * 한 산불/호우 episode 가 본문 텍스트 차이(코사인&lt;0.85)로 수십 개 이벤트로 파편화되던 것을 차단.
      * 전국 단일인 {@link #GLOBAL_TYPE}(태풍)과 같은 철학이되 시군구 스코프(전국 blob 방지).
      */
-    REGIONAL_TYPE
+    REGIONAL_TYPE,
+    /**
+     * 전국 예정 행사 머지 — 수능·민방위훈련 문자를 사건·비사건 분류와 지역·임베딩에 상관없이 같은 행사 제목의
+     * 전국 광역 이벤트(마지막 알림 후 72시간 안)에 묶는다({@link NationalScheduledEvent}). 2026-11-19 사용자 결정,
+     * 기준은 CLUSTERING_CRITERIA.md 4절. 비사건 문자가 제외·분산되던 것을 행사 단위로 모으기 위해 만들었다.
+     */
+    NATIONAL_EVENT
 }
