@@ -1,6 +1,6 @@
 # 데이터 모델: 불일치 쌍 사람 라벨링
 
-## 새 테이블 `clustering_pair_label` (V140)
+## 새 테이블 `clustering_pair_label` (V142)
 
 | 열 | 형식 | 설명 |
 |---|---|---|

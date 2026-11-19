@@ -2,7 +2,7 @@
 
 ## 준비
 
-- 로컬: `docker compose -f docker-compose.dev.yml up postgres redis`, 백엔드 `./gradlew bootRun`(V140 적용), 프론트 `npm run dev`.
+- 로컬: `docker compose -f docker-compose.dev.yml up postgres redis`, 백엔드 `./gradlew bootRun`(V142 적용), 프론트 `npm run dev`.
 - ADMIN 회원 하나와 일반 회원 하나.
 - 불일치 쌍: 운영에는 2026-11-18 현재 0건이다. 로컬에서는 통합 테스트처럼 `clustering_daily_score`·`clustering_daily_score_pair` 에 과병합·과소병합 쌍을 몇 개 넣는다(운영 DB 는 읽기만).
 

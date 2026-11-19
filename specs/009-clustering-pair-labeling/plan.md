@@ -14,7 +14,7 @@
 
 **주요 의존성**: Spring Web·Security(`@PreAuthorize`, `@AuthenticationPrincipal`)·Data JPA, Flyway, TanStack Query(`useMutation`), axios 공용 인스턴스. 새 라이브러리 없음
 
-**저장소**: PostgreSQL — 새 테이블 `clustering_pair_label`(V140). 기존 `clustering_daily_score`·`clustering_daily_score_pair`·`disaster_alert` 는 읽기만
+**저장소**: PostgreSQL — 새 테이블 `clustering_pair_label`(V142). 기존 `clustering_daily_score`·`clustering_daily_score_pair`·`disaster_alert` 는 읽기만
 
 **테스트**: JUnit 5 — 판정·집계·평가용 라벨 묶음 순수 클래스는 단위 테스트(Red-Green), 라벨 저장·권한·집계 API 는 `@IntegrationTest`(Red-Green). 프론트는 Jest + ui-checker. 프론트 TDD 여부는 tasks 의 확인 단계에서 사용자가 정한다
 
@@ -30,7 +30,7 @@
 
 ## 설계
 
-### 1. 사람 라벨 저장 (`clustering_pair_label`, V140)
+### 1. 사람 라벨 저장 (`clustering_pair_label`, V142)
 
 - 두 알림 쌍(`alert_a < alert_b`)마다 한 줄, `(alert_a, alert_b)` UNIQUE. 날짜를 키에 넣지 않아 같은 쌍이 여러 날 나와도 라벨은 하나다(spec FR-002).
 - 열: 라벨(SAME/DIFF/UNSURE), 기준 시점(DATE), 처음 매긴 회원·시각, 마지막으로 고친 회원·시각.
@@ -96,7 +96,7 @@ specs/009-clustering-pair-labeling/
 ### 소스 코드
 
 ```text
-backend/src/main/resources/db/migration/V140__create_clustering_pair_label.sql
+backend/src/main/resources/db/migration/V142__create_clustering_pair_label.sql
 
 backend/src/main/java/com/disaster/alert/alertapi/
 ├── domain/event/
