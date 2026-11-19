@@ -13,6 +13,7 @@ import { EmptyChart } from "../_charts";
 import { useTranslation } from "react-i18next";
 import { useLanguageStore } from "@/store/languageStore";
 import { LANG_LOCALE } from "./common";
+import { BAR_FILL, CHART_CURSOR, CHART_GRID, CHART_TICK } from "../_constants";
 import { useYearComparison, CompareTooltipContent, YoyBadge } from "./useYearComparison";
 
 /**
@@ -45,22 +46,22 @@ export function CompareBars({
       <div className="flex-1 min-h-0 relative">
         <ResponsiveContainer width="100%" height="100%" className="absolute inset-0">
           <BarChart data={months} margin={{ top: 4, right: 4, bottom: 4, left: 4 }}>
-            <CartesianGrid vertical={false} stroke="#f3f4f6" />
+            <CartesianGrid vertical={false} stroke={CHART_GRID} />
             <XAxis dataKey="label" axisLine={false} tickLine={false}
-              tick={{ fontSize: 10, fill: "#9ca3af" }} />
+              tick={{ fontSize: 10, fill: CHART_TICK }} />
             <YAxis axisLine={false} tickLine={false}
-              tick={{ fontSize: 10, fill: "#9ca3af" }} width={32} />
+              tick={{ fontSize: 10, fill: CHART_TICK }} width={32} />
             <Tooltip
               content={<CompareTooltipContent months={months} currentMonth={currentMonth} currentYear={currentYear} locale={locale} t={t} />}
-              cursor={{ fill: "#f3f4f6" }} wrapperStyle={{ zIndex: 30 }} />
+              cursor={{ fill: CHART_CURSOR }} wrapperStyle={{ zIndex: 30 }} />
             {/* formatter: Recharts 범례의 "ly"/"ty" 키를 연도로 변환 */}
             <Legend wrapperStyle={{ fontSize: 12 }}
               formatter={(value: string) =>
                 value === "ly" ? String(currentYear - 1) : String(currentYear)
               } />
-            {/* ly: 작년 (회색), ty: 올해 (파란색) */}
-            <Bar dataKey="ly" fill="#cbd5e1" radius={[3, 3, 0, 0]} maxBarSize={16} isAnimationActive={false} />
-            <Bar dataKey="ty" fill="#2563eb" radius={[3, 3, 0, 0]} maxBarSize={16} isAnimationActive={false} />
+            {/* ly: 작년 (gray-30), ty: 올해 (primary-50) */}
+            <Bar dataKey="ly" fill="#b1b8be" radius={[3, 3, 0, 0]} maxBarSize={16} isAnimationActive={false} />
+            <Bar dataKey="ty" fill={BAR_FILL} radius={[3, 3, 0, 0]} maxBarSize={16} isAnimationActive={false} />
           </BarChart>
         </ResponsiveContainer>
       </div>

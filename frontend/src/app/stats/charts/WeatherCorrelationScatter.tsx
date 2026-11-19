@@ -73,11 +73,11 @@ export function WeatherCorrelationScatter({ data }: { data: WeatherCorrelationSt
     <div className="flex-1 min-h-0 relative">
       <ResponsiveContainer width="100%" height="100%" className="absolute inset-0">
         <ScatterChart margin={{ top: 8, right: 8, bottom: 4, left: 4 }}>
-          <CartesianGrid stroke="#f3f4f6" />
+          <CartesianGrid stroke="#e6e8ea" />
           <XAxis type="number" dataKey="x" name={t("statsPage.weatherChart.temperatureLabel")} axisLine={false} tickLine={false}
-            tick={{ fontSize: 9, fill: "#9ca3af" }} tickFormatter={(v: number) => `${v}°`} />
+            tick={{ fontSize: 9, fill: "#6d7882" }} tickFormatter={(v: number) => `${v}°`} />
           <YAxis type="number" dataKey="y" name={t("statsPage.weatherChart.countAxisLabel")} axisLine={false} tickLine={false}
-            tick={{ fontSize: 9, fill: "#9ca3af" }} width={32} />
+            tick={{ fontSize: 9, fill: "#6d7882" }} width={32} />
           {/* 버블 크기 범위를 줄여 점들이 서로 덜 겹치도록 함 */}
           <ZAxis type="number" dataKey="z" range={[20, 120]} />
           <Tooltip content={<TooltipContent />} cursor={{ strokeDasharray: "3 3" }} wrapperStyle={{ zIndex: 30 }} />
@@ -85,7 +85,7 @@ export function WeatherCorrelationScatter({ data }: { data: WeatherCorrelationSt
           <Legend wrapperStyle={{ fontSize: 11, cursor: "pointer" }}
             onClick={(e: { value?: string }) => toggleType(String(e.value ?? ""))}
             formatter={(value: string) => (
-              <span style={{ color: hidden.has(value) ? "#cbd5e1" : "#6b7280" }}>{translateType(value)}</span>
+              <span style={{ color: hidden.has(value) ? "#b1b8be" : "#464c53" }}>{translateType(value)}</span>
             )} />
           {grouped.map(g => (
             // 투명도를 낮추고 흰 테두리를 더해 겹쳐도 개별 점 윤곽이 구분되게 함

@@ -61,20 +61,20 @@ export function CompareTooltipContent({
     <div style={TT_BOX}>
       <p style={TT_LABEL}>{label}</p>
       <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 2 }}>
-        <span style={{ width: 8, height: 8, borderRadius: 2, background: "#cbd5e1", display: "inline-block", flexShrink: 0 }} />
+        <span style={{ width: 8, height: 8, borderRadius: 2, background: "#b1b8be", display: "inline-block", flexShrink: 0 }} />
         <span style={{ color: "#fff", fontSize: 11 }}>
           {currentYear - 1}: {lyVal.toLocaleString(locale)}{t("statsPage.countUnit")}
         </span>
       </div>
       <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: diff !== null ? 4 : 0 }}>
-        <span style={{ width: 8, height: 8, borderRadius: 2, background: "#2563eb", display: "inline-block", flexShrink: 0 }} />
+        <span style={{ width: 8, height: 8, borderRadius: 2, background: "#256ef4", display: "inline-block", flexShrink: 0 }} />
         <span style={{ color: "#fff", fontSize: 11 }}>
           {currentYear}: {tyVal.toLocaleString(locale)}{t("statsPage.countUnit")}
         </span>
       </div>
       {diff !== null && (
         <p style={{
-          color: tyVal >= lyVal ? "#f87171" : "#60a5fa",
+          color: tyVal >= lyVal ? "#f87171" : "#86aff9",
           fontWeight: 700, fontSize: 11, margin: 0, textAlign: "center",
         }}>
           {tyVal >= lyVal ? `↑ +${diff}%` : `↓ ${diff}%`}
@@ -87,8 +87,8 @@ export function CompareTooltipContent({
 export function YoyBadge({ yoy }: { yoy: number | null }) {
   if (yoy === null) return null;
   return (
-    <div className="flex justify-end text-xs">
-      <span className={`font-bold ${yoy >= 0 ? "text-red-600" : "text-blue-600"}`}>
+    <div className="flex justify-end text-[14px]">
+      <span className={`font-bold ${yoy >= 0 ? "text-[#bd2c0f]" : "text-[#0b50d0]"}`}>
         {yoy >= 0 ? `↑ +${yoy}%` : `↓ ${yoy}%`} (YoY)
       </span>
     </div>

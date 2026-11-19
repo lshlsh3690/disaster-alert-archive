@@ -1,6 +1,6 @@
 "use client";
 
-import { TYPE_COLORS } from "../_constants";
+import { CHART_GRID, TYPE_COLORS } from "../_constants";
 import { useTranslation } from "react-i18next";
 import { useLanguageStore } from "@/store/languageStore";
 import { LANG_LOCALE } from "./common";
@@ -42,7 +42,7 @@ export function DonutChart({
       {/* SVG 도넛 원 */}
       <svg viewBox="0 0 100 100" width="120" height="120" style={{ flexShrink: 0 }}>
         {/* 회색 배경 원 (전체 원) */}
-        <circle cx="50" cy="50" r={r} fill="none" stroke="#f3f4f6" strokeWidth="14" />
+        <circle cx="50" cy="50" r={r} fill="none" stroke={CHART_GRID} strokeWidth="14" />
 
         {data.map((d, i) => {
           // total이 0이면(모든 count가 0인 경우) 0/0 = NaN이 되어 dash·offset이 깨지므로 방어
@@ -69,14 +69,14 @@ export function DonutChart({
         })}
 
         {/* 중앙 텍스트: 총 건수 */}
-        <text x="50" y="47" textAnchor="middle" fontSize="8" fill="#6b7280">{t("statsPage.total")}</text>
-        <text x="50" y="60" textAnchor="middle" fontSize="13" fontWeight="700" fill="#111827">
+        <text x="50" y="47" textAnchor="middle" fontSize="8" fill="#6d7882">{t("statsPage.total")}</text>
+        <text x="50" y="60" textAnchor="middle" fontSize="13" fontWeight="800" fill="#1e2124">
           {total.toLocaleString(locale)}
         </text>
       </svg>
 
       {/* 범례 목록 — onTypeClick이 있으면 클릭 가능, selectedType이 있으면 해당 항목 외 흐리게 */}
-      <ul className="flex-1 space-y-1.5">
+      <ul className="flex-1 min-w-0 space-y-1.5">
         {data.map((d, i) => {
           const key = d.type ?? t("statsPage.other");
           const label = labelFormatter ? labelFormatter(key) : key;
@@ -85,14 +85,14 @@ export function DonutChart({
           return (
             <li key={d.type ?? i}
               onClick={() => onTypeClick?.(key)}
-              className={`flex items-center gap-2 text-xs rounded px-1 -mx-1 transition-opacity
-                ${onTypeClick ? "cursor-pointer hover:bg-gray-50" : ""}
+              className={`flex items-center gap-2 text-[15px] rounded px-1 -mx-1 transition-opacity
+                ${onTypeClick ? "cursor-pointer hover:bg-[#ecf2fe]" : ""}
                 ${isDimmed ? "opacity-30" : ""}`}>
-              <span className="w-2 h-2 rounded-sm shrink-0"
+              <span className="w-2.5 h-2.5 rounded-sm shrink-0"
                 style={{ background: TYPE_COLORS[i % TYPE_COLORS.length] }} />
-              <span className="flex-1 text-gray-700 truncate">{label}</span>
-              <span className="text-gray-400">{total > 0 ? Math.round((d.count / total) * 100) : 0}%</span>
-              <span className="font-semibold text-gray-900 min-w-[36px] text-right">
+              <span className="flex-1 text-[#1e2124] truncate">{label}</span>
+              <span className="text-[#6d7882]">{total > 0 ? Math.round((d.count / total) * 100) : 0}%</span>
+              <span className="font-bold text-[#1e2124] min-w-[36px] text-right">
                 {d.count.toLocaleString(locale)}
               </span>
             </li>

@@ -2,7 +2,7 @@
 
 import { Fragment, useState } from "react";
 import type { HourlyStat } from "@/types/alerts";
-import { DOW_TO_IDX, getWeekdays } from "../_constants";
+import { CHART_CURSOR, CHART_TICK, DOW_TO_IDX, HEAT_RGB, getWeekdays } from "../_constants";
 import { useTranslation } from "react-i18next";
 import { useLanguageStore } from "@/store/languageStore";
 import { LANG_LOCALE } from "./common";
@@ -11,7 +11,7 @@ import { LANG_LOCALE } from "./common";
  * Heatmap
  *
  * 요일(행) × 시간대(열) 교차점에 재난 발생 빈도를 색 농도로 표현합니다.
- * 파란색이 진할수록 발생 건수가 많습니다.
+ * primary 색이 진할수록 발생 건수가 많습니다.
  *
  * @param data - { dayOfWeek: number, hour: number, count: number }[] 배열
  *              dayOfWeek은 PostgreSQL EXTRACT(DOW) 기준: 0=일요일, 1=월요일 ... 6=토요일
@@ -42,7 +42,7 @@ export function Heatmap({ data }: { data: HourlyStat[] }) {
         {/* 시간대 헤더 (0, 3, 6, ... 21시만 표시) */}
         <div />
         {Array.from({ length: 24 }).map((_, h) => (
-          <div key={h} style={{ fontSize: 8, color: "#9ca3af", textAlign: "center" }}>
+          <div key={h} style={{ fontSize: 8, color: CHART_TICK, textAlign: "center" }}>
             {h % 3 === 0 ? h : ""}
           </div>
         ))}
@@ -52,7 +52,7 @@ export function Heatmap({ data }: { data: HourlyStat[] }) {
           <Fragment key={di}>
             {/* 요일 레이블 */}
             <div style={{
-              fontSize: 10, color: "#6b7280",
+              fontSize: 10, color: "#464c53",
               display: "flex", alignItems: "center",
               justifyContent: "flex-end", paddingRight: 4,
             }}>
@@ -65,10 +65,10 @@ export function Heatmap({ data }: { data: HourlyStat[] }) {
                 key={hi}
                 style={{
                   height: 22,
-                  // 건수가 0이면 회색, 있으면 파란색(농도는 비율에 비례)
+                  // 건수가 0이면 회색, 있으면 primary(농도는 비율에 비례)
                   background: v === 0
-                    ? "#f3f4f6"
-                    : `rgba(37,99,235,${0.15 + (v / max) * 0.75})`,
+                    ? CHART_CURSOR
+                    : `rgba(${HEAT_RGB},${0.15 + (v / max) * 0.75})`,
                   borderRadius: 2,
                   cursor: "pointer",
                 }}
@@ -93,20 +93,20 @@ export function Heatmap({ data }: { data: HourlyStat[] }) {
       {/* 툴팁 팝업 */}
       {tooltip && (
         <div
-          className="absolute z-10 bg-gray-800 text-white text-xs rounded px-2 py-1.5 shadow-lg pointer-events-none whitespace-nowrap -translate-x-1/2 -translate-y-full"
+          className="absolute z-10 bg-[#1e2124] text-white text-[13px] rounded-[6px] px-2.5 py-1.5 pointer-events-none whitespace-nowrap -translate-x-1/2 -translate-y-full"
           style={{ left: tooltip.x, top: tooltip.y - 6 }}
         >
           <div className="font-semibold">{weekdays[tooltip.di]} {tooltip.hi}{t("statsPage.hourSuffix")}</div>
-          <div className="text-gray-300">{tooltip.v.toLocaleString(locale)}{t("statsPage.countUnit")}</div>
+          <div className="text-[#cdd1d5]">{tooltip.v.toLocaleString(locale)}{t("statsPage.countUnit")}</div>
         </div>
       )}
 
       {/* 색상 범례: 적음 → 많음 */}
-      <div className="flex items-center gap-1.5 text-xs text-gray-400 mt-1 flex-wrap">
+      <div className="flex items-center gap-1.5 text-[13px] text-[#6d7882] mt-1 flex-wrap">
         <span>{t("statsPage.low")}</span>
         {[0.15, 0.3, 0.5, 0.7, 0.9].map(o => (
           <span key={o} className="w-4 h-2.5 rounded-sm inline-block"
-            style={{ background: `rgba(37,99,235,${o})` }} />
+            style={{ background: `rgba(${HEAT_RGB},${o})` }} />
         ))}
         <span>{t("statsPage.high")}</span>
       </div>

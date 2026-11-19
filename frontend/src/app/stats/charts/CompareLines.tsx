@@ -13,6 +13,7 @@ import { EmptyChart } from "../_charts";
 import { useTranslation } from "react-i18next";
 import { useLanguageStore } from "@/store/languageStore";
 import { LANG_LOCALE } from "./common";
+import { BAR_FILL, CHART_GRID, CHART_TICK } from "../_constants";
 import { useYearComparison, CompareTooltipContent, YoyBadge } from "./useYearComparison";
 
 /**
@@ -47,11 +48,11 @@ export function CompareLines({
       <div className="flex-1 min-h-0 relative">
         <ResponsiveContainer width="100%" height="100%" className="absolute inset-0">
           <LineChart data={months} margin={{ top: 4, right: 4, bottom: 4, left: 4 }}>
-            <CartesianGrid vertical={false} stroke="#f3f4f6" />
+            <CartesianGrid vertical={false} stroke={CHART_GRID} />
             <XAxis dataKey="label" axisLine={false} tickLine={false}
-              tick={{ fontSize: 10, fill: "#9ca3af" }} />
+              tick={{ fontSize: 10, fill: CHART_TICK }} />
             <YAxis axisLine={false} tickLine={false}
-              tick={{ fontSize: 10, fill: "#9ca3af" }} width={32} />
+              tick={{ fontSize: 10, fill: CHART_TICK }} width={32} />
             <Tooltip
               content={<CompareTooltipContent months={months} currentMonth={currentMonth} currentYear={currentYear} locale={locale} t={t} />}
               wrapperStyle={{ zIndex: 30 }} />
@@ -61,10 +62,10 @@ export function CompareLines({
                 value === "ly" ? String(currentYear - 1) : String(currentYear)
               } />
             {/* ly: 작년 (회색 점선), ty: 올해 (파란 실선) */}
-            <Line dataKey="ly" stroke="#cbd5e1" strokeWidth={2} strokeDasharray="5 3"
-              dot={{ r: 3, fill: "#cbd5e1" }} isAnimationActive={false} />
-            <Line dataKey="ty" stroke="#2563eb" strokeWidth={2}
-              dot={{ r: 3, fill: "#2563eb" }} isAnimationActive={false} />
+            <Line dataKey="ly" stroke="#b1b8be" strokeWidth={2} strokeDasharray="5 3"
+              dot={{ r: 3, fill: "#b1b8be" }} isAnimationActive={false} />
+            <Line dataKey="ty" stroke={BAR_FILL} strokeWidth={2}
+              dot={{ r: 3, fill: BAR_FILL }} isAnimationActive={false} />
           </LineChart>
         </ResponsiveContainer>
       </div>

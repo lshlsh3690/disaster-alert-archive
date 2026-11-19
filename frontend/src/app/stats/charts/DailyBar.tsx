@@ -1,7 +1,7 @@
 "use client";
 
 import {
-  BarChart, Bar,
+  BarChart, Bar, Cell,
   XAxis, YAxis,
   CartesianGrid,
   Tooltip,
@@ -10,6 +10,7 @@ import {
 } from "recharts";
 import type { DailyStat } from "@/types/alerts";
 import { EmptyChart } from "../_charts";
+import { BAR_FILL, BAR_FILL_MUTED, CHART_CURSOR, CHART_GRID, CHART_TICK } from "../_constants";
 import { useTranslation } from "react-i18next";
 import { useLanguageStore } from "@/store/languageStore";
 import { LANG_LOCALE, TT_BOX, TT_LABEL, TT_VALUE, TTProps } from "./common";
@@ -19,6 +20,7 @@ import { LANG_LOCALE, TT_BOX, TT_LABEL, TT_VALUE, TTProps } from "./common";
  *
  * 날짜별 건수를 Recharts BarChart로 표현합니다.
  * ResponsiveContainer를 사용해 LineChart와 동일한 높이 제약을 받습니다.
+ * 막대는 primary-30, 마지막 날(가장 최근)만 primary-50 으로 칠합니다(KRDS 통계 시안).
  *
  * @param data - { date: "YYYY-MM-DD", count: number }[] 배열
  */
@@ -43,19 +45,23 @@ export function DailyBar({ data }: { data: DailyStat[] }) {
     <div className="flex-1 min-h-0 relative">
       <ResponsiveContainer width="100%" height="100%" className="absolute inset-0">
         <BarChart data={data} margin={{ top: 8, right: 8, bottom: 4, left: 4 }}>
-          <CartesianGrid vertical={false} stroke="#f3f4f6" />
+          <CartesianGrid vertical={false} stroke={CHART_GRID} />
           <XAxis dataKey="date" axisLine={false} tickLine={false}
-            tick={{ fontSize: 9, fill: "#9ca3af" }}
+            tick={{ fontSize: 9, fill: CHART_TICK }}
             tickFormatter={(v: string) => v.slice(5)}
             interval={labelStride - 1} />
           <YAxis axisLine={false} tickLine={false}
-            tick={{ fontSize: 9, fill: "#9ca3af" }} width={32} />
-          <Tooltip content={<TooltipContent />} cursor={{ fill: "#f3f4f6" }} />
-          <Bar dataKey="count" fill="#3b82f6" radius={[2, 2, 0, 0]} maxBarSize={40} isAnimationActive={false} />
+            tick={{ fontSize: 9, fill: CHART_TICK }} width={32} />
+          <Tooltip content={<TooltipContent />} cursor={{ fill: CHART_CURSOR }} />
+          <Bar dataKey="count" radius={[3, 3, 0, 0]} maxBarSize={40} isAnimationActive={false}>
+            {data.map((_, i) => (
+              <Cell key={i} fill={i === data.length - 1 ? BAR_FILL : BAR_FILL_MUTED} />
+            ))}
+          </Bar>
           {data.length > 7 && (
-            <Brush dataKey="date" height={22} stroke="#93c5fd" fill="#eff6ff" travellerWidth={8}
+            <Brush dataKey="date" height={22} stroke="#86aff9" fill="#ecf2fe" travellerWidth={8}
               tickFormatter={(v: string) => v.slice(5)}
-              style={{ fontSize: 9, fill: "#6b7280" }} />
+              style={{ fontSize: 9, fill: CHART_TICK }} />
           )}
         </BarChart>
       </ResponsiveContainer>

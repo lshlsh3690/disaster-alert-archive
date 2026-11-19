@@ -10,7 +10,7 @@ import { LANG_LOCALE } from "./common";
  * LevelsCard
  *
  * 재난 경보 단계(안전안내·긴급재난·위급재난)의 건수와 비율을
- * 색상 카드 + 게이지 바 형태로 보여줍니다.
+ * KRDS System 색 카드(안전안내 info·긴급재난 warning·위급재난 danger) + 게이지 바 형태로 보여줍니다.
  *
  * @param data - { level: "LEVEL_1"|"LEVEL_2"|"LEVEL_3"|null, count: number }[]
  *              LEVEL_META(_constants.ts)에서 각 단계의 색상·텍스트를 가져옵니다.
@@ -35,12 +35,12 @@ export function LevelsCard({ data }: { data: LevelStat[] }) {
       <div className="flex gap-2">
         {levels.map(l => (
           <div key={l.code}
-            className={`flex-1 text-center rounded-lg border py-2.5 ${l.bg} ${l.border}`}>
-            <div className={`text-xs font-semibold mb-1 ${l.textCls}`}>{l.text}</div>
-            <div className={`text-xl font-extrabold ${l.textCls}`}>
+            className={`flex-1 text-center rounded-[6px] py-3 ${l.bg} ${l.textCls}`}>
+            <div className="text-[14px] font-bold mb-0.5">{l.text}</div>
+            <div className="text-[21px] font-extrabold leading-tight">
               {l.count.toLocaleString(locale)}
             </div>
-            <div className="text-xs text-gray-400">
+            <div className="text-[14px]">
               {Math.round((l.count / total) * 100)}%
             </div>
           </div>
@@ -48,13 +48,13 @@ export function LevelsCard({ data }: { data: LevelStat[] }) {
       </div>
 
       {/* 비율 게이지 바: flex의 flex 값을 건수로 지정하면 비율대로 나눠집니다 */}
-      <div className="flex h-2.5 rounded-full overflow-hidden">
+      <div className="flex h-2 rounded-full overflow-hidden bg-[#e6e8ea]">
         {levels.map(l => (
           <div key={l.code} style={{ flex: l.count || 0, background: l.solid }} />
         ))}
       </div>
 
-      <p className="text-xs text-gray-500 leading-relaxed">
+      <p className="text-[15px] text-[#6d7882] leading-relaxed">
         {t("statsPage.urgentSummary", { total: total.toLocaleString(locale), percent: urgentPct })}
       </p>
     </div>

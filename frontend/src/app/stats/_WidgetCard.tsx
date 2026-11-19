@@ -9,7 +9,7 @@
  *                    page.tsx에서 내려온 모든 데이터를 받아 각 차트에 필요한 것만 전달합니다.
  *
  *   - WidgetCard    : 헤더(제목·변형 토글·PNG 다운로드·삭제)와 콘텐츠 영역으로 이루어진 카드 래퍼.
- *                    isNew prop이 true이면 추가 직후 파란 glow 애니메이션을 1.6초간 재생합니다.
+ *                    isNew prop이 true이면 추가 직후 primary 외곽선 애니메이션을 1.6초간 재생합니다.
  */
 
 import { useState, useRef, useEffect } from "react";
@@ -39,10 +39,9 @@ import type { I18nKey } from "@/constants/i18n";
 function GranularityToggle({ value, onChange }: { value: "daily" | "hourly"; onChange: (v: "daily" | "hourly") => void }) {
   const { t } = useTranslation();
   return (
-    <div className="flex border border-[var(--line)] rounded overflow-hidden self-start">
+    <div className="krds-segment stats-segment-sm self-start">
       {(["daily", "hourly"] as const).map(g => (
-        <button key={g} onClick={() => onChange(g)}
-          className={`px-2 py-0.5 text-[11px] font-medium transition-colors ${value === g ? "bg-[var(--blue)] text-white" : "text-[var(--text-subtle)] hover:bg-[var(--canvas)]"}`}>
+        <button key={g} type="button" onClick={() => onChange(g)} aria-pressed={value === g}>
           {g === "daily" ? t("statsPage.granularityDaily") : t("statsPage.granularityHourly")}
         </button>
       ))}
@@ -230,60 +229,70 @@ export function WidgetCard({ widget, lib, onVariantChange, onRemove, titleOverri
   };
 
   return (
-    <div ref={cardRef} className={`bg-[var(--surface)] rounded-xl shadow flex flex-col${highlighted ? " widget-added" : ""}`} style={{ gridColumn: `span ${widget.span}`, minHeight: 240 }}>
-      <div className="flex flex-wrap items-center justify-between gap-y-1.5 px-3.5 py-2.5 border-b border-[var(--line)]">
-        <div className="flex items-center gap-1.5">
+    <div ref={cardRef} className={`krds-card flex flex-col${highlighted ? " widget-added" : ""}`} style={{ gridColumn: `span ${widget.span}`, minHeight: 240 }}>
+      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 px-5 py-4 border-b border-[var(--krds-gray-10)]">
+        <div className="flex items-center gap-2 min-w-0">
           {dragHandleListeners && (
             <span {...dragHandleListeners}
-              className="cursor-grab active:cursor-grabbing text-gray-300 hover:text-[var(--text-subtle)] select-none px-0.5"
+              className="cursor-grab active:cursor-grabbing text-[var(--krds-gray-40)] hover:text-[var(--krds-gray-70)] select-none"
               title={t("statsPage.dragWidget")}>
-              ⠿
+              {/* 드래그 손잡이: 점 6개 */}
+              <svg width="12" height="18" viewBox="0 0 12 18" fill="currentColor" aria-hidden="true">
+                <circle cx="3" cy="3" r="1.5" /><circle cx="9" cy="3" r="1.5" />
+                <circle cx="3" cy="9" r="1.5" /><circle cx="9" cy="9" r="1.5" />
+                <circle cx="3" cy="15" r="1.5" /><circle cx="9" cy="15" r="1.5" />
+              </svg>
             </span>
           )}
-          <span className="text-sm">{lib.icon}</span>
-          <h3 className="text-sm font-bold text-[var(--ink)]">{titleOverride ?? lib.title}</h3>
+          <h3 className="text-[19px] font-bold leading-snug text-[var(--krds-gray-90)]">{titleOverride ?? lib.title}</h3>
           <div className="relative">
             <button
+              type="button"
               onMouseEnter={() => setHelpOpen(true)}
               onMouseLeave={() => setHelpOpen(false)}
+              onFocus={() => setHelpOpen(true)}
+              onBlur={() => setHelpOpen(false)}
               aria-label={t("statsPage.widgetHelp")}
-              className="w-4 h-4 rounded-full border border-[var(--line)] text-[var(--text-subtle)] text-[10px] font-bold leading-none flex items-center justify-center hover:border-[var(--blue)] hover:text-blue-500 transition-colors"
+              className="w-5 h-5 rounded-full border border-[var(--krds-gray-30)] text-[var(--krds-gray-60)] text-[12px] font-bold leading-none flex items-center justify-center hover:border-[var(--krds-primary-50)] hover:text-[var(--krds-primary-50)] transition-colors"
             >
               ?
             </button>
             {helpOpen && (
-              <div className="absolute left-0 top-full mt-1.5 z-20 w-64 bg-gray-800 text-white text-xs rounded-lg px-3 py-2.5 shadow-xl pointer-events-none leading-relaxed">
+              <div className="absolute left-0 top-full mt-1.5 z-20 w-64 bg-[var(--krds-gray-90)] text-white text-[14px] rounded-[var(--radius-control)] px-3 py-2.5 pointer-events-none leading-relaxed">
                 {lib.help}
               </div>
             )}
           </div>
         </div>
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-2">
           {lib.variants && lib.variants.length > 1 && (() => {
             // 현재 선택된 변형 키 (없으면 라이브러리 첫 번째 변형)
             const cur = widget.variant ?? lib.variants![0].key;
             return (
-              <div className="flex border border-[var(--line)] rounded overflow-hidden">
+              <div className="krds-segment stats-segment-sm">
                 {lib.variants!.map(v => (
-                  <button key={v.key} onClick={() => onVariantChange(widget.id, v.key)}
-                    className={`px-1.5 py-0.5 text-[11px] font-medium transition-colors ${cur === v.key ? "bg-[var(--blue)] text-white" : "text-[var(--text-subtle)] hover:bg-[var(--canvas)]"}`}>
+                  <button key={v.key} type="button" onClick={() => onVariantChange(widget.id, v.key)} aria-pressed={cur === v.key}>
                     {v.label}
                   </button>
                 ))}
               </div>
             );
           })()}
-          <button onClick={handleDownloadPng} title={t("statsPage.downloadPng")}
-            className="px-1.5 py-0.5 text-xs border border-[var(--line)] text-[var(--text-subtle)] rounded hover:border-green-400 hover:text-green-600 transition-colors">
-            ⬇
+          <button type="button" onClick={handleDownloadPng} title={t("statsPage.downloadPng")} aria-label={t("statsPage.downloadPng")}
+            className="stats-icon-btn">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M12 4v11" /><path d="m7 10 5 5 5-5" /><path d="M5 20h14" />
+            </svg>
           </button>
-          <button onClick={() => onRemove(widget.id)} title={t("statsPage.removeWidget")}
-            className="w-5 h-5 flex items-center justify-center text-gray-300 rounded hover:bg-red-50 hover:text-red-500 transition-colors">
-            ✕
+          <button type="button" onClick={() => onRemove(widget.id)} title={t("statsPage.removeWidget")} aria-label={t("statsPage.removeWidget")}
+            className="stats-icon-btn">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+              <path d="M6 6l12 12" /><path d="M18 6 6 18" />
+            </svg>
           </button>
         </div>
       </div>
-      <div className="flex-1 p-3.5 flex flex-col min-h-0">{children}</div>
+      <div className="flex-1 px-5 py-4 flex flex-col min-h-0">{children}</div>
     </div>
   );
 }
