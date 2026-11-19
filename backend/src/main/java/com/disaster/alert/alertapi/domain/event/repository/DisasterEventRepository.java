@@ -527,58 +527,7 @@ public interface DisasterEventRepository extends JpaRepository<DisasterEvent, Lo
             """, nativeQuery = true)
     List<Object[]> findRepresentativeMessages(@Param("eventIds") List<Long> eventIds);
 
-    // ── 기록관(archive) 조회 ────────────────────────────────────────
-
-    /**
-     * 연도별 주요 사건 + 각 사건의 대표 알림 sn. 한 번의 쿼리로 정렬된 상위 10행을 돌려준다.
-     *
-     * <p><b>규칙을 SQL 에 두는 이유(헌법 VI 예외)</b>: 정렬·상위 10·대표 알림 결정은
-     * 사건 전체에 대한 조회 규칙이라, 사건을 메모리로 올려 순수 클래스에서 거를 수 없다.
-     *
-     * <p>CTE 두 단계로 나눈 이유: 대표 sn 을 select 목록의 상관 서브쿼리로 넣으면 플래너가 정렬·LIMIT 전에
-     * 모든 후보 행에서 계산할 수 있다. 먼저 10개로 자른 뒤({@code top}) 그 10개에만 대표 알림을 구한다({@code rep}).
-     *
-     * <ul>
-     *   <li>연도 = {@code first_alert_at} 이 [start, end) — 반열린 구간, 시간대 변환 없음(KST 그대로 저장된 값)</li>
-     *   <li>유형으로 거르지 않는다(specs/007 research R3, 2026-11-18 번복) — 지속형 유형도 알림 수 순위에 그대로 든다</li>
-     *   <li>정렬 마지막 키 {@code id} 는 알림 수·첫 알림 시각이 같을 때 순서를 고정하는 용도(응답에는 내보내지 않음)</li>
-     *   <li>대표 알림 = {@code created_at} 오름차순, 같으면 {@code sn} 오름차순 첫 알림. 알림이 0개인 사건은 JOIN 에서 빠진다</li>
-     * </ul>
-     *
-     * <p>반환 열 순서: {representative_sn, event_title, primary_disaster_type, primary_region_name,
-     * first_alert_at, last_alert_at, alert_count}
-     */
-    @Query(value = """
-            WITH top AS (
-                SELECT id, event_title, primary_disaster_type, primary_region_name,
-                       first_alert_at, last_alert_at, alert_count
-                FROM disaster_events
-                WHERE first_alert_at >= :start AND first_alert_at < :end
-                ORDER BY alert_count DESC, first_alert_at ASC, id ASC
-                LIMIT 10
-            ),
-            rep AS (
-                SELECT DISTINCT ON (event_id) event_id, sn
-                FROM disaster_alert
-                WHERE event_id IN (SELECT id FROM top)
-                ORDER BY event_id, created_at, sn
-            )
-            SELECT rep.sn, top.event_title, top.primary_disaster_type, top.primary_region_name,
-                   top.first_alert_at, top.last_alert_at, top.alert_count
-            FROM top
-            JOIN rep ON rep.event_id = top.id
-            ORDER BY top.alert_count DESC, top.first_alert_at ASC, top.id ASC
-            """, nativeQuery = true)
-    List<Object[]> findMajorEventRows(@Param("start") LocalDateTime start,
-                                      @Param("end") LocalDateTime end);
-
-    /** 사건이 존재하는 연도(내림차순) — 기록관 연도 선택지. 프론트가 시작 연도를 하드코딩하지 않게 한다. */
-    @Query(value = """
-            SELECT DISTINCT CAST(EXTRACT(YEAR FROM first_alert_at) AS integer) AS y
-            FROM disaster_events
-            ORDER BY y DESC
-            """, nativeQuery = true)
-    List<Integer> findEventYears();
+    // ── 사건 영구 링크 조회 ────────────────────────────────────────
 
     /**
      * 사건의 대표 알림 sn — 가장 먼저 발령된 알림, 같은 시각이면 작은 sn. 알림이 없으면 빈 값.

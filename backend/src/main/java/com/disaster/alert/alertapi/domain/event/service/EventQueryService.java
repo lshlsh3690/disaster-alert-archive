@@ -10,7 +10,6 @@ import com.disaster.alert.alertapi.domain.event.dto.EventDetailResponse;
 import com.disaster.alert.alertapi.domain.event.dto.EventListResponse;
 import com.disaster.alert.alertapi.domain.event.dto.EventSearchRequest;
 import com.disaster.alert.alertapi.domain.event.dto.EventTimelineRow;
-import com.disaster.alert.alertapi.domain.event.dto.MajorEventRow;
 import com.disaster.alert.alertapi.domain.event.model.DisasterEvent;
 import com.disaster.alert.alertapi.domain.event.repository.DisasterEventRepository;
 import com.disaster.alert.alertapi.domain.event.repository.DisasterEventTranslationRepository;
@@ -23,7 +22,6 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
-import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.ZoneId;
@@ -119,7 +117,7 @@ public class EventQueryService {
         List<EventTimelineRow> rows = disasterEventRepository.findTimelineRows(id);
         Map<Long, List<String>> regionNamesByAlert = loadRegionNames(rows);
 
-        // 기록관 영구 링크용 대표 알림 sn — 규칙은 findRepresentativeSn 한 곳에 둔다
+        // 사건 영구 링크(/archive/events/{대표 sn})용 대표 알림 sn — 규칙은 findRepresentativeSn 한 곳에 둔다
         Long representativeSn = representativeSn(id);
 
         Optional<SupportedLanguage> langOpt = SupportedLanguage.fromRequestParam(lang);
@@ -232,43 +230,10 @@ public class EventQueryService {
         return map;
     }
 
-    // ── 기록관(archive)용 조회 ─────────────────────────────────────────
-
-    /**
-     * 연도별 주요 사건 — {@code first_alert_at} 이 그 연도 안인 사건 중 상위 10개(유형으로 거르지 않는다).
-     * 정렬은 포함 알림 수 내림차순(규칙은 {@link DisasterEventRepository#findMajorEventRows} 의 SQL 에 있다).
-     */
-    public List<MajorEventRow> majorEvents(int year) {
-        // 1) 연도 경계는 [year-01-01 00:00, (year+1)-01-01 00:00) — 저장된 시각이 KST 그대로라 변환하지 않는다
-        LocalDateTime start = LocalDate.of(year, 1, 1).atStartOfDay();
-        LocalDateTime end = start.plusYears(1);
-
-        // 2) 쿼리가 반환 열 순서대로 준 행을 record 로 옮긴다 (정렬은 쿼리가 이미 맞춰 둠)
-        return disasterEventRepository.findMajorEventRows(start, end)
-                .stream()
-                .map(r -> new MajorEventRow(
-                        ((Number) r[0]).longValue(),
-                        (String) r[1],
-                        (String) r[2],
-                        (String) r[3],
-                        toLocalDateTime(r[4]),
-                        toLocalDateTime(r[5]),
-                        ((Number) r[6]).intValue()))
-                .toList();
-    }
-
-    /** 사건이 존재하는 연도 목록(내림차순). */
-    public List<Integer> eventYears() {
-        return disasterEventRepository.findEventYears();
-    }
+    // ── 사건 영구 링크용 조회 ─────────────────────────────────────────
 
     /** 사건의 대표 알림 sn — 가장 먼저 발령된 알림, 같은 시각이면 작은 sn. 알림이 없으면 null. */
     public Long representativeSn(Long eventId) {
         return disasterEventRepository.findRepresentativeSn(eventId).orElse(null);
-    }
-
-    /** 네이티브 쿼리의 timestamp 열은 드라이버·하이버네이트 버전에 따라 Timestamp 또는 LocalDateTime 으로 온다. */
-    private static LocalDateTime toLocalDateTime(Object value) {
-        return value instanceof java.sql.Timestamp ts ? ts.toLocalDateTime() : (LocalDateTime) value;
     }
 }

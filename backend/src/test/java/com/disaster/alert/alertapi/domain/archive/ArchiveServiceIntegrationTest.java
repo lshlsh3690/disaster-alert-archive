@@ -1,7 +1,6 @@
 package com.disaster.alert.alertapi.domain.archive;
 
 import com.disaster.alert.alertapi.domain.archive.dto.ArchiveEventResolveResponse;
-import com.disaster.alert.alertapi.domain.archive.dto.ArchiveMajorEventsResponse;
 import com.disaster.alert.alertapi.domain.archive.service.ArchiveService;
 import com.disaster.alert.alertapi.domain.disasteralert.model.DisasterAlert;
 import com.disaster.alert.alertapi.domain.disasteralert.repository.DisasterAlertRepository;
@@ -16,13 +15,10 @@ import org.springframework.beans.factory.annotation.Autowired;
 
 import java.time.LocalDateTime;
 
-import java.util.concurrent.atomic.AtomicReference;
-
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatCode;
 
 /**
- * 재난 기록관의 핵심 규칙 4개를 실제 Postgres 로 검증한다.
+ * 사건 영구 링크의 핵심 규칙(대표 sn, sn → 현재 사건 해석)을 실제 Postgres 로 검증한다.
  *
  * <p>규칙이 SQL 조회에 들어가므로(사건 전체를 메모리로 올려 거를 수 없다) 통합 테스트가 맞다.
  * 데이터는 실제 사건이 없는 1999년으로 넣고 테스트 트랜잭션과 함께 롤백된다 — 운영·개발 데이터와 섞이지 않는다.
@@ -42,53 +38,9 @@ class ArchiveServiceIntegrationTest {
     @Autowired
     private DisasterAlertRepository alertRepository;
 
-    /** 테스트가 넣는 알림에 매기는 sn. 운영 sn 대역과 겹치지 않는 큰 값에서 시작해 하나씩 올린다. */
-    private long nextSn = 990_000_000L;
-
-    /**
-     * 지속형 유형(폭염)도 유형으로 거르지 않는다 — 처음의 "지속형 제외" 규칙은 실측 근거가 없었고 평가 사본에서
-     * 효과가 0이었다(research.md R3). 폭염 사건의 알림 수가 가장 많으면 목록 맨 앞에 와야 한다.
-     * 현재 코드는 지속형을 SQL 에서 빼므로 폭염이 사라져 ["호우 사건"] 만 나와 순서 단언에서 실패한다.
-     */
-    @Test
-    @DisplayName("지속형 유형(폭염) 사건도 알림 수가 많으면 주요 사건에 포함된다")
-    void 지속형_유형도_알림_수가_많으면_주요_사건에_포함된다() {
-        // 폭염 사건: 알림 5건으로 가장 크다 → 유형으로 거르지 않으면 1위가 된다
-        saveEventWithAlerts("폭염 사건", "폭염", LocalDateTime.of(YEAR, 7, 1, 9, 0), 5);
-        // 호우 사건: 알림 2건 → 폭염 뒤 2위
-        saveEventWithAlerts("호우 사건", "호우", LocalDateTime.of(YEAR, 7, 10, 9, 0), 2);
-
-        ArchiveMajorEventsResponse response = archiveService.majorEvents(YEAR);
-
-        // 알림 수 내림차순이라 폭염(5) → 호우(2). 폭염이 빠져 있으면(현재 동작) 여기서 실패한다
-        assertThat(response.events())
-                .extracting(ArchiveMajorEventsResponse.Item::eventTitle)
-                .containsExactly("폭염 사건", "호우 사건");
-    }
-
-    /**
-     * 주요 사건은 포함 알림 수가 많은 순서로 최대 10개다. 11개를 넣어 "10개로 잘리고, 가장 작은 하나가 빠지는지"를 본다.
-     * 뼈대는 빈 목록이라 알림 수 순서 단언에서 실패한다.
-     */
-    @Test
-    @DisplayName("알림 수 내림차순으로 최대 10개만 나온다")
-    void 알림_수_내림차순_최대_10개() {
-        // 알림 수 1~11건인 호우 사건 11개 — 일부러 작은 수부터 넣어 "입력 순서가 아니라 알림 수로 정렬"하는지 본다
-        for (int count = 1; count <= 11; count++) {
-            saveEventWithAlerts("사건 " + count, "호우", LocalDateTime.of(YEAR, 3, count, 9, 0), count);
-        }
-
-        ArchiveMajorEventsResponse response = archiveService.majorEvents(YEAR);
-
-        // 11개 중 10개만, 가장 큰 11부터 2까지. 알림 1건짜리(11번째)는 잘려 나간다
-        assertThat(response.events())
-                .extracting(ArchiveMajorEventsResponse.Item::alertCount)
-                .containsExactly(11, 10, 9, 8, 7, 6, 5, 4, 3, 2);
-    }
-
     /**
      * 사건 영구 링크의 기준(대표 sn)은 "사건에서 가장 먼저 발령된 알림"이다. 입력 순서·sn 크기가 아니라 발령 시각으로 정하고,
-     * 같은 시각이면 작은 sn 이 이긴다. 뼈대는 빈 목록이라 대표 sn 단언에서 실패한다.
+     * 같은 시각이면 작은 sn 이 이긴다. 사건 상세의 영구 링크와 sn 해석이 같은 규칙을 쓴다.
      */
     @Test
     @DisplayName("대표 sn 은 사건에서 가장 먼저 발령된 알림의 sn 이다(같은 시각이면 작은 sn)")
@@ -101,12 +53,11 @@ class ArchiveServiceIntegrationTest {
         saveAlert(100L, LocalDateTime.of(YEAR, 5, 1, 10, 30), event);
         saveAlert(600L, LocalDateTime.of(YEAR, 5, 1, 11, 0), event);
 
-        ArchiveMajorEventsResponse response = archiveService.majorEvents(YEAR);
+        // 사건의 어느 알림으로 열어도(여기서는 가장 늦은 600) 대표 sn 은 같다
+        ArchiveEventResolveResponse resolved = archiveService.resolveEvent(600L);
 
         // 10:00 알림 둘 중 작은 sn(400). 100 이면 sn 만 보고 고른 것, 500 이면 같은 시각 순서를 안 본 것이다
-        assertThat(response.events())
-                .extracting(ArchiveMajorEventsResponse.Item::representativeSn)
-                .containsExactly(400L);
+        assertThat(resolved.representativeSn()).isEqualTo(400L);
     }
 
     /**
@@ -136,39 +87,7 @@ class ArchiveServiceIntegrationTest {
         assertThat(unbound.alert().sn()).isEqualTo(3000L);
     }
 
-    /**
-     * 공개 API 라 로그인 없이 누구나 ?year= 에 아무 숫자나 넣을 수 있다. 사건이 있는 연도 목록에 없는 연도는 DB 를 조회하지 않고
-     * 빈 목록으로 답해야 한다 — 300000 년은 Postgres timestamp 범위(최대 294276년)를 넘어 DB 예외 → 500 + log.error 가 되는데,
-     * 로그 레벨이 유일한 장애 신호라 이런 입력이 error 로그를 쌓으면 안 된다. 예외는 400 도 아니다(데이터 없는 연도와 같은 취급).
-     * 현재 코드는 목록 확인 없이 [300000-01-01, 300001-01-01) 로 조회해 예외가 터지고, 그 예외가 단언(doesNotThrowAnyException)에서 실패로 잡힌다.
-     */
-    @Test
-    @DisplayName("사건이 없는 터무니없는 연도(300000)는 예외 없이 빈 목록으로 답한다")
-    void 범위_밖_연도는_예외_없이_빈_목록() {
-        // 사건이 있는 연도(1999)를 하나 만들어 둔다 — years 는 비어 있지 않고 300000 은 그 안에 없다는 상황
-        saveEventWithAlerts("호우 사건", "호우", LocalDateTime.of(YEAR, 7, 10, 9, 0), 2);
-
-        // 예외가 그대로 터지면 "예외로 실패"가 되어 Red 로 읽기 어렵다 — 감싸서 "예외 없어야 한다"는 단언에서 실패하게 한다
-        AtomicReference<ArchiveMajorEventsResponse> result = new AtomicReference<>();
-        assertThatCode(() -> result.set(archiveService.majorEvents(300_000)))
-                .doesNotThrowAnyException();
-
-        // 응답 year 는 요청값 그대로, 사건이 없으니 events 는 빈 목록, years 는 실제 사건 연도(1999) 그대로
-        assertThat(result.get().year()).isEqualTo(300_000);
-        assertThat(result.get().events()).isEmpty();
-        assertThat(result.get().years()).contains(YEAR);
-    }
-
     // ── 테스트 데이터 ───────────────────────────────────────────
-
-    /** 사건 하나와 알림 {@code alertCount} 건(1분 간격)을 만든다. 사건의 alert_count 도 같은 값이라 실제 데이터와 모순이 없다. */
-    private DisasterEvent saveEventWithAlerts(String title, String type, LocalDateTime firstAlertAt, int alertCount) {
-        DisasterEvent event = saveEvent(title, type, firstAlertAt, alertCount);
-        for (int i = 0; i < alertCount; i++) {
-            saveAlert(nextSn++, firstAlertAt.plusMinutes(i), event);
-        }
-        return event;
-    }
 
     private DisasterEvent saveEvent(String title, String type, LocalDateTime firstAlertAt, int alertCount) {
         return eventRepository.saveAndFlush(DisasterEvent.builder()
