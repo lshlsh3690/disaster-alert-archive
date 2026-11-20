@@ -38,6 +38,8 @@ interface DatePickerProps {
   clearLabel?: string;
   prevMonthLabel?: string;
   nextMonthLabel?: string;
+  /** 고를 수 있는 가장 이른 날짜("YYYY-MM-DD"). 이보다 앞선 날은 누를 수 없고, 그 달보다 앞으로는 넘어가지 않는다. */
+  min?: string;
 }
 
 export default function DatePicker({
@@ -50,6 +52,7 @@ export default function DatePicker({
   clearLabel = "지우기",
   prevMonthLabel = "이전 달",
   nextMonthLabel = "다음 달",
+  min,
 }: DatePickerProps) {
   const [open, setOpen] = useState(false);
   const selected = useMemo(() => toDateOnly(value), [value]);
@@ -116,6 +119,13 @@ export default function DatePicker({
   }, [viewMonth]);
 
   const today = new Date();
+  const minDate = useMemo(() => (min ? toDateOnly(min) : null), [min]);
+  const isBeforeMin = (date: Date) => minDate !== null && date < minDate;
+  // 보고 있는 달이 최소 날짜가 든 달이면 이전 달로 넘어가지 않는다
+  const atMinMonth =
+    minDate !== null &&
+    (viewMonth.getFullYear() < minDate.getFullYear() ||
+      (viewMonth.getFullYear() === minDate.getFullYear() && viewMonth.getMonth() <= minDate.getMonth()));
 
   return (
     <div className="relative" ref={rootRef}>
@@ -138,7 +148,8 @@ export default function DatePicker({
             <button
               type="button"
               onClick={() => setViewMonth((m) => new Date(m.getFullYear(), m.getMonth() - 1, 1))}
-              className="rounded-[var(--radius-control)] p-1 text-[var(--text-muted)] hover:bg-[var(--blue-soft)] hover:text-[var(--blue)]"
+              disabled={atMinMonth}
+              className="rounded-[var(--radius-control)] p-1 text-[var(--text-muted)] hover:bg-[var(--blue-soft)] hover:text-[var(--blue)] disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-transparent"
               aria-label={prevMonthLabel}
             >
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 18l-6-6 6-6" /></svg>
@@ -160,16 +171,20 @@ export default function DatePicker({
             {days.map(({ date, inMonth }, i) => {
               const isSelected = selected && sameDay(date, selected);
               const isToday = sameDay(date, today);
+              const disabled = isBeforeMin(date);
               return (
                 <button
                   key={i}
                   type="button"
+                  disabled={disabled}
                   onClick={() => {
                     onChange(toValue(date));
                     setOpen(false);
                   }}
                   className={`rounded-[var(--radius-control)] py-1 text-xs transition-colors ${
-                    isSelected
+                    disabled
+                      ? "cursor-not-allowed text-[var(--text-subtle)] opacity-40"
+                      : isSelected
                       ? "bg-[var(--blue)] font-semibold text-white"
                       : inMonth
                       ? "text-[var(--text-body)] hover:bg-[var(--blue-soft)]"
