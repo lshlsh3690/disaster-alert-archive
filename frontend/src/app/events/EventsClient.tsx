@@ -13,6 +13,7 @@ import { fetchSigungu } from "@/api/alertApi";
 import {
   EVENTS_EMPTY_FORM,
   buildEventsListParams,
+  buildEventsQuery,
   parseEventsPage,
   parseEventsSearchForm,
   parseEventsTab,
@@ -83,20 +84,30 @@ function EventsClientInner() {
   const { data, isLoading, isFetching } = useSearchEvents(params);
 
   // 탭/페이지/필터 상태를 URL 쿼리에 동기화 — 상세 진입 후 뒤로 가기 시 같은 페이지·검색결과로 복원된다.
+  // 마지막으로 쓴 쿼리를 기억해, 아래 effect 가 "내가 바꾼 주소"와 "밖에서 바뀐 주소"를 구분한다.
+  const lastQueryRef = useRef<string | null>(null);
   useEffect(() => {
-    const url = new URLSearchParams();
-    if (tab === "active") url.set("active", "true");
-    else if (tab === "past") url.set("active", "false");
-    if (page > 0) url.set("page", String(page));
-    if (formState.sido) url.set("sido", formState.sido);
-    if (formState.sigungu) url.set("sigungu", formState.sigungu);
-    if (formState.type) url.set("type", formState.type);
-    if (formState.startDate) url.set("startDate", formState.startDate);
-    if (formState.endDate) url.set("endDate", formState.endDate);
-    if (formState.keyword) url.set("keyword", formState.keyword);
-    const qs = url.toString();
+    const qs = buildEventsQuery(formState, tab, page);
+    lastQueryRef.current = qs;
     router.replace(qs ? `/events?${qs}` : "/events", { scroll: false });
   }, [tab, page, formState, router]);
+
+  // 밖에서 주소가 바뀌면(헤더의 "사건 목록"을 다시 눌러 /events 로 오거나 브라우저 앞·뒤로 가기) 상태를 그 주소로 맞춘다.
+  // 같은 경로라 컴포넌트가 다시 마운트되지 않아, 이게 없으면 필터가 남은 채 위 effect 가 옛 쿼리를 주소에 다시 써 버린다.
+  useEffect(() => {
+    const nextTab = parseEventsTab(searchParams);
+    const nextPage = parseEventsPage(searchParams);
+    const nextForm = parseEventsSearchForm(searchParams);
+    if (lastQueryRef.current === null || buildEventsQuery(nextForm, nextTab, nextPage) === lastQueryRef.current) return;
+    // 시도가 바뀌어도 주소에서 받은 시군구를 "시도 변경 → 시군구 비우기" effect 가 지우지 않게 1회 건너뛴다
+    if (nextForm.sido !== watchedSido) sidoFirstRender.current = true;
+    reset(nextForm);
+    setFormState(nextForm);
+    setTab(nextTab);
+    setPage(nextPage);
+    // watchedSido 는 비교용으로만 읽는다 — 폼 입력 중 시도를 바꿀 때마다 주소와 다시 맞추면 입력이 되돌아간다
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams, reset]);
 
   const handleTabChange = (next: EventsActiveTab) => {
     setTab(next);

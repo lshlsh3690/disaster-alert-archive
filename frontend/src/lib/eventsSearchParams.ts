@@ -57,6 +57,21 @@ export function parseEventsPage(sp: RawSearchParams): number {
   return Number.isNaN(p) || p < 0 ? 0 : p;
 }
 
+/** 탭·페이지·필터를 /events 주소의 쿼리스트링으로 만든다(기본값인 항목은 넣지 않는다). parse* 의 반대 방향. */
+export function buildEventsQuery(f: EventsSearchForm, tab: EventsActiveTab, page: number): string {
+  const url = new URLSearchParams();
+  if (tab === "active") url.set("active", "true");
+  else if (tab === "past") url.set("active", "false");
+  if (page > 0) url.set("page", String(page));
+  if (f.sido) url.set("sido", f.sido);
+  if (f.sigungu) url.set("sigungu", f.sigungu);
+  if (f.type) url.set("type", f.type);
+  if (f.startDate) url.set("startDate", f.startDate);
+  if (f.endDate) url.set("endDate", f.endDate);
+  if (f.keyword) url.set("keyword", f.keyword);
+  return url.toString();
+}
+
 /** useSearchEvents에 넘기는 params. */
 export function buildEventsListParams(
   f: EventsSearchForm,

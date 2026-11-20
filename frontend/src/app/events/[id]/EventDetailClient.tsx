@@ -29,8 +29,9 @@ export default function EventDetailClient({ eventId }: { eventId?: number } = {}
   const lang = useLanguageStore((s) => s.language);
   const { t } = useTranslation();
   const { data, isLoading } = useEvent(id, lang);
-  const [allExpanded, setAllExpanded] = useState(false);
-  const [expandedDates, setExpandedDates] = useState<Set<string>>(new Set());
+  // 반복형 유형의 날짜별 타임라인은 처음부터 모두 펼쳐 둔다 — 접은 날짜만 기억한다
+  const [collapsedDates, setCollapsedDates] = useState<Set<string>>(new Set());
+  const allExpanded = collapsedDates.size === 0;
 
   // 대표 지역명 번역: 시도는 t("metros"), 시군구는 /districts/sigungu 응답으로 매핑.
   // sido는 useEvent 응답에서 파생되므로(이벤트→지역 조회 순서 자체는 불가피한 의존관계),
@@ -80,7 +81,7 @@ export default function EventDetailClient({ eventId }: { eventId?: number } = {}
   }, [data, isRepetitive]);
 
   const toggleDate = (date: string) => {
-    setExpandedDates((prev) => {
+    setCollapsedDates((prev) => {
       const next = new Set(prev);
       if (next.has(date)) next.delete(date);
       else next.add(date);
@@ -146,12 +147,7 @@ export default function EventDetailClient({ eventId }: { eventId?: number } = {}
             <button
               className="text-xs font-medium text-[var(--blue)] hover:underline"
               onClick={() => {
-                if (allExpanded) {
-                  setExpandedDates(new Set());
-                } else {
-                  setExpandedDates(new Set(timelineGroups.map((g) => g.date!)));
-                }
-                setAllExpanded((v) => !v);
+                setCollapsedDates(allExpanded ? new Set(timelineGroups.map((g) => g.date!)) : new Set());
               }}
             >
               {allExpanded ? t("events.collapseAll") : t("events.expandAll")}
@@ -167,7 +163,7 @@ export default function EventDetailClient({ eventId }: { eventId?: number } = {}
               ));
             }
 
-            const isOpen = expandedDates.has(group.date);
+            const isOpen = !collapsedDates.has(group.date);
             const dateLabel = group.date.slice(2).replace(/-/g, "/");
             return (
               <div key={group.date} className="mb-2">
