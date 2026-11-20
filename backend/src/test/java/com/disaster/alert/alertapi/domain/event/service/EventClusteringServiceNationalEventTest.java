@@ -36,7 +36,7 @@ import static org.mockito.Mockito.when;
 @MockitoSettings(strictness = Strictness.LENIENT)
 class EventClusteringServiceNationalEventTest {
 
-    private static final String SUNEUNG_TITLE = "2026 수능";
+    private static final String SUNEUNG_TITLE = "2027학년도 수능";
 
     @Mock EmbeddingModel embeddingModel;
     @Mock DisasterAlertRepository disasterAlertRepository;
@@ -75,7 +75,7 @@ class EventClusteringServiceNationalEventTest {
     }
 
     // 결정: 수능 문자는 비사건이어도 비사건 제외(ADVISORY return)보다 먼저 전국 예정 행사 경로를 타서,
-    //       같은 제목("2026 수능")의 진행 중 광역 이벤트에 NATIONAL_EVENT 로 병합된다.
+    //       같은 제목("2027학년도 수능")의 진행 중 광역 이벤트에 NATIONAL_EVENT 로 병합된다.
     //       이유: 수능 안내 문자는 대부분 비사건이라 이전에는 전부 미배정으로 버려졌다.
     // Red: 현재는 ADVISORY 면 바로 return 해서 알림이 어느 이벤트에도 배정되지 않아 eventId 단언이 실패한다.
     @Test
@@ -116,7 +116,7 @@ class EventClusteringServiceNationalEventTest {
         // 실행
         service.clusterNewAlert(1L);
 
-        // 검증: 저장된 이벤트가 광역이고 제목이 알림 연도의 "수능"이다(생성 뒤 제목을 행사 제목으로 정함).
+        // 검증: 저장된 이벤트가 광역이고 제목이 알림 연도+1 학년도 수능이다(생성 뒤 제목을 행사 제목으로 정함).
         ArgumentCaptor<DisasterEvent> saved = ArgumentCaptor.forClass(DisasterEvent.class);
         verify(disasterEventRepository).save(saved.capture());
         assertThat(saved.getValue().isBroadcast()).isTrue();
