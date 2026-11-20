@@ -77,6 +77,14 @@ public class DisasterEvent {
     @Column(name = "is_broadcast", nullable = false)
     private boolean broadcast;
 
+    /**
+     * 전국 예정 행사(수능·민방위훈련) 이벤트의 행사 종류 — 같은 행사 알림을 한 이벤트로 묶는 키.
+     * 행사 이벤트가 아니면 null. 제목은 화면용이라 키로 쓰지 않는다.
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "scheduled_event", length = 32)
+    private NationalScheduledEvent scheduledEvent;
+
     @CreatedDate
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
@@ -195,6 +203,13 @@ public class DisasterEvent {
      */
     public void retitle(String title) {
         this.eventTitle = title;
+    }
+
+    /**
+     * 이 이벤트를 전국 예정 행사 이벤트로 표시한다 — 같은 행사 알림을 찾는 키({@code scheduled_event})를 정한다.
+     */
+    public void markScheduledEvent(NationalScheduledEvent scheduledEvent) {
+        // Red 단계 뼈대 — 구현은 Green 에서
     }
 
     /**
