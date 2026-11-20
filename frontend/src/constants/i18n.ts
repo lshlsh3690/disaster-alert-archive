@@ -230,6 +230,10 @@ export const i18n = {
       clear: "지우기",
       prevMonth: "이전 달",
       nextMonth: "다음 달",
+      year: "연도 선택",
+      month: "월 선택",
+      prevYear: "이전 해",
+      nextYear: "다음 해",
     },
 
     alertReport: {
@@ -807,6 +811,10 @@ export const i18n = {
       clear: "Clear",
       prevMonth: "Previous month",
       nextMonth: "Next month",
+      year: "Select year",
+      month: "Select month",
+      prevYear: "Previous year",
+      nextYear: "Next year",
     },
 
     alertReport: {
@@ -1312,6 +1320,10 @@ export const i18n = {
       clear: "クリア",
       prevMonth: "前の月",
       nextMonth: "次の月",
+      year: "年を選択",
+      month: "月を選択",
+      prevYear: "前の年",
+      nextYear: "次の年",
     },
 
     alertReport: {
@@ -1817,6 +1829,10 @@ export const i18n = {
       clear: "清除",
       prevMonth: "上个月",
       nextMonth: "下个月",
+      year: "选择年份",
+      month: "选择月份",
+      prevYear: "上一年",
+      nextYear: "下一年",
     },
 
     alertReport: {

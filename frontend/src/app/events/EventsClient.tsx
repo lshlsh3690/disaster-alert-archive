@@ -4,6 +4,7 @@ import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "rea
 import Link from "next/link";
 import { Controller, useForm } from "react-hook-form";
 import DatePicker from "@/components/form/DatePicker";
+import { FILTER_MIN_DATE } from "@/constants/dateRange";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -268,7 +269,7 @@ function EventsClientInner() {
               name="startDate"
               control={control}
               render={({ field }) => (
-                <DatePicker value={field.value ?? ""} onChange={field.onChange} className="krds-control" placeholder={t("events.filter.startDate")} locale={LANG_LOCALE[lang] ?? "ko-KR"} clearLabel={t("datePicker.clear")} prevMonthLabel={t("datePicker.prevMonth")} nextMonthLabel={t("datePicker.nextMonth")} />
+                <DatePicker min={FILTER_MIN_DATE} value={field.value ?? ""} onChange={field.onChange} className="krds-control" placeholder={t("events.filter.startDate")} locale={LANG_LOCALE[lang] ?? "ko-KR"} clearLabel={t("datePicker.clear")} prevMonthLabel={t("datePicker.prevMonth")} nextMonthLabel={t("datePicker.nextMonth")} />
               )}
             />
           </div>
@@ -277,7 +278,7 @@ function EventsClientInner() {
               name="endDate"
               control={control}
               render={({ field }) => (
-                <DatePicker value={field.value ?? ""} onChange={field.onChange} className="krds-control" placeholder={t("events.filter.endDate")} locale={LANG_LOCALE[lang] ?? "ko-KR"} clearLabel={t("datePicker.clear")} prevMonthLabel={t("datePicker.prevMonth")} nextMonthLabel={t("datePicker.nextMonth")} />
+                <DatePicker min={FILTER_MIN_DATE} value={field.value ?? ""} onChange={field.onChange} className="krds-control" placeholder={t("events.filter.endDate")} locale={LANG_LOCALE[lang] ?? "ko-KR"} clearLabel={t("datePicker.clear")} prevMonthLabel={t("datePicker.prevMonth")} nextMonthLabel={t("datePicker.nextMonth")} />
               )}
             />
           </div>

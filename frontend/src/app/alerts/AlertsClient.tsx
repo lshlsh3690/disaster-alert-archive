@@ -11,6 +11,7 @@ import Link from "next/link";
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import DatePicker from "@/components/form/DatePicker";
+import { FILTER_MIN_DATE } from "@/constants/dateRange";
 import { z } from "zod";
 import { useRouter, useSearchParams } from "next/navigation";
 import { DISASTER_TYPES } from "@/ui/disasterType";
@@ -332,7 +333,7 @@ function AlertsClientInner() {
                   name="startDate"
                   control={control}
                   render={({ field }) => (
-                    <DatePicker value={field.value ?? ""} onChange={field.onChange} locale={LANG_LOCALE[language] ?? "ko-KR"} clearLabel={t("datePicker.clear")} prevMonthLabel={t("datePicker.prevMonth")} nextMonthLabel={t("datePicker.nextMonth")} className="krds-control" />
+                    <DatePicker min={FILTER_MIN_DATE} value={field.value ?? ""} onChange={field.onChange} locale={LANG_LOCALE[language] ?? "ko-KR"} clearLabel={t("datePicker.clear")} prevMonthLabel={t("datePicker.prevMonth")} nextMonthLabel={t("datePicker.nextMonth")} className="krds-control" />
                   )}
                 />
               </div>
@@ -342,7 +343,7 @@ function AlertsClientInner() {
                   name="endDate"
                   control={control}
                   render={({ field }) => (
-                    <DatePicker value={field.value ?? ""} onChange={field.onChange} locale={LANG_LOCALE[language] ?? "ko-KR"} clearLabel={t("datePicker.clear")} prevMonthLabel={t("datePicker.prevMonth")} nextMonthLabel={t("datePicker.nextMonth")} className="krds-control" />
+                    <DatePicker min={FILTER_MIN_DATE} value={field.value ?? ""} onChange={field.onChange} locale={LANG_LOCALE[language] ?? "ko-KR"} clearLabel={t("datePicker.clear")} prevMonthLabel={t("datePicker.prevMonth")} nextMonthLabel={t("datePicker.nextMonth")} className="krds-control" />
                   )}
                 />
               </div>

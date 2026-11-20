@@ -65,6 +65,7 @@ import type { TFunction } from "i18next";
 import { useLanguageStore } from "@/store/languageStore";
 import type { I18nKey } from "@/constants/i18n";
 import DatePicker from "@/components/form/DatePicker";
+import { FILTER_MIN_DATE } from "@/constants/dateRange";
 import "./stats.css";
 
 const LANG_LOCALE: Record<string, string> = { ko: "ko-KR", en: "en-US", zh: "zh-CN", ja: "ja-JP" };
@@ -778,9 +779,9 @@ function StatsPageInner() {
           <div className="krds-field">
             {t("statsPage.period")}
             <div className="flex flex-wrap items-center gap-2">
-              <DatePicker value={localFilter.startDate} onChange={v => setLocalFilter(f => ({ ...f, startDate: v }))} locale={locale} clearLabel={t("datePicker.clear")} prevMonthLabel={t("datePicker.prevMonth")} nextMonthLabel={t("datePicker.nextMonth")} className="krds-control min-w-[160px]" />
+              <DatePicker min={FILTER_MIN_DATE} value={localFilter.startDate} onChange={v => setLocalFilter(f => ({ ...f, startDate: v }))} locale={locale} clearLabel={t("datePicker.clear")} prevMonthLabel={t("datePicker.prevMonth")} nextMonthLabel={t("datePicker.nextMonth")} className="krds-control min-w-[160px]" />
               <span className="text-[var(--krds-gray-50)] font-normal">~</span>
-              <DatePicker value={localFilter.endDate} onChange={v => setLocalFilter(f => ({ ...f, endDate: v }))} locale={locale} clearLabel={t("datePicker.clear")} prevMonthLabel={t("datePicker.prevMonth")} nextMonthLabel={t("datePicker.nextMonth")} className="krds-control min-w-[160px]" />
+              <DatePicker min={FILTER_MIN_DATE} value={localFilter.endDate} onChange={v => setLocalFilter(f => ({ ...f, endDate: v }))} locale={locale} clearLabel={t("datePicker.clear")} prevMonthLabel={t("datePicker.prevMonth")} nextMonthLabel={t("datePicker.nextMonth")} className="krds-control min-w-[160px]" />
               <div className="flex flex-wrap gap-2">
                 {QUICK_PERIODS.map(d => (
                   <button key={d} type="button" onClick={() => setQuickDate(d)}
