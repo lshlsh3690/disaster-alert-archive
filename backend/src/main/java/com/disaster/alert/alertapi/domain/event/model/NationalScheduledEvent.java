@@ -57,15 +57,14 @@ public enum NationalScheduledEvent {
     }
 
     /**
-     * 이 행사의 이벤트 제목 — 행사를 치른 해(알림 시각의 연도)로 정한다. 제목이 곧 "같은 행사" 키라 해마다
-     * 다음 행사와 서로 병합되지 않는다. 수능도 공식 명칭의 학년도("2027학년도", 다음 해)가 아니라 치른 해로
-     * "2026 수능" 이라 쓴다 — 사건 목록에서 민방위훈련("2026 민방위훈련")과 같이 언제 일어난 일인지로 읽히게
-     * 하려는 것이다(2026-11-19 사용자 결정).
+     * 이 행사의 이벤트 제목 — 알림 시각의 연도로 정한다(수능은 다음 해 학년도, 민방위훈련은 그 해).
+     * 제목이 곧 "같은 행사" 키라 해마다 다음 행사와 서로 병합되지 않는다.
+     * 수능 문자가 11월 시험 직전·당일에 오므로 알림 연도+1 이 학년도다(2026-11 → 2027학년도).
      */
     public String title(LocalDateTime createdAt) {
         int year = createdAt.getYear();
         return switch (this) {
-            case SUNEUNG -> year + " 수능";
+            case SUNEUNG -> (year + 1) + "학년도 수능";
             case CIVIL_DEFENSE_DRILL -> year + " 민방위훈련";
         };
     }

@@ -191,7 +191,7 @@ public class DisasterEvent {
 
     /**
      * 제목을 지정한 값으로 바꾼다 — 전국 예정 행사 이벤트는 첫 알림 본문이 아니라 행사 제목
-     * ("2026 수능")이 곧 같은 행사 키라, 생성 직후 저장 전에 이 메서드로 정한다.
+     * ("2027학년도 수능")이 곧 같은 행사 키라, 생성 직후 저장 전에 이 메서드로 정한다.
      */
     public void retitle(String title) {
         this.eventTitle = title;
