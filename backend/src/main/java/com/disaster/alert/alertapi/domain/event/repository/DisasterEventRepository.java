@@ -323,7 +323,10 @@ public interface DisasterEventRepository extends JpaRepository<DisasterEvent, Lo
      * 시도 키 없이 유형만으로 묶는다(라벨 "전국 {유형}"). 행안부 전국 호우/대설 안내처럼 17개 시도
      * 전체에 발송되는 알림이 시도별로 흩어지지 않게 하나로 통합.
      *
-     * <p>(Red 뼈대) 전국 예정 행사 이벤트를 후보에서 빼는 조건은 Green 에서 {@code scheduled_event IS NULL} 로 넣는다.
+     * <p>전국 예정 행사 이벤트({@code scheduled_event} 가 있는 이벤트, 예: "2026 민방위훈련", 유형 민방공)는 후보에서
+     * 뺀다 — 일반 광역 병합이 행사 이벤트를 고르면 행사 키워드 없는 실제 전국 경보가 훈련 이벤트에 묻힌다. 1건만 고르기
+     * (LIMIT 1) <b>전에</b> 빼야 한다 — 고른 뒤에 거르면 가장 최근 이벤트가 훈련일 때 그 아래 실제 경보 이벤트가 후보에
+     * 오르지 못해 실제 경보의 후속 알림이 새 이벤트로 갈라진다. 제목이 아니라 종류 키로 거르므로 제목을 손으로 고쳐도 빠진다.
      */
     @Query(value = """
             SELECT * FROM disaster_events
@@ -331,6 +334,7 @@ public interface DisasterEventRepository extends JpaRepository<DisasterEvent, Lo
               AND primary_disaster_type = :primaryDisasterType
               AND primary_region_code IS NULL
               AND last_alert_at > :lastAlertAt
+              AND scheduled_event IS NULL
             ORDER BY last_alert_at DESC
             LIMIT 1
             """, nativeQuery = true)

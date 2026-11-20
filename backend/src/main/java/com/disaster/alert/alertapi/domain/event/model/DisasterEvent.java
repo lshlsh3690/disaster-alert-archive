@@ -199,7 +199,8 @@ public class DisasterEvent {
 
     /**
      * 제목을 지정한 값으로 바꾼다 — 전국 예정 행사 이벤트는 첫 알림 본문이 아니라 행사 제목
-     * ("2027학년도 수능")이 곧 같은 행사 키라, 생성 직후 저장 전에 이 메서드로 정한다.
+     * ("2027학년도 수능")으로 보여 주므로, 생성 직후 저장 전에 이 메서드로 정한다. 제목은 화면용이고
+     * 같은 행사를 찾는 키는 {@link #markScheduledEvent} 의 행사 종류다.
      */
     public void retitle(String title) {
         this.eventTitle = title;
@@ -209,7 +210,7 @@ public class DisasterEvent {
      * 이 이벤트를 전국 예정 행사 이벤트로 표시한다 — 같은 행사 알림을 찾는 키({@code scheduled_event})를 정한다.
      */
     public void markScheduledEvent(NationalScheduledEvent scheduledEvent) {
-        // Red 단계 뼈대 — 구현은 Green 에서
+        this.scheduledEvent = scheduledEvent;
     }
 
     /**
