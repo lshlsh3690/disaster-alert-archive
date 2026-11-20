@@ -31,7 +31,6 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 /**
  * 이벤트 클러스터링 핵심 서비스.
@@ -192,17 +191,6 @@ public class EventClusteringService {
         }
 
         try {
-            // 전국 예정 행사(수능·민방위훈련)는 비사건 제외보다 앞에서 처리한다 — 행사 문자 대부분이 비사건으로 분류돼
-            // 제외 뒤에 두면 전부 미배정으로 버려진다.
-            if (clusterNationalScheduledEvent(alert)) {
-                return;
-            }
-            // 비사건(ADVISORY)은 이벤트로 묶지 않기로 한 결정이라 임베딩·후보 검색·LLM 폴백보다 앞에서 끊는다.
-            // null(분류 실패·분류 도입 전 기존 알림)은 통과시킨다 — 분류 실패가 사건을 이벤트에서 빼면 안 된다.
-            if (alert.getAlertKind() == AlertKind.ADVISORY) {
-                log.info("clusterNewAlert: alertId={} 비사건(ADVISORY, type={}) — 클러스터링 제외", alertId, alert.getDisasterType());
-                return;
-            }
             doCluster(alert);
         } catch (Exception e) {
             // 한 건 실패가 수집 사이클을 막지 않도록 여기서 잡음.
@@ -233,9 +221,11 @@ public class EventClusteringService {
     /**
      * 전국 예정 행사(수능·민방위훈련) 알림을 행사 하나의 전국 광역 이벤트로 묶는다.
      *
-     * <p>사건·비사건 분류와 무관하게 유형(기타·민방공)과 본문 키워드로만 판정하고, 임베딩·LLM 은 쓰지 않는다 —
-     * 행사 종류와 연도가 곧 키라 본문 유사도를 볼 이유가 없다. {@code clusterNewAlert} 의 try/catch 안에서
-     * 불리므로 여기서 던진 예외는 alertId 와 함께 error 로그로 남고 수집 사이클은 계속된다.
+     * <p>사건·비사건 분류와 무관하게 유형(기타·민방공)과 본문 키워드로만 판정하고, LLM 은 쓰지 않는다 —
+     * 행사 종류가 곧 키라 본문 유사도를 볼 이유가 없다. 임베딩은 병합·신규 판단이 끝난 뒤 저장만 한다(판단에는 안 씀).
+     * 같은 행사는 이벤트 제목이 아니라 행사 종류 키({@code scheduled_event})로 찾는다 — 제목은 화면 값이라
+     * 손으로 고쳐도 같은 행사로 찾혀야 하기 때문이다. {@code doCluster} 맨 앞에서 불리며 여기서 던진 예외는
+     * {@code clusterNewAlert} 의 try/catch 가 alertId 와 함께 error 로그로 남기고 수집 사이클은 계속된다.
      *
      * @return 행사 알림으로 처리했으면 true(호출한 쪽은 더 클러스터링하지 않는다), 아니면 false
      */
@@ -246,52 +236,68 @@ public class EventClusteringService {
         if (matched.isEmpty()) {
             return false;
         }
-        String title = matched.get().title(alert.getCreatedAt());
-        // 2) 같은 제목의 광역 이벤트를 72시간 안에서 찾는다. 예고(1~2일 전)부터 당일까지가 한 행사이고,
-        //    제목에 연도가 있어 해마다 다음 행사와 갈린다. 윈도우를 넘겨 이어 붙는 것을 막는 용도라 설정 키는 두지 않았다.
+        NationalScheduledEvent kind = matched.get();
+        String title = kind.title(alert.getCreatedAt());
+        // 2) 같은 행사 종류의 광역 이벤트를 72시간 안에서 찾는다. 예고(1~2일 전)부터 당일까지가 한 행사이고,
+        //    연도는 키에 없지만 72시간이면 해마다 다음 행사와 저절로 갈린다. 제목이 아니라 종류로 찾는 이유는 제목이
+        //    화면 값이라서다(손으로 고쳐도 찾혀야 한다). 윈도우는 이어 붙는 것을 막는 용도라 설정 키는 두지 않았다.
         Optional<DisasterEvent> target = disasterEventRepository.findLatestNationalScheduledEvent(
-                title, alert.getCreatedAt().minusHours(NATIONAL_EVENT_WINDOW_HOURS),
+                kind.name(), alert.getCreatedAt().minusHours(NATIONAL_EVENT_WINDOW_HOURS),
                 alert.getCreatedAt().plusHours(NATIONAL_EVENT_WINDOW_HOURS));
         if (target.isPresent()) {
             mergeIntoExisting(target.get().getId(), alert, null, MergeMethod.NATIONAL_EVENT);
             log.info("clusterNewAlert(전국 행사): alertId={} → event={} 병합('{}')", alert.getId(), target.get().getId(), title);
         } else {
             // 3) 없으면 전국 광역 이벤트를 새로 만든다 — 지역 이벤트로 두면 시군구가 따로 보낸 안내가 붙지 못한다.
-            createNewEvent(alert, null, "전국", true, title);
+            //    종류 키를 함께 달아야 다음 알림이 이 이벤트를 찾고, 일반 광역 병합 후보에서도 빠진다.
+            createNewEvent(alert, null, "전국", true, title, kind);
             log.info("clusterNewAlert(전국 행사): alertId={} → 신규 전국 이벤트('{}')", alert.getId(), title);
         }
+        // 4) 임베딩은 저장만 한다 — 위 판단에는 쓰지 않았다. 비워 두면 00:30 구조 검사가 "임베딩 없음"으로 세기 때문이고,
+        //    행사 이벤트는 광역(is_broadcast=true)이라 다른 유형의 임베딩 후보 검색에 안 걸려 묶음 결과는 안 바뀐다.
+        storeEmbeddingBestEffort(alert);
         return true;
     }
 
-    /** 알림 시각 기준 올해·지난해 전국 예정 행사 이벤트 제목들 — 행사 제목은 연도가 들어가 해가 바뀌면 달라진다. */
-    private String[] nationalScheduledEventTitles(LocalDateTime alertAt) {
-        return Arrays.stream(NationalScheduledEvent.values())
-                .flatMap(e -> Stream.of(e.title(alertAt), e.title(alertAt.minusYears(1))))
-                .toArray(String[]::new);
-    }
-
+    /**
+     * 경로 순서대로 판단하고 먼저 걸린 경로가 처리하면 끝낸다. 단계 번호는 CLUSTERING_CRITERIA.md 3절 표와 같다.
+     * 여기서 던진 예외는 {@code clusterNewAlert} 의 try/catch 가 alertId 와 함께 error 로그로 남긴다.
+     */
     private void doCluster(DisasterAlert alert) {
-        // 0. 실종 인물(기타 + 이름·나이)은 신원(이름+나이+키)으로만 클러스터링 — 시군구·임베딩 무관.
+        // 0a. 전국 예정 행사(수능·민방위훈련)는 비사건 제외보다 앞에서 처리한다 — 행사 문자 대부분이 비사건으로 분류돼
+        //     제외 뒤에 두면 전부 미배정으로 버려진다.
+        if (clusterNationalScheduledEvent(alert)) {
+            return;
+        }
+
+        // 0b. 비사건(ADVISORY)은 이벤트로 묶지 않기로 한 결정이라 임베딩·후보 검색·LLM 폴백보다 앞에서 끊는다.
+        //     null(분류 실패·분류 도입 전 기존 알림)은 통과시킨다 — 분류 실패가 사건을 이벤트에서 빼면 안 된다.
+        if (alert.getAlertKind() == AlertKind.ADVISORY) {
+            log.info("clusterNewAlert: alertId={} 비사건(ADVISORY, type={}) — 클러스터링 제외", alert.getId(), alert.getDisasterType());
+            return;
+        }
+
+        // 1. 실종 인물(기타 + 이름·나이)은 신원(이름+나이+키)으로만 클러스터링 — 시군구·임베딩 무관.
         //    같은 사람=한 이벤트(지역 옮겨도), 다른 사람=다른 이벤트(같은 시군구라도). broadcast 도 안 탐.
         if (clusterPerson(alert)) {
             return;
         }
 
-        // 0.2 동물 탈출·출몰(기타 + 종 식별) — 종 하드게이트 + 임베딩 후보 + LLM 판정을 판정 순간에 한 번에 처리.
+        // 2. 동물 탈출·출몰(기타 + 종 식별) — 종 하드게이트 + 임베딩 후보 + LLM 판정을 판정 순간에 한 번에 처리.
         //     예전엔 일단 임베딩 경로로 이벤트를 만든 뒤 별도 cross-region 패스가 다시 합쳤다(이벤트가 두 번 바뀜).
         //     실종 인물처럼 유형 안에서 먼저 분기해 지역별로 갈린 이벤트가 생기지 않게 한다.
         if (clusterAnimal(alert)) {
             return;
         }
 
-        // 0.5 전국 통합 유형(태풍 등)은 지역·임베딩 무관하게 시간 윈도우로만 단일 이벤트에 묶는다.
+        // 3. 전국 통합 유형(태풍 등)은 지역·임베딩 무관하게 시간 윈도우로만 단일 이벤트에 묶는다.
         //     태풍 알림은 대부분 시군구 단위로 쪼개져 발송돼(span 게이트 미달) local 경로의 지역
         //     hard 필터에 막혀 시군구마다 이벤트가 생겼다. 유형 자체를 키로 써서 임베딩 전에 분기.
         if (clusterGlobalType(alert)) {
             return;
         }
 
-        // 0.7 지역 한정 유형(산불·산사태·홍수) — 유형+시군구가 곧 사건. 같은 시군구·같은 유형·유형별
+        // 4. 지역 한정 유형(산불·산사태·홍수) — 유형+시군구가 곧 사건. 같은 시군구·같은 유형·유형별
         //     윈도우 안이면 임베딩 무관하게 단일 이벤트로 묶는다. 한 산불/호우 episode 가 같은 시군구에서
         //     며칠 burst 로 쏟아질 때 본문 텍스트가 갈려(코사인<0.85) 임베딩 경로가 한 사건을 수십 개로
         //     파편화하던 것을 차단. 태풍(GLOBAL_TYPE)과 같은 철학이되 전국이 아니라 시군구 스코프(blob 방지).
@@ -299,7 +305,7 @@ public class EventClusteringService {
             return;
         }
 
-        // 0.8 지속형 유형(폭염·한파·대설·강풍·가축질병) — 같은 시군구·같은 유형의 발령이 끊김 없이
+        // 5. 지속형 유형(폭염·한파·대설·강풍·가축질병) — 같은 시군구·같은 유형의 발령이 끊김 없이
         //     이어지는 동안은 안내/특보·문장 유사도와 무관하게 하나의 이벤트. 임베딩·LLM 호출 전에 분기해
         //     비용도 들지 않는다. 시군구 1개는 키 병합, 2개 이상(다지역)은 지역 이벤트와 섞이지 않게
         //     곧바로 광역(broadcast) 경로로 보낸다(시군구 간 다리 방지). 사고성은 전파 허용이라 대상 아님.
@@ -307,11 +313,11 @@ public class EventClusteringService {
             return;
         }
 
-        // 1. 임베딩 확보 — 이미 저장돼 있으면 재사용(OpenAI 재호출 X), 없으면 생성 후 저장.
+        // 6. 임베딩 경로. 6-1) 임베딩 확보 — 이미 저장돼 있으면 재사용(OpenAI 재호출 X), 없으면 생성 후 저장.
         //    덕분에 재클러스터링(임계값 튜닝)이 공짜+빠름: 비싼 임베딩은 1회만.
         String embeddingText = ensureEmbedding(alert);
 
-        // 3. 후보 이벤트 검색
+        // 6-2) 후보 이벤트 검색
         String[] regionCodes = extractRegionCodes(alert);
         if (regionCodes.length == 0) {
             // 지역 정보 없으면 후보 검색 불가 → 항상 신규 이벤트
@@ -335,10 +341,10 @@ public class EventClusteringService {
         List<Object[]> candidates = disasterEventRepository.findTopCandidates(
                 embeddingText, sigunguPrefixes(regionCodes), since, regionalTypeNames());
 
-        // 4. top-3 후보 로깅 (임계값 튜닝 / 디버깅용)
+        // 6-3) top-3 후보 로깅 (임계값 튜닝 / 디버깅용)
         logCandidates(alert.getId(), candidates);
 
-        // 5. 임계값 판정 — 같은 지역 후보 중 코사인 유사도 >= threshold 면 머지
+        // 6-4) 임계값 판정 — 같은 지역 후보 중 코사인 유사도 >= threshold 면 머지
         double mergeMaxDistance = 0.15;   // 코사인 거리 0.15 이하(유사도 0.85 이상)면 병합
         // 판정 기록: 조회 결과 그대로(0건이면 빈 목록)와 적용 기준을 남긴다.
         for (Object[] row : candidates) {
@@ -350,12 +356,12 @@ public class EventClusteringService {
             }
         }
 
-        // 5.2 인접 시군구 후보 — 사고성 유형만, 임계값 병합만(LLM 폴백 없음).
+        // 6-5) 인접 시군구 후보 — 사고성 유형만, 임계값 병합만(LLM 폴백 없음).
         if (tryMergeAdjacent(alert, embeddingText, regionCodes, mergeMaxDistance)) {
             return;
         }
 
-        // 5.5 LLM 폴백 — 임베딩은 임계 미만이지만 같은 사건일 수 있는 사고성 알림을 LLM 으로 판정.
+        // 6-6) LLM 폴백 — 임베딩은 임계 미만이지만 같은 사건일 수 있는 사고성 알림을 LLM 으로 판정.
         //     "서소문 고가 붕괴"처럼 같은 사고를 여러 기관이 다른 측면(도로통제/열차중지)으로 보내
         //     본문 임베딩이 갈리는 케이스를 묶는다. 폭염 등 기상특보는 화이트리스트에서 제외(과병합 방지).
         if (tryLlmFallback(alert, candidates, mergeMaxDistance)) {
@@ -556,7 +562,7 @@ public class EventClusteringService {
         try {
             embedding = embeddingModel.embed(alert.getMessage());
         } catch (RuntimeException e) {
-            log.warn("지역 한정 경로 임베딩 생성 실패 — 규칙 병합은 계속한다: alertId={} reason={}",
+            log.warn("규칙 병합 경로(지역 한정·전국 행사) 임베딩 생성 실패 — 병합은 계속한다: alertId={} reason={}",
                     alert.getId(), e.toString());
             return;
         }
@@ -715,8 +721,7 @@ public class EventClusteringService {
         LocalDateTime since = alert.getCreatedAt().minusHours(globalWindowHours);
         // 전국 broadcast(region_code=null) 이벤트만 키로 — broadcast 격리 규칙과 일관(local 과 안 섞임).
         Optional<DisasterEvent> target = disasterEventRepository
-                .findLatestBroadcastNationwide(
-                        type, since, new String[0]);
+                .findLatestBroadcastNationwide(type, since);
         if (target.isPresent()) {
             mergeIntoExisting(target.get().getId(), alert, null, MergeMethod.GLOBAL_TYPE);
             upgradeGlobalTitleIfNamed(target.get().getId(), type, alert.getMessage());
@@ -973,11 +978,15 @@ public class EventClusteringService {
     }
 
     private void createNewEvent(DisasterAlert alert, String regionCode, String regionName, boolean broadcast) {
-        createNewEvent(alert, regionCode, regionName, broadcast, null);
+        createNewEvent(alert, regionCode, regionName, broadcast, null, null);
     }
 
-    /** {@code title} 이 null 이 아니면 자동 생성 제목 대신 그 제목으로 정한다(전국 예정 행사용). */
-    private void createNewEvent(DisasterAlert alert, String regionCode, String regionName, boolean broadcast, String title) {
+    /**
+     * {@code title} 이 null 이 아니면 자동 생성 제목 대신 그 제목으로 정하고, {@code scheduledEvent} 가 null 이 아니면
+     * 행사 종류 키를 단다(둘 다 전국 예정 행사용 — 제목은 화면용, 종류는 같은 행사를 찾는 키).
+     */
+    private void createNewEvent(DisasterAlert alert, String regionCode, String regionName, boolean broadcast,
+                                String title, NationalScheduledEvent scheduledEvent) {
         DisasterEvent event = DisasterEvent.createFromFirstAlert(
                 alert.getDisasterType(),
                 regionCode,
@@ -988,6 +997,9 @@ public class EventClusteringService {
         );
         if (title != null) {
             event.retitle(title);
+        }
+        if (scheduledEvent != null) {
+            event.markScheduledEvent(scheduledEvent);
         }
         DisasterEvent saved = disasterEventRepository.save(event);
         alert.assignToEvent(saved, 1, null, MergeMethod.SEED);
@@ -1021,10 +1033,9 @@ public class EventClusteringService {
             if (informative) {
                 // 전국 예정 행사 이벤트(예: "2026 민방위훈련", 유형 민방공)는 일반 광역 병합 대상에서 뺀다 — 행사 키워드가 없는
                 // 실제 전국 민방공 경보가 훈련 이벤트에 묻히면 안 된다(CodeRabbit PR #347 지적). 행사 후속 알림은 키워드로
-                // 행사 경로가 먼저 가져가므로 여기 오지 않는다. 제외는 쿼리 안(1건 고르기 전)에서 한다.
+                // 행사 경로가 먼저 가져가므로 여기 오지 않는다. 제외는 쿼리 안(1건 고르기 전, scheduled_event IS NULL)에서 한다.
                 Optional<DisasterEvent> target = disasterEventRepository
-                        .findLatestBroadcastNationwide(
-                                type, since, nationalScheduledEventTitles(alert.getCreatedAt()));
+                        .findLatestBroadcastNationwide(type, since);
                 if (target.isPresent()) {
                     log.info("clusterNewAlert: alertId={} 전국({}시도) → broadcast event={} 유형 머지({})",
                             alert.getId(), sidoSpan, target.get().getId(), type);

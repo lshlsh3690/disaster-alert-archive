@@ -77,6 +77,14 @@ public class DisasterEvent {
     @Column(name = "is_broadcast", nullable = false)
     private boolean broadcast;
 
+    /**
+     * 전국 예정 행사(수능·민방위훈련) 이벤트의 행사 종류 — 같은 행사 알림을 한 이벤트로 묶는 키.
+     * 행사 이벤트가 아니면 null. 제목은 화면용이라 키로 쓰지 않는다.
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "scheduled_event", length = 32)
+    private NationalScheduledEvent scheduledEvent;
+
     @CreatedDate
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
@@ -191,10 +199,18 @@ public class DisasterEvent {
 
     /**
      * 제목을 지정한 값으로 바꾼다 — 전국 예정 행사 이벤트는 첫 알림 본문이 아니라 행사 제목
-     * ("2027학년도 수능")이 곧 같은 행사 키라, 생성 직후 저장 전에 이 메서드로 정한다.
+     * ("2027학년도 수능")으로 보여 주므로, 생성 직후 저장 전에 이 메서드로 정한다. 제목은 화면용이고
+     * 같은 행사를 찾는 키는 {@link #markScheduledEvent} 의 행사 종류다.
      */
     public void retitle(String title) {
         this.eventTitle = title;
+    }
+
+    /**
+     * 이 이벤트를 전국 예정 행사 이벤트로 표시한다 — 같은 행사 알림을 찾는 키({@code scheduled_event})를 정한다.
+     */
+    public void markScheduledEvent(NationalScheduledEvent scheduledEvent) {
+        this.scheduledEvent = scheduledEvent;
     }
 
     /**
