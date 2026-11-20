@@ -191,17 +191,6 @@ public class EventClusteringService {
         }
 
         try {
-            // 전국 예정 행사(수능·민방위훈련)는 비사건 제외보다 앞에서 처리한다 — 행사 문자 대부분이 비사건으로 분류돼
-            // 제외 뒤에 두면 전부 미배정으로 버려진다.
-            if (clusterNationalScheduledEvent(alert)) {
-                return;
-            }
-            // 비사건(ADVISORY)은 이벤트로 묶지 않기로 한 결정이라 임베딩·후보 검색·LLM 폴백보다 앞에서 끊는다.
-            // null(분류 실패·분류 도입 전 기존 알림)은 통과시킨다 — 분류 실패가 사건을 이벤트에서 빼면 안 된다.
-            if (alert.getAlertKind() == AlertKind.ADVISORY) {
-                log.info("clusterNewAlert: alertId={} 비사건(ADVISORY, type={}) — 클러스터링 제외", alertId, alert.getDisasterType());
-                return;
-            }
             doCluster(alert);
         } catch (Exception e) {
             // 한 건 실패가 수집 사이클을 막지 않도록 여기서 잡음.
@@ -270,28 +259,45 @@ public class EventClusteringService {
         return true;
     }
 
+    /**
+     * 경로 순서대로 판단하고 먼저 걸린 경로가 처리하면 끝낸다. 단계 번호는 CLUSTERING_CRITERIA.md 3절 표와 같다.
+     * 여기서 던진 예외는 {@code clusterNewAlert} 의 try/catch 가 alertId 와 함께 error 로그로 남긴다.
+     */
     private void doCluster(DisasterAlert alert) {
-        // 0. 실종 인물(기타 + 이름·나이)은 신원(이름+나이+키)으로만 클러스터링 — 시군구·임베딩 무관.
+        // 0a. 전국 예정 행사(수능·민방위훈련)는 비사건 제외보다 앞에서 처리한다 — 행사 문자 대부분이 비사건으로 분류돼
+        //     제외 뒤에 두면 전부 미배정으로 버려진다.
+        if (clusterNationalScheduledEvent(alert)) {
+            return;
+        }
+
+        // 0b. 비사건(ADVISORY)은 이벤트로 묶지 않기로 한 결정이라 임베딩·후보 검색·LLM 폴백보다 앞에서 끊는다.
+        //     null(분류 실패·분류 도입 전 기존 알림)은 통과시킨다 — 분류 실패가 사건을 이벤트에서 빼면 안 된다.
+        if (alert.getAlertKind() == AlertKind.ADVISORY) {
+            log.info("clusterNewAlert: alertId={} 비사건(ADVISORY, type={}) — 클러스터링 제외", alert.getId(), alert.getDisasterType());
+            return;
+        }
+
+        // 1. 실종 인물(기타 + 이름·나이)은 신원(이름+나이+키)으로만 클러스터링 — 시군구·임베딩 무관.
         //    같은 사람=한 이벤트(지역 옮겨도), 다른 사람=다른 이벤트(같은 시군구라도). broadcast 도 안 탐.
         if (clusterPerson(alert)) {
             return;
         }
 
-        // 0.2 동물 탈출·출몰(기타 + 종 식별) — 종 하드게이트 + 임베딩 후보 + LLM 판정을 판정 순간에 한 번에 처리.
+        // 2. 동물 탈출·출몰(기타 + 종 식별) — 종 하드게이트 + 임베딩 후보 + LLM 판정을 판정 순간에 한 번에 처리.
         //     예전엔 일단 임베딩 경로로 이벤트를 만든 뒤 별도 cross-region 패스가 다시 합쳤다(이벤트가 두 번 바뀜).
         //     실종 인물처럼 유형 안에서 먼저 분기해 지역별로 갈린 이벤트가 생기지 않게 한다.
         if (clusterAnimal(alert)) {
             return;
         }
 
-        // 0.5 전국 통합 유형(태풍 등)은 지역·임베딩 무관하게 시간 윈도우로만 단일 이벤트에 묶는다.
+        // 3. 전국 통합 유형(태풍 등)은 지역·임베딩 무관하게 시간 윈도우로만 단일 이벤트에 묶는다.
         //     태풍 알림은 대부분 시군구 단위로 쪼개져 발송돼(span 게이트 미달) local 경로의 지역
         //     hard 필터에 막혀 시군구마다 이벤트가 생겼다. 유형 자체를 키로 써서 임베딩 전에 분기.
         if (clusterGlobalType(alert)) {
             return;
         }
 
-        // 0.7 지역 한정 유형(산불·산사태·홍수) — 유형+시군구가 곧 사건. 같은 시군구·같은 유형·유형별
+        // 4. 지역 한정 유형(산불·산사태·홍수) — 유형+시군구가 곧 사건. 같은 시군구·같은 유형·유형별
         //     윈도우 안이면 임베딩 무관하게 단일 이벤트로 묶는다. 한 산불/호우 episode 가 같은 시군구에서
         //     며칠 burst 로 쏟아질 때 본문 텍스트가 갈려(코사인<0.85) 임베딩 경로가 한 사건을 수십 개로
         //     파편화하던 것을 차단. 태풍(GLOBAL_TYPE)과 같은 철학이되 전국이 아니라 시군구 스코프(blob 방지).
@@ -299,7 +305,7 @@ public class EventClusteringService {
             return;
         }
 
-        // 0.8 지속형 유형(폭염·한파·대설·강풍·가축질병) — 같은 시군구·같은 유형의 발령이 끊김 없이
+        // 5. 지속형 유형(폭염·한파·대설·강풍·가축질병) — 같은 시군구·같은 유형의 발령이 끊김 없이
         //     이어지는 동안은 안내/특보·문장 유사도와 무관하게 하나의 이벤트. 임베딩·LLM 호출 전에 분기해
         //     비용도 들지 않는다. 시군구 1개는 키 병합, 2개 이상(다지역)은 지역 이벤트와 섞이지 않게
         //     곧바로 광역(broadcast) 경로로 보낸다(시군구 간 다리 방지). 사고성은 전파 허용이라 대상 아님.
@@ -307,11 +313,11 @@ public class EventClusteringService {
             return;
         }
 
-        // 1. 임베딩 확보 — 이미 저장돼 있으면 재사용(OpenAI 재호출 X), 없으면 생성 후 저장.
+        // 6. 임베딩 경로. 6-1) 임베딩 확보 — 이미 저장돼 있으면 재사용(OpenAI 재호출 X), 없으면 생성 후 저장.
         //    덕분에 재클러스터링(임계값 튜닝)이 공짜+빠름: 비싼 임베딩은 1회만.
         String embeddingText = ensureEmbedding(alert);
 
-        // 3. 후보 이벤트 검색
+        // 6-2) 후보 이벤트 검색
         String[] regionCodes = extractRegionCodes(alert);
         if (regionCodes.length == 0) {
             // 지역 정보 없으면 후보 검색 불가 → 항상 신규 이벤트
@@ -335,10 +341,10 @@ public class EventClusteringService {
         List<Object[]> candidates = disasterEventRepository.findTopCandidates(
                 embeddingText, sigunguPrefixes(regionCodes), since, regionalTypeNames());
 
-        // 4. top-3 후보 로깅 (임계값 튜닝 / 디버깅용)
+        // 6-3) top-3 후보 로깅 (임계값 튜닝 / 디버깅용)
         logCandidates(alert.getId(), candidates);
 
-        // 5. 임계값 판정 — 같은 지역 후보 중 코사인 유사도 >= threshold 면 머지
+        // 6-4) 임계값 판정 — 같은 지역 후보 중 코사인 유사도 >= threshold 면 머지
         double mergeMaxDistance = 0.15;   // 코사인 거리 0.15 이하(유사도 0.85 이상)면 병합
         // 판정 기록: 조회 결과 그대로(0건이면 빈 목록)와 적용 기준을 남긴다.
         for (Object[] row : candidates) {
@@ -350,12 +356,12 @@ public class EventClusteringService {
             }
         }
 
-        // 5.2 인접 시군구 후보 — 사고성 유형만, 임계값 병합만(LLM 폴백 없음).
+        // 6-5) 인접 시군구 후보 — 사고성 유형만, 임계값 병합만(LLM 폴백 없음).
         if (tryMergeAdjacent(alert, embeddingText, regionCodes, mergeMaxDistance)) {
             return;
         }
 
-        // 5.5 LLM 폴백 — 임베딩은 임계 미만이지만 같은 사건일 수 있는 사고성 알림을 LLM 으로 판정.
+        // 6-6) LLM 폴백 — 임베딩은 임계 미만이지만 같은 사건일 수 있는 사고성 알림을 LLM 으로 판정.
         //     "서소문 고가 붕괴"처럼 같은 사고를 여러 기관이 다른 측면(도로통제/열차중지)으로 보내
         //     본문 임베딩이 갈리는 케이스를 묶는다. 폭염 등 기상특보는 화이트리스트에서 제외(과병합 방지).
         if (tryLlmFallback(alert, candidates, mergeMaxDistance)) {
