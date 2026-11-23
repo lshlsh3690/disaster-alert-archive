@@ -16,9 +16,9 @@ import { formatDateTime, formatNumber, formatRatio } from "./_format";
 
 // 관리자 클러스터링 화면의 네 영역. 모두 읽기 전용이고 이미 기록된 값만 보여 준다(새 LLM 호출 없음).
 
-export const TABLE = "w-full text-sm border-collapse";
-export const TH = "px-3 py-2 text-left font-medium text-[var(--text-muted)] border-b border-[var(--line)] whitespace-nowrap";
-export const TD = "px-3 py-2 border-b border-[var(--line)] align-top whitespace-nowrap";
+const TABLE = "w-full text-sm border-collapse";
+const TH = "px-3 py-2 text-left font-medium text-[var(--text-muted)] border-b border-[var(--line)] whitespace-nowrap";
+const TD = "px-3 py-2 border-b border-[var(--line)] align-top whitespace-nowrap";
 
 const STATUS_LABEL: Record<DayStatus, string> = {
   SCORED: "채점됨",

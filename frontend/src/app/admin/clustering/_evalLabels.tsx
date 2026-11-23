@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { isAxiosError } from "axios";
 import type { EvalLabelPair, EvalLabelRelation, HumanLabel } from "@/api/clusteringAdminApi";
@@ -38,7 +38,7 @@ const LABEL_TEXT: Record<HumanLabel, string> = Object.fromEntries(
  * 두 알림의 발송 간격. 같은 사건인지 판단할 때 가장 먼저 보는 단서라 따로 보인다.
  * 24시간 미만은 "N시간 M분", 이상은 "N일 M시간". 한쪽 시각이 없으면 "-".
  */
-export function formatGap(a: string | null, b: string | null): string {
+function formatGap(a: string | null, b: string | null): string {
   if (!a || !b) return "-";
   const minutes = Math.round(Math.abs(new Date(b).getTime() - new Date(a).getTime()) / 60000);
   if (Number.isNaN(minutes)) return "-";
@@ -138,10 +138,27 @@ export function EvalLabelsSection() {
 }
 
 const PAGE_BLOCK = 10;
+const PAGE_WINDOW = 5;
+
+/** 넓은 화면의 번호: 지금 페이지가 든 10개 묶음(1~10, 11~20 …). */
+function blockPages(page: number, totalPages: number): number[] {
+  const start = Math.floor(page / PAGE_BLOCK) * PAGE_BLOCK;
+  return Array.from({ length: Math.min(PAGE_BLOCK, totalPages - start) }, (_, i) => start + i);
+}
 
 /**
- * 가운데 정렬된 페이지 넘김: 이전 · 번호 10개 묶음 · 다음. 번호는 지금 페이지가 든 10개 묶음(1~10, 11~20 …)을 보인다.
- * 이전·다음은 한 페이지씩 움직이고, 묶음 끝에서 넘어가면 다음 묶음 번호가 보인다. page 는 0부터, 화면 번호는 1부터.
+ * 휴대폰 폭의 번호: 지금 페이지를 가운데 두고 앞뒤로 2개씩, 모두 5개. 처음·끝 근처에서는 한쪽으로 밀어 늘 5개를 채운다
+ * (예: 1페이지면 1~5, 14페이지 중 14면 10~14). 전체가 5페이지보다 적으면 있는 만큼만.
+ */
+function windowPages(page: number, totalPages: number): number[] {
+  const size = Math.min(PAGE_WINDOW, totalPages);
+  const start = Math.min(Math.max(page - Math.floor(PAGE_WINDOW / 2), 0), totalPages - size);
+  return Array.from({ length: size }, (_, i) => start + i);
+}
+
+/**
+ * 가운데 정렬된 페이지 넘김: 이전 · 번호 · 다음, 한 줄. 번호는 넓은 화면(md~)에서 10개 묶음, 휴대폰 폭에서는 지금 페이지를
+ * 가운데 둔 5개다(10개는 휴대폰 한 줄에 다 들어가지 않는다). 이전·다음은 한 페이지씩 움직인다. page 는 0부터, 화면 번호는 1부터.
  */
 function Pagination({ page, totalPages, totalElements, busy, onChange }: {
   page: number;
@@ -150,36 +167,38 @@ function Pagination({ page, totalPages, totalElements, busy, onChange }: {
   busy: boolean;
   onChange: (page: number) => void;
 }) {
-  const blockStart = Math.floor(page / PAGE_BLOCK) * PAGE_BLOCK;
-  const pages = Array.from({ length: Math.min(PAGE_BLOCK, totalPages - blockStart) }, (_, i) => blockStart + i);
   // 이전·다음은 테두리 있는 버튼(화살표 + 글자), 번호는 테두리 없는 칸(지금 페이지만 채움)으로 모양을 나눈다
-  const step = "inline-flex items-center gap-1 px-3 py-1 text-sm rounded-[var(--radius-control)] border border-[var(--line)] "
+  const step = "inline-flex shrink-0 items-center gap-1 px-3 py-1 text-sm rounded-[var(--radius-control)] border border-[var(--line)] "
     + "text-[var(--text-body)] hover:bg-[var(--blue-soft)] disabled:opacity-40 disabled:hover:bg-transparent";
   const number = "min-w-[2rem] h-8 px-1.5 text-sm rounded-[var(--radius-control)] disabled:opacity-40";
+  const numbers = (pages: number[], className: string) => (
+    <div className={`items-center justify-center gap-0.5 ${className}`}>
+      {pages.map((p) => (
+        <button
+          key={p}
+          type="button"
+          onClick={() => onChange(p)}
+          disabled={busy}
+          aria-current={p === page ? "page" : undefined}
+          className={`${number} ${
+            p === page
+              ? "bg-[var(--blue)] text-white font-semibold"
+              : "text-[var(--text-muted)] hover:bg-[var(--blue-soft)] hover:text-[var(--blue)]"
+          }`}
+        >
+          {p + 1}
+        </button>
+      ))}
+    </div>
+  );
   return (
     <nav className="flex flex-col items-center gap-1" aria-label="평가 셋 라벨 페이지">
-      <div className="flex flex-wrap items-center justify-center gap-2">
+      <div className="flex items-center justify-center gap-1 md:gap-2">
         <button type="button" onClick={() => onChange(page - 1)} disabled={busy || page === 0} className={step}>
           <span aria-hidden="true">‹</span> 이전
         </button>
-        <div className="flex flex-wrap items-center justify-center gap-0.5">
-          {pages.map((p) => (
-            <button
-              key={p}
-              type="button"
-              onClick={() => onChange(p)}
-              disabled={busy}
-              aria-current={p === page ? "page" : undefined}
-              className={`${number} ${
-                p === page
-                  ? "bg-[var(--blue)] text-white font-semibold"
-                  : "text-[var(--text-muted)] hover:bg-[var(--blue-soft)] hover:text-[var(--blue)]"
-              }`}
-            >
-              {p + 1}
-            </button>
-          ))}
-        </div>
+        {numbers(windowPages(page, totalPages), "flex md:hidden")}
+        {numbers(blockPages(page, totalPages), "hidden md:flex")}
         <button type="button" onClick={() => onChange(page + 1)} disabled={busy || page + 1 >= totalPages} className={step}>
           다음 <span aria-hidden="true">›</span>
         </button>
@@ -192,49 +211,61 @@ function Pagination({ page, totalPages, totalElements, busy, onChange }: {
 }
 
 /**
- * 라벨 쌍 표. 수정은 한 번에 하나만 보낸다(저장 중에는 모든 줄의 버튼을 막는다).
+ * 라벨 쌍 목록. 태블릿 이상(md, 768px~)은 표로, 휴대폰 폭은 카드로 보여 준다 — 표의 짧은 칸 고정 너비 합이
+ * 휴대폰 화면보다 넓어 표가 무너지고, 안쪽 좌우 스크롤도 쓰지 않기로 했기 때문이다(CSS 로 둘 중 하나만 보인다).
+ * 수정은 한 번에 하나만 보낸다(저장 중에는 모든 쌍의 버튼을 막는다).
  * 순번은 지금 조건(셋·라벨 필터)의 목록에서 몇 번째인지다(1부터, 페이지를 넘겨도 이어진다).
  */
 function EvalLabelTable({ pairs, startIndex }: { pairs: EvalLabelPair[]; startIndex: number }) {
   const update = useUpdateEvalLabel();
+  const saveOf = (p: EvalLabelPair) => (label: HumanLabel, reason: string, callbacks: SaveCallbacks) =>
+    update.mutate({ id: p.id, body: { label, reason } }, callbacks);
   return (
-    <table className={TABLE}>
-      <colgroup>
-        {COLUMNS.map((w, i) => <col key={i} style={w ? { width: w } : undefined} />)}
-      </colgroup>
-      <thead>
-        <tr>
-          <th className={`${TH} ${NOWRAP}`}>순번</th>
-          <th className={`${TH} ${NOWRAP}`}>관계<br />간격</th>
-          <th className={TH}>알림 A</th>
-          <th className={TH}>알림 B</th>
-          <th className={`${TH} ${NOWRAP}`}>라벨</th>
-          <th className={`${TH} ${NOWRAP}`}>기준 시점<br />마지막 수정</th>
-          <th className={`${TH} ${NOWRAP}`}>이력</th>
-        </tr>
-      </thead>
-      <tbody>
+    <>
+      <table className={`${TABLE} hidden md:table`}>
+        <colgroup>
+          {COLUMNS.map((w, i) => <col key={i} style={w ? { width: w } : undefined} />)}
+        </colgroup>
+        <thead>
+          <tr>
+            <th className={`${TH} ${NOWRAP}`}>순번</th>
+            <th className={`${TH} ${NOWRAP}`}>관계<br />간격</th>
+            <th className={TH}>알림 A</th>
+            <th className={TH}>알림 B</th>
+            <th className={`${TH} ${NOWRAP}`}>라벨</th>
+            <th className={`${TH} ${NOWRAP}`}>기준 시점<br />마지막 수정</th>
+            <th className={`${TH} ${NOWRAP}`}>이력</th>
+          </tr>
+        </thead>
+        <tbody>
+          {pairs.map((p, i) => (
+            <EvalLabelRow key={p.id} pair={p} index={startIndex + i + 1} saving={update.isPending} onSave={saveOf(p)} />
+          ))}
+        </tbody>
+      </table>
+      <ul className="space-y-3 md:hidden">
         {pairs.map((p, i) => (
-          <EvalLabelRow key={p.id} pair={p} index={startIndex + i + 1} saving={update.isPending}
-            onSave={(label, reason, callbacks) => update.mutate({ id: p.id, body: { label, reason } }, callbacks)} />
+          <EvalLabelCard key={p.id} pair={p} index={startIndex + i + 1} saving={update.isPending} onSave={saveOf(p)} />
         ))}
-      </tbody>
-    </table>
+      </ul>
+    </>
   );
 }
 
 type SaveCallbacks = { onSuccess: () => void; onError: (e: unknown) => void };
-
-/**
- * 라벨 쌍 한 줄. 지금 라벨과 다른 버튼을 누르면 사유 입력 모달이 뜨고, 사유를 적고 저장해야 바뀐다.
- * 같은 라벨을 누르면 아무것도 하지 않는다(서버도 같은 라벨은 바꾸지 않는다). 이력 "보기"도 모달로 띄운다.
- */
-function EvalLabelRow({ pair, index, saving, onSave }: {
+type PairProps = {
   pair: EvalLabelPair;
   index: number;
   saving: boolean;
   onSave: (label: HumanLabel, reason: string, callbacks: SaveCallbacks) => void;
-}) {
+};
+
+/**
+ * 쌍 하나의 편집 상태와 모달. 표의 줄과 휴대폰 카드가 같이 쓴다.
+ * 지금 라벨과 다른 버튼을 누르면 사유 입력 모달이 뜨고, 사유를 적고 저장해야 바뀐다.
+ * 같은 라벨을 누르면 아무것도 하지 않는다(서버도 같은 라벨은 바꾸지 않는다). 이력 보기도 모달로 띄운다.
+ */
+function usePairEditor({ pair, index, saving, onSave }: PairProps) {
   const [draft, setDraft] = useState<HumanLabel | null>(null);
   const [reason, setReason] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -257,6 +288,70 @@ function EvalLabelRow({ pair, index, saving, onSave }: {
     });
   };
 
+  const modals = (
+    <>
+      {draft && (
+        <ReasonModal index={index} pair={pair} from={pair.label} to={draft} reason={reason} saving={saving}
+          error={error} onReasonChange={setReason} onSave={save} onCancel={cancel} />
+      )}
+      {historyOpen && <HistoryModal index={index} pair={pair} onClose={() => setHistoryOpen(false)} />}
+    </>
+  );
+  return { draft, choose, openHistory: () => setHistoryOpen(true), modals };
+}
+
+/** 라벨 버튼 3개. 지금 라벨은 채우고, 모달에서 고르는 중인 라벨은 옅게 표시한다. */
+function LabelButtons({ pair, draft, saving, onChoose }: {
+  pair: EvalLabelPair;
+  draft: HumanLabel | null;
+  saving: boolean;
+  onChoose: (label: HumanLabel) => void;
+}) {
+  return (
+    <div className="flex flex-wrap gap-1" role="group" aria-label={`라벨 쌍 #${pair.id} 라벨`}>
+      {HUMAN_LABEL_OPTIONS.map((o) => {
+        const current = pair.label === o.value;
+        const chosen = draft === o.value;
+        return (
+          <button
+            key={o.value}
+            type="button"
+            aria-pressed={current}
+            disabled={saving}
+            onClick={() => onChoose(o.value)}
+            className={`px-2 py-0.5 text-xs rounded-[var(--radius-control)] border disabled:opacity-40 ${NOWRAP} ${
+              current
+                ? "border-[var(--blue)] bg-[var(--blue)] text-white"
+                : chosen
+                  ? "border-[var(--blue)] text-[var(--blue)] bg-[var(--blue-soft)]"
+                  : "border-[var(--line)] text-[var(--text-body)] hover:bg-[var(--blue-soft)]"
+            }`}
+          >
+            {o.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function HistoryButton({ label, onClick }: { label: string; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      aria-haspopup="dialog"
+      onClick={onClick}
+      className={`px-2 py-0.5 text-xs border border-[var(--line)] rounded-[var(--radius-control)] hover:bg-[var(--blue-soft)] ${NOWRAP}`}
+    >
+      {label}
+    </button>
+  );
+}
+
+/** 표의 한 줄(태블릿 이상). */
+function EvalLabelRow(props: PairProps) {
+  const { pair, index, saving } = props;
+  const editor = usePairEditor(props);
   return (
     <>
       <tr>
@@ -268,68 +363,56 @@ function EvalLabelRow({ pair, index, saving, onSave }: {
         <td className={TD}><AlertCell alert={pair.alertA} fluid /></td>
         <td className={TD}><AlertCell alert={pair.alertB} fluid /></td>
         <td className={TD}>
-          <div className="flex flex-wrap gap-1" role="group" aria-label={`라벨 쌍 #${pair.id} 라벨`}>
-            {HUMAN_LABEL_OPTIONS.map((o) => {
-              const current = pair.label === o.value;
-              const chosen = draft === o.value;
-              return (
-                <button
-                  key={o.value}
-                  type="button"
-                  aria-pressed={current}
-                  disabled={saving}
-                  onClick={() => choose(o.value)}
-                  className={`px-2 py-0.5 text-xs rounded-[var(--radius-control)] border disabled:opacity-40 ${NOWRAP} ${
-                    current
-                      ? "border-[var(--blue)] bg-[var(--blue)] text-white"
-                      : chosen
-                        ? "border-[var(--blue)] text-[var(--blue)] bg-[var(--blue-soft)]"
-                        : "border-[var(--line)] text-[var(--text-body)] hover:bg-[var(--blue-soft)]"
-                  }`}
-                >
-                  {o.label}
-                </button>
-              );
-            })}
-          </div>
+          <LabelButtons pair={pair} draft={editor.draft} saving={saving} onChoose={editor.choose} />
         </td>
         <td className={`${TD} ${NOWRAP}`}>
           <div>{pair.criteriaDate ?? "-"}</div>
           <div className="text-xs text-[var(--text-muted)]">{pair.updatedAt ? formatDateTime(pair.updatedAt) : "고친 적 없음"}</div>
         </td>
         <td className={`${TD} ${NOWRAP}`}>
-          <button
-            type="button"
-            aria-haspopup="dialog"
-            onClick={() => setHistoryOpen(true)}
-            className="px-2 py-0.5 text-xs border border-[var(--line)] rounded-[var(--radius-control)] hover:bg-[var(--blue-soft)]"
-          >
-            보기
-          </button>
+          <HistoryButton label="보기" onClick={editor.openHistory} />
         </td>
       </tr>
-      {draft && (
-        <ReasonModal
-          index={index}
-          pair={pair}
-          from={pair.label}
-          to={draft}
-          reason={reason}
-          saving={saving}
-          error={error}
-          onReasonChange={setReason}
-          onSave={save}
-          onCancel={cancel}
-        />
-      )}
-      {historyOpen && <HistoryModal index={index} pair={pair} onClose={() => setHistoryOpen(false)} />}
+      {editor.modals}
     </>
   );
 }
 
+/** 휴대폰 폭의 카드 하나. 표의 칸을 위에서 아래로 쌓는다: 순번·관계·간격 → 두 알림 원문 → 라벨 버튼·이력 → 기준 시점·수정. */
+function EvalLabelCard(props: PairProps) {
+  const { pair, index, saving } = props;
+  const editor = usePairEditor(props);
+  return (
+    <li className="space-y-3 rounded-[var(--radius-control)] border border-[var(--line)] p-3 text-sm">
+      <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+        <span className="font-semibold text-[var(--ink)]">{index}번</span>
+        <span className="text-xs text-[var(--text-muted)]">
+          {pair.relation ? RELATION_LABEL[pair.relation] : "관계 없음"} · 간격 {formatGap(pair.alertA.sentAt, pair.alertB.sentAt)}
+        </span>
+      </div>
+      {[{ name: "알림 A", alert: pair.alertA }, { name: "알림 B", alert: pair.alertB }].map(({ name, alert }) => (
+        <div key={name}>
+          <div className="mb-1 text-xs font-medium text-[var(--text-muted)]">{name}</div>
+          <AlertCell alert={alert} fluid />
+        </div>
+      ))}
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <LabelButtons pair={pair} draft={editor.draft} saving={saving} onChoose={editor.choose} />
+        <HistoryButton label="이력 보기" onClick={editor.openHistory} />
+      </div>
+      <div className="text-xs text-[var(--text-muted)]">
+        기준 시점 {pair.criteriaDate ?? "-"} · {pair.updatedAt ? `마지막 수정 ${formatDateTime(pair.updatedAt)}` : "고친 적 없음"}
+      </div>
+      {editor.modals}
+    </li>
+  );
+}
+
 /**
- * 이 화면의 모달 공통 틀: 어두운 배경 + 가운데 상자, Esc·바깥 클릭으로 닫기(closable 이 false 면 닫지 않음).
- * body 아래로 그린다(createPortal) — 표의 tbody 안에 div 를 둘 수 없고, 표의 overflow·z-index 에 갇히지 않게.
+ * 이 화면의 모달 공통 틀. 브라우저 기본 모달(<dialog> 의 showModal)을 써서,
+ * 모달이 열려 있는 동안 뒤 화면은 키보드로도 누를 수 없고(Tab 이 모달 안에서만 돈다) 다른 줄의 모달이 겹쳐 열리지 않는다.
+ * Esc 와 바깥(배경) 클릭으로 닫히고, closable 이 false(저장 중)면 닫히지 않는다. 닫히면 모달을 연 버튼으로 포커스를 돌려준다.
+ * body 아래로 그린다(createPortal) — 표의 tbody 안에 dialog 를 둘 수 없어서다.
  */
 function ModalShell({ titleId, closable, onClose, children }: {
   titleId: string;
@@ -337,26 +420,42 @@ function ModalShell({ titleId, closable, onClose, children }: {
   onClose: () => void;
   children: React.ReactNode;
 }) {
+  const ref = useRef<HTMLDialogElement>(null);
+
+  // 마운트할 때 모달로 열고, 사라질 때 닫은 뒤 연 버튼으로 포커스를 돌려준다
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && closable) onClose();
+    const dialog = ref.current;
+    if (!dialog) return;
+    const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    if (!dialog.open) dialog.showModal();
+    return () => {
+      if (dialog.open) dialog.close();
+      opener?.focus();
     };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [closable, onClose]);
+  }, []);
+
+  // 바깥 클릭: 배경을 누르면 클릭 대상이 dialog 자신이고 좌표가 상자 밖이다(상자 안 여백 클릭과 구분)
+  const onBackdropClick = (e: React.MouseEvent<HTMLDialogElement>) => {
+    if (!closable || e.target !== e.currentTarget) return;
+    const box = e.currentTarget.getBoundingClientRect();
+    const inside = e.clientX >= box.left && e.clientX <= box.right && e.clientY >= box.top && e.clientY <= box.bottom;
+    if (!inside) onClose();
+  };
 
   return createPortal(
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => closable && onClose()}>
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby={titleId}
-        onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-2xl max-h-[90vh] overflow-y-auto space-y-4 rounded-[var(--radius-panel-card)] bg-[var(--surface)] p-6 shadow-[0_10px_30px_rgba(28,39,60,0.12)]"
-      >
-        {children}
-      </div>
-    </div>,
+    <dialog
+      ref={ref}
+      aria-labelledby={titleId}
+      // Esc 는 브라우저가 cancel 이벤트로 알린다. 기본 동작(바로 닫기)을 막고 상태로 닫는다 — 저장 중에는 닫지 않는다
+      onCancel={(e) => {
+        e.preventDefault();
+        if (closable) onClose();
+      }}
+      onClick={onBackdropClick}
+      className="m-auto w-[calc(100%-2rem)] max-w-2xl max-h-[90vh] overflow-y-auto rounded-[var(--radius-panel-card)] border-0 bg-[var(--surface)] p-6 text-[var(--text-body)] shadow-[0_10px_30px_rgba(28,39,60,0.12)] backdrop:bg-black/40"
+    >
+      <div className="space-y-4">{children}</div>
+    </dialog>,
     document.body,
   );
 }
