@@ -107,10 +107,10 @@ public class ClusteringAdminController {
         return ResponseEntity.ok(ApiResponse.success(dailyCheckService.problemAlerts(date)));
     }
 
-    /** 평가 셋 사람 라벨 목록. dataset·label 은 선택 필터, size 는 1~100(기본 20). */
+    /** 평가 셋 사람 라벨 목록. dataset(평가 셋 이름)은 필수, label 은 선택 필터, size 는 1~100(기본 20). */
     @GetMapping("/eval-labels")
     public ResponseEntity<ApiResponse<EvalLabelsResponse>> evalLabels(
-            @RequestParam(required = false) String dataset,
+            @RequestParam String dataset,
             @RequestParam(required = false) Label label,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {

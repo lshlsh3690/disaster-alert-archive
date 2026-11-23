@@ -49,13 +49,17 @@ public class EvaluationLabelService {
     private final DisasterAlertService disasterAlertService;
 
     /**
-     * 라벨 목록. dataset·label 은 주면 그 값으로만 거르고 생략하면 거르지 않는다.
-     * labelCounts 는 label 필터와 상관없이 그 셋(셋을 안 주면 전체) 기준이다.
+     * 평가 셋 하나의 라벨 목록. label 은 주면 그 값으로만 거르고 생략하면 거르지 않는다.
+     * labelCounts 는 label 필터와 상관없이 그 셋 전체 기준이다. 셋 이름은 필수다 — 여러 셋이 섞이면 문항 번호가 겹쳐
+     * 화면에서 구분할 수 없고, 다른 셋의 라벨을 고칠 수 있다.
      *
-     * @throws CustomException page·size 범위를 벗어나면 {@code INVALID_REQUEST}
+     * @throws CustomException 셋 이름이 비었거나 page·size 범위를 벗어나면 {@code INVALID_REQUEST}
      */
     @Transactional(readOnly = true)
     public EvalLabelsResponse list(String dataset, Label label, int page, int size) {
+        if (dataset == null || dataset.isBlank()) {
+            throw new CustomException(ErrorCode.INVALID_REQUEST, "dataset(평가 셋 이름)이 필요합니다");
+        }
         if (page < 0 || size < 1 || size > MAX_PAGE_SIZE) {
             throw new CustomException(ErrorCode.INVALID_REQUEST, "page 는 0 이상, size 는 1~" + MAX_PAGE_SIZE);
         }
@@ -81,7 +85,8 @@ public class EvaluationLabelService {
      * @throws CustomException 없는 id 면 {@code EVAL_LABEL_NOT_FOUND}
      */
     public EvalLabelResponse update(Long memberId, long id, EvalLabelUpdateRequest request) {
-        EvaluationLabel label = labelRepository.findById(id)
+        // 0) 행을 잠그고 읽는다 — 동시 수정이 같은 옛 라벨을 읽고 이력을 두 줄 남기지 않게(먼저 온 쪽이 끝날 때까지 기다림)
+        EvaluationLabel label = labelRepository.findForUpdateById(id)
                 .orElseThrow(() -> new CustomException(ErrorCode.EVAL_LABEL_NOT_FOUND));
         // 1) 판단이 안 바뀌었으면 이력·수정자를 남기지 않는다 — 진짜 수정 이력이 "바뀐 적 없는 기록"에 묻히지 않게
         if (label.getLabel() == request.label()) {
@@ -98,18 +103,13 @@ public class EvaluationLabelService {
     }
 
     private Page<EvaluationLabel> findPage(String dataset, Label label, Pageable pageable) {
-        if (dataset == null) {
-            return label == null ? labelRepository.findAll(pageable) : labelRepository.findByLabel(label, pageable);
-        }
         return label == null
                 ? labelRepository.findByDataset(dataset, pageable)
                 : labelRepository.findByDatasetAndLabel(dataset, label, pageable);
     }
 
     private EvalLabelsResponse.LabelCounts countLabels(String dataset) {
-        Function<Label, Long> count = dataset == null
-                ? labelRepository::countByLabel
-                : l -> labelRepository.countByDatasetAndLabel(dataset, l);
+        Function<Label, Long> count = l -> labelRepository.countByDatasetAndLabel(dataset, l);
         return new EvalLabelsResponse.LabelCounts(count.apply(Label.SAME), count.apply(Label.DIFF), count.apply(Label.UNSURE));
     }
 
