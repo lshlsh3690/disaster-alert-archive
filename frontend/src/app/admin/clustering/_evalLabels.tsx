@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { isAxiosError } from "axios";
 import type { EvalLabelPair, EvalLabelRelation, HumanLabel } from "@/api/clusteringAdminApi";
 import { useUpdateEvalLabel } from "@/lib/mutations/useUpdateEvalLabel";
@@ -22,7 +23,6 @@ const TD = "px-2 py-2 border-b border-[var(--line)] align-top [overflow-wrap:any
 // 짧은 칸은 고정 너비 + 줄바꿈 금지로 두고(좁은 화면에서 "1/0"·"보/기"처럼 글자가 쪼개지지 않게),
 // 남는 너비는 너비를 정하지 않은 두 알림 칸이 반씩 나눠 갖는다. 순서: 순번·관계/간격·알림 A·알림 B·라벨·기준/수정·이력
 const COLUMNS: (string | undefined)[] = ["3rem", "7rem", undefined, undefined, "7.5rem", "7rem", "4rem"];
-const COLUMN_COUNT = COLUMNS.length;
 const NOWRAP = "whitespace-nowrap [overflow-wrap:normal]";
 
 const RELATION_LABEL: Record<EvalLabelRelation, string> = {
@@ -124,28 +124,70 @@ export function EvalLabelsSection() {
         <EvalLabelTable pairs={list.data.pairs} startIndex={list.data.page * list.data.size} />
       )}
       {list.data && list.data.totalPages > 1 && (
-        <div className="flex items-center gap-2 text-sm">
-          <button
-            onClick={() => setPage((p) => Math.max(0, p - 1))}
-            disabled={page === 0}
-            className="px-3 py-1 border border-[var(--line)] rounded-[var(--radius-control)] disabled:opacity-40"
-          >
-            이전
-          </button>
-          <span className="text-[var(--text-muted)]">
-            {page + 1} / {list.data.totalPages} (총 {formatNumber(list.data.totalElements)}쌍)
-          </span>
-          <button
-            onClick={() => setPage((p) => p + 1)}
-            // 이전 응답(placeholder)의 totalPages 로 넘어가면 새 조건에 없는 빈 페이지를 요청하게 된다
-            disabled={list.isPlaceholderData || page + 1 >= list.data.totalPages}
-            className="px-3 py-1 border border-[var(--line)] rounded-[var(--radius-control)] disabled:opacity-40"
-          >
-            다음
-          </button>
-        </div>
+        <Pagination
+          page={page}
+          totalPages={list.data.totalPages}
+          totalElements={list.data.totalElements}
+          // 이전 응답(placeholder)의 totalPages 로 넘어가면 새 조건에 없는 빈 페이지를 요청하게 된다 — 불러오는 동안 이동을 막는다
+          busy={list.isPlaceholderData}
+          onChange={setPage}
+        />
       )}
     </Section>
+  );
+}
+
+const PAGE_BLOCK = 10;
+
+/**
+ * 가운데 정렬된 페이지 넘김: 이전 · 번호 10개 묶음 · 다음. 번호는 지금 페이지가 든 10개 묶음(1~10, 11~20 …)을 보인다.
+ * 이전·다음은 한 페이지씩 움직이고, 묶음 끝에서 넘어가면 다음 묶음 번호가 보인다. page 는 0부터, 화면 번호는 1부터.
+ */
+function Pagination({ page, totalPages, totalElements, busy, onChange }: {
+  page: number;
+  totalPages: number;
+  totalElements: number;
+  busy: boolean;
+  onChange: (page: number) => void;
+}) {
+  const blockStart = Math.floor(page / PAGE_BLOCK) * PAGE_BLOCK;
+  const pages = Array.from({ length: Math.min(PAGE_BLOCK, totalPages - blockStart) }, (_, i) => blockStart + i);
+  // 이전·다음은 테두리 있는 버튼(화살표 + 글자), 번호는 테두리 없는 칸(지금 페이지만 채움)으로 모양을 나눈다
+  const step = "inline-flex items-center gap-1 px-3 py-1 text-sm rounded-[var(--radius-control)] border border-[var(--line)] "
+    + "text-[var(--text-body)] hover:bg-[var(--blue-soft)] disabled:opacity-40 disabled:hover:bg-transparent";
+  const number = "min-w-[2rem] h-8 px-1.5 text-sm rounded-[var(--radius-control)] disabled:opacity-40";
+  return (
+    <nav className="flex flex-col items-center gap-1" aria-label="평가 셋 라벨 페이지">
+      <div className="flex flex-wrap items-center justify-center gap-2">
+        <button type="button" onClick={() => onChange(page - 1)} disabled={busy || page === 0} className={step}>
+          <span aria-hidden="true">‹</span> 이전
+        </button>
+        <div className="flex flex-wrap items-center justify-center gap-0.5">
+          {pages.map((p) => (
+            <button
+              key={p}
+              type="button"
+              onClick={() => onChange(p)}
+              disabled={busy}
+              aria-current={p === page ? "page" : undefined}
+              className={`${number} ${
+                p === page
+                  ? "bg-[var(--blue)] text-white font-semibold"
+                  : "text-[var(--text-muted)] hover:bg-[var(--blue-soft)] hover:text-[var(--blue)]"
+              }`}
+            >
+              {p + 1}
+            </button>
+          ))}
+        </div>
+        <button type="button" onClick={() => onChange(page + 1)} disabled={busy || page + 1 >= totalPages} className={step}>
+          다음 <span aria-hidden="true">›</span>
+        </button>
+      </div>
+      <span className="text-xs text-[var(--text-muted)]">
+        {page + 1} / {totalPages} 페이지 · 총 {formatNumber(totalElements)}쌍
+      </span>
+    </nav>
   );
 }
 
@@ -184,9 +226,8 @@ function EvalLabelTable({ pairs, startIndex }: { pairs: EvalLabelPair[]; startIn
 type SaveCallbacks = { onSuccess: () => void; onError: (e: unknown) => void };
 
 /**
- * 라벨 쌍 한 줄. 지금 라벨과 다른 버튼을 누르면 그 줄 아래에 사유 입력 줄이 표 전체 폭으로 열리고, 사유를 적고 저장해야 바뀐다.
- * 같은 라벨을 누르면 아무것도 하지 않는다(서버도 같은 라벨은 바꾸지 않는다). 이력 "보기"도 그 줄 아래에 펼친다.
- * 입력 칸을 좁은 라벨 칸 안에 두지 않는 이유: 태블릿 폭에서 입력 칸과 버튼이 쓸 수 없을 만큼 좁아진다.
+ * 라벨 쌍 한 줄. 지금 라벨과 다른 버튼을 누르면 사유 입력 모달이 뜨고, 사유를 적고 저장해야 바뀐다.
+ * 같은 라벨을 누르면 아무것도 하지 않는다(서버도 같은 라벨은 바꾸지 않는다). 이력 "보기"도 모달로 띄운다.
  */
 function EvalLabelRow({ pair, index, saving, onSave }: {
   pair: EvalLabelPair;
@@ -259,61 +300,173 @@ function EvalLabelRow({ pair, index, saving, onSave }: {
         <td className={`${TD} ${NOWRAP}`}>
           <button
             type="button"
-            aria-expanded={historyOpen}
-            onClick={() => setHistoryOpen((v) => !v)}
+            aria-haspopup="dialog"
+            onClick={() => setHistoryOpen(true)}
             className="px-2 py-0.5 text-xs border border-[var(--line)] rounded-[var(--radius-control)] hover:bg-[var(--blue-soft)]"
           >
-            {historyOpen ? "닫기" : "보기"}
+            보기
           </button>
         </td>
       </tr>
-      {(draft || error) && (
-        <tr>
-          <td className={TD} colSpan={COLUMN_COUNT}>
-            {draft && (
-              <div className="space-y-1">
-                <p className="text-xs text-[var(--text-muted)]">
-                  {index}번 쌍의 라벨을 바꿉니다: {LABEL_TEXT[pair.label]} → {LABEL_TEXT[draft]}. 바꾸는 사유를 적어 주세요.
-                </p>
-                <textarea
-                  aria-label="바꾸는 사유"
-                  value={reason}
-                  onChange={(e) => setReason(e.target.value)}
-                  rows={2}
-                  className="w-full border border-[var(--line)] rounded-[var(--radius-control)] px-2 py-1 text-sm bg-[var(--surface)] text-[var(--text-body)]"
-                />
-                <div className="flex gap-1">
-                  <button
-                    type="button"
-                    onClick={save}
-                    disabled={saving || reason.trim() === ""}
-                    className="px-3 py-1 text-xs rounded-[var(--radius-control)] border border-[var(--blue)] bg-[var(--blue)] text-white disabled:opacity-40"
-                  >
-                    {saving ? "저장 중…" : "저장"}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={cancel}
-                    disabled={saving}
-                    className="px-3 py-1 text-xs rounded-[var(--radius-control)] border border-[var(--line)] text-[var(--text-body)] disabled:opacity-40"
-                  >
-                    취소
-                  </button>
-                </div>
-              </div>
-            )}
-            {error && <p className="text-xs text-[var(--coral)]">{error}</p>}
-          </td>
-        </tr>
+      {draft && (
+        <ReasonModal
+          index={index}
+          pair={pair}
+          from={pair.label}
+          to={draft}
+          reason={reason}
+          saving={saving}
+          error={error}
+          onReasonChange={setReason}
+          onSave={save}
+          onCancel={cancel}
+        />
       )}
-      {historyOpen && (
-        <tr>
-          <td className={TD} colSpan={COLUMN_COUNT}>
-            <EvalLabelHistory id={pair.id} />
-          </td>
-        </tr>
-      )}
+      {historyOpen && <HistoryModal index={index} pair={pair} onClose={() => setHistoryOpen(false)} />}
     </>
+  );
+}
+
+/**
+ * 이 화면의 모달 공통 틀: 어두운 배경 + 가운데 상자, Esc·바깥 클릭으로 닫기(closable 이 false 면 닫지 않음).
+ * body 아래로 그린다(createPortal) — 표의 tbody 안에 div 를 둘 수 없고, 표의 overflow·z-index 에 갇히지 않게.
+ */
+function ModalShell({ titleId, closable, onClose, children }: {
+  titleId: string;
+  closable: boolean;
+  onClose: () => void;
+  children: React.ReactNode;
+}) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && closable) onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [closable, onClose]);
+
+  return createPortal(
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => closable && onClose()}>
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        onClick={(e) => e.stopPropagation()}
+        className="w-full max-w-2xl max-h-[90vh] overflow-y-auto space-y-4 rounded-[var(--radius-panel-card)] bg-[var(--surface)] p-6 shadow-[0_10px_30px_rgba(28,39,60,0.12)]"
+      >
+        {children}
+      </div>
+    </div>,
+    document.body,
+  );
+}
+
+/** 모달 위쪽의 두 알림 원문(나란히, 좁은 화면에서는 위아래). 표로 돌아가지 않고 판단을 다시 확인하게 한다. */
+function PairAlerts({ pair }: { pair: EvalLabelPair }) {
+  return (
+    <div className="grid gap-3 sm:grid-cols-2 text-sm">
+      {[{ name: "알림 A", alert: pair.alertA }, { name: "알림 B", alert: pair.alertB }].map(({ name, alert }) => (
+        <div key={name} className="rounded-[var(--radius-control)] border border-[var(--line)] p-3">
+          <div className="mb-1 text-xs font-medium text-[var(--text-muted)]">{name}</div>
+          <AlertCell alert={alert} fluid />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function pairFacts(pair: EvalLabelPair): string {
+  return `${pair.relation ? RELATION_LABEL[pair.relation] : "관계 없음"} · 간격 ${formatGap(pair.alertA.sentAt, pair.alertB.sentAt)}`;
+}
+
+/** 라벨을 바꿀 때 사유를 받는 모달. 사유가 비면 저장할 수 없고, 저장 중에는 닫을 수 없다. 실패 이유는 모달 안에 보인다. */
+function ReasonModal({ index, pair, from, to, reason, saving, error, onReasonChange, onSave, onCancel }: {
+  index: number;
+  pair: EvalLabelPair;
+  from: HumanLabel;
+  to: HumanLabel;
+  reason: string;
+  saving: boolean;
+  error: string | null;
+  onReasonChange: (value: string) => void;
+  onSave: () => void;
+  onCancel: () => void;
+}) {
+  const titleId = `eval-label-reason-${pair.id}`;
+  return (
+    <ModalShell titleId={titleId} closable={!saving} onClose={onCancel}>
+      <div className="space-y-1">
+        <h3 id={titleId} className="text-base font-semibold text-[var(--ink)]">{index}번 쌍 라벨 바꾸기</h3>
+        <p className="text-sm text-[var(--text-body)]">
+          <span className="text-[var(--text-muted)]">{LABEL_TEXT[from]}</span>
+          {" → "}
+          <span className="font-semibold text-[var(--blue)]">{LABEL_TEXT[to]}</span>
+          <span className="text-[var(--text-muted)]"> · {pairFacts(pair)}</span>
+        </p>
+      </div>
+      <PairAlerts pair={pair} />
+      <div className="space-y-1">
+        <label htmlFor={`${titleId}-reason`} className="text-sm font-medium text-[var(--ink)]">
+          바꾸는 사유 <span className="text-[var(--coral)]">*</span>
+        </label>
+        <textarea
+          id={`${titleId}-reason`}
+          value={reason}
+          onChange={(e) => onReasonChange(e.target.value)}
+          rows={3}
+          autoFocus
+          placeholder="예: 같은 화재의 발생과 진화 안내라 같은 사건"
+          className="w-full rounded-[var(--radius-control)] border border-[var(--line)] bg-[var(--surface)] px-3 py-2 text-sm text-[var(--text-body)]"
+        />
+        {error && <p className="text-sm text-[var(--coral)]">{error}</p>}
+      </div>
+      <div className="flex justify-end gap-2">
+        <button
+          type="button"
+          onClick={onCancel}
+          disabled={saving}
+          className="rounded-[var(--radius-control)] border border-[var(--line)] px-4 py-2 text-sm text-[var(--text-body)] disabled:opacity-40"
+        >
+          취소
+        </button>
+        <button
+          type="button"
+          onClick={onSave}
+          disabled={saving || reason.trim() === ""}
+          className="rounded-[var(--radius-control)] border border-[var(--blue)] bg-[var(--blue)] px-4 py-2 text-sm text-white disabled:opacity-40"
+        >
+          {saving ? "저장 중…" : "저장"}
+        </button>
+      </div>
+    </ModalShell>
+  );
+}
+
+/** 라벨 하나의 변경 이력을 띄우는 모달. 현재 라벨·기준 시점과 두 알림 원문을 함께 보여 준다. */
+function HistoryModal({ index, pair, onClose }: { index: number; pair: EvalLabelPair; onClose: () => void }) {
+  const titleId = `eval-label-history-${pair.id}`;
+  return (
+    <ModalShell titleId={titleId} closable onClose={onClose}>
+      <div className="space-y-1">
+        <h3 id={titleId} className="text-base font-semibold text-[var(--ink)]">{index}번 쌍 라벨 이력</h3>
+        <p className="text-sm text-[var(--text-muted)]">
+          지금 라벨 <span className="font-semibold text-[var(--ink)]">{LABEL_TEXT[pair.label]}</span>
+          {" · "}기준 시점 {pair.criteriaDate ?? "-"} · {pairFacts(pair)}
+        </p>
+      </div>
+      <PairAlerts pair={pair} />
+      <EvalLabelHistory id={pair.id} />
+      <div className="flex justify-end">
+        <button
+          type="button"
+          onClick={onClose}
+          autoFocus
+          className="rounded-[var(--radius-control)] border border-[var(--line)] px-4 py-2 text-sm text-[var(--text-body)]"
+        >
+          닫기
+        </button>
+      </div>
+    </ModalShell>
   );
 }
 
