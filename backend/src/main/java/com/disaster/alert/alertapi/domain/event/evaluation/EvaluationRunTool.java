@@ -220,11 +220,11 @@ public class EvaluationRunTool implements ApplicationRunner {
         return new LabelSource(datasetName(path), LabelJson.parse(Files.readString(path, StandardCharsets.UTF_8)));
     }
 
-    // 관리자 화면에서 관리하는 평가 셋 라벨(evaluation_pair_label)을 셋 이름으로 읽는다. 문항 번호 순이라 리포트의 쌍 순서가 매번 같다.
+    // 관리자 화면에서 관리하는 평가 셋 라벨(evaluation_pair_label)을 셋 이름으로 읽는다. 넣은 순서(id)라 리포트의 쌍 순서가 매번 같다.
     // 평가는 로컬 사본에서 돌므로, 운영에서 라벨을 고쳤다면 그 라벨을 사본에 먼저 넣어야 한다(backend/evaluation/README.md).
     private LabelSource readDatasetFromDb(ApplicationArguments args) {
         String dataset = singleValue(args, "eval.dataset", "--eval.dataset=<평가 셋 이름, 예: cluster-eval-2026-11> 값이 비어 있습니다");
-        List<LabeledPair> pairs = evaluationLabelRepository.findByDatasetOrderByQAscIdAsc(dataset).stream()
+        List<LabeledPair> pairs = evaluationLabelRepository.findByDatasetOrderByIdAsc(dataset).stream()
                 .map(l -> new LabeledPair(l.getAlertAId(), l.getAlertBId(), l.getLabel()))
                 .toList();
         if (pairs.isEmpty()) {

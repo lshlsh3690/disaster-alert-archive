@@ -8,6 +8,8 @@ import com.disaster.alert.alertapi.domain.event.dto.ClusteringDashboardHardPairG
 import com.disaster.alert.alertapi.domain.event.dto.ClusteringDashboardJudgeVersionsResponse;
 import com.disaster.alert.alertapi.domain.event.dto.ClusteringPairLabelRequest;
 import com.disaster.alert.alertapi.domain.event.dto.ClusteringPairLabelResponse;
+import com.disaster.alert.alertapi.domain.event.dto.EvalLabelDatasetsResponse;
+import com.disaster.alert.alertapi.domain.event.dto.EvalLabelHistoryResponse;
 import com.disaster.alert.alertapi.domain.event.dto.EvalLabelResponse;
 import com.disaster.alert.alertapi.domain.event.dto.EvalLabelUpdateRequest;
 import com.disaster.alert.alertapi.domain.event.dto.EvalLabelsResponse;
@@ -105,6 +107,18 @@ public class ClusteringAdminController {
     public ResponseEntity<ApiResponse<ClusteringDashboardDailyCheckAlertsResponse>> dailyCheckAlerts(
             @PathVariable @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
         return ResponseEntity.ok(ApiResponse.success(dailyCheckService.problemAlerts(date)));
+    }
+
+    /** 평가 셋 목록(이름순). 셋마다 쌍 수·라벨별 개수·마지막 수정 시각. 화면이 셋을 고르는 데 쓴다. */
+    @GetMapping("/eval-labels/datasets")
+    public ResponseEntity<ApiResponse<EvalLabelDatasetsResponse>> evalLabelDatasets() {
+        return ResponseEntity.ok(ApiResponse.success(evaluationLabelService.datasets()));
+    }
+
+    /** 평가 셋 라벨 하나의 변경 이력(최신 먼저). */
+    @GetMapping("/eval-labels/{id}/history")
+    public ResponseEntity<ApiResponse<EvalLabelHistoryResponse>> evalLabelHistory(@PathVariable long id) {
+        return ResponseEntity.ok(ApiResponse.success(evaluationLabelService.history(id)));
     }
 
     /** 평가 셋 사람 라벨 목록. dataset(평가 셋 이름)은 필수, label 은 선택 필터, size 는 1~100(기본 20). */

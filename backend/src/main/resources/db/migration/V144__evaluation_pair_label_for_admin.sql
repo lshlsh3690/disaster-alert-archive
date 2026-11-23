@@ -20,11 +20,9 @@ ALTER TABLE evaluation_pair_label ALTER COLUMN stratum  DROP NOT NULL;
 ALTER TABLE evaluation_pair_label ALTER COLUMN sub_type DROP NOT NULL;
 
 -- 2) 관리자 화면용 열
--- q            : 평가 셋 문항 번호(JSON 의 q)
 -- relation     : 두 알림의 지역 관계 — 같은 시군구 / 인접 시군구
 -- criteria_date: 라벨을 매길 때의 판정 기준 시점(ClusteringCriteria.VERSION_DATE) — 기준이 바뀐 뒤 라벨과 구분하려고
 -- updated_by/at: 마지막으로 라벨을 고친 회원과 시각(고친 적 없으면 NULL)
-ALTER TABLE evaluation_pair_label ADD COLUMN q             INT;
 ALTER TABLE evaluation_pair_label ADD COLUMN relation      VARCHAR(16);
 ALTER TABLE evaluation_pair_label ADD COLUMN criteria_date DATE;
 ALTER TABLE evaluation_pair_label ADD COLUMN updated_by    BIGINT;

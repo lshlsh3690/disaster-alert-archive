@@ -20,7 +20,7 @@ public record EvalLabelsResponse(int page, int size, long totalElements, int tot
     }
 
     /** 라벨 쌍 하나. 알림을 찾을 수 없으면 AlertSummary 는 id 만 채워진다(화면은 "원문 없음"). */
-    public record Pair(long id, Integer q, Relation relation, Label label, LocalDate criteriaDate,
+    public record Pair(long id, Relation relation, Label label, LocalDate criteriaDate,
                        LocalDateTime updatedAt, AlertSummary alertA, AlertSummary alertB) {
     }
 }

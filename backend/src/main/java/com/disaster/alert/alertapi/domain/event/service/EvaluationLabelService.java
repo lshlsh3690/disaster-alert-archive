@@ -5,6 +5,8 @@ import com.disaster.alert.alertapi.domain.common.exception.ErrorCode;
 import com.disaster.alert.alertapi.domain.disasteralert.dto.AlertSummaryDto;
 import com.disaster.alert.alertapi.domain.disasteralert.service.DisasterAlertService;
 import com.disaster.alert.alertapi.domain.event.dto.ClusteringDashboardDisagreementsResponse.AlertSummary;
+import com.disaster.alert.alertapi.domain.event.dto.EvalLabelDatasetsResponse;
+import com.disaster.alert.alertapi.domain.event.dto.EvalLabelHistoryResponse;
 import com.disaster.alert.alertapi.domain.event.dto.EvalLabelResponse;
 import com.disaster.alert.alertapi.domain.event.dto.EvalLabelUpdateRequest;
 import com.disaster.alert.alertapi.domain.event.dto.EvalLabelsResponse;
@@ -41,12 +43,39 @@ import java.util.stream.Collectors;
 public class EvaluationLabelService {
 
     private static final int MAX_PAGE_SIZE = 100;
-    // 문항 번호 순, 같으면 id 순 — 화면에서 행이 매번 같은 자리에 나오게
-    private static final Sort ORDER = Sort.by(Sort.Order.asc("q"), Sort.Order.asc("id"));
+    // 넣은 순서(id) — 덤프를 원래 문항 순서대로 넣어 두었고, 화면에서 행이 매번 같은 자리에 나온다
+    private static final Sort ORDER = Sort.by(Sort.Order.asc("id"));
 
     private final EvaluationLabelRepository labelRepository;
     private final EvaluationLabelHistoryRepository historyRepository;
     private final DisasterAlertService disasterAlertService;
+
+    /** 셋 목록(이름순). 셋마다 쌍 수·라벨별 개수·마지막으로 라벨을 고친 시각. 라벨이 하나도 없으면 빈 목록이다. */
+    @Transactional(readOnly = true)
+    public EvalLabelDatasetsResponse datasets() {
+        List<EvalLabelDatasetsResponse.Dataset> datasets = labelRepository.summarizeDatasets().stream()
+                .map(d -> new EvalLabelDatasetsResponse.Dataset(d.getDataset(), d.getPairs(), d.getSame(), d.getDiff(),
+                        d.getUnsure(), d.getLastUpdatedAt()))
+                .toList();
+        return new EvalLabelDatasetsResponse(datasets);
+    }
+
+    /**
+     * 라벨 하나의 변경 이력(최신 먼저). 고친 적 없으면 빈 목록이다.
+     *
+     * @throws CustomException 없는 id 면 {@code EVAL_LABEL_NOT_FOUND}
+     */
+    @Transactional(readOnly = true)
+    public EvalLabelHistoryResponse history(long id) {
+        if (!labelRepository.existsById(id)) {
+            throw new CustomException(ErrorCode.EVAL_LABEL_NOT_FOUND);
+        }
+        List<EvalLabelHistoryResponse.Change> changes = historyRepository.findByLabelIdOrderByChangedAtDescIdDesc(id).stream()
+                .map(h -> new EvalLabelHistoryResponse.Change(h.getOldLabel(), h.getNewLabel(), h.getReason(),
+                        h.getChangedBy(), h.getChangedAt()))
+                .toList();
+        return new EvalLabelHistoryResponse(id, changes);
+    }
 
     /**
      * 평가 셋 하나의 라벨 목록. label 은 주면 그 값으로만 거르고 생략하면 거르지 않는다.
@@ -114,7 +143,7 @@ public class EvaluationLabelService {
     }
 
     private static EvalLabelsResponse.Pair toPair(EvaluationLabel r, Map<Long, AlertSummaryDto> summaries) {
-        return new EvalLabelsResponse.Pair(r.getId(), r.getQ(), r.getRelation(), r.getLabel(), r.getCriteriaDate(),
+        return new EvalLabelsResponse.Pair(r.getId(), r.getRelation(), r.getLabel(), r.getCriteriaDate(),
                 r.getUpdatedAt(), summaryOf(r.getAlertAId(), summaries), summaryOf(r.getAlertBId(), summaries));
     }
 

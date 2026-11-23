@@ -42,10 +42,6 @@ public class EvaluationLabel extends BaseTimeEntity {
     @Column(name = "dataset", nullable = false, length = 50)
     private String dataset;
 
-    /** 평가 셋 문항 번호 */
-    @Column(name = "q")
-    private Integer q;
-
     @Column(name = "alert_a_id", nullable = false)
     private long alertAId;
 
