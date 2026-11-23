@@ -223,3 +223,81 @@ export async function fetchClusteringJudgeVersions(): Promise<ClusteringJudgeVer
   const res = await instance.get(`${BASE}/judge-versions`, { headers: AUTH });
   return res.data.data as ClusteringJudgeVersionsResponse;
 }
+
+// ---- 평가 셋 라벨(evaluation_pair_label) — 클러스터링 평가의 정답을 관리자 화면에서 보고 고친다 ----
+
+/** 두 알림의 지역 관계. 옛 행에는 없어 null 일 수 있다. */
+export type EvalLabelRelation = "SAME_SIGUNGU" | "ADJACENT_SIGUNGU";
+
+/** 평가 셋 하나의 요약. lastUpdatedAt 은 라벨을 고친 적 없으면 null. */
+export type EvalLabelDataset = {
+  name: string;
+  pairs: number;
+  same: number;
+  diff: number;
+  unsure: number;
+  lastUpdatedAt: string | null;
+};
+
+export type EvalLabelDatasetsResponse = { datasets: EvalLabelDataset[] };
+
+/** 라벨 쌍 하나. criteriaDate 는 라벨을 매긴(마지막으로 고친) 때의 판정 기준 시점, updatedAt 은 고친 적 없으면 null. */
+export type EvalLabelPair = {
+  id: number;
+  relation: EvalLabelRelation | null;
+  label: HumanLabel;
+  criteriaDate: string | null;
+  updatedAt: string | null;
+  alertA: ClusteringAlertSummary;
+  alertB: ClusteringAlertSummary;
+};
+
+/** labelCounts 는 label 필터와 상관없이 그 셋 전체 기준. */
+export type EvalLabelsResponse = {
+  page: number;
+  size: number;
+  totalElements: number;
+  totalPages: number;
+  labelCounts: { same: number; diff: number; unsure: number };
+  pairs: EvalLabelPair[];
+};
+
+export type EvalLabelsParams = { dataset: string; label?: HumanLabel | null; page?: number; size?: number };
+
+/** 사유는 필수(공백만이면 서버가 400). 기준 시점·수정자는 서버가 붙인다. */
+export type UpdateEvalLabelRequest = { label: HumanLabel; reason: string };
+
+export type EvalLabelResponse = { id: number; label: HumanLabel; criteriaDate: string | null; updatedAt: string | null };
+
+/** 변경 한 번. changedBy 는 바꾼 관리자의 회원 id. */
+export type EvalLabelChange = { oldLabel: HumanLabel; newLabel: HumanLabel; reason: string; changedBy: number; changedAt: string };
+
+export type EvalLabelHistoryResponse = { labelId: number; changes: EvalLabelChange[] };
+
+/** 평가 셋 목록(이름순). */
+export async function fetchEvalLabelDatasets(): Promise<EvalLabelDatasetsResponse> {
+  const res = await instance.get(`${BASE}/eval-labels/datasets`, { headers: AUTH });
+  return res.data.data as EvalLabelDatasetsResponse;
+}
+
+/** 평가 셋 하나의 라벨 목록(넣은 순서). label 이 없으면 파라미터를 빼서 모든 라벨을 받는다. */
+export async function fetchEvalLabels(params: EvalLabelsParams): Promise<EvalLabelsResponse> {
+  const { dataset, label, page = 0, size = 20 } = params;
+  const res = await instance.get(`${BASE}/eval-labels`, {
+    params: { dataset, page, size, ...(label ? { label } : {}) },
+    headers: AUTH,
+  });
+  return res.data.data as EvalLabelsResponse;
+}
+
+/** 라벨을 고친다. 같은 라벨이면 서버가 아무것도 바꾸지 않고 현재 값을 돌려준다. */
+export async function updateEvalLabel(id: number, body: UpdateEvalLabelRequest): Promise<EvalLabelResponse> {
+  const res = await instance.put(`${BASE}/eval-labels/${id}`, body, { headers: AUTH });
+  return res.data.data as EvalLabelResponse;
+}
+
+/** 라벨 하나의 변경 이력(최신 먼저). */
+export async function fetchEvalLabelHistory(id: number): Promise<EvalLabelHistoryResponse> {
+  const res = await instance.get(`${BASE}/eval-labels/${id}/history`, { headers: AUTH });
+  return res.data.data as EvalLabelHistoryResponse;
+}

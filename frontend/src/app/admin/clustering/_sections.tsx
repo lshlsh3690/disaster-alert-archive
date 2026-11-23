@@ -16,9 +16,9 @@ import { formatDateTime, formatNumber, formatRatio } from "./_format";
 
 // 관리자 클러스터링 화면의 네 영역. 모두 읽기 전용이고 이미 기록된 값만 보여 준다(새 LLM 호출 없음).
 
-const TABLE = "w-full text-sm border-collapse";
-const TH = "px-3 py-2 text-left font-medium text-[var(--text-muted)] border-b border-[var(--line)] whitespace-nowrap";
-const TD = "px-3 py-2 border-b border-[var(--line)] align-top whitespace-nowrap";
+export const TABLE = "w-full text-sm border-collapse";
+export const TH = "px-3 py-2 text-left font-medium text-[var(--text-muted)] border-b border-[var(--line)] whitespace-nowrap";
+export const TD = "px-3 py-2 border-b border-[var(--line)] align-top whitespace-nowrap";
 
 const STATUS_LABEL: Record<DayStatus, string> = {
   SCORED: "채점됨",
@@ -44,7 +44,7 @@ export function Section({ title, description, children }: { title: string; descr
 }
 
 // 실패하면 서버가 준 이유(예: 조회 범위 오류)를 함께 보인다. 이유가 없으면 고정 문구만
-function QueryState({ isLoading, error }: { isLoading: boolean; error: unknown }) {
+export function QueryState({ isLoading, error }: { isLoading: boolean; error: unknown }) {
   if (isLoading) return <p className="text-sm text-[var(--text-muted)]">불러오는 중…</p>;
   if (!error) return null;
   const message = isAxiosError(error) ? (error.response?.data as { message?: string } | undefined)?.message : undefined;
@@ -111,12 +111,13 @@ export function DailyScoresSection({ from, to }: { from: string; to: string }) {
   );
 }
 
-function AlertCell({ alert }: { alert: ClusteringAlertSummary }) {
+// fluid 면 최소·최대 너비 없이 칸 너비에 맞춰 줄바꿈한다(칸 비율을 고정한 표에서 쓴다)
+export function AlertCell({ alert, fluid = false }: { alert: ClusteringAlertSummary; fluid?: boolean }) {
   if (alert.message === null) {
     return <span className="text-[var(--text-muted)]">#{alert.id} · 원문 없음</span>;
   }
   return (
-    <div className="space-y-1 whitespace-normal min-w-[16rem] max-w-[28rem]">
+    <div className={`space-y-1 whitespace-normal ${fluid ? "[overflow-wrap:anywhere]" : "min-w-[16rem] max-w-[28rem]"}`}>
       <div className="text-xs text-[var(--text-muted)]">
         #{alert.id} · {formatDateTime(alert.sentAt)} · {alert.type ?? "-"}
       </div>
@@ -125,7 +126,7 @@ function AlertCell({ alert }: { alert: ClusteringAlertSummary }) {
   );
 }
 
-const HUMAN_LABEL_OPTIONS: { value: HumanLabel; label: string }[] = [
+export const HUMAN_LABEL_OPTIONS: { value: HumanLabel; label: string }[] = [
   { value: "SAME", label: "같은 사건" },
   { value: "DIFF", label: "다른 사건" },
   { value: "UNSURE", label: "모르겠음" },
