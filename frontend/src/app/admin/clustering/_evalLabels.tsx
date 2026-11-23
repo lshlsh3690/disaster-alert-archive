@@ -421,14 +421,18 @@ function ModalShell({ titleId, closable, onClose, children }: {
   children: React.ReactNode;
 }) {
   const ref = useRef<HTMLDialogElement>(null);
+  // 언마운트 정리에서 직접 닫는 중인지. 그때 오는 close 이벤트는 브라우저가 닫은 것이 아니라 무시한다
+  const unmountingRef = useRef(false);
 
   // 마운트할 때 모달로 열고, 사라질 때 닫은 뒤 연 버튼으로 포커스를 돌려준다
   useEffect(() => {
     const dialog = ref.current;
     if (!dialog) return;
+    unmountingRef.current = false;
     const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     if (!dialog.open) dialog.showModal();
     return () => {
+      unmountingRef.current = true;
       if (dialog.open) dialog.close();
       opener?.focus();
     };
@@ -450,6 +454,15 @@ function ModalShell({ titleId, closable, onClose, children }: {
       onCancel={(e) => {
         e.preventDefault();
         if (closable) onClose();
+      }}
+      // 그래도 브라우저가 닫는 경우가 있다 — Chrome 은 Esc 를 연달아 누르면 두 번째 cancel 을 막지 못하게 하고 바로 닫는다.
+      // 그대로 두면 dialog 만 닫히고 상태는 열림이라, 저장 실패 문구가 안 보이고 라벨 버튼을 눌러도 다시 열리지 않는다.
+      // 닫아도 되면 상태도 닫고, 저장 중이면 다시 연다. 이미 다시 열린 뒤 늦게 온 이벤트(StrictMode 재마운트)는 무시한다
+      onClose={(e) => {
+        const dialog = e.currentTarget;
+        if (unmountingRef.current || dialog.open) return;
+        if (closable) onClose();
+        else dialog.showModal();
       }}
       onClick={onBackdropClick}
       className="m-auto w-[calc(100%-2rem)] max-w-2xl max-h-[90vh] overflow-y-auto rounded-[var(--radius-panel-card)] border-0 bg-[var(--surface)] p-6 text-[var(--text-body)] shadow-[0_10px_30px_rgba(28,39,60,0.12)] backdrop:bg-black/40"
