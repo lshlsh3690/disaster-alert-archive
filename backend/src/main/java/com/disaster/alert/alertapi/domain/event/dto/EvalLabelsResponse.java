@@ -11,8 +11,6 @@ import java.util.List;
 /**
  * 관리자 화면 "평가 셋 라벨" 목록 응답. 라벨 쌍을 페이지로 나눠 두 알림 원문과 함께 담고,
  * labelCounts 는 필터와 상관없이 그 평가 셋 전체의 라벨별 개수다.
- *
- * <p>Red 단계 뼈대 - 값을 담는 구조만 있다.
  */
 public record EvalLabelsResponse(int page, int size, long totalElements, int totalPages,
                                  LabelCounts labelCounts, List<Pair> pairs) {
