@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { isAxiosError } from "axios";
 import type { EvalLabelPair, EvalLabelRelation, HumanLabel } from "@/api/clusteringAdminApi";
 import { useUpdateEvalLabel } from "@/lib/mutations/useUpdateEvalLabel";
@@ -19,8 +19,11 @@ const PAGE_SIZE = 20;
 const TABLE = "w-full table-fixed text-sm border-collapse";
 const TH = "px-2 py-2 text-left font-medium text-[var(--text-muted)] border-b border-[var(--line)] align-bottom";
 const TD = "px-2 py-2 border-b border-[var(--line)] align-top [overflow-wrap:anywhere]";
-// 칸 비율(합 100%). 원문이 긴 두 알림 칸에 가장 많이 준다
-const COLUMNS = ["4%", "7%", "7%", "26%", "26%", "13%", "11%", "6%"];
+// 짧은 칸은 고정 너비 + 줄바꿈 금지로 두고(좁은 화면에서 "1/0"·"보/기"처럼 글자가 쪼개지지 않게),
+// 남는 너비는 너비를 정하지 않은 두 알림 칸이 반씩 나눠 갖는다. 순서: 순번·관계/간격·알림 A·알림 B·라벨·기준/수정·이력
+const COLUMNS: (string | undefined)[] = ["3rem", "7rem", undefined, undefined, "7.5rem", "7rem", "4rem"];
+const COLUMN_COUNT = COLUMNS.length;
+const NOWRAP = "whitespace-nowrap [overflow-wrap:normal]";
 
 const RELATION_LABEL: Record<EvalLabelRelation, string> = {
   SAME_SIGUNGU: "같은 시군구",
@@ -152,91 +155,53 @@ export function EvalLabelsSection() {
  */
 function EvalLabelTable({ pairs, startIndex }: { pairs: EvalLabelPair[]; startIndex: number }) {
   const update = useUpdateEvalLabel();
-  const [openHistory, setOpenHistory] = useState<number | null>(null);
-
   return (
-    <div>
-      <table className={TABLE}>
-        <colgroup>
-          {COLUMNS.map((w, i) => <col key={i} style={{ width: w }} />)}
-        </colgroup>
-        <thead>
-          <tr>
-            <th className={TH}>순번</th>
-            <th className={TH}>관계</th>
-            <th className={TH}>간격</th>
-            <th className={TH}>알림 A</th>
-            <th className={TH}>알림 B</th>
-            <th className={TH}>라벨</th>
-            <th className={TH}>기준 시점 · 마지막 수정</th>
-            <th className={TH}>이력</th>
-          </tr>
-        </thead>
-        <tbody>
-          {pairs.map((p, i) => (
-            <Fragment key={p.id}>
-              <tr>
-                <td className={TD}>{startIndex + i + 1}</td>
-                <td className={TD}>{p.relation ? RELATION_LABEL[p.relation] : "-"}</td>
-                <td className={TD}>{formatGap(p.alertA.sentAt, p.alertB.sentAt)}</td>
-                <td className={TD}><AlertCell alert={p.alertA} fluid /></td>
-                <td className={TD}><AlertCell alert={p.alertB} fluid /></td>
-                <td className={TD}>
-                  <LabelEditor pair={p} saving={update.isPending} onSave={(label, reason, callbacks) =>
-                    update.mutate({ id: p.id, body: { label, reason } }, callbacks)} />
-                </td>
-                <td className={TD}>
-                  <div>{p.criteriaDate ?? "-"}</div>
-                  <div className="text-xs text-[var(--text-muted)]">{p.updatedAt ? formatDateTime(p.updatedAt) : "고친 적 없음"}</div>
-                </td>
-                <td className={TD}>
-                  <button
-                    type="button"
-                    aria-expanded={openHistory === p.id}
-                    onClick={() => setOpenHistory((id) => (id === p.id ? null : p.id))}
-                    className="px-2 py-0.5 text-xs border border-[var(--line)] rounded-[var(--radius-control)] hover:bg-[var(--blue-soft)]"
-                  >
-                    {openHistory === p.id ? "닫기" : "보기"}
-                  </button>
-                </td>
-              </tr>
-              {openHistory === p.id && (
-                <tr>
-                  <td className={TD} colSpan={8}>
-                    <EvalLabelHistory id={p.id} />
-                  </td>
-                </tr>
-              )}
-            </Fragment>
-          ))}
-        </tbody>
-      </table>
-    </div>
+    <table className={TABLE}>
+      <colgroup>
+        {COLUMNS.map((w, i) => <col key={i} style={w ? { width: w } : undefined} />)}
+      </colgroup>
+      <thead>
+        <tr>
+          <th className={`${TH} ${NOWRAP}`}>순번</th>
+          <th className={`${TH} ${NOWRAP}`}>관계<br />간격</th>
+          <th className={TH}>알림 A</th>
+          <th className={TH}>알림 B</th>
+          <th className={`${TH} ${NOWRAP}`}>라벨</th>
+          <th className={`${TH} ${NOWRAP}`}>기준 시점<br />마지막 수정</th>
+          <th className={`${TH} ${NOWRAP}`}>이력</th>
+        </tr>
+      </thead>
+      <tbody>
+        {pairs.map((p, i) => (
+          <EvalLabelRow key={p.id} pair={p} index={startIndex + i + 1} saving={update.isPending}
+            onSave={(label, reason, callbacks) => update.mutate({ id: p.id, body: { label, reason } }, callbacks)} />
+        ))}
+      </tbody>
+    </table>
   );
 }
 
 type SaveCallbacks = { onSuccess: () => void; onError: (e: unknown) => void };
 
 /**
- * 쌍 하나의 라벨 편집. 지금 라벨과 다른 버튼을 누르면 사유 입력 칸이 열리고, 사유를 적고 저장해야 바뀐다.
- * 같은 라벨을 누르면 아무것도 하지 않는다(서버도 같은 라벨은 바꾸지 않는다).
+ * 라벨 쌍 한 줄. 지금 라벨과 다른 버튼을 누르면 그 줄 아래에 사유 입력 줄이 표 전체 폭으로 열리고, 사유를 적고 저장해야 바뀐다.
+ * 같은 라벨을 누르면 아무것도 하지 않는다(서버도 같은 라벨은 바꾸지 않는다). 이력 "보기"도 그 줄 아래에 펼친다.
+ * 입력 칸을 좁은 라벨 칸 안에 두지 않는 이유: 태블릿 폭에서 입력 칸과 버튼이 쓸 수 없을 만큼 좁아진다.
  */
-function LabelEditor({ pair, saving, onSave }: {
+function EvalLabelRow({ pair, index, saving, onSave }: {
   pair: EvalLabelPair;
+  index: number;
   saving: boolean;
   onSave: (label: HumanLabel, reason: string, callbacks: SaveCallbacks) => void;
 }) {
   const [draft, setDraft] = useState<HumanLabel | null>(null);
   const [reason, setReason] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [historyOpen, setHistoryOpen] = useState(false);
 
   const choose = (value: HumanLabel) => {
     setError(null);
-    if (value === pair.label) {
-      setDraft(null);
-      return;
-    }
-    setDraft(value);
+    setDraft(value === pair.label ? null : value);
   };
   const cancel = () => {
     setDraft(null);
@@ -252,65 +217,103 @@ function LabelEditor({ pair, saving, onSave }: {
   };
 
   return (
-    <div className="space-y-1">
-      <div className="flex flex-wrap gap-1" role="group" aria-label={`라벨 쌍 #${pair.id} 라벨`}>
-        {HUMAN_LABEL_OPTIONS.map((o) => {
-          const current = pair.label === o.value;
-          const chosen = draft === o.value;
-          return (
-            <button
-              key={o.value}
-              type="button"
-              aria-pressed={current}
-              disabled={saving}
-              onClick={() => choose(o.value)}
-              className={`px-2 py-0.5 text-xs rounded-[var(--radius-control)] border disabled:opacity-40 ${
-                current
-                  ? "border-[var(--blue)] bg-[var(--blue)] text-white"
-                  : chosen
-                    ? "border-[var(--blue)] text-[var(--blue)] bg-[var(--blue-soft)]"
-                    : "border-[var(--line)] text-[var(--text-body)] hover:bg-[var(--blue-soft)]"
-              }`}
-            >
-              {o.label}
-            </button>
-          );
-        })}
-      </div>
-      {draft && (
-        <div className="space-y-1">
-          <p className="text-xs text-[var(--text-muted)]">
-            {LABEL_TEXT[pair.label]} → {LABEL_TEXT[draft]} 로 바꿉니다. 사유를 적어 주세요.
-          </p>
-          <textarea
-            aria-label="바꾸는 사유"
-            value={reason}
-            onChange={(e) => setReason(e.target.value)}
-            rows={2}
-            className="w-full border border-[var(--line)] rounded-[var(--radius-control)] px-2 py-1 text-xs bg-[var(--surface)] text-[var(--text-body)]"
-          />
-          <div className="flex gap-1">
-            <button
-              type="button"
-              onClick={save}
-              disabled={saving || reason.trim() === ""}
-              className="px-2 py-0.5 text-xs rounded-[var(--radius-control)] border border-[var(--blue)] bg-[var(--blue)] text-white disabled:opacity-40"
-            >
-              {saving ? "저장 중…" : "저장"}
-            </button>
-            <button
-              type="button"
-              onClick={cancel}
-              disabled={saving}
-              className="px-2 py-0.5 text-xs rounded-[var(--radius-control)] border border-[var(--line)] text-[var(--text-body)] disabled:opacity-40"
-            >
-              취소
-            </button>
+    <>
+      <tr>
+        <td className={`${TD} ${NOWRAP}`}>{index}</td>
+        <td className={`${TD} ${NOWRAP}`}>
+          <div>{pair.relation ? RELATION_LABEL[pair.relation] : "-"}</div>
+          <div className="text-xs text-[var(--text-muted)]">{formatGap(pair.alertA.sentAt, pair.alertB.sentAt)}</div>
+        </td>
+        <td className={TD}><AlertCell alert={pair.alertA} fluid /></td>
+        <td className={TD}><AlertCell alert={pair.alertB} fluid /></td>
+        <td className={TD}>
+          <div className="flex flex-wrap gap-1" role="group" aria-label={`라벨 쌍 #${pair.id} 라벨`}>
+            {HUMAN_LABEL_OPTIONS.map((o) => {
+              const current = pair.label === o.value;
+              const chosen = draft === o.value;
+              return (
+                <button
+                  key={o.value}
+                  type="button"
+                  aria-pressed={current}
+                  disabled={saving}
+                  onClick={() => choose(o.value)}
+                  className={`px-2 py-0.5 text-xs rounded-[var(--radius-control)] border disabled:opacity-40 ${NOWRAP} ${
+                    current
+                      ? "border-[var(--blue)] bg-[var(--blue)] text-white"
+                      : chosen
+                        ? "border-[var(--blue)] text-[var(--blue)] bg-[var(--blue-soft)]"
+                        : "border-[var(--line)] text-[var(--text-body)] hover:bg-[var(--blue-soft)]"
+                  }`}
+                >
+                  {o.label}
+                </button>
+              );
+            })}
           </div>
-        </div>
+        </td>
+        <td className={`${TD} ${NOWRAP}`}>
+          <div>{pair.criteriaDate ?? "-"}</div>
+          <div className="text-xs text-[var(--text-muted)]">{pair.updatedAt ? formatDateTime(pair.updatedAt) : "고친 적 없음"}</div>
+        </td>
+        <td className={`${TD} ${NOWRAP}`}>
+          <button
+            type="button"
+            aria-expanded={historyOpen}
+            onClick={() => setHistoryOpen((v) => !v)}
+            className="px-2 py-0.5 text-xs border border-[var(--line)] rounded-[var(--radius-control)] hover:bg-[var(--blue-soft)]"
+          >
+            {historyOpen ? "닫기" : "보기"}
+          </button>
+        </td>
+      </tr>
+      {(draft || error) && (
+        <tr>
+          <td className={TD} colSpan={COLUMN_COUNT}>
+            {draft && (
+              <div className="space-y-1">
+                <p className="text-xs text-[var(--text-muted)]">
+                  {index}번 쌍의 라벨을 바꿉니다: {LABEL_TEXT[pair.label]} → {LABEL_TEXT[draft]}. 바꾸는 사유를 적어 주세요.
+                </p>
+                <textarea
+                  aria-label="바꾸는 사유"
+                  value={reason}
+                  onChange={(e) => setReason(e.target.value)}
+                  rows={2}
+                  className="w-full border border-[var(--line)] rounded-[var(--radius-control)] px-2 py-1 text-sm bg-[var(--surface)] text-[var(--text-body)]"
+                />
+                <div className="flex gap-1">
+                  <button
+                    type="button"
+                    onClick={save}
+                    disabled={saving || reason.trim() === ""}
+                    className="px-3 py-1 text-xs rounded-[var(--radius-control)] border border-[var(--blue)] bg-[var(--blue)] text-white disabled:opacity-40"
+                  >
+                    {saving ? "저장 중…" : "저장"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={cancel}
+                    disabled={saving}
+                    className="px-3 py-1 text-xs rounded-[var(--radius-control)] border border-[var(--line)] text-[var(--text-body)] disabled:opacity-40"
+                  >
+                    취소
+                  </button>
+                </div>
+              </div>
+            )}
+            {error && <p className="text-xs text-[var(--coral)]">{error}</p>}
+          </td>
+        </tr>
       )}
-      {error && <p className="text-xs text-[var(--coral)]">{error}</p>}
-    </div>
+      {historyOpen && (
+        <tr>
+          <td className={TD} colSpan={COLUMN_COUNT}>
+            <EvalLabelHistory id={pair.id} />
+          </td>
+        </tr>
+      )}
+    </>
   );
 }
 
