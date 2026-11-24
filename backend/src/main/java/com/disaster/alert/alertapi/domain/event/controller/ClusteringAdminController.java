@@ -8,10 +8,17 @@ import com.disaster.alert.alertapi.domain.event.dto.ClusteringDashboardHardPairG
 import com.disaster.alert.alertapi.domain.event.dto.ClusteringDashboardJudgeVersionsResponse;
 import com.disaster.alert.alertapi.domain.event.dto.ClusteringPairLabelRequest;
 import com.disaster.alert.alertapi.domain.event.dto.ClusteringPairLabelResponse;
+import com.disaster.alert.alertapi.domain.event.dto.EvalLabelDatasetsResponse;
+import com.disaster.alert.alertapi.domain.event.dto.EvalLabelHistoryResponse;
+import com.disaster.alert.alertapi.domain.event.dto.EvalLabelResponse;
+import com.disaster.alert.alertapi.domain.event.dto.EvalLabelUpdateRequest;
+import com.disaster.alert.alertapi.domain.event.dto.EvalLabelsResponse;
+import com.disaster.alert.alertapi.domain.event.evaluation.LabelJson.Label;
 import com.disaster.alert.alertapi.domain.event.model.ClusteringDailyScorePair.Disagreement;
 import com.disaster.alert.alertapi.domain.event.service.ClusteringDailyCheckService;
 import com.disaster.alert.alertapi.domain.event.service.ClusteringDashboardService;
 import com.disaster.alert.alertapi.domain.event.service.ClusteringPairLabelService;
+import com.disaster.alert.alertapi.domain.event.service.EvaluationLabelService;
 import com.disaster.alert.alertapi.global.dto.ApiResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -47,6 +54,7 @@ public class ClusteringAdminController {
     private final ClusteringDashboardService dashboardService;
     private final ClusteringPairLabelService pairLabelService;
     private final ClusteringDailyCheckService dailyCheckService;
+    private final EvaluationLabelService evaluationLabelService;
 
     /** 날짜별 일일 채점. from·to 는 yyyy-MM-dd(양 끝 포함). */
     @GetMapping("/daily-scores")
@@ -99,6 +107,37 @@ public class ClusteringAdminController {
     public ResponseEntity<ApiResponse<ClusteringDashboardDailyCheckAlertsResponse>> dailyCheckAlerts(
             @PathVariable @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
         return ResponseEntity.ok(ApiResponse.success(dailyCheckService.problemAlerts(date)));
+    }
+
+    /** 평가 셋 목록(이름순). 셋마다 쌍 수·라벨별 개수·마지막 수정 시각. 화면이 셋을 고르는 데 쓴다. */
+    @GetMapping("/eval-labels/datasets")
+    public ResponseEntity<ApiResponse<EvalLabelDatasetsResponse>> evalLabelDatasets() {
+        return ResponseEntity.ok(ApiResponse.success(evaluationLabelService.datasets()));
+    }
+
+    /** 평가 셋 라벨 하나의 변경 이력(최신 먼저). */
+    @GetMapping("/eval-labels/{id}/history")
+    public ResponseEntity<ApiResponse<EvalLabelHistoryResponse>> evalLabelHistory(@PathVariable long id) {
+        return ResponseEntity.ok(ApiResponse.success(evaluationLabelService.history(id)));
+    }
+
+    /** 평가 셋 사람 라벨 목록. dataset(평가 셋 이름)은 필수, label 은 선택 필터, size 는 1~100(기본 20). */
+    @GetMapping("/eval-labels")
+    public ResponseEntity<ApiResponse<EvalLabelsResponse>> evalLabels(
+            @RequestParam String dataset,
+            @RequestParam(required = false) Label label,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        return ResponseEntity.ok(ApiResponse.success(evaluationLabelService.list(dataset, label, page, size)));
+    }
+
+    /** 평가 셋 라벨을 고친다. 사유 필수, 같은 라벨이면 아무것도 바꾸지 않는다. 회원 id 는 로그인 정보에서 온다. */
+    @PutMapping("/eval-labels/{id}")
+    public ResponseEntity<ApiResponse<EvalLabelResponse>> updateEvalLabel(
+            @AuthenticationPrincipal(expression = "id") Long memberId,
+            @PathVariable long id,
+            @Valid @RequestBody EvalLabelUpdateRequest request) {
+        return ResponseEntity.ok(ApiResponse.success(evaluationLabelService.update(memberId, id, request)));
     }
 
     /** 판사 버전 이력. */

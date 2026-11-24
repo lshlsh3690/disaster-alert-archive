@@ -6,6 +6,7 @@ import com.disaster.alert.alertapi.domain.event.evaluation.PairCounter.Observati
 import com.disaster.alert.alertapi.domain.event.evaluation.RecheckCandidateFinder.Rule;
 import com.disaster.alert.alertapi.domain.event.evaluation.ReportFormatter.Row;
 import com.disaster.alert.alertapi.domain.event.repository.ClusteringPairLabelRepository;
+import com.disaster.alert.alertapi.domain.event.repository.EvaluationLabelRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.ApplicationArguments;
@@ -28,12 +29,14 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalDouble;
 import java.util.Set;
+import java.util.stream.Stream;
 
 /**
  * 클러스터링 평가 실행 진입점. 사용법은 specs/006-clustering-evaluation/quickstart.md "실행" 절.
  *
  * <p>{@code --eval.labels} 라벨 JSON 을 읽어 DB 의 이벤트 배정과 비교하고,
- * {@code --eval.pair-labels-as-of=<ISO 시각>} 을 대신 주면 파일 없이 DB 에 저장된 불일치 쌍 사람 라벨(그 시각까지 저장·수정된 것)을 정답으로 쓴다
+ * {@code --eval.dataset=<셋 이름>} 을 주면 파일 대신 관리자 화면에서 관리하는 평가 셋 라벨(evaluation_pair_label)을,
+ * {@code --eval.pair-labels-as-of=<ISO 시각>} 을 주면 DB 에 저장된 불일치 쌍 사람 라벨(그 시각까지 저장·수정된 것)을 정답으로 쓴다
  * (둘 중 정확히 하나가 필수, 함께 주면 오류). {@code --eval.report}(선택) 경로에 마크다운 리포트를 쓴다. {@code --eval.bcubed}(선택)에 B-cubed 정답 JSON 을
  * 주면 알림 단위 점수 절이 리포트 맨 끝에 붙는다. {@code --eval.recheck=D,E,G,I}(선택)를 주면 채점 대신
  * 재확인 후보 목록({@link RecheckRunner})만 낸다. {@code --eval.judge-agreement}(선택, 값 없음)를 주면 채점 대신
@@ -49,6 +52,7 @@ public class EvaluationRunTool implements ApplicationRunner {
     private final RecheckRunner recheckRunner;
     private final JudgeAgreementRunner judgeAgreementRunner;
     private final ClusteringPairLabelRepository pairLabelRepository;
+    private final EvaluationLabelRepository evaluationLabelRepository;
     private final ConfigurableApplicationContext context;
 
     /** 평가에 쓸 라벨 쌍과 리포트 머리에 적을 데이터셋 이름. 파일·DB 어느 출처든 이 모양으로 모은다. */
@@ -59,6 +63,7 @@ public class EvaluationRunTool implements ApplicationRunner {
     public void run(ApplicationArguments args) throws IOException {
         // 1) 라벨을 먼저 끝까지 읽는다 - 형식 오류면 채점(DB 배정 조회)을 시작하기 전에 실패한다. 출처는 둘 중 하나다
         //    · 파일(--eval.labels): JSON 배열 [{"q":1,"label":"SAME","a":{"id":25154,...},"b":{"id":28106,...}}, ...]
+        //    · DB(--eval.dataset): 관리자 화면에서 관리하는 평가 셋 라벨(evaluation_pair_label), 셋 이름으로 고름
         //    · DB(--eval.pair-labels-as-of): 관리자가 대시보드에서 매긴 불일치 쌍 라벨(clustering_pair_label)
         //    → pairs   : [LabeledPair(25154, 28106, SAME), LabeledPair(24037, 28111, DIFF), ...]  (원문 등 사람이 보는 필드는 버림)
         //    이름과 쌍 목록만 출처에 따라 다르고, 이후 채점·리포트·재확인·판사 일치율 흐름은 둘이 똑같다
@@ -190,21 +195,43 @@ public class EvaluationRunTool implements ApplicationRunner {
         return values.get(0);
     }
 
-    // 라벨 출처를 정해 읽는다. 두 옵션 중 정확히 하나여야 한다 - 함께 주면 한쪽이 조용히 무시되고, 둘 다 없으면 정답이 없다
+    // 라벨 출처를 정해 읽는다. 세 옵션 중 정확히 하나여야 한다 - 함께 주면 한쪽이 조용히 무시되고, 하나도 없으면 정답이 없다
+    //   --eval.labels=<JSON 경로> / --eval.pair-labels-as-of=<ISO 시각>(불일치 쌍 라벨) / --eval.dataset=<셋 이름>(평가 셋 라벨, evaluation_pair_label)
     private LabelSource readLabelSource(ApplicationArguments args) throws IOException {
-        boolean fromDb = args.containsOption("eval.pair-labels-as-of");
-        if (fromDb && args.containsOption("eval.labels")) {
-            throw new IllegalArgumentException("--eval.labels 와 --eval.pair-labels-as-of 는 함께 쓸 수 없습니다");
+        List<String> given = Stream.of("eval.labels", "eval.pair-labels-as-of", "eval.dataset")
+                .filter(args::containsOption).toList();
+        if (given.size() > 1) {
+            throw new IllegalArgumentException("라벨 출처는 하나만 줄 수 있습니다(받은 옵션: --" + String.join(", --", given) + ")");
         }
-        if (fromDb) {
+        if (given.isEmpty()) {
+            throw new IllegalArgumentException("--eval.dataset=<평가 셋 이름>, --eval.labels=<라벨 JSON 경로>, "
+                    + "--eval.pair-labels-as-of=<ISO 시각> 중 하나가 필요합니다");
+        }
+        if (args.containsOption("eval.dataset")) {
+            return readDatasetFromDb(args);
+        }
+        if (args.containsOption("eval.pair-labels-as-of")) {
             return readLabelsFromDb(args);
         }
-        Path path = Path.of(singleValue(args, "eval.labels",
-                "--eval.labels=<라벨 JSON 경로> 또는 --eval.pair-labels-as-of=<ISO 시각> 이 필요합니다"));
+        Path path = Path.of(singleValue(args, "eval.labels", "--eval.labels=<라벨 JSON 경로> 값이 비어 있습니다"));
         if (!Files.isRegularFile(path)) {
             throw new IllegalArgumentException("라벨 JSON 파일이 없습니다: " + path);
         }
         return new LabelSource(datasetName(path), LabelJson.parse(Files.readString(path, StandardCharsets.UTF_8)));
+    }
+
+    // 관리자 화면에서 관리하는 평가 셋 라벨(evaluation_pair_label)을 셋 이름으로 읽는다. 넣은 순서(id)라 리포트의 쌍 순서가 매번 같다.
+    // 평가는 로컬 사본에서 돌므로, 운영에서 라벨을 고쳤다면 그 라벨을 사본에 먼저 넣어야 한다(backend/evaluation/README.md).
+    private LabelSource readDatasetFromDb(ApplicationArguments args) {
+        String dataset = singleValue(args, "eval.dataset", "--eval.dataset=<평가 셋 이름, 예: cluster-eval-2026-11> 값이 비어 있습니다");
+        List<LabeledPair> pairs = evaluationLabelRepository.findByDatasetOrderByIdAsc(dataset).stream()
+                .map(l -> new LabeledPair(l.getAlertAId(), l.getAlertBId(), l.getLabel()))
+                .toList();
+        if (pairs.isEmpty()) {
+            throw new IllegalArgumentException("평가 셋 '" + dataset + "' 의 라벨이 이 DB 에 없습니다 — "
+                    + "backend/evaluation/datasets/pair_label_data_*.sql 을 먼저 넣었는지 확인하세요");
+        }
+        return new LabelSource(dataset + " (DB, " + pairs.size() + "쌍)", pairs);
     }
 
     // DB 에 저장된 불일치 쌍 사람 라벨을 기준 시각의 묶음으로 읽는다. 0개면 채점하지 않고 멈춘다(빈 라벨로 점수를 내면 의미가 없다)
