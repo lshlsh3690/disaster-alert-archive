@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useAuthStore } from "@/store/authStore";
@@ -14,18 +14,36 @@ const TABS = [
   { href: "/admin/clustering/eval-labels", label: "평가 셋 라벨" },
 ];
 
-/** 접근할 수 없을 때 띄우는 안내 모달. 확인을 누르면 target 으로 이동한다(뒤로 가기로 다시 오지 않게 replace). */
+/**
+ * 접근할 수 없을 때 띄우는 안내 모달. 확인을 누르면 target 으로 이동한다(뒤로 가기로 다시 오지 않게 replace).
+ * 브라우저 기본 dialog 를 showModal() 로 열어 포커스를 모달 안에 가두고, 문구를 접근 가능한 이름으로 쓴다.
+ * 닫고 머무를 화면이 없으므로 Esc 로는 닫지 않고, 브라우저가 강제로 닫으면(Chrome 의 Esc 연타) 다시 연다.
+ */
 function RedirectNotice({ message, target }: { message: string; target: string }) {
   const router = useRouter();
+  const ref = useRef<HTMLDialogElement>(null);
+  useEffect(() => {
+    const dialog = ref.current;
+    if (dialog && !dialog.open) dialog.showModal();
+    return () => {
+      if (dialog?.open) dialog.close();
+    };
+  }, []);
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" role="dialog" aria-modal="true">
-      <div className="w-full max-w-sm space-y-4 rounded-[var(--radius-panel-card)] bg-[var(--surface)] p-6 text-center shadow-[0_10px_30px_rgba(28,39,60,0.12)]">
-        <p className="text-[var(--ink)]">{message}</p>
-        <Button fullWidth onClick={() => router.replace(target)} autoFocus>
-          확인
-        </Button>
-      </div>
-    </div>
+    <dialog
+      ref={ref}
+      aria-labelledby="redirect-notice-message"
+      onCancel={(e) => e.preventDefault()}
+      onClose={(e) => {
+        if (e.currentTarget.isConnected && !e.currentTarget.open) e.currentTarget.showModal();
+      }}
+      className="m-auto w-[calc(100%-2rem)] max-w-sm space-y-4 rounded-[var(--radius-panel-card)] border-0 bg-[var(--surface)] p-6 text-center shadow-[0_10px_30px_rgba(28,39,60,0.12)] backdrop:bg-black/40"
+    >
+      <p id="redirect-notice-message" className="text-[var(--ink)]">{message}</p>
+      <Button fullWidth onClick={() => router.replace(target)} autoFocus>
+        확인
+      </Button>
+    </dialog>
   );
 }
 
