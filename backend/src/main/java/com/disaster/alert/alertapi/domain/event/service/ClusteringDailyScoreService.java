@@ -243,14 +243,20 @@ public class ClusteringDailyScoreService {
                 p.eventA(), p.eventB(), disagreement);
     }
 
-    // 날짜별 요약 한 줄. 비율은 분자/분모로 적어 분모를 잃지 않는다(분모가 0 이어도 0/0 으로 그대로 보인다). 점수는 PairCountResult 의 값이다
+    // 날짜별 요약은 균형 정확도를 먼저 보인다. 두 비율은 분모가 0이어도 분자/분모를 남기며 저장 형식은 바꾸지 않는다.
     private static void logSummary(LocalDate date, ClusteringDailyScore d, PairCountResult counted) {
+        // 1) 대표 지표도 PairCounter의 결과를 사용해 리포트·조회와 계산 정의가 갈라지지 않게 한다.
+        String balancedAccuracy = counted.balancedAccuracy().isPresent()
+                ? String.format(Locale.ROOT, "%.1f%%", counted.balancedAccuracy().getAsDouble()) : "-";
         String score = counted.score().isPresent() ? String.format(Locale.ROOT, "%.1f", counted.score().getAsDouble()) : "-";
-        log.info("클러스터링 일일 채점 {}: 판정 {}쌍(UNSURE {}, 형식 실패 {}), 맞게 묶은 비율 {}/{}, 빠짐없이 묶은 비율 {}/{}, 점수 {}, "
+        // 2) 기존 F1과 판사 일치율은 보조 근거로 남긴다. 모르겠음·형식 실패 개수는 저장된 일일 집계에서 읽는다.
+        log.info("클러스터링 일일 채점 {}: 균형 정확도 {}, 빠짐없이 묶은 비율 {}/{}, 섞지 않은 비율 {}/{}, "
+                        + "보조 맞게 묶은 비율 {}/{}, F1 {}, 판정 {}쌍(UNSURE {}, 형식 실패 {}), "
                         + "판사 일치율(버전 {}) 같은 사건 {}/{}·다른 사건 {}/{}",
-                date, d.getPairCount(), d.getUnsureCount(), d.getFormatFailureCount(),
-                d.getCorrectlyMerged(), d.getCorrectlyMerged() + d.getOverMerged(),
-                d.getCorrectlyMerged(), d.getCorrectlyMerged() + d.getMissed(), score,
+                date, balancedAccuracy, counted.correctlyMerged(), counted.sameEventPairs(),
+                counted.correctlySeparated(), counted.differentEventPairs(),
+                counted.correctlyMerged(), counted.mergedPairs(), score,
+                d.getPairCount(), d.getUnsureCount(), d.getFormatFailureCount(),
                 d.getJudgeVersion(), d.getAgreementSameNum(), d.getAgreementSameDen(),
                 d.getAgreementDiffNum(), d.getAgreementDiffDen());
     }

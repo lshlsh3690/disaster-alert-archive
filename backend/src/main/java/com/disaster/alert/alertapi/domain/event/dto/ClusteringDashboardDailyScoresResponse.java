@@ -9,8 +9,7 @@ import java.util.List;
 
 /**
  * 관리자 대시보드 "날짜별 일일 채점" 응답(계약: specs/008 contracts 1절). 요청 범위의 모든 날이 최신 날짜 먼저로 들어간다.
- *
- * <p>Red 단계 뼈대 - 값을 담는 구조만 있고, 채우는 로직은 {@code ClusteringDashboardService} 의 Green 에서 쓴다.
+ * 맞게 나눔·섞지 않은 비율·균형 정확도는 기존 일일 집계에서 계산한 파생 값이다.
  */
 public record ClusteringDashboardDailyScoresResponse(LocalDate from, LocalDate to, List<Day> days) {
 
@@ -21,9 +20,9 @@ public record ClusteringDashboardDailyScoresResponse(LocalDate from, LocalDate t
     @JsonInclude(JsonInclude.Include.NON_NULL)
     public record Day(LocalDate date, DayStatus status,
                       Integer incidentCount, Integer pairCount,
-                      Integer correctlyMerged, Integer overMerged, Integer missed,
+                      Integer correctlyMerged, Integer overMerged, Integer missed, Integer correctlySeparated,
                       Integer unsureCount, Integer formatFailureCount,
-                      Ratio purity, Ratio completeness, Double score,
+                      Ratio purity, Ratio completeness, Ratio separation, Double balancedAccuracy, Double score,
                       Judge judge,
                       Long promptTokens, Long completionTokens, Double estimatedCostUsd) {
     }
