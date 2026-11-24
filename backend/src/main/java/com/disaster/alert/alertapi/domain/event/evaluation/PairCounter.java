@@ -56,7 +56,7 @@ public final class PairCounter {
                 wrong.add(new WrongPair(o.alertA(), o.alertB(), ErrorType.OVER_MERGED));
             }
         }
-        return new PairCountResult(correct, missed, over, unsure, unassigned,
+        return new PairCountResult(correct, missed, over, 0, unsure, unassigned,
                 rate(missed, correct + missed), rate(over, correct + over), wrong);
     }
 

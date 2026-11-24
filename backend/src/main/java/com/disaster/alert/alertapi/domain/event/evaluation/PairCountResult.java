@@ -7,10 +7,32 @@ import java.util.OptionalDouble;
  * PairCounter 가 세어 낸 결과. ReportFormatter 가 이 값을 읽어 리포트를 만든다.
  * 비율은 퍼센트 값(0~100)이고, 분모가 0 이면 empty 다.
  */
-public record PairCountResult(int correctlyMerged, int missed, int overMerged,
+public record PairCountResult(int correctlyMerged, int missed, int overMerged, int correctlySeparated,
                               int excludedUnsure, int excludedUnassigned,
                               OptionalDouble underMergeRate, OptionalDouble overMergeRate,
                               List<WrongPair> wrongPairs) {
+
+    // Red 단계 뼈대 — 구현은 Green 에서. 기존 여섯 집계만으로 맞게 나눔을 복원하는 진입점이다.
+    public static PairCountResult fromDailyCounts(int pairCount, int correctlyMerged, int missed,
+                                                   int overMerged, int unsureCount, int formatFailureCount) {
+        return new PairCountResult(0, 0, 0, 0, 0, 0,
+                OptionalDouble.empty(), OptionalDouble.empty(), List.of());
+    }
+
+    // Red 단계 뼈대 — 구현은 Green 에서. 다른 사건 쌍을 분모로 쓰는 비율이다.
+    public OptionalDouble separation() {
+        return OptionalDouble.empty();
+    }
+
+    // Red 단계 뼈대 — 구현은 Green 에서. 두 클래스의 정답률을 같은 비중으로 읽는 대표 지표다.
+    public OptionalDouble balancedAccuracy() {
+        return OptionalDouble.empty();
+    }
+
+    // Red 단계 뼈대 — 구현은 Green 에서. 과병합과 맞게 나눔이 속하는 전체 다른 사건 쌍이다.
+    public int differentEventPairs() {
+        return 0;
+    }
 
     /**
      * 맞게 묶은 비율(%) = 묶은 쌍 중 맞게 묶은 비율 = 맞게 묶음 ÷ (맞게 묶음 + 과병합). 과병합율의 반대편 수치다.

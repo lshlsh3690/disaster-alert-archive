@@ -241,7 +241,7 @@ public class ClusteringDashboardService {
         // 1) 저장된 개수로 PairCountResult 를 만들어 비율·점수 정의를 그쪽 한 곳에서 가져온다
         //    (과소병합/과병합 비율과 제외 미배정 칸은 이 화면이 쓰지 않아 비운다)
         PairCountResult counts = new PairCountResult(s.getCorrectlyMerged(), s.getMissed(), s.getOverMerged(),
-                s.getUnsureCount(), 0, OptionalDouble.empty(), OptionalDouble.empty(), List.of());
+                0, s.getUnsureCount(), 0, OptionalDouble.empty(), OptionalDouble.empty(), List.of());
         //    분모도 PairCountResult 에서 꺼내 분자/분모와 백분율이 같은 정의에서 나오게 한다
         Ratio purity = ClusteringDashboardMetrics.ratio(counts.correctlyMerged(), counts.mergedPairs());
         Ratio completeness = ClusteringDashboardMetrics.ratio(counts.correctlyMerged(), counts.sameEventPairs());
