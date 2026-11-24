@@ -43,10 +43,13 @@ export type ClusteringDailyScoreDay = {
   correctlyMerged?: number;
   overMerged?: number;
   missed?: number;
+  correctlySeparated?: number;
   unsureCount?: number;
   formatFailureCount?: number;
   purity?: Ratio;
   completeness?: Ratio;
+  separation?: Ratio;
+  balancedAccuracy?: number;
   score?: number;
   judge?: ClusteringJudge;
   promptTokens?: number;

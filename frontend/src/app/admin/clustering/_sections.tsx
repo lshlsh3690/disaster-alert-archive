@@ -51,7 +51,7 @@ export function QueryState({ isLoading, error }: { isLoading: boolean; error: un
   return <p className="text-sm text-[var(--coral)]">불러오지 못했습니다.{message ? ` (${message})` : ""}</p>;
 }
 
-/** 일일 채점 — 날짜마다 점수와 같은 줄에 그날 판사 버전·일치율을 둔다(점수만 따로 보이지 않게). */
+/** 일일 채점 — 균형 정확도를 먼저 보이고 같은 줄에 두 비율·보조 F1·그날 판사 일치율을 둔다. */
 export function DailyScoresSection({ from, to }: { from: string; to: string }) {
   const { data, isLoading, error } = useClusteringDailyScores(from, to);
   return (
@@ -66,9 +66,11 @@ export function DailyScoresSection({ from, to }: { from: string; to: string }) {
                 <th className={TH}>상태</th>
                 <th className={TH}>사건 알림</th>
                 <th className={TH}>판정 쌍</th>
-                <th className={TH}>맞게 묶은 비율</th>
+                <th className={TH}>균형 정확도</th>
                 <th className={TH}>빠짐없이 묶은 비율</th>
-                <th className={TH}>점수</th>
+                <th className={TH}>섞지 않은 비율</th>
+                <th className={TH}>맞게 묶은 비율</th>
+                <th className={TH}>F1</th>
                 <th className={TH}>과병합 / 과소병합</th>
                 <th className={TH}>UNSURE / 형식 실패</th>
                 <th className={TH}>판사</th>
@@ -83,13 +85,16 @@ export function DailyScoresSection({ from, to }: { from: string; to: string }) {
                   <td className={TD}>{d.date}</td>
                   <td className={TD}>{STATUS_LABEL[d.status]}</td>
                   {d.status === "NO_RECORD" ? (
-                    <td className={TD} colSpan={11}>-</td>
+                    <td className={TD} colSpan={13}>-</td>
                   ) : (
                     <>
                       <td className={TD}>{formatNumber(d.incidentCount)}</td>
                       <td className={TD}>{formatNumber(d.pairCount)}</td>
-                      <td className={TD}>{formatRatio(d.purity)}</td>
-                      <td className={TD}>{formatRatio(d.completeness)}</td>
+                      {/* 0%도 유효한 값이므로 계산 불가는 키가 생략됐는지로만 구별한다. */}
+                      <td className={TD}>{d.balancedAccuracy === undefined ? "계산할 수 없음" : `${d.balancedAccuracy.toFixed(1)}%`}</td>
+                      <td className={TD}>{d.completeness === undefined ? "계산할 수 없음" : formatRatio(d.completeness)}</td>
+                      <td className={TD}>{d.separation === undefined ? "계산할 수 없음" : formatRatio(d.separation)}</td>
+                      <td className={TD}>{d.purity === undefined ? "계산할 수 없음" : formatRatio(d.purity)}</td>
                       <td className={TD}>{d.score === undefined ? "계산할 수 없음" : d.score.toFixed(1)}</td>
                       <td className={TD}>{formatNumber(d.overMerged)} / {formatNumber(d.missed)}</td>
                       <td className={TD}>{formatNumber(d.unsureCount)} / {formatNumber(d.formatFailureCount)}</td>

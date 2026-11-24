@@ -11,7 +11,8 @@ import java.util.List;
 import java.util.OptionalDouble;
 
 /**
- * (라벨, 배정 여부, 같은 이벤트 여부) 관측을 세어 두 비율과 틀린 쌍 목록을 만든다.
+ * (라벨, 배정 여부, 같은 이벤트 여부) 관측을 세어 네 정오 범주와 틀린 쌍 목록을 만든다.
+ * 모르겠음·미배정 제외 규칙은 오프라인 평가와 운영 일일 채점에서 함께 쓴다.
  */
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
 public final class PairCounter {
@@ -23,10 +24,12 @@ public final class PairCounter {
     public record Observation(long alertA, long alertB, Label label, boolean assigned, boolean sameEvent) {
     }
 
+    /** 제외 쌍을 먼저 가른 뒤 맞게 묶음·과소병합·과병합·맞게 나눔을 같은 관측에서 센다. */
     public static PairCountResult count(List<Observation> observations) {
         int correct = 0;
         int missed = 0;
         int over = 0;
+        int separated = 0;
         int unsure = 0;
         int unassigned = 0;
         List<WrongPair> wrong = new ArrayList<>();
@@ -51,12 +54,15 @@ public final class PairCounter {
                     wrong.add(new WrongPair(o.alertA(), o.alertB(), ErrorType.MISSED));
                 }
             } else if (o.sameEvent()) {
-                // 4) 다른 사건인데 같은 이벤트면 과병합 (다른 이벤트는 어디에도 안 센다)
+                // 4) 다른 사건인데 같은 이벤트면 과병합 — 기존 틀린 쌍의 순서와 종류는 유지한다.
                 over++;
                 wrong.add(new WrongPair(o.alertA(), o.alertB(), ErrorType.OVER_MERGED));
+            } else {
+                // 5) 배정된 DIFF 쌍을 다른 이벤트에 둔 정답도 세어 섞지 않은 비율의 분자로 쓴다.
+                separated++;
             }
         }
-        return new PairCountResult(correct, missed, over, unsure, unassigned,
+        return new PairCountResult(correct, missed, over, separated, unsure, unassigned,
                 rate(missed, correct + missed), rate(over, correct + over), wrong);
     }
 

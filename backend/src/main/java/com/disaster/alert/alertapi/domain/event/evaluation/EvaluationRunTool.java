@@ -103,7 +103,7 @@ public class EvaluationRunTool implements ApplicationRunner {
 
         // 2) 쌍마다 두 알림의 이벤트 배정을 DB 에서 읽어 관측으로 만들고 센다
         //    pairs → 관측: [Observation(25154, 28106, SAME, assigned=true, sameEvent=false), ...]
-        //    관측 → result: PairCountResult(correctlyMerged=2, missed=2, overMerged=1, excludedUnsure=0,
+        //    관측 → result: PairCountResult(correctlyMerged=2, missed=2, overMerged=1, correctlySeparated=1, excludedUnsure=0,
         //                  excludedUnassigned=0, underMergeRate=50.0, overMergeRate=33.3, wrongPairs=[(25154,28106,MISSED), ...])
         PairCountResult result = PairCounter.count(pairs.stream().map(this::observe).toList());
 
@@ -114,8 +114,8 @@ public class EvaluationRunTool implements ApplicationRunner {
             return new Row(w.alertA(), w.alertB(), w.kind(), facts);
         }).toList();
 
-        // 4) 리포트는 항상 로그로, --eval.report 가 있으면 파일로도 쓴다
-        //    마크다운(줄 단위): '# 클러스터링 평가 - cluster-eval-2026-11' → '## 요약' → '- 점수 …점' → '- 맞게 묶은 비율 …%' → '- 빠짐없이 묶은 비율 …%' → 틀린 쌍 표
+        // 4) 리포트는 균형 정확도·두 비율·보조 F1·판단 없는 기준선 순이며(기준선은 포매터가 개수에서 구한다),
+        //    항상 로그로 쓰고 경로가 있으면 파일로도 쓴다.
         String report = ReportFormatter.format(dataset, LocalDateTime.now(), result, rows);
         //    알림 단위 점수는 쌍 리포트 맨 끝에 새 절로 붙인다 - 틀린 쌍 표의 위치가 흔들리지 않아 두 리포트를 diff 로 비교하기 쉽다
         if (bcubedGold != null) {

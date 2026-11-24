@@ -22,7 +22,7 @@ class PairCounterTest {
     // Red 단계: 뼈대는 모든 개수 0, 비율 empty, 틀린 쌍 없음 → correctlyMerged 기대(2)에서 실패한다.
     @Test
     void 가이드_예시_6쌍은_과소_50퍼센트_과병합_33점3퍼센트() {
-        // 준비: 쌍 1~2 맞게 묶음, 3~4 과소병합, 5 과병합, 6 은 어느 개수에도 안 들어감
+        // 준비: 쌍 1~2 맞게 묶음, 3~4 과소병합, 5 과병합, 6 은 맞게 나눔(기존 세 개수에는 안 들어감)
         List<Observation> observations = List.of(
                 obs(1, Label.SAME, true, true),
                 obs(2, Label.SAME, true, true),
@@ -46,13 +46,38 @@ class PairCounterTest {
                 new WrongPair(50, 51, ErrorType.OVER_MERGED));
     }
 
+    // 다른 사건을 다른 이벤트에 둔 관측도 정답으로 세어야 섞지 않은 비율을 계산할 수 있다.
+    // Red 단계에서는 생성자에 넘기는 맞게 나눔이 0이라, 유효한 DIFF 관측 2쌍 기대에서 실패한다.
+    @Test
+    void 다른_사건을_다른_이벤트에_두면_맞게_나눔으로_센다() {
+        // Given: 맞게 나눔 2쌍에 과병합·SAME·제외 관측을 섞어 다른 범주가 함께 세어지는 것을 막는다.
+        List<Observation> observations = List.of(
+                obs(1, Label.DIFF, true, false),
+                obs(2, Label.DIFF, true, false),
+                obs(3, Label.DIFF, true, true),
+                obs(4, Label.SAME, true, false),
+                obs(5, Label.UNSURE, true, false),
+                obs(6, Label.DIFF, false, false));
+
+        // When: 기존의 모르겠음 우선·미배정 제외 규칙을 거쳐 맞게 나눈 관측을 집계한다.
+        PairCountResult result = PairCounter.count(observations);
+
+        // Then: 배정된 DIFF+다른 이벤트 2쌍만 새 정답 범주이며, 기존 오류·제외 개수는 그대로다.
+        assertThat(result.correctlySeparated()).isEqualTo(2);
+        assertThat(result.correctlyMerged()).isZero();
+        assertThat(result.missed()).isEqualTo(1);
+        assertThat(result.overMerged()).isEqualTo(1);
+        assertThat(result.excludedUnsure()).isEqualTo(1);
+        assertThat(result.excludedUnassigned()).isEqualTo(1);
+    }
+
     // 분모가 0 이면 0% 가 아니라 "비율 없음" 이어야 한다(0% 는 "아주 좋음" 으로 오해된다).
     // 같은 사건 라벨이 하나도 없고, 묶인 쌍도 없는 입력: 두 비율 모두 empty. 제외 개수도 함께 확인해
     // 뼈대(전부 0)로는 통과하지 못하게 한다.
     // Red 단계: 비율은 뼈대도 empty 라 맞지만 excludedUnsure 가 0 으로 나와 실패한다.
     @Test
     void 분모가_0이면_비율이_없다() {
-        // 준비: DIFF+다른 이벤트(어디에도 안 셈) 1쌍과 UNSURE 1쌍뿐
+        // 준비: DIFF+다른 이벤트(맞게 나눔) 1쌍과 UNSURE 1쌍뿐
         List<Observation> observations = List.of(
                 obs(1, Label.DIFF, true, false),
                 obs(2, Label.UNSURE, true, true));

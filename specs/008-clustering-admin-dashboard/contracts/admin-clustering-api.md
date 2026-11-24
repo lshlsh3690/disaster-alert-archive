@@ -24,8 +24,11 @@
       "pairCount": 6,
       "correctlyMerged": 1, "overMerged": 0, "missed": 0,
       "unsureCount": 0, "formatFailureCount": 0,
+      "correctlySeparated": 5,
       "purity": { "numerator": 1, "denominator": 1, "percent": 100.0 },
       "completeness": { "numerator": 1, "denominator": 1, "percent": 100.0 },
+      "separation": { "numerator": 5, "denominator": 5, "percent": 100.0 },
+      "balancedAccuracy": 100.0,
       "score": 100.0,
       "judge": {
         "version": "v1",
@@ -42,7 +45,10 @@
 ```
 
 - `status`: `SCORED` | `NO_PAIRS` | `NO_RECORD`. `NO_RECORD` 는 날짜와 상태만.
-- `score` 는 계산할 수 없으면 null. `estimatedCostUsd` 는 버전 단가를 모르면 null.
+- `score`는 기존 F1이다. 계산 불가이면 키를 생략한다. `estimatedCostUsd`도 버전 단가를 모르면 키를 생략한다.
+- 2026-11-24 [013 변경](../../013-balanced-accuracy-metric/contracts/report-and-api.md): `correctlySeparated?: number`, `separation?: Ratio`, `balancedAccuracy?: number`를 추가한다. 맞게 나눔은 전체 판정 수에서 맞게 묶음·과소병합·과병합·모르겠음·형식 실패를 빼 복원하며 저장 열은 추가하지 않는다.
+- 기록이 있으면 `correctlySeparated`와 `separation`을 보낸다. 두 클래스 분모가 모두 양수일 때만 `balancedAccuracy`를 보내며, 한쪽이라도 0이면 키를 생략한다. `NO_RECORD`에는 새 필드도 없다.
+- 분모 0인 Ratio는 객체와 분자·분모를 유지하고 `percent: null`을 보낸다. 화면은 생략된 균형 정확도와 기록 없음을 구분하며 0점은 유효한 값으로 보인다.
 - `judge` 의 일치율은 그날 기록에 남은 당시 값, `model` 은 버전 목록에서.
 - 정렬: 날짜 내림차순.
 

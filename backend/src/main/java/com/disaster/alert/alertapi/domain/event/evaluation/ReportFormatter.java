@@ -12,7 +12,8 @@ import java.util.Locale;
 import java.util.OptionalDouble;
 
 /**
- * 평가 결과를 마크다운 리포트로 만든다. 형식은 specs/006-clustering-evaluation/quickstart.md "리포트" 절.
+ * 평가 결과를 마크다운 리포트로 만든다. 요약 형식은 specs/013-balanced-accuracy-metric/contracts/report-and-api.md 1절.
+ * 대표 균형 정확도와 보조 F1을 함께 표시하며, 기존 머리글과 틀린 쌍 표 형식은 유지한다.
  */
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
 public final class ReportFormatter {
@@ -25,28 +26,21 @@ public final class ReportFormatter {
 
     private static final DateTimeFormatter RUN_AT_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
 
+    /**
+     * 같은 평가 집합의 판단 없는 기준선(전부 묶음·전부 따로)을 요약에 함께 표시한 리포트를 반환한다.
+     * 기준선은 결과 개수만으로 정해지므로 호출자가 따로 계산해 넘기지 않는다. 계산 불가 비율·점수는 대시로 쓴다.
+     */
     public static String format(String datasetName, LocalDateTime runAt,
                                 PairCountResult result, List<Row> wrongRows) {
+        PairCountResult allMerged = TrivialBaselines.allMerged(result);
+        PairCountResult allSeparated = TrivialBaselines.allSeparated(result);
         StringBuilder sb = new StringBuilder();
         // 1) 머리: 데이터셋 이름과 실행 시각만
         sb.append("# 클러스터링 평가 - ").append(datasetName).append('\n');
         sb.append("- 실행 시각: ").append(runAt.format(RUN_AT_FORMAT)).append("\n\n");
 
-        // 2) 요약: 점수 한 줄로 전체 품질을 먼저 보이고, 그 재료인 맞게 묶은 비율·빠짐없이 묶은 비율을 근거 개수와 함께 적는다
-        //    분모는 묶은 쌍 = 맞게 묶음+과병합, 같은 사건 쌍 = 맞게 묶음+과소병합. 과병합율·과소병합율은
-        //    괄호에 남겨 이전 리포트와 이어 읽게 한다(PairCounter 가 계산해 넘긴 값을 그대로 쓴다)
-        int same = result.correctlyMerged() + result.missed();
-        int merged = result.correctlyMerged() + result.overMerged();
-        sb.append("## 요약\n");
-        sb.append("- 점수 ").append(score(result.score())).append(" — 맞게 묶은 비율과 빠짐없이 묶은 비율의 조화평균\n");
-        sb.append("- 맞게 묶은 비율 ").append(percent(result.purity())).append(" — 묶은 ").append(merged).append("쌍 중 ")
-                .append(result.correctlyMerged()).append("쌍 맞음, ").append(result.overMerged())
-                .append("쌍 과병합 (과병합율 ").append(percent(result.overMergeRate())).append(")\n");
-        sb.append("- 빠짐없이 묶은 비율 ").append(percent(result.completeness())).append(" — 같은 사건 ").append(same)
-                .append("쌍 중 ").append(result.correctlyMerged()).append("쌍 묶음, ").append(result.missed())
-                .append("쌍 과소병합 (과소병합율 ").append(percent(result.underMergeRate())).append(")\n");
-        sb.append("- 제외: 모르겠음 ").append(result.excludedUnsure()).append("쌍, 이벤트 미배정 ")
-                .append(result.excludedUnassigned()).append("쌍\n");
+        // 2) 요약을 새 계약에 맞추되 머리글과 틀린 쌍 표는 기존 위치·형식을 유지한다.
+        appendSummary(sb, result, allMerged, allSeparated);
 
         // 3) 틀린 쌍 표: 이유는 계산하지 않고 사실만 적는다
         sb.append(WRONG_PAIRS_HEADING).append('\n');
@@ -56,6 +50,31 @@ public final class ReportFormatter {
             appendRow(sb, r.alertA(), r.alertB(), kindLabel(r.kind()), r.facts());
         }
         return sb.toString();
+    }
+
+    private static void appendSummary(StringBuilder sb, PairCountResult result,
+                                      PairCountResult allMerged, PairCountResult allSeparated) {
+        // 1) 두 클래스의 정답률과 근거 개수를 먼저 보여 구성비가 다른 평가 결과도 비교하게 한다.
+        sb.append("## 요약\n");
+        sb.append("- 균형 정확도 ").append(percent(result.balancedAccuracy()))
+                .append(" — 빠짐없이 묶은 비율과 섞지 않은 비율의 평균\n");
+        sb.append("- 빠짐없이 묶은 비율 ").append(percent(result.completeness())).append(" — 같은 사건 ")
+                .append(result.sameEventPairs()).append("쌍 중 ").append(result.correctlyMerged())
+                .append("쌍 묶음, ").append(result.missed()).append("쌍 과소병합 (과소병합율 ")
+                .append(percent(result.underMergeRate())).append(")\n");
+        sb.append("- 섞지 않은 비율 ").append(percent(result.separation())).append(" — 다른 사건 ")
+                .append(result.differentEventPairs()).append("쌍 중 ").append(result.correctlySeparated())
+                .append("쌍 따로 둠, ").append(result.overMerged()).append("쌍 과병합\n");
+        // 2) 기존 F1과 맞게 묶은 비율은 보조로 남겨 지난 리포트의 수치와 이어 읽을 수 있게 한다.
+        sb.append("- 보조: 맞게 묶은 비율 ").append(percent(result.purity())).append(" (묶은 ")
+                .append(result.mergedPairs()).append("쌍 중 ").append(result.correctlyMerged())
+                .append("쌍), F1 ").append(score(result.score())).append('\n');
+        sb.append("- 판단 없는 기준선: 전부 하나로 묶음 균형 정확도 ")
+                .append(percent(allMerged.balancedAccuracy())).append(" · F1 ").append(score(allMerged.score()))
+                .append(" / 전부 따로 둠 ").append(percent(allSeparated.balancedAccuracy()))
+                .append(" · F1 ").append(score(allSeparated.score())).append('\n');
+        sb.append("- 제외: 모르겠음 ").append(result.excludedUnsure()).append("쌍, 이벤트 미배정 ")
+                .append(result.excludedUnassigned()).append("쌍\n");
     }
 
     private static void appendTableHeader(StringBuilder sb) {

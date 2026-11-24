@@ -7,10 +7,48 @@ import java.util.OptionalDouble;
  * PairCounter 가 세어 낸 결과. ReportFormatter 가 이 값을 읽어 리포트를 만든다.
  * 비율은 퍼센트 값(0~100)이고, 분모가 0 이면 empty 다.
  */
-public record PairCountResult(int correctlyMerged, int missed, int overMerged,
+public record PairCountResult(int correctlyMerged, int missed, int overMerged, int correctlySeparated,
                               int excludedUnsure, int excludedUnassigned,
                               OptionalDouble underMergeRate, OptionalDouble overMergeRate,
                               List<WrongPair> wrongPairs) {
+
+    /**
+     * 과거 일일 점수를 쌍별 기록 없이 읽도록 기존 여섯 집계에서 맞게 나눔을 복원한다.
+     * 두 알림이 배정된 쌍의 집계이므로 미배정은 0이며, 형식 실패는 평가 분모에서만 제외한다.
+     */
+    public static PairCountResult fromDailyCounts(int pairCount, int correctlyMerged, int missed,
+                                                  int overMerged, int unsureCount, int formatFailureCount) {
+        // 1) 전체 판정 수에는 제외 쌍도 들어 있다. 여섯 범주의 나머지가 맞게 나눔이며 음수를 0으로 보정하지 않는다.
+        int separated = pairCount - correctlyMerged - missed - overMerged - unsureCount - formatFailureCount;
+        // 2) 오류 비율도 기존 개수에서 구한다. 쌍별 기록을 읽지 않았으므로 틀린 쌍 목록은 비워 둔다.
+        return new PairCountResult(correctlyMerged, missed, overMerged, separated, unsureCount, 0,
+                ratio(missed, correctlyMerged + missed), ratio(overMerged, correctlyMerged + overMerged), List.of());
+    }
+
+    /** 다른 사건 쌍 중 따로 둔 비율(%). 다른 사건 쌍 자체가 없으면 empty다. */
+    public OptionalDouble separation() {
+        return ratio(correctlySeparated, differentEventPairs());
+    }
+
+    /**
+     * 구성비와 무관하게 두 클래스의 정답률을 같은 비중으로 읽는 대표 지표(%).
+     * 한쪽 클래스라도 없으면 전체 품질을 비교할 수 없으므로 empty다.
+     */
+    public OptionalDouble balancedAccuracy() {
+        // 1) 한쪽 분모가 없을 때 다른 쪽 정답률만 대표 점수로 쓰지 않는다.
+        int same = sameEventPairs();
+        int different = differentEventPairs();
+        if (same <= 0 || different <= 0) {
+            return OptionalDouble.empty();
+        }
+        // 2) 표시용으로 반올림된 비율을 평균내지 않고 원래 개수에서 바로 계산한다.
+        return OptionalDouble.of((correctlyMerged * 100.0 / same + correctlySeparated * 100.0 / different) / 2);
+    }
+
+    /** 섞지 않은 비율의 분모 = 다른 사건 쌍 수(과병합 + 맞게 나눔). */
+    public int differentEventPairs() {
+        return overMerged + correctlySeparated;
+    }
 
     /**
      * 맞게 묶은 비율(%) = 묶은 쌍 중 맞게 묶은 비율 = 맞게 묶음 ÷ (맞게 묶음 + 과병합). 과병합율의 반대편 수치다.

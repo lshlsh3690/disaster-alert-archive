@@ -30,6 +30,7 @@ import com.disaster.alert.alertapi.domain.event.repository.ClusteringDailyScoreP
 import com.disaster.alert.alertapi.domain.event.repository.ClusteringDailyScoreRepository;
 import com.disaster.alert.alertapi.domain.event.repository.ClusteringPairLabelRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -44,7 +45,6 @@ import java.util.EnumSet;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.OptionalDouble;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.function.Function;
@@ -58,6 +58,7 @@ import java.util.stream.Collectors;
  * 같은 정의를 이 service 에 다시 쓰면 대시보드와 일일 채점 점수가 어긋난다. 알림 원문은 다른 맥락(disasteralert)의
  * 저장소를 직접 주입하지 않고 {@link DisasterAlertService} 를 거쳐 읽는다(research R5).
  */
+@Slf4j
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
@@ -236,15 +237,25 @@ public class ClusteringDashboardService {
     private static ClusteringDashboardDailyScoresResponse.Day toScoreDay(DayEntry entry, ClusteringDailyScore s) {
         if (s == null) {
             return new ClusteringDashboardDailyScoresResponse.Day(entry.date(), DayStatus.NO_RECORD,
-                    null, null, null, null, null, null, null, null, null, null, null, null, null, null);
+                    null, null, null, null, null, null, null, null, null, null, null, null, null,
+                    null, null, null, null);
         }
-        // 1) 저장된 개수로 PairCountResult 를 만들어 비율·점수 정의를 그쪽 한 곳에서 가져온다
-        //    (과소병합/과병합 비율과 제외 미배정 칸은 이 화면이 쓰지 않아 비운다)
-        PairCountResult counts = new PairCountResult(s.getCorrectlyMerged(), s.getMissed(), s.getOverMerged(),
-                s.getUnsureCount(), 0, OptionalDouble.empty(), OptionalDouble.empty(), List.of());
+        // 1) 과거·신규 기록 모두 기존 여섯 집계만으로 복원한다. 쌍별 기록이 없어도 같은 규칙으로 읽는다.
+        PairCountResult counts = PairCountResult.fromDailyCounts(s.getPairCount(), s.getCorrectlyMerged(),
+                s.getMissed(), s.getOverMerged(), s.getUnsureCount(), s.getFormatFailureCount());
+        //    여섯 집계가 서로 맞지 않으면 맞게 나눔이 음수가 되고 비율이 음수나 100% 초과로 나간다.
+        //    값을 0 으로 지어내지 않고(명세 013) 원인을 찾을 수 있게 그대로 두고 경고만 남긴다
+        if (counts.correctlySeparated() < 0) {
+            log.warn("일일 채점 집계 불일치 {}: 맞게 나눔 {} (판정 {}, 맞게 묶음 {}, 과소병합 {}, 과병합 {}, UNSURE {}, 형식 실패 {})",
+                    s.getScoreDate(), counts.correctlySeparated(), s.getPairCount(), s.getCorrectlyMerged(),
+                    s.getMissed(), s.getOverMerged(), s.getUnsureCount(), s.getFormatFailureCount());
+        }
         //    분모도 PairCountResult 에서 꺼내 분자/분모와 백분율이 같은 정의에서 나오게 한다
         Ratio purity = ClusteringDashboardMetrics.ratio(counts.correctlyMerged(), counts.mergedPairs());
         Ratio completeness = ClusteringDashboardMetrics.ratio(counts.correctlyMerged(), counts.sameEventPairs());
+        Ratio separation = ClusteringDashboardMetrics.ratio(counts.correctlySeparated(), counts.differentEventPairs());
+        //    한쪽 클래스가 없으면 null이라 Day의 NON_NULL 정책으로 키가 빠진다. Ratio는 0/0과 percent:null을 유지한다.
+        Double balancedAccuracy = ClusteringDashboardMetrics.roundPercent(counts.balancedAccuracy());
         // 2) 판사: 일치율은 그날 기록에 복사된 당시 값, 모델만 현재 목록에서 찾는다
         ClusteringDashboardDailyScoresResponse.Judge judge = new ClusteringDashboardDailyScoresResponse.Judge(
                 s.getJudgeVersion(),
@@ -257,9 +268,10 @@ public class ClusteringDashboardService {
         Double score = ClusteringDashboardMetrics.roundPercent(counts.score());
         return new ClusteringDashboardDailyScoresResponse.Day(entry.date(), entry.status(),
                 s.getIncidentCount(), s.getPairCount(),
-                s.getCorrectlyMerged(), s.getOverMerged(), s.getMissed(),
+                s.getCorrectlyMerged(), s.getOverMerged(), s.getMissed(), counts.correctlySeparated(),
                 s.getUnsureCount(), s.getFormatFailureCount(),
-                purity, completeness, score, judge, s.getPromptTokens(), s.getCompletionTokens(), cost);
+                purity, completeness, separation, balancedAccuracy, score,
+                judge, s.getPromptTokens(), s.getCompletionTokens(), cost);
     }
 
     // 쌍 하나의 응답. 라벨이 없으면 라벨 필드 셋 모두 null
