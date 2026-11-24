@@ -1,20 +1,12 @@
 <!--
 Sync Impact Report (최신 개정. 개정 이력 전체는 파일 맨 아래 절들에 누적)
-- Version change: 1.1.0 → 1.2.0
-- Modified principles: I·II 근거 문구(존재하지 않는 `prompts/PROMPTS.md` 출처 표기 삭제), III 예시
-  (2026-11-05 삭제된 "위험도 계산" → "같은 사건 판정") — 규칙 내용은 바뀌지 않음
-- Added sections: Core Principles VI(도메인 규칙은 순수 클래스로), VII(맥락 경계)
+- Version change: 1.2.0 → 1.2.1
+- Modified principles: V의 스킬 참조 경로만 `.agents/skills`로 정정 — 규칙 내용은 바뀌지 않음
+- Added sections: 없음
 - Removed sections: 없음
-- Templates requiring updates:
-  - .specify/templates/plan-template.md ✅ (헌법 검사 절이 범용 게이트 문구라 수정 불필요, 확인만 함)
-  - .specify/templates/spec-template.md ✅ (원칙 참조 없음)
-  - .specify/templates/tasks-template.md ✅ (원칙 참조 없음)
-  - .specify/templates/commands/ — 디렉터리 없음
-  - CLAUDE.md ✅ (팀 컨벤션 절에 VI·VII 요약 추가)
-  - .claude/agents/code-reviewer.md ✅ (백엔드 체크리스트에 VI·VII 항목 추가)
-  - specs/007-disaster-archive/plan.md ✅ (헌법 검사 표·소스 구조에 반영)
-  - prompts/PROMPTS.md — 참조 삭제. `.gitignore`(`**/PROMPTS.md`)로 2025-10-05부터 커밋 대상에서
-    빠진 로컬 전용 파일이었고 git 이력·디스크 어디에도 없다. 팀 컨벤션의 원본은 이제 CLAUDE.md "팀 컨벤션" 절이다
+- Templates requiring updates: 없음 — 규칙·템플릿 구조 변경 없음
+- Related guidance updated: CLAUDE.md, AGENTS.md, .codex/README.md
+- Historical references: 아래 과거 개정 이력의 당시 경로는 보존
 - Follow-up TODOs: 없음
 -->
 
@@ -62,7 +54,7 @@ TEST_CASE)는 반드시 실제 코드(엔티티, 컨트롤러, 마이그레이�
 Commits)을 따른다. `type`은 `feat`/`fix`/`chore`/`docs`/`refactor`/`test`/`ci` 등을 사용하고,
 `scope`는 도메인/모듈명을 쓰되 애매하면 생략한다.
 **근거**: 기존 커밋 히스토리(`git log`)가 이 컨벤션을 따르고 있으며, 팀이 명시적으로
-확인한 규칙이다(`.claude/skills/commit-message`, `.claude/skills/pr-message` 참고).
+확인한 규칙이다(`.agents/skills/commit-message`, `.agents/skills/pr-message` 참고).
 
 ### VI. 도메인 규칙은 순수 클래스로 (Pure Domain Rules)
 판정·계산 규칙(같은 사건 판정, 쿨다운, 표기 추출 등)은 JPA·Spring 을 import 하지 않는
@@ -124,7 +116,7 @@ PATCH는 표현 수정이나 오탈자 교정에 해당한다. 코드 리뷰(및
 원칙들과의 정합성을 확인해야 하며, 원칙을 벗어난 복잡성은 반드시 근거를 문서화해야 한다.
 런타임 개발 가이드는 `CLAUDE.md`를 따른다.
 
-**Version**: 1.2.0 | **Ratified**: 2026-07-03 | **Last Amended**: 2026-11-18
+**Version**: 1.2.1 | **Ratified**: 2026-07-03 | **Last Amended**: 2026-11-24
 
 ---
 
@@ -183,3 +175,11 @@ PATCH는 표현 수정이나 오탈자 교정에 해당한다. 코드 리뷰(및
 | `CLAUDE.md` | 반영 (팀 컨벤션 절) |
 | `.claude/agents/code-reviewer.md` | 반영 (백엔드 체크리스트) |
 | `specs/007-disaster-archive/plan.md` | 반영 (헌법 검사 표, 소스 구조) |
+
+## Sync Impact Report — 1.2.0 → 1.2.1 (2026-11-24)
+
+**사유**: 스킬 원본을 `.agents/skills`에서 직접 읽는 구조에 맞춰 원칙 V의 현재 참조 경로를 정정한다. `.claude/skills` 연결 생성 절차는 제거한다.
+
+**버전**: PATCH — 원칙·권한·커밋 승인 범위는 바꾸지 않고 참조 경로만 고친다.
+
+**영향**: `CLAUDE.md`, `AGENTS.md`, `.codex/README.md`의 사용 안내를 함께 갱신한다. 명세·계획·태스크 템플릿 구조는 그대로이며, 기존 개정 이력은 당시 기록으로 보존한다.

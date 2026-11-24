@@ -4,15 +4,16 @@
 
 ## 공유 스킬과 Claude 호출 방식
 
-- 스킬의 유일한 원본은 `.agents/skills/<name>/SKILL.md`다. `.claude/skills`는 그 폴더로
-  연결되는 로컬 디렉터리 링크이며, 스킬 내용의 사본을 저장하지 않는다.
-- 새 clone 또는 worktree에서 `python .agents/scripts/setup-shared-skills.py`를 한 번 실행한다.
-  Windows에서는 관리자 권한 없는 junction, 다른 OS에서는 심볼릭 링크를 만든다.
-  링크는 Git에 저장하지 않는다. 스킬이 목록에 보이지 않으면 연결을 확인하고 새 세션을 시작한다.
-- Claude에서는 `/commit-message`, `/pr-message`, `/speckit-plan`처럼 호출한다.
-  공용 지침에 있는 접두사 없는 스킬 이름은 Claude의 `/스킬이름` 호출로 해석한다.
-  `USER_REQUEST`는 해당 호출의 사용자 요청과 인수이며 셸 환경변수가 아니다.
-- 확장 훅의 스킬 이름은 점을 하이픈으로 바꿔 찾는다. 출력만 하지 말고 실제 지침을 수행한다.
+- 스킬의 유일한 원본은 `.agents/skills/<name>/SKILL.md`다. `.claude/skills` 폴더나 링크는
+  만들지 않는다. 새 clone이나 worktree에서도 스킬 연결을 위한 초기화는 필요 없다.
+- 사용자 요청에 스킬 이름이 있거나 에이전트 지침이 스킬을 요구하면 해당 `SKILL.md`를
+  처음부터 끝까지 읽고, 필요한 참조를 확인한 뒤 그 절차를 수행한다. 파일을 읽었다는 보고로
+  실제 작업을 대신하지 않는다.
+- Claude에서는 `speckit-plan 스킬로 구현 계획을 작성해줘`처럼 이름이나 파일 경로로 요청한다.
+  이 구조에서는 Claude의 기본 탐색 경로에 스킬을 설치하지 않으므로 `/speckit-plan` 등의
+  메뉴 자동 등록이나 `Skill` 도구 호출을 가정하지 않는다.
+- `USER_REQUEST`는 해당 요청과 인수이며 셸 환경변수가 아니다. 확장 훅의 스킬 이름은
+  점을 하이픈으로 바꿔 `.agents/skills/<name>/SKILL.md`를 찾고 직접 읽어 수행한다.
 - Bash 예시와 공유 Spec Kit 래퍼는 Bash에서 실행한다. Windows에서는 Git Bash를 사용한다:
 
   ```powershell

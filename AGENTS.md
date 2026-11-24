@@ -9,8 +9,9 @@ Codex에서의 도구·호출 방식과 아래 충돌 정리는 이 파일을 �
 - 스킬: `.agents/skills/<name>/SKILL.md`. `$commit-message`, `$pr-message`,
   `$speckit-plan`처럼 호출한다. `/skills` 또는 `$` 선택기에서도 찾을 수 있다.
 - `.agents/skills`가 스킬의 유일한 원본이다. 공유 스킬에서 모델명·호출 접두사·도구별
-  작성자 정보를 고정하지 않는다. Claude용 연결은 `python .agents/scripts/setup-shared-skills.py`로
-  만든다. 공유 스킬은 직접 수정하며 에이전트 생성 스크립트로 덮어쓰지 않는다.
+  작성자 정보를 고정하지 않는다. Claude도 `CLAUDE.md`의 안내에 따라 이 원본을 직접 읽는다.
+  `.claude/skills` 폴더나 연결을 만들지 않는다. 공유 스킬은 직접 수정하며 에이전트 생성
+  스크립트로 덮어쓰지 않는다.
 - 에이전트: `.codex/agents/<name>.toml`. 역할에 맞는 에이전트를 이름으로 지정한다.
   모델·추론 수준·권한·MCP는 부모 세션에서 상속한다.
 - 공용 스킬과 도구별 에이전트의 관리 방법은 [.codex/README.md](.codex/README.md)를 본다.
