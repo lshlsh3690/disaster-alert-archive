@@ -75,6 +75,3 @@ backend/src/main/resources/firebase-service-account.json
 
 # Claude Code 로컬 권한 설정 (세션마다 누적되는 개인 허용 목록이라 저장소에 안 남김)
 .claude/settings.json
-
-# Local junction/symlink to the canonical shared skills (created by setup-shared-skills.py)
-/.claude/skills/
