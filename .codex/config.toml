@@ -1,0 +1,4 @@
+# Shared models, permissions, and MCP settings are inherited from the user's session.
+# Custom agent definitions live in .codex/agents/*.toml.
+[agents]
+enabled = true
