@@ -61,11 +61,12 @@ DB 에 저장된 이벤트 배정을 읽어 라벨과 비교한다. 클러스터
 ```bash
 ./gradlew bootRun --args="--spring.profiles.active=eval \
   --spring.datasource.url=$EVAL_DB --server.port=0 \
-  --eval.labels=evaluation/datasets/cluster-eval-2026-11.json \
+  --eval.dataset=cluster-eval-2026-11 \
   --eval.report=evaluation/reports/<새 리포트 이름>.md"
 ```
 
-- `--eval.labels`: 라벨 JSON 파일. 아래 `--eval.pair-labels-as-of` 와 둘 중 정확히 하나가 필요하다(함께 주면 오류).
+- `--eval.dataset`: 평가 셋 이름. 접속한 DB 의 `evaluation_pair_label` 에서 그 셋의 라벨을 읽는다(JSON 파일은 읽지 않는다). 아래 `--eval.pair-labels-as-of` 와 둘 중 정확히 하나가 필요하다(함께 주면 오류). 라벨이 그 DB 에 없으면 오류로 끝난다.
+- **라벨은 평가 사본 DB 안에 있어야 한다.** 새 평가 사본에는 [pair_label_data_2026_11.sql](datasets/pair_label_data_2026_11.sql) 을 DBeaver 등으로 한 번 실행해 넣는다(Flyway 아님, 여러 번 실행해도 중복되지 않는다). 이미 라벨이 든 다른 로컬 DB 에서 옮길 때는 `COPY (SELECT … FROM evaluation_pair_label WHERE dataset='cluster-eval-2026-11') TO STDOUT` 를 `COPY evaluation_pair_label (…) FROM STDIN` 으로 이어도 된다.
 - `--eval.report`: 없으면 로그로만 출력한다.
 - 정상이면 종료 코드 0 이다.
 - 2026-11-24부터 대표 점수는 균형 정확도다. 요약은 균형 정확도 → 빠짐없이 묶은 비율 → 섞지 않은 비율 → 보조 맞게 묶은 비율·F1 → 판단 없는 기준선 두 개 순서다. 각 비율은 분자·분모를 함께 읽는다. 같은 사건·다른 사건 쌍 중 한쪽 분모가 0이면 균형 정확도는 `-`다. 이유와 기준선 표는 [006 quickstart](../../specs/006-clustering-evaluation/quickstart.md#대표-균형-정확도와-보조-지표).
@@ -83,7 +84,7 @@ DB 에 저장된 이벤트 배정을 읽어 라벨과 비교한다. 클러스터
   --eval.report=evaluation/reports/<새 리포트 이름>.md"
 ```
 
-- `--eval.pair-labels-as-of`: ISO 시각(KST). 이 시각까지 저장·수정된 라벨만 쓴다 — 튜닝 전후 비교가 같은 라벨로 돌도록 매번 같은 시각을 준다. `--eval.labels` 와 함께 주면 오류.
+- `--eval.pair-labels-as-of`: ISO 시각(KST). 이 시각까지 저장·수정된 라벨만 쓴다 — 튜닝 전후 비교가 같은 라벨로 돌도록 매번 같은 시각을 준다. `--eval.dataset` 과 함께 주면 오류.
 - 리포트 머리의 데이터셋 이름은 `불일치 쌍 사람 라벨(DB, 기준 <시각>, N쌍)` 이다. 이전 리포트와 N 이 다르면 그사이 라벨이 바뀐 것이다(라벨은 덮어쓰기라 기준 시각 뒤에 고친 라벨은 옛 값으로 돌아가지 않고 빠진다).
 - 라벨이 0개면 채점하지 않고 0 이 아닌 종료 코드로 끝난다.
 - 틀린 쌍 표는 `(알림 A id, 알림 B id)` 오름차순으로 나온다. 채점 이후 `--eval.recheck`·`--eval.judge-agreement` 등은 파일 모드와 똑같이 쓴다.
