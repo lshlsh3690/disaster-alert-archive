@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate repository-scoped Codex skills and agents from the Claude definitions.
+"""Generate Codex agent definitions from the separate Claude agent definitions.
 
 Requires Python 3.11+ and PyYAML. --check performs no writes.
 """
@@ -15,7 +15,6 @@ import yaml
 
 
 ROOT = Path(__file__).resolve().parents[2]
-SKILL_ROOT = ROOT / ".agents" / "skills"
 AGENT_ROOT = ROOT / ".codex" / "agents"
 
 
@@ -52,82 +51,11 @@ def portable_text(body):
     body = body.replace("파일 경로 검색 도구/내용 검색 도구으로", "경로·내용 검색으로")
     body = re.sub(
         r"\.specify/scripts/bash/(check-prerequisites|setup-plan|setup-tasks|create-new-feature)\.sh",
-        r"bash .codex/scripts/run-speckit.sh \1",
+        r"bash .agents/scripts/run-speckit.sh \1",
         body,
     )
     return "\n".join(line.rstrip() for line in body.splitlines())
 
-
-def skill_content(source):
-    metadata, body = read_definition(source)
-    name = metadata["name"]
-    frontmatter = {key: metadata[key] for key in ("name", "description")}
-    extra = dict(metadata.get("metadata", {}))
-    extra["codex-source"] = source.relative_to(ROOT).as_posix()
-    if "compatibility" in metadata:
-        extra["compatibility"] = metadata["compatibility"]
-    frontmatter["metadata"] = extra
-    body = portable_text(body)
-    if name == "commit-message":
-        body = re.sub(
-            r"6\. 본문 마지막에.*?\n7\. 사용자에게.*?(?=\n\n## 예시)",
-            "6. 공동 작성자 표기는 사용자가 지정했거나 실제 세션에 설정된 경우에만 추가한다. "
-            "Claude 이름이나 이메일을 Codex 결과에 복사하지 않는다.\n"
-            "7. 사용자에게 초안을 제시한다. 커밋 실행이 승인된 경우 UTF-8 임시 파일에 "
-            "메시지를 쓰고 `git commit -F <메시지 파일>`로 전달한다. "
-            "현재 작업의 파일만 스테이징한다.",
-            body,
-            flags=re.DOTALL,
-        )
-        body = re.sub(r"\nCo-Authored-By: Claude[^\n]*", "", body)
-    if name == "speckit-plan":
-        body = body.replace(
-            "Phase 1: Update agent context by running the agent script",
-            "Phase 1: Update agent context only if an applicable update script exists. "
-            "This checkout has no update-agent-context script; summarize the relevant "
-            "context in the report instead of invoking a missing script or overwriting AGENTS.md",
-        )
-    if name == "speckit-constitution":
-        body = body.replace(
-            "each command file in `.specify/templates/commands/*.md` (including this one)",
-            "each Codex Spec Kit skill in `.agents/skills/speckit-*/SKILL.md` (including this one)",
-        )
-    if name == "speckit-taskstoissues":
-        body = re.sub(
-            r"1\. \*\*Fetch existing issues for deduplication\*\*:.*?(?=\n> \[!CAUTION\])",
-            lambda _: "1. **Fetch existing issues for deduplication**: Extract the task IDs from "
-            "tasks.md using `\\bT\\d{3}\\b`. Discover the connected GitHub tools and "
-            "their actual schemas. Fetch both open and closed issues, paging until all "
-            "task IDs have matches or the repository's issues are exhausted. Respect "
-            "the actual tool's state values and cursor or page-number pagination; do "
-            "not assume Claude MCP tool names or arguments exist. If the connector "
-            "cannot do this, use authenticated `gh api --paginate` against the remote "
-            "repository's issues endpoint with `state=all&per_page=100`, excluding "
-            "pull requests. Match task IDs in issue titles with word boundaries.\n"
-            "1. For each task without a matching issue, strip the checkbox and "
-            "`[P]` / `[US#]` markers and create the canonical title "
-            "`T001: <description>` exactly once, using a connected GitHub tool or "
-            "`gh issue create --repo <owner/repo> --title <title> --body-file <UTF-8 file>`. "
-            "Update the in-memory ID set after creation, skip existing IDs, and "
-            "report created and skipped issues. Only create issues when the user "
-            "has requested this conversion, and only in the repository matching the remote.\n",
-            body,
-            flags=re.DOTALL,
-        )
-    context = (
-        "## Codex 실행\n\n"
-        f"원본: [Claude 스킬](../../../.claude/skills/{name}/SKILL.md). "
-        "이 파일은 `.codex/scripts/sync-claude-assets.py`로 생성한다.\n"
-        "저장소의 [AGENTS.md](../../../AGENTS.md)를 따른다. "
-        f"`${name}`에 첨부된 현재 사용자 요청을 입력으로 사용한다. "
-        "`USER_REQUEST`는 그 요청을 뜻하는 설명용 표기이며 환경변수가 아니다.\n"
-        "Bash 코드 블록과 `.sh` 스크립트는 Bash에서 실행한다. "
-        "스킬 호출·확장 훅은 해당 지침을 읽고 실제 도구로 수행하며, "
-        "명령 문자열 출력으로 실행을 대신하지 않는다.\n\n"
-    )
-    return "---\n" + yaml.safe_dump(
-        frontmatter, allow_unicode=True, sort_keys=False, width=110
-    ) + "---\n\n" + context + body + "\n"
 
 
 def agent_content(source):
@@ -226,7 +154,7 @@ def agent_content(source):
         raise ValueError(f"TOML literal delimiter in {source}")
     result = (
         f"# Generated from {source.relative_to(ROOT).as_posix()}.\n"
-        "# Edit the Claude source or .codex/scripts/sync-claude-assets.py, then regenerate.\n"
+        "# Edit the Claude source or .codex/scripts/sync-claude-agents.py, then regenerate.\n"
         f"name = {json.dumps(name)}\n"
         f"description = {json.dumps(metadata['description'], ensure_ascii=False)}\n"
         "developer_instructions = '''\n" + instructions + "'''\n"
@@ -240,12 +168,9 @@ def main():
     parser.add_argument("--check", action="store_true", help="Check generated files without writing")
     args = parser.parse_args()
     outputs = {}
-    skills = sorted((ROOT / ".claude/skills").glob("*/SKILL.md"))
     agents = sorted((ROOT / ".claude/agents").glob("*.md"))
-    if not skills or not agents:
-        raise ValueError("Claude skill or agent definitions are missing")
-    for source in skills:
-        outputs[SKILL_ROOT / source.parent.name / "SKILL.md"] = skill_content(source)
+    if not agents:
+        raise ValueError("Claude agent definitions are missing")
     for source in agents:
         outputs[AGENT_ROOT / f"{source.stem}.toml"] = agent_content(source)
     changed = []
@@ -260,7 +185,7 @@ def main():
     if args.check and changed:
         print("Out of date:\n" + "\n".join(changed), file=sys.stderr)
         return 1
-    print(f"{'Checked' if args.check else 'Generated'} {len(skills)} skills and {len(agents)} agents; "
+    print(f"{'Checked' if args.check else 'Generated'} {len(agents)} agents; "
           f"{len(changed)} {'out of date' if args.check else 'updated'}.")
     return 0
 

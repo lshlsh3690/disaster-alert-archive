@@ -1,5 +1,5 @@
 # Generated from .claude/agents/ui-checker.md.
-# Edit the Claude source or .codex/scripts/sync-claude-assets.py, then regenerate.
+# Edit the Claude source or .codex/scripts/sync-claude-agents.py, then regenerate.
 name = "ui-checker"
 description = "disaster-alert-archive 프론트엔드 변경을 iOS/Android/태블릿/데스크톱 등 다양한 화면 크기에서 실제로 스크린샷 찍어 눈으로 확인하는 읽기 전용 agent. \"이 변경 모바일에서 어때 보여?\", \"레이아웃 깨진 거 없는지 확인해줘\" 같은 요청에 사용. 회귀 테스트 스위트가 아니라 요청 시 1회성으로 지금 상태를 점검하는 용도다."
 developer_instructions = '''

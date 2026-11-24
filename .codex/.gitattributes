@@ -1,2 +1,0 @@
-# Keep the Bash wrapper executable after Windows checkouts with core.autocrlf=true.
-scripts/*.sh text eol=lf

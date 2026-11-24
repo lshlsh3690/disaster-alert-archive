@@ -8,9 +8,12 @@ Codex에서의 도구·호출 방식과 아래 충돌 정리는 이 파일을 �
 
 - 스킬: `.agents/skills/<name>/SKILL.md`. `$commit-message`, `$pr-message`,
   `$speckit-plan`처럼 호출한다. `/skills` 또는 `$` 선택기에서도 찾을 수 있다.
+- `.agents/skills`가 스킬의 유일한 원본이다. 공유 스킬에서 모델명·호출 접두사·도구별
+  작성자 정보를 고정하지 않는다. Claude용 연결은 `python .agents/scripts/setup-shared-skills.py`로
+  만든다. 공유 스킬은 직접 수정하며 에이전트 생성 스크립트로 덮어쓰지 않는다.
 - 에이전트: `.codex/agents/<name>.toml`. 역할에 맞는 에이전트를 이름으로 지정한다.
   모델·추론 수준·권한·MCP는 부모 세션에서 상속한다.
-- Claude 원본과 Codex 사본의 관리 방법은 [.codex/README.md](.codex/README.md)를 본다.
+- 공용 스킬과 도구별 에이전트의 관리 방법은 [.codex/README.md](.codex/README.md)를 본다.
 - `Read`/`Grep`/`Glob`은 사용 가능한 파일 읽기·검색 도구로, `Bash`는 셸 실행 도구로,
   `Edit`/`Write`는 파일 편집 도구로 해석한다. 파일 검색은 `rg`/`rg --files`를 우선한다.
   `Skill` 도구를 가정하지 않고 해당 `SKILL.md`를 읽고 실제 절차를 수행한다.
@@ -38,7 +41,7 @@ Codex에서의 도구·호출 방식과 아래 충돌 정리는 이 파일을 �
   `bash.exe`가 WSL 런처일 수 있으므로 Git Bash 설치 경로를 먼저 확인한다. 예:
 
   ```powershell
-  & 'C:\Program Files\Git\bin\bash.exe' .codex/scripts/run-speckit.sh check-prerequisites --json --paths-only
+  & 'C:\Program Files\Git\bin\bash.exe' .agents/scripts/run-speckit.sh check-prerequisites --json --paths-only
   ```
 
 - Bash 예시의 `/tmp`, `VAR=value command`, `$(...)`, heredoc, `trap`, `&`를
@@ -50,7 +53,7 @@ Codex에서의 도구·호출 방식과 아래 충돌 정리는 이 파일을 �
 
 ## Spec Kit
 
-- Codex에서는 `bash .codex/scripts/run-speckit.sh <스크립트 이름> <인자>`로 공통
+- Codex에서는 `bash .agents/scripts/run-speckit.sh <스크립트 이름> <인자>`로 공통
   스크립트를 실행한다. 래퍼는 Windows `python3` 별칭이 실행 불가능하면 동작하는
   `python`을 해당 프로세스에서만 사용한다. Python 설치나 전역 PATH를 바꾸지 않는다.
 - `.specify/`의 기존 템플릿·스크립트·헌법·feature 상태를 공유한다. Claude 통합 설정을

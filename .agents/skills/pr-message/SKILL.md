@@ -2,15 +2,7 @@
 name: pr-message
 description: 현재 브랜치의 커밋들을 분석해 PR 제목, 본문(Summary/Test plan), 붙일 라벨 초안을 작성한다. 사용자가 "PR 메시지 작성해줘", "PR 초안 만들어줘"라고 요청할
   때 사용한다.
-metadata:
-  codex-source: .claude/skills/pr-message/SKILL.md
 ---
-
-## Codex 실행
-
-원본: [Claude 스킬](../../../.claude/skills/pr-message/SKILL.md). 이 파일은 `.codex/scripts/sync-claude-assets.py`로 생성한다.
-저장소의 [AGENTS.md](../../../AGENTS.md)를 따른다. `$pr-message`에 첨부된 현재 사용자 요청을 입력으로 사용한다. `USER_REQUEST`는 그 요청을 뜻하는 설명용 표기이며 환경변수가 아니다.
-Bash 코드 블록과 `.sh` 스크립트는 Bash에서 실행한다. 스킬 호출·확장 훅은 해당 지침을 읽고 실제 도구로 수행하며, 명령 문자열 출력으로 실행을 대신하지 않는다.
 
 # PR Message 작성 지침
 

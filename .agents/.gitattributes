@@ -1,0 +1,2 @@
+# Keep the shared Bash wrapper executable on Windows.
+scripts/*.sh text eol=lf

@@ -1,5 +1,5 @@
 # Generated from .claude/agents/ui-fixer.md.
-# Edit the Claude source or .codex/scripts/sync-claude-assets.py, then regenerate.
+# Edit the Claude source or .codex/scripts/sync-claude-agents.py, then regenerate.
 name = "ui-fixer"
 description = "ui-checker agent(또는 사용자)가 보고한 반응형 레이아웃 문제(모바일/태블릿/데스크톱)를 실제로 고치는 agent. \"ui-checker가 찾은 거 고쳐줘\" 같은 요청에 사용. 보고받은 문제만 최소 범위로 수정하고, 고친 뒤 같은 화면을 다시 스크린샷 찍어 스스로 확인한다."
 developer_instructions = '''

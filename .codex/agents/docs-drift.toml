@@ -1,5 +1,5 @@
 # Generated from .claude/agents/docs-drift.md.
-# Edit the Claude source or .codex/scripts/sync-claude-assets.py, then regenerate.
+# Edit the Claude source or .codex/scripts/sync-claude-agents.py, then regenerate.
 name = "docs-drift"
 description = "CLAUDE.md와 specs/*/spec.md·plan.md가 실제 코드와 어긋나지 않았는지 검증하는 읽기 전용 agent. 문서 내용을 근거로 작업을 시작하기 전, 문서를 갱신한 뒤, 또는 주기적으로 \"문서랑 코드랑 맞는지 확인해줘\" 요청 시 사용. 이 저장소에서 실제로 CLAUDE.md가 존재하지 않는 EventFragmentMergeService/ClusteringProperties를 언급하고 있었고, FCM 서비스워커가 재작성된 뒤에도 옛 onBackgroundMessage 방식으로 서술돼 있던 전례가 있다."
 developer_instructions = '''

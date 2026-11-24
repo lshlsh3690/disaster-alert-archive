@@ -2,6 +2,28 @@
 
 이 파일은 이 저장소에서 작업하는 Claude Code(claude.ai/code)에게 제공하는 가이드입니다.
 
+## 공유 스킬과 Claude 호출 방식
+
+- 스킬의 유일한 원본은 `.agents/skills/<name>/SKILL.md`다. `.claude/skills`는 그 폴더로
+  연결되는 로컬 디렉터리 링크이며, 스킬 내용의 사본을 저장하지 않는다.
+- 새 clone 또는 worktree에서 `python .agents/scripts/setup-shared-skills.py`를 한 번 실행한다.
+  Windows에서는 관리자 권한 없는 junction, 다른 OS에서는 심볼릭 링크를 만든다.
+  링크는 Git에 저장하지 않는다. 스킬이 목록에 보이지 않으면 연결을 확인하고 새 세션을 시작한다.
+- Claude에서는 `/commit-message`, `/pr-message`, `/speckit-plan`처럼 호출한다.
+  공용 지침에 있는 접두사 없는 스킬 이름은 Claude의 `/스킬이름` 호출로 해석한다.
+  `USER_REQUEST`는 해당 호출의 사용자 요청과 인수이며 셸 환경변수가 아니다.
+- 확장 훅의 스킬 이름은 점을 하이픈으로 바꿔 찾는다. 출력만 하지 말고 실제 지침을 수행한다.
+- Bash 예시와 공유 Spec Kit 래퍼는 Bash에서 실행한다. Windows에서는 Git Bash를 사용한다:
+
+  ```powershell
+  & 'C:\Program Files\Git\bin\bash.exe' .agents/scripts/run-speckit.sh check-prerequisites --json --paths-only
+  ```
+
+- 커밋 공동 작성자 표기는 기존 Claude 규칙인
+  `Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>`를 사용한다.
+  이 도구별 정보는 공유 스킬에 넣지 않는다.
+- 에이전트 정의는 `.claude/agents/*.md`를 유지한다. Codex용 정의와 설정은 `.codex/`에서 관리한다.
+
 ## 프로젝트 개요
 
 Disaster Alert Archive(재난 안전 문자 아카이브) — 한국 정부의 재난문자 공공데이터를 수집하고, 관련 알림들을 "이벤트"로 클러스터링하고, 관심지역 기반으로 사용자에게 FCM 푸시 알림을 보내는 서비스입니다. 백엔드는 Spring Boot, 프론트엔드는 Next.js를 사용합니다. 대부분의 식별자, 주석, 커밋 메시지는 한국어로 작성되어 있습니다.
