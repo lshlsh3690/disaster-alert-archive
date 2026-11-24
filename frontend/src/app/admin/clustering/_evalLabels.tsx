@@ -121,7 +121,8 @@ export function EvalLabelsSection() {
         <p className="text-sm text-[var(--text-muted)]">이 조건에 맞는 라벨 쌍이 없습니다.</p>
       )}
       {list.data && list.data.pairs.length > 0 && (
-        <EvalLabelTable pairs={list.data.pairs} startIndex={list.data.page * list.data.size} />
+        // 셋·필터·페이지를 바꾸면 새 응답이 올 때까지 이전 목록(placeholder)이 보인다 — 그동안은 라벨을 고치지 못하게 잠근다
+        <EvalLabelTable pairs={list.data.pairs} startIndex={list.data.page * list.data.size} locked={list.isPlaceholderData} />
       )}
       {list.data && list.data.totalPages > 1 && (
         <Pagination
@@ -215,13 +216,14 @@ function Pagination({ page, totalPages, totalElements, busy, onChange }: {
  * 휴대폰 화면보다 넓어 표가 무너지고, 안쪽 좌우 스크롤도 쓰지 않기로 했기 때문이다(CSS 로 둘 중 하나만 보인다).
  * 수정은 한 번에 하나만 보낸다(저장 중에는 모든 쌍의 버튼을 막는다).
  * 순번은 지금 조건(셋·라벨 필터)의 목록에서 몇 번째인지다(1부터, 페이지를 넘겨도 이어진다).
+ * locked 면(새 조건의 응답을 기다리는 중) 목록을 흐리게 하고 라벨 버튼을 막는다 — 고른 셋과 다른 셋의 쌍을 고치지 않게.
  */
-function EvalLabelTable({ pairs, startIndex }: { pairs: EvalLabelPair[]; startIndex: number }) {
+function EvalLabelTable({ pairs, startIndex, locked }: { pairs: EvalLabelPair[]; startIndex: number; locked: boolean }) {
   const update = useUpdateEvalLabel();
   const saveOf = (p: EvalLabelPair) => (label: HumanLabel, reason: string, callbacks: SaveCallbacks) =>
     update.mutate({ id: p.id, body: { label, reason } }, callbacks);
   return (
-    <>
+    <div aria-busy={locked} className={locked ? "opacity-60" : undefined}>
       <table className={`${TABLE} hidden md:table`}>
         <colgroup>
           {COLUMNS.map((w, i) => <col key={i} style={w ? { width: w } : undefined} />)}
@@ -239,16 +241,16 @@ function EvalLabelTable({ pairs, startIndex }: { pairs: EvalLabelPair[]; startIn
         </thead>
         <tbody>
           {pairs.map((p, i) => (
-            <EvalLabelRow key={p.id} pair={p} index={startIndex + i + 1} saving={update.isPending} onSave={saveOf(p)} />
+            <EvalLabelRow key={p.id} pair={p} index={startIndex + i + 1} saving={update.isPending} locked={locked} onSave={saveOf(p)} />
           ))}
         </tbody>
       </table>
       <ul className="space-y-3 md:hidden">
         {pairs.map((p, i) => (
-          <EvalLabelCard key={p.id} pair={p} index={startIndex + i + 1} saving={update.isPending} onSave={saveOf(p)} />
+          <EvalLabelCard key={p.id} pair={p} index={startIndex + i + 1} saving={update.isPending} locked={locked} onSave={saveOf(p)} />
         ))}
       </ul>
-    </>
+    </div>
   );
 }
 
@@ -257,6 +259,7 @@ type PairProps = {
   pair: EvalLabelPair;
   index: number;
   saving: boolean;
+  locked: boolean;
   onSave: (label: HumanLabel, reason: string, callbacks: SaveCallbacks) => void;
 };
 
@@ -301,10 +304,10 @@ function usePairEditor({ pair, index, saving, onSave }: PairProps) {
 }
 
 /** 라벨 버튼 3개. 지금 라벨은 채우고, 모달에서 고르는 중인 라벨은 옅게 표시한다. */
-function LabelButtons({ pair, draft, saving, onChoose }: {
+function LabelButtons({ pair, draft, disabled, onChoose }: {
   pair: EvalLabelPair;
   draft: HumanLabel | null;
-  saving: boolean;
+  disabled: boolean;
   onChoose: (label: HumanLabel) => void;
 }) {
   return (
@@ -317,7 +320,7 @@ function LabelButtons({ pair, draft, saving, onChoose }: {
             key={o.value}
             type="button"
             aria-pressed={current}
-            disabled={saving}
+            disabled={disabled}
             onClick={() => onChoose(o.value)}
             className={`px-2 py-0.5 text-xs rounded-[var(--radius-control)] border disabled:opacity-40 ${NOWRAP} ${
               current
@@ -350,7 +353,7 @@ function HistoryButton({ label, onClick }: { label: string; onClick: () => void 
 
 /** 표의 한 줄(태블릿 이상). */
 function EvalLabelRow(props: PairProps) {
-  const { pair, index, saving } = props;
+  const { pair, index, saving, locked } = props;
   const editor = usePairEditor(props);
   return (
     <>
@@ -363,7 +366,7 @@ function EvalLabelRow(props: PairProps) {
         <td className={TD}><AlertCell alert={pair.alertA} fluid /></td>
         <td className={TD}><AlertCell alert={pair.alertB} fluid /></td>
         <td className={TD}>
-          <LabelButtons pair={pair} draft={editor.draft} saving={saving} onChoose={editor.choose} />
+          <LabelButtons pair={pair} draft={editor.draft} disabled={saving || locked} onChoose={editor.choose} />
         </td>
         <td className={`${TD} ${NOWRAP}`}>
           <div>{pair.criteriaDate ?? "-"}</div>
@@ -380,7 +383,7 @@ function EvalLabelRow(props: PairProps) {
 
 /** 휴대폰 폭의 카드 하나. 표의 칸을 위에서 아래로 쌓는다: 순번·관계·간격 → 두 알림 원문 → 라벨 버튼·이력 → 기준 시점·수정. */
 function EvalLabelCard(props: PairProps) {
-  const { pair, index, saving } = props;
+  const { pair, index, saving, locked } = props;
   const editor = usePairEditor(props);
   return (
     <li className="space-y-3 rounded-[var(--radius-control)] border border-[var(--line)] p-3 text-sm">
@@ -397,7 +400,7 @@ function EvalLabelCard(props: PairProps) {
         </div>
       ))}
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <LabelButtons pair={pair} draft={editor.draft} saving={saving} onChoose={editor.choose} />
+        <LabelButtons pair={pair} draft={editor.draft} disabled={saving || locked} onChoose={editor.choose} />
         <HistoryButton label="이력 보기" onClick={editor.openHistory} />
       </div>
       <div className="text-xs text-[var(--text-muted)]">
