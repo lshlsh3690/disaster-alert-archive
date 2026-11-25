@@ -54,7 +54,8 @@ class ClusteringDailyCheckServiceTest {
         insertAlert(9_100_000_104L, "INCIDENT", "2001-03-03 12:00:00", null);
 
         // 실행
-        ClusteringDailyCheck result = service.check(DAY);
+        service.checkRecent(DAY, 1);
+        ClusteringDailyCheck result = repository.findById(DAY).orElseThrow();
 
         // 검증: 대상 2건 중 미배정 1건(101), 임베딩 없음 1건(101). 제외한 103·104 가 섞이면 이 숫자가 달라진다.
         assertThat(result.getIncidentCount()).isEqualTo(2);
@@ -68,13 +69,13 @@ class ClusteringDailyCheckServiceTest {
     void 같은_날짜를_두_번_돌리면_줄은_하나이고_늘어난_건수로_갱신된다() {
         // 준비: 첫 실행 때 대상은 미배정 1건뿐
         insertAlert(9_100_000_201L, "INCIDENT", "2001-03-04 09:00:00", null);
-        service.check(DAY);
+        service.checkRecent(DAY, 1);
 
         // 준비: 첫 실행 뒤 같은 날짜의 미배정 알림이 하나 더 들어왔다고 가정
         insertAlert(9_100_000_202L, "INCIDENT", "2001-03-04 10:00:00", null);
 
         // 실행: 같은 날짜로 한 번 더
-        service.check(DAY);
+        service.checkRecent(DAY, 1);
 
         // 검증: 그 날짜의 줄은 1개이고, 두 번째 실행의 건수(대상 2, 미배정 2)로 덮어써져 있다
         assertThat(repository.findAll().stream().filter(c -> DAY.equals(c.getCheckDate())).count()).isEqualTo(1);
