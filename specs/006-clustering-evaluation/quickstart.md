@@ -23,7 +23,7 @@ set -a; . ../.env.dev; set +a
 - `--spring.datasource.url`(사실상 필수): 평가 사본. 빼면 `.env.dev` 의 개발 DB 에 붙어 엉뚱한 배정을 읽는다. `--server.port=0` 은 실행 중인 다른 서버와 포트가 겹치지 않게 한다.
 - `--eval.dataset`(필수, 또는 `--eval.pair-labels-as-of`): 평가 셋 이름. 그 DB 에 라벨이 없으면 실패한다.
 - `--eval.report`(선택): 마크다운 리포트 경로. 없으면 로그로만 출력한다.
-- `--eval.bcubed`(선택): B-cubed 정답 JSON 경로(예: `evaluation/datasets/bcubed-2026-05.labels.json`). 주면 리포트 맨 끝에 `## 알림 단위 점수` 절이 붙고, 안 주면 그 절이 없다. `unreviewed` 가 남았거나 형식이 틀리면 DB 를 건드리기 전에 즉시 실패한다. `--eval.dataset` 은 이 옵션과 상관없이 계속 필수다.
+- `--eval.bcubed`(선택): B-cubed 정답 JSON 경로(예: `evaluation/datasets/bcubed-2026-05.labels.json`). 주면 리포트 맨 끝에 `## 알림 단위 점수` 절이 붙고, 안 주면 그 절이 없다. `unreviewed` 가 남았거나 형식이 틀리면 DB 를 건드리기 전에 즉시 실패한다. 이 옵션을 줘도 라벨 출처 옵션(`--eval.dataset` 또는 `--eval.pair-labels-as-of` 중 하나)은 계속 필수다.
 - 리포트 머리에는 데이터셋 이름과 실행 시각만 적고, 끝나면 애플리케이션이 종료된다.
 - 라벨이 DB 에 없으면(0쌍) 채점을 시작하기 전에 실패한다.
 

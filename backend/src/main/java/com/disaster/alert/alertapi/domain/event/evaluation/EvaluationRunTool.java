@@ -197,6 +197,11 @@ public class EvaluationRunTool implements ApplicationRunner {
     // 라벨 출처를 정해 읽는다. 두 옵션 중 정확히 하나여야 한다 - 함께 주면 한쪽이 조용히 무시되고, 하나도 없으면 정답이 없다
     //   --eval.dataset=<셋 이름>(평가 셋 라벨, evaluation_pair_label) / --eval.pair-labels-as-of=<ISO 시각>(불일치 쌍 라벨)
     private LabelSource readLabelSource(ApplicationArguments args) {
+        //    없앤 옵션은 모르는 옵션이라 조용히 무시된다 - 옛 명령에 --eval.dataset 만 덧붙이면 파일 라벨로 채점된 줄 알게 되므로 막는다
+        if (args.containsOption("eval.labels")) {
+            throw new IllegalArgumentException("--eval.labels 는 없앴습니다(2026-11-24). 라벨은 DB 에서만 읽으니 "
+                    + "--eval.labels 를 빼고 --eval.dataset=<평가 셋 이름> 을 쓰세요");
+        }
         List<String> given = Stream.of("eval.pair-labels-as-of", "eval.dataset")
                 .filter(args::containsOption).toList();
         if (given.size() > 1) {
