@@ -54,6 +54,8 @@ export function QueryState({ isLoading, error }: { isLoading: boolean; error: un
 /** 일일 채점 — 균형 정확도를 먼저 보이고 같은 줄에 두 비율·보조 F1·그날 판사 일치율을 둔다. */
 export function DailyScoresSection({ from, to }: { from: string; to: string }) {
   const { data, isLoading, error } = useClusteringDailyScores(from, to);
+  // 불일치 쌍을 펼친 날짜 하나. 과병합·과소병합이 있는 날만 펼칠 수 있고, 다시 누르면 접힌다
+  const [openDate, setOpenDate] = useState<string | null>(null);
   return (
     <Section title="일일 채점" description="추정 비용은 프롬프트 캐시 할인을 빼지 않은 상한값입니다.">
       <QueryState isLoading={isLoading} error={error} />
@@ -80,39 +82,114 @@ export function DailyScoresSection({ from, to }: { from: string; to: string }) {
               </tr>
             </thead>
             <tbody>
-              {data.days.map((d) => (
-                <tr key={d.date} className={d.status === "NO_RECORD" ? "text-[var(--text-muted)]" : ""}>
-                  <td className={TD}>{d.date}</td>
-                  <td className={TD}>{STATUS_LABEL[d.status]}</td>
-                  {d.status === "NO_RECORD" ? (
-                    <td className={TD} colSpan={13}>-</td>
-                  ) : (
-                    <>
-                      <td className={TD}>{formatNumber(d.incidentCount)}</td>
-                      <td className={TD}>{formatNumber(d.pairCount)}</td>
-                      {/* 0%도 유효한 값이므로 계산 불가는 키가 생략됐는지로만 구별한다. */}
-                      <td className={TD}>{d.balancedAccuracy === undefined ? "계산할 수 없음" : `${d.balancedAccuracy.toFixed(1)}%`}</td>
-                      <td className={TD}>{d.completeness === undefined ? "계산할 수 없음" : formatRatio(d.completeness)}</td>
-                      <td className={TD}>{d.separation === undefined ? "계산할 수 없음" : formatRatio(d.separation)}</td>
-                      <td className={TD}>{d.purity === undefined ? "계산할 수 없음" : formatRatio(d.purity)}</td>
-                      <td className={TD}>{d.score === undefined ? "계산할 수 없음" : d.score.toFixed(1)}</td>
-                      <td className={TD}>{formatNumber(d.overMerged)} / {formatNumber(d.missed)}</td>
-                      <td className={TD}>{formatNumber(d.unsureCount)} / {formatNumber(d.formatFailureCount)}</td>
-                      <td className={TD}>{d.judge ? `${d.judge.version}${d.judge.model ? ` · ${d.judge.model}` : ""}` : "-"}</td>
-                      <td className={TD}>
-                        {d.judge ? `${formatRatio(d.judge.sameAgreement)} / ${formatRatio(d.judge.diffAgreement)}` : "-"}
-                      </td>
-                      <td className={TD}>{formatNumber(d.promptTokens)} / {formatNumber(d.completionTokens)}</td>
-                      <td className={TD}>{d.estimatedCostUsd === undefined ? "알 수 없음" : `$${d.estimatedCostUsd.toFixed(3)}`}</td>
-                    </>
-                  )}
-                </tr>
-              ))}
+              {data.days.map((d) => {
+                const disagreed = (d.overMerged ?? 0) + (d.missed ?? 0) > 0;
+                const open = disagreed && openDate === d.date;
+                return (
+                  <Fragment key={d.date}>
+                    <tr className={d.status === "NO_RECORD" ? "text-[var(--text-muted)]" : ""}>
+                      <td className={TD}>{d.date}</td>
+                      <td className={TD}>{STATUS_LABEL[d.status]}</td>
+                      {d.status === "NO_RECORD" ? (
+                        <td className={TD} colSpan={13}>-</td>
+                      ) : (
+                        <>
+                          <td className={TD}>{formatNumber(d.incidentCount)}</td>
+                          <td className={TD}>{formatNumber(d.pairCount)}</td>
+                          {/* 0%도 유효한 값이므로 계산 불가는 키가 생략됐는지로만 구별한다. */}
+                          <td className={TD}>{d.balancedAccuracy === undefined ? "-" : `${d.balancedAccuracy.toFixed(1)}%`}</td>
+                          <td className={TD}>{formatRatio(d.completeness)}</td>
+                          <td className={TD}>{formatRatio(d.separation)}</td>
+                          <td className={TD}>{formatRatio(d.purity)}</td>
+                          <td className={TD}>{d.score === undefined ? "-" : d.score.toFixed(1)}</td>
+                          <td className={TD}>
+                            {formatNumber(d.overMerged)} / {formatNumber(d.missed)}
+                            {disagreed && (
+                              <button
+                                type="button"
+                                aria-expanded={open}
+                                aria-controls={`daily-score-pairs-${d.date}`}
+                                aria-label={`${d.date} 불일치 쌍 ${open ? "접기" : "자세히 보기"}`}
+                                onClick={() => setOpenDate(open ? null : d.date)}
+                                className="ml-2 px-2 py-0.5 text-xs rounded-[var(--radius-control)] border border-[var(--line)] text-[var(--blue)] hover:bg-[var(--blue-soft)]"
+                              >
+                                {open ? "접기" : "자세히 보기"}
+                              </button>
+                            )}
+                          </td>
+                          <td className={TD}>{formatNumber(d.unsureCount)} / {formatNumber(d.formatFailureCount)}</td>
+                          <td className={TD}>{d.judge ? `${d.judge.version}${d.judge.model ? ` · ${d.judge.model}` : ""}` : "-"}</td>
+                          <td className={TD}>
+                            {d.judge ? `${formatRatio(d.judge.sameAgreement)} / ${formatRatio(d.judge.diffAgreement)}` : "-"}
+                          </td>
+                          <td className={TD}>{formatNumber(d.promptTokens)} / {formatNumber(d.completionTokens)}</td>
+                          <td className={TD}>{d.estimatedCostUsd === undefined ? "알 수 없음" : `$${d.estimatedCostUsd.toFixed(3)}`}</td>
+                        </>
+                      )}
+                    </tr>
+                    {open && (
+                      <tr id={`daily-score-pairs-${d.date}`}>
+                        <td colSpan={15} className="px-3 py-3 border-b border-[var(--line)] bg-[var(--canvas)]">
+                          <DailyScorePairs date={d.date} />
+                        </td>
+                      </tr>
+                    )}
+                  </Fragment>
+                );
+              })}
             </tbody>
           </table>
         </div>
       )}
     </Section>
+  );
+}
+
+// 일일 채점 행 아래 펼침 — 그날 과병합·과소병합 쌍의 두 알림 원문. 라벨은 아래 "불일치 쌍" 에서 매긴다
+function DailyScorePairs({ date }: { date: string }) {
+  // 100 은 서버가 받는 한 페이지 상한이다. 넘는 날은 나머지를 "불일치 쌍" 에서 넘겨 본다
+  const { data, isLoading, error } = useClusteringDisagreements({ from: date, to: date, size: 100 });
+  return (
+    // 표가 옆으로 넓어 가로로 밀린 상태에서도 펼친 내용은 화면 왼쪽에 붙어 보이게 한다
+    <div className="sticky left-3 w-[min(64rem,calc(100vw-5rem))] space-y-2 whitespace-normal">
+      <QueryState isLoading={isLoading} error={error} />
+      {data && data.pairs.length === 0 && <p className="text-sm text-[var(--text-muted)]">이 날의 쌍 기록이 없습니다.</p>}
+      {data && data.totalElements > data.pairs.length && (
+        <p className="text-xs text-[var(--text-muted)]">
+          {formatNumber(data.totalElements)}쌍 중 {formatNumber(data.pairs.length)}쌍만 보입니다. 나머지는 아래 불일치 쌍에서 보세요.
+        </p>
+      )}
+      {data && data.pairs.length > 0 && (
+        <ul className="space-y-2">
+          {data.pairs.map((p) => (
+            <li key={`${p.alertA.id}-${p.alertB.id}`} className="rounded-[var(--radius-compact)] border border-[var(--line)] bg-[var(--surface)] p-3 space-y-2">
+              <div className="flex flex-wrap items-center gap-2 text-xs text-[var(--text-muted)]">
+                <span className="rounded-[var(--radius-pill)] bg-[var(--coral-soft)] px-2 py-0.5 text-[var(--coral)]">{KIND_LABEL[p.kind]}</span>
+                <span>{p.kind === "OVER_MERGED" ? "시스템은 묶었는데 판사는 다른 사건" : "판사는 같은 사건인데 시스템이 안 묶음"}</span>
+                <span>사람 라벨: {HUMAN_LABEL_OPTIONS.find((o) => o.value === p.humanLabel)?.label ?? "-"}</span>
+              </div>
+              <div className="grid gap-3 text-sm md:grid-cols-2">
+                {[
+                  { alert: p.alertA, eventId: p.eventA },
+                  { alert: p.alertB, eventId: p.eventB },
+                ].map(({ alert, eventId }) => (
+                  <div key={alert.id} className="min-w-0 space-y-1">
+                    <AlertCell alert={alert} fluid />
+                    {eventId === null ? (
+                      <span className="text-xs text-[var(--text-muted)]">당시 미배정</span>
+                    ) : (
+                      <a href={`/events/${eventId}`} target="_blank" rel="noopener noreferrer" className="text-xs text-[var(--blue)] hover:underline">
+                        당시 사건 #{eventId}
+                      </a>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
   );
 }
 

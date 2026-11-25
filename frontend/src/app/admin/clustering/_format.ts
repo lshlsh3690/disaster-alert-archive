@@ -41,10 +41,9 @@ export function defaultRange(now = new Date()): { from: string; to: string } {
   return { from: addDays(to, -29), to };
 }
 
-/** 비율은 항상 분자/분모와 함께 — 분모가 0 이면 "계산할 수 없음"(0% 와 구별). */
+/** 비율은 항상 분자/분모와 함께 — 분모가 0 이면 계산할 수 없으므로 "-" 하나만 쓴다(0% 와 구별). */
 export function formatRatio(ratio: Ratio | null | undefined): string {
-  if (!ratio) return "-";
-  if (ratio.percent === null) return `${ratio.numerator}/${ratio.denominator} (계산할 수 없음)`;
+  if (!ratio || ratio.percent === null) return "-";
   return `${ratio.numerator}/${ratio.denominator} (${ratio.percent.toFixed(1)}%)`;
 }
 
