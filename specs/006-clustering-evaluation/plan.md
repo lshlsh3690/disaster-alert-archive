@@ -104,7 +104,7 @@
 
 ### 4. 일일 채점 (스토리 5)
 
-- **스케줄러**: 매일 01:00 KST(일일 구조 검사 00:30 뒤), `@Async`로 별도 실행기. 최근 7일 중 **기록이 없는 날만** 채점한다(같은 날을 다시 채점해 돈을 두 번 쓰지 않음, 빠진 날은 메움). 단 **채점 시작일(도입일)을 설정으로 두고 그 날짜 이전은 찾지 않는다** — 첫 실행에는 기록이 하나도 없어 하한이 없으면 도입 전 7일까지 유료 호출하게 되고, 이는 FR-020(도입 시점부터만 채점)과 어긋난다.
+- **스케줄러**: 매일 01:00 KST(일일 구조 검사 00:30 뒤), `@Async`로 별도 실행기. 최근 7일 중 **기록이 없는 날만** 채점한다(같은 날을 다시 채점해 돈을 두 번 쓰지 않음, 빠진 날은 메움). **`prod` 프로필에서만 돌고 끄는 설정은 없다**(2026-11-25). 도입 때 쓰던 채점 시작일 설정(`clustering.daily-score.start-date`, 도입 전 날짜를 채점하지 않는 FR-020 용)은 도입일이 7일 창을 벗어나 쓸모가 없어져 삭제했다.
 - **판정 대상 쌍(FR-016)**: 그날 발송된 사건 알림 X마다, X보다 앞선 7일(168시간) 안의 사건 알림 Y(①②에 모두 적용, 같은 이벤트 쌍도 168시간을 넘으면 대상이 아니다) 중 ① 시스템이 X와 같은 이벤트에 넣은 것 ② 같은 유형이고 시군구가 같거나 이웃인데 다른 이벤트에 있는 것. 평가 셋을 뽑은 틀(같은 유형, 168시간, 같은 시군구 또는 이웃)과 같게 맞춰, 272쌍으로 잰 일치율을 운영 쌍에 그대로 붙일 수 있게 한다.
 - **점수**: 판사 판정을 라벨로 보고 기존 `PairCounter.count()`에 넣어 맞게 묶은 비율·빠짐없이 묶은 비율·점수, 과병합·과소병합 쌍을 얻는다. UNSURE·형식 실패는 분모에서 빼고 수를 따로 저장한다.
 - **저장**: 아래 데이터 모델. 판정한 쌍은 모두 저장하고, 불일치 쌍은 시스템 이벤트 id와 함께 남겨 SQL 한 번으로 두 알림 원문과 시스템 이벤트를 볼 수 있게 한다(SC-007, 화면을 만들지 않음).
@@ -177,7 +177,7 @@ backend/src/main/java/com/disaster/alert/alertapi/domain/event/
 ├── model/ClusteringDailyScore, ClusteringDailyScorePair
 ├── repository/ClusteringDailyScoreRepository, ClusteringDailyScorePairRepository
 ├── service/ClusteringDailyScoreService     # 4절 대상 쌍 수집·판정·PairCounter·저장
-└── scheduler/ClusteringDailyScoreScheduler # 01:00 KST, CLUSTERING_DAILY_SCORE_START_DATE 가 비면 꺼짐
+└── scheduler/ClusteringDailyScoreScheduler # 01:00 KST, prod 프로필 전용
 
 backend/src/main/resources/db/migration/V139__create_clustering_daily_score.sql
 backend/src/test/java/.../domain/event/{evaluation,judge,service}/  # 단위·통합 테스트

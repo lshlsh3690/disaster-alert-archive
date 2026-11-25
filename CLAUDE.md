@@ -101,7 +101,7 @@ docker compose -f docker-compose.dev.yml up postgres redis   # Postgres(pgvector
 
 **유형별 병합·분리 기준의 원본은 `specs/001-event-clustering-pipeline/CLUSTERING_CRITERIA.md` 입니다** — 그 문서가 기준의 단일 출처이고 CLAUDE.md 는 기준을 다시 쓰지 않습니다. 기준을 바꾸면 그 문서를 먼저 고치세요. (2026-10-17 안내 경로 삭제가 CLAUDE.md 에 반영되지 않아 3주간 없는 기능을 설명하고 있던 전례가 있습니다.)
 
-이 서브시스템의 as-built 상세 동작(37개 기능 요구사항, file:line 근거 포함)은 `specs/001-event-clustering-pipeline/spec.md`·`plan.md` 참고. 평가·검증(같은 사건 정답 기준, 라벨 셋, 지표, 운영 검증)과 평가 결과·읽는 법 문서는 `specs/006-clustering-evaluation/` 에 있습니다(2026-11-13 `docs/event-clustering/` 에서 옮김). 운영 검증은 두 스케줄러입니다 — 00:30 일일 구조 검사(`ClusteringDailyCheckScheduler`, 무료)와 01:00 일일 채점(`ClusteringDailyScoreScheduler`, LLM 판사·유료, 점수 옆에 판사 일치율을 함께 저장). **일일 채점은 `CLUSTERING_DAILY_SCORE_START_DATE` 가 비어 있으면 돌지 않습니다** — 대상·비용·판사 버전은 그 폴더의 plan.md 를 보세요.
+이 서브시스템의 as-built 상세 동작(37개 기능 요구사항, file:line 근거 포함)은 `specs/001-event-clustering-pipeline/spec.md`·`plan.md` 참고. 평가·검증(같은 사건 정답 기준, 라벨 셋, 지표, 운영 검증)과 평가 결과·읽는 법 문서는 `specs/006-clustering-evaluation/` 에 있습니다(2026-11-13 `docs/event-clustering/` 에서 옮김). 운영 검증은 두 스케줄러입니다 — 00:30 일일 구조 검사(`ClusteringDailyCheckScheduler`, 무료)와 01:00 일일 채점(`ClusteringDailyScoreScheduler`, LLM 판사·유료, 점수 옆에 판사 일치율을 함께 저장). **일일 채점은 `prod` 프로필에서만, 끄는 설정 없이 항상 돕니다**(2026-11-25 — 예전의 시작일 설정 `CLUSTERING_DAILY_SCORE_START_DATE` 는 삭제) — 대상·비용·판사 버전은 그 폴더의 plan.md 를 보세요.
 
 ### 위험도 계산 — 2026-11-05 삭제
 

@@ -14,10 +14,3 @@ management:
     web:
       exposure:
         include: health
-
-# 일일 채점(LLM 판사, 유료)은 운영에서 PR #335 가 머지된 날(2026-11-17)부터 돈다(2026-11-17 운영 도입 승인).
-# base application.yml 은 시작일이 비어 있어 꺼짐이고, 운영만 여기서 켠다. 환경변수로 덮어쓸 수 있다 —
-# CLUSTERING_DAILY_SCORE_START_DATE 를 빈 값으로 두면 다시 꺼진다. 비용은 조용한 날 약 $0.06, 큰 사건 날 수십 달러(상한 없음).
-clustering:
-  daily-score:
-    start-date: ${CLUSTERING_DAILY_SCORE_START_DATE:2026-11-17}
