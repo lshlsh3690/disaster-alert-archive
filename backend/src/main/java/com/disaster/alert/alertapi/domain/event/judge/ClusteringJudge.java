@@ -12,7 +12,6 @@ import org.springframework.stereotype.Component;
 
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.Optional;
 
 /**
  * 두 사건 문자가 같은 사건인지 LLM 이 판정하는 판사.
@@ -27,16 +26,16 @@ import java.util.Optional;
 public class ClusteringJudge {
 
     /**
-     * 프롬프트 본문이나 모델이 바뀌면 올린다(일치율은 프롬프트와 모델을 함께 잰 값이다). 버전마다 272쌍 일치율이
-     * {@link JudgeVersionCatalog} 에 있어야 일일 채점을 한다. 올리는 순서: 이 값과 {@link #MODEL} 을 바꾼다 →
-     * {@code --eval.judge-agreement} 로 272쌍을 잰다(카탈로그에 아직 없어도 측정은 돈다) → 잰 값을 카탈로그 맨 앞에 추가한다.
-     * 카탈로그에 없는 동안 일일 채점은 warn 을 남기고 건너뛴다.
+     * 프롬프트 본문이나 모델이 바뀌면 올린다(일치율은 프롬프트와 모델을 함께 잰 값이다). 올리는 순서: 이 값과 {@link #MODEL} 을
+     * 바꾸고 {@link JudgeVersionCatalog} 맨 앞에 버전·모델·단가를 추가한다 → {@code --eval.judge-agreement} 로 272쌍을 재서
+     * 측정 기록을 DB 에 남긴다 → 운영에는 그 측정을 시드 마이그레이션으로 넣는다(specs/014). 그 버전의 측정 기록이 DB 에 없는
+     * 동안 일일 채점은 warn 을 남기고 건너뛴다.
      */
     public static final String PROMPT_VERSION = "v2";
 
     // 모델은 상수로 둔다 — 카탈로그에서 꺼내면 새 버전을 카탈로그에 넣기 전(=일치율을 재기 전)에는 판사가 뜨지 않아
     // 측정 자체를 할 수 없다. 카탈로그 항목의 모델과 같은지는 테스트(ClusteringJudgeTest)가 검사한다.
-    // 모델을 고른 이유와 버전별 수치는 카탈로그 javadoc 에 있다.
+    // 모델을 고른 이유는 카탈로그 javadoc 에, 버전별 일치율은 DB 측정 기록에 있다.
     public static final String MODEL = "gpt-4o-mini";
     // 같은 쌍은 같은 답이 나와야 프롬프트 버전끼리 점수를 비교할 수 있어 온도 0.
     private static final double TEMPERATURE = 0.0;
@@ -237,14 +236,5 @@ public class ClusteringJudge {
             case "UNSURE" -> JudgeVerdict.UNSURE;
             default -> JudgeVerdict.FORMAT_FAILURE;
         };
-    }
-
-    /**
-     * 프롬프트 버전의 272쌍 일치율. 값이 없는 버전은 비어 있다(= 일일 채점을 하지 않음).
-     * 값과 측정 근거는 {@link JudgeVersionCatalog} 에 있고, 여기서는 호출부가 쓰던 {@link Agreement} 모양으로만 바꿔 준다.
-     */
-    public static Optional<Agreement> agreementOf(String promptVersion) {
-        return JudgeVersionCatalog.find(promptVersion)
-                .map(e -> new Agreement(e.sameNum(), e.sameDen(), e.diffNum(), e.diffDen()));
     }
 }
