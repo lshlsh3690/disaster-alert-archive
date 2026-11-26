@@ -7,7 +7,8 @@ import com.disaster.alert.alertapi.domain.event.judge.JudgeVerdict;
 import java.util.Map;
 
 /**
- * JudgeAgreementCounter 가 세어 낸 판사 일치율 측정 결과. 리포트 출력(Green 에서 추가)이 이 값을 읽는다.
+ * JudgeAgreementCounter 가 세어 낸 판사 일치율 측정 결과. 측정 도구의 콘솔 요약이 이 값을 읽는다(일치율 자체는 저장한 판정과
+ * 현재 라벨로 JudgeAgreementCalculator 가 다시 센다, specs/014).
  *
  * @param crossTab         사람 라벨(SAME/DIFF) × 판사 판정(4가지) 교차표. 칸 하나는 {@link #cell} 로 읽는다
  * @param agreement        같은 사건 쌍·다른 사건 쌍 일치율(분자/분모). 분모는 판사가 SAME/DIFF 로 답한 쌍만이다

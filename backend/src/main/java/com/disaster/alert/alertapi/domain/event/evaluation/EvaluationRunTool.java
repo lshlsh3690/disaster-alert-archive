@@ -40,7 +40,8 @@ import java.util.stream.Stream;
  * (둘 중 정확히 하나가 필수, 함께 주면 오류). {@code --eval.report}(선택) 경로에 마크다운 리포트를 쓴다. {@code --eval.bcubed}(선택)에 B-cubed 정답 JSON 을
  * 주면 알림 단위 점수 절이 리포트 맨 끝에 붙는다. {@code --eval.recheck=D,E,G,I}(선택)를 주면 채점 대신
  * 재확인 후보 목록({@link RecheckRunner})만 낸다. {@code --eval.judge-agreement}(선택, 값 없음)를 주면 채점 대신
- * 판사(LLM)가 라벨 쌍을 판정해 사람 라벨과의 일치율 리포트({@link JudgeAgreementRunner})만 낸다 - <b>유료 호출</b>이라 실행 전 승인이 필요하다.
+ * 판사(LLM)가 라벨 쌍을 판정해 측정을 DB 에 저장한다({@link JudgeAgreementRunner}, --eval.dataset 만, --eval.report 불가) -
+ * <b>유료 호출</b>이라 실행 전 승인이 필요하다.
  */
 @Slf4j
 @Component
@@ -79,6 +80,10 @@ public class EvaluationRunTool implements ApplicationRunner {
         if (args.containsOption("eval.recheck") && args.containsOption("eval.judge-agreement")) {
             throw new IllegalArgumentException("--eval.recheck 와 --eval.judge-agreement 는 함께 쓸 수 없습니다");
         }
+        //    판사 일치율 측정의 옵션 조합은 판사를 부르기 전에 확인한다(돈이 나간 뒤 실패하지 않게)
+        if (args.containsOption("eval.judge-agreement")) {
+            judgeAgreementDataset(args);
+        }
         //    --eval.judge-agreement 는 값 없는 플래그다. containsOption 은 값을 보지 않아 =false 를 줘도 유료 호출이 돌므로 값이 있으면 막는다
         if (args.containsOption("eval.judge-agreement") && !args.getOptionValues("eval.judge-agreement").isEmpty()) {
             throw new IllegalArgumentException("--eval.judge-agreement 는 값 없이 씁니다(받은 값: "
@@ -93,9 +98,10 @@ public class EvaluationRunTool implements ApplicationRunner {
             return;
         }
 
-        //    --eval.judge-agreement 가 있으면 채점 대신 판사 일치율만 잰다(유료: 판사를 실제로 호출한다). 라벨은 위에서 이미 읽었다
+        //    --eval.judge-agreement 가 있으면 채점 대신 판사 일치율만 재서 측정을 DB 에 저장한다(유료: 판사를 실제로 호출한다).
+        //    라벨은 위에서 이미 읽었다. 결과는 파일이 아니라 DB(judge_agreement_run)에 남는다(specs/014)
         if (args.containsOption("eval.judge-agreement")) {
-            writeReport(judgeAgreementRunner.run(dataset, pairs), reportPath);
+            judgeAgreementRunner.run(judgeAgreementDataset(args), pairs);
             System.exit(SpringApplication.exit(context, () -> 0));
             return;
         }
@@ -192,6 +198,20 @@ public class EvaluationRunTool implements ApplicationRunner {
                     + String.join(", ", values) + ")");
         }
         return values.get(0);
+    }
+
+    // 판사 일치율 측정이 쓸 셋 이름. 측정 기록에 남아 일치율을 셀 때 그 셋의 현재 라벨을 쓴다(specs/014 계약 3절).
+    //   --eval.report: 리포트 파일은 없앴다 — 조용히 무시하면 파일이 생긴 줄 알게 되므로 막는다
+    //   --eval.pair-labels-as-of: 불일치 쌍 라벨은 판사·시스템이 갈린 어려운 쌍만 모은 것이라 버전 일치율과 뜻이 달라 막는다
+    private static String judgeAgreementDataset(ApplicationArguments args) {
+        if (args.containsOption("eval.report")) {
+            throw new IllegalArgumentException("--eval.judge-agreement 는 리포트 파일을 쓰지 않습니다(결과는 DB 에 저장) — --eval.report 를 빼세요");
+        }
+        if (!args.containsOption("eval.dataset")) {
+            throw new IllegalArgumentException("--eval.judge-agreement 는 --eval.dataset=<평가 셋 이름> 으로만 잽니다"
+                    + "(--eval.pair-labels-as-of 의 불일치 쌍 라벨은 쓰지 않습니다)");
+        }
+        return singleValue(args, "eval.dataset", "--eval.dataset=<평가 셋 이름> 값이 비어 있습니다");
     }
 
     // 라벨 출처를 정해 읽는다. 두 옵션 중 정확히 하나여야 한다 - 함께 주면 한쪽이 조용히 무시되고, 하나도 없으면 정답이 없다

@@ -5,6 +5,7 @@ import com.disaster.alert.alertapi.domain.event.judge.JudgeAgreementCalculator;
 import com.disaster.alert.alertapi.domain.event.judge.JudgeAgreementCalculator.PairLabel;
 import com.disaster.alert.alertapi.domain.event.judge.JudgeAgreementCalculator.PairVerdict;
 import com.disaster.alert.alertapi.domain.event.model.JudgeAgreementRun;
+import com.disaster.alert.alertapi.domain.event.model.JudgeAgreementRunPair;
 import com.disaster.alert.alertapi.domain.event.repository.EvaluationLabelRepository;
 import com.disaster.alert.alertapi.domain.event.repository.JudgeAgreementRunPairRepository;
 import com.disaster.alert.alertapi.domain.event.repository.JudgeAgreementRunRepository;
@@ -12,7 +13,10 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -21,7 +25,7 @@ import java.util.Optional;
  * 현재 사람 라벨({@code evaluation_pair_label})을 {@link JudgeAgreementCalculator} 에 넘겨 그때그때 센다. 규칙은 계산기에만 있고
  * 여기서는 읽어서 넘기기만 한다(헌법 VI).
  *
- * <p>쓰는 곳: 일일 채점(채점 순간의 값을 그날 기록에 복사), 대시보드 판사 버전 이력.
+ * <p>쓰는 곳: 일일 채점(채점 순간의 값을 그날 기록에 복사), 대시보드 판사 버전 이력, 평가 도구의 측정 저장({@link #saveRun}).
  */
 @Service
 @RequiredArgsConstructor
@@ -75,5 +79,25 @@ public class JudgeAgreementService {
         JudgeAgreementCalculator.Result r = JudgeAgreementCalculator.calculate(verdicts, labels);
         Agreement agreement = new Agreement(r.sameNum(), r.sameDen(), r.diffNum(), r.diffDen());
         return Optional.of(new VersionAgreement(version, run.getModel(), measuredOn, agreement, true, r.unmeasuredPairs()));
+    }
+
+    /**
+     * 평가 도구(--eval.judge-agreement)로 잰 측정 하나를 저장한다 — 측정 1행과 쌍별 판정을 한 트랜잭션으로 넣는다. 판정을 다 마친
+     * 뒤에만 부른다(도중에 멈추면 아무것도 남기지 않아 다시 잰다). 저장한 측정은 고치지 않는다.
+     *
+     * @param estimatedUsd 토큰 × 그 버전 단가(캐시 할인을 빼지 않은 상한). 소수 넷째 자리로 반올림해 저장한다
+     * @return 저장한 측정 id
+     */
+    @Transactional
+    public long saveRun(String version, String model, String dataset, List<PairVerdict> verdicts,
+                        long promptTokens, long completionTokens, double estimatedUsd) {
+        // 1) 측정 1행 — id 가 있어야 쌍별 행이 가리킬 수 있어 먼저 저장한다
+        JudgeAgreementRun run = runRepository.save(JudgeAgreementRun.measured(version, model, dataset, LocalDateTime.now(),
+                promptTokens, completionTokens, BigDecimal.valueOf(estimatedUsd).setScale(4, RoundingMode.HALF_UP)));
+        // 2) 쌍별 판정 — 알림 순서는 엔티티가 (작은 id, 큰 id)로 맞춘다
+        pairRepository.saveAll(verdicts.stream()
+                .map(v -> JudgeAgreementRunPair.of(run.getId(), v.alertA(), v.alertB(), v.verdict()))
+                .toList());
+        return run.getId();
     }
 }

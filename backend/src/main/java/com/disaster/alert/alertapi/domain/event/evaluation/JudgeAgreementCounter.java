@@ -19,8 +19,8 @@ import java.util.Map;
 public final class JudgeAgreementCounter {
 
     /**
-     * 한 쌍의 사람 라벨, 판사 결과, 두 알림. 집계는 라벨과 결과만 쓰고, 두 알림은 리포트의 쌍 목록에 보인다
-     * ({@link JudgeAgreementReport}).
+     * 한 쌍의 사람 라벨, 판사 결과, 두 알림. 집계는 라벨과 결과만 쓴다(두 알림은 마크다운 리포트가 쓰던 것으로, 리포트는
+     * 2026-11-26 에 없앴다 — 측정은 DB 에 저장되고 이 집계는 측정 도구의 콘솔 요약에만 쓰인다).
      */
     public record PairRecord(Label human, JudgeResult result, AlertSnapshot first, AlertSnapshot second) {
         public JudgeVerdict verdict() {
