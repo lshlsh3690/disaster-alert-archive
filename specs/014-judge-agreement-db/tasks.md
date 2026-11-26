@@ -4,7 +4,7 @@
 
 **전제조건**: PR #358(라벨 JSON 읽기 삭제)이 develop 에 머지돼 있어야 한다. 로컬 Postgres·Redis 가 떠 있어야 통합 테스트가 돈다.
 
-**테스트**: 저장소 규칙(CLAUDE.md)대로 새 순수 로직은 Red-Green 으로 한다. Red 는 `tdd-developer`(단계: RED)가 쓰고 커밋한 뒤 **사용자가 확인할 때까지 멈춘다**. Green 은 사용자가 "Red 확인했다/Green 진행해"라고 한 뒤에만 한다. Red 는 핵심 동작 2~4개만 둔다.
+**테스트**: 저장소 규칙(CLAUDE.md)대로 새 순수 로직은 Red-Green 으로 한다. Red 는 `tdd-developer`(단계: RED)가 쓰고 스테이징한 뒤 **사용자가 확인할 때까지 멈춘다**(커밋은 사용자가 다음 단계를 말한 뒤, 2026-11-26 규칙 — 실행 기록 참고). Green 은 사용자가 "Red 확인했다/Green 진행해"라고 한 뒤에만 한다. Red 는 핵심 동작 2~4개만 둔다.
 
 **판사(유료) 호출**: 어떤 작업도 판사를 실제로 부르지 않는다.
 
@@ -33,7 +33,7 @@
 - [x] T004 [P] `{event}/model/JudgeAgreementRun.java` 엔티티 — 생성 팩터리 두 개(쌍별 판정 있는 측정 / 합계만 있는 측정)만 두고 수정 메서드는 두지 않는다(FR-012).
 - [x] T005 [P] `{event}/model/JudgeAgreementRunPair.java` 엔티티 — 생성 때 `alert_a < alert_b` 로 정규화, 판정은 `SAME/DIFF/UNSURE/FORMAT_FAILURE/CALL_FAILURE`(호출 실패는 `JudgeVerdict` 에 넣지 않음, data-model 2절).
 - [x] T006 [P] `{event}/repository/JudgeAgreementRunRepository.java`(버전별 최신 측정 1건 조회), `{event}/repository/JudgeAgreementRunPairRepository.java`(run_id 로 전부 조회). `{event}/repository/EvaluationLabelRepository.java` 의 기존 `findByDatasetOrderByIdAsc` 를 쓰고 새 메서드가 필요 없으면 손대지 않는다.
-- [x] T007 `tdd-developer`(단계: RED)로 `{event-test}/judge/JudgeAgreementCalculatorTest.java` 를 쓴다. 핵심 동작 4개: (1) 현재 라벨로 같은 사건·다른 사건 분자/분모를 센다, (2) 라벨이 SAME→DIFF 로 바뀐 쌍은 다른 사건 분모로 옮겨 간다, (3) 라벨은 있는데 판정이 없는 쌍은 분모 밖에서 `unmeasuredPairs` 로 센다, (4) 판사 UNSURE·형식 실패·호출 실패는 분모 밖에서 따로 센다. 틀린 기본값을 돌려주는 뼈대 `{event}/judge/JudgeAgreementCalculator.java`(JPA·Spring import 없음)를 함께 두고 커밋한다.
+- [x] T007 `tdd-developer`(단계: RED)로 `{event-test}/judge/JudgeAgreementCalculatorTest.java` 를 쓴다. 핵심 동작 4개: (1) 현재 라벨로 같은 사건·다른 사건 분자/분모를 센다, (2) 라벨이 SAME→DIFF 로 바뀐 쌍은 다른 사건 분모로 옮겨 간다, (3) 라벨은 있는데 판정이 없는 쌍은 분모 밖에서 `unmeasuredPairs` 로 센다, (4) 판사 UNSURE·형식 실패·호출 실패는 분모 밖에서 따로 센다. 틀린 기본값을 돌려주는 뼈대 `{event}/judge/JudgeAgreementCalculator.java`(JPA·Spring import 없음)를 함께 두고 스테이징한다.
 
 **체크포인트(멈춤)**: 사용자에게 `./gradlew test --tests "*JudgeAgreementCalculatorTest"` 로 Red 확인을 요청한다. 명시적 확인 전에는 T008 을 하지 않는다.
 

@@ -21,7 +21,14 @@ cd backend
 
 ## 2. 시드 교차표가 리포트와 같은지 (SC-002, FR-009)
 
-라벨이 있는 로컬 사본에 백엔드를 한 번 띄워 V145·V146 을 적용한 뒤(또는 `flyway migrate`), 아래 SQL 로 교차표를 본다.
+라벨이 있는 로컬 사본에 백엔드를 한 번 띄워 V145·V146 을 적용한 뒤, 아래 SQL 로 교차표를 본다.
+
+```bash
+cd backend
+./gradlew bootRun --args="--spring.datasource.url=jdbc:postgresql://localhost:5432/disaster_alert_eval_v6"
+```
+
+DB 이름만 바꾸고 나머지 설정은 평소 로컬 실행과 같다(`backend/evaluation/README.md` 의 `--spring.datasource.url` 과 같은 방식). 띄우면 Flyway 가 V145·V146 을 적용한다.
 
 ```sql
 WITH l AS (
@@ -40,7 +47,7 @@ FROM p JOIN l USING (a, b) GROUP BY 1, 2 ORDER BY 1, 2;
 
 ## 3. 대시보드 값 (SC-002)
 
-로컬 백엔드를 라벨 있는 사본에 붙여 띄우고 관리자로 판사 버전 이력을 연다.
+2절 명령으로 백엔드를 라벨 있는 사본에 붙여 띄우고, 프론트 실행과 관리자 로그인은 `specs/008-clustering-admin-dashboard/quickstart.md` 대로 해서 판사 버전 이력을 연다.
 
 - v2: 같은 사건 127/141 (90.1%), 다른 사건 74/81 (91.4%), 측정일 2026-11-18, 측정에 없는 쌍 표시 없음.
 - v1: 124/142 (87.3%), 77/80 (96.3%), "합계만(라벨 변경 미반영)" 표시.
