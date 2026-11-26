@@ -9,6 +9,7 @@
 docker run --rm --gpus all -p 8081:80 -v tei-cache:/data \
   ghcr.io/huggingface/text-embeddings-inference:89-1.9 \
   --model-id Qwen/Qwen3-Embedding-0.6B \
+  --max-client-batch-size 200 \
   --default-prompt "Instruct: Given a Korean emergency alert message, retrieve alerts that report the same incident
 Query: "
 ```
@@ -33,15 +34,17 @@ Query: "
 
 ## 3. 1단계 측정 모드 — `EvaluationRunTool`
 
+라벨은 평가 사본 DB 의 평가 셋(`--eval.dataset`)에서 읽는다(JSON 읽기 `--eval.labels` 는 2026-11-24 에 삭제).
+
 ```bash
 # (a) 기준선 저장 거리: 평가 사본에 저장된 임베딩으로 거리만 잰다 (호출 없음)
---eval.labels=evaluation/datasets/cluster-eval-2026-11.json --eval.embedding-pairs=stored --eval.report=<폴더>
+--eval.dataset=cluster-eval-2026-11 --eval.embedding-pairs=stored --eval.report=<폴더>
 
 # (b) 모델 하나로 다시 임베딩해 거리를 잰다 (위 2의 설정과 함께)
---eval.labels=... --eval.embedding-pairs=<별칭> --eval.report=<폴더> [--eval.approve]
+--eval.dataset=... --eval.embedding-pairs=<별칭> --eval.report=<폴더> [--eval.approve]
 
 # (c) 모은 거리 파일로 두 지점 비교 리포트를 만든다 (호출 없음)
---eval.labels=... --eval.embedding-pairs-summary=stored,3small,3large,qwen3_06b,e5_large_instruct,bge_m3_ko --eval.report=<폴더>
+--eval.dataset=... --eval.embedding-pairs-summary=stored,3small,3large,qwen3_06b,e5_large_instruct,bge_m3_ko --eval.report=<폴더>
 ```
 
 - 대상 쌍은 research R1 규칙으로 고른다. 유형 목록은 `clustering.regional-types`·`clustering.sustained-types` 설정에서 읽는다.

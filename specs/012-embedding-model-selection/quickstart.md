@@ -8,7 +8,7 @@
 
 - 로컬 Postgres 와 평가 사본 `disaster_alert_eval_v6`(2026-11-20 확인: 알림 62,554건, 임베딩 60,382건).
 - 모든 명령은 `backend/` 에서 `./gradlew bootRun --args='--spring.profiles.active=eval --spring.datasource.url=jdbc:postgresql://localhost:5432/<사본> --server.port=0 …'` 형태다(006 quickstart 와 같음).
-- 공개 모델은 TEI 컨테이너 3개를 띄운다([contracts](contracts/experiment-cli.md) 1절).
+- 공개 모델은 TEI 컨테이너 3개를 띄운다([contracts](contracts/experiment-cli.md) 1절). `--max-client-batch-size 200` 을 빼면 채우기 도구의 200건 요청이 거부된다.
 
 ## 1. 연결 시험 (무료)
 
@@ -39,8 +39,8 @@
    - 후보 설정으로 `--backfill.embed-only=true`(`3large` 는 약 $0.8, 승인 후). `count(*)`·`count(embedding)` 확인.
    - 1024 사본은 인덱스 재생성: `CREATE INDEX idx_disaster_alert_embedding_hnsw ON disaster_alert USING hnsw (embedding vector_cosine_ops) WITH (m = 16, ef_construction = 64)`.
    - 재클러스터링(약 $0.3): 006 절차 + 후보 임베딩 설정 + `--clustering.merge-max-distance=<바로 병합 기준> --clustering.llm-fallback.distance-ceil=<LLM 후보 기준> --clustering.cross-region.similarity-floor=<1 − LLM 후보 기준>`.
-   - 평가: `--eval.labels=evaluation/datasets/cluster-eval-2026-11.json --eval.bcubed=evaluation/datasets/bcubed-2026-05.labels.json --eval.report=…`.
-3. 확인: 후보 점수 − 기준선 점수가 흔들림보다 큰가. 고쳐진 쌍·새로 틀린 쌍을 원문으로 읽는다.
+   - 평가: `--eval.dataset=cluster-eval-2026-11 --eval.bcubed=evaluation/datasets/bcubed-2026-05.labels.json --eval.report=…`.
+3. 확인: 후보 점수(균형 정확도) − 기준선 점수가 흔들림보다 큰가. 고쳐진 쌍·새로 틀린 쌍을 원문으로 읽는다.
 
 ## 5. 맥북 확인 (조건부)
 

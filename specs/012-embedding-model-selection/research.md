@@ -33,7 +33,18 @@
 - **결정**: 공개 모델은 Hugging Face TEI(text-embeddings-inference) Docker 컨테이너로 띄운다. TEI 는 OpenAI 와 같은 형식의 `/v1/embeddings` 주소를 연다. 백엔드는 운영 클러스터링이 쓰는 Spring AI `EmbeddingModel` 빈을 그대로 쓰고, 설정만 바꿔(`spring.ai.openai.embedding.base-url`·`options.model`·`options.dimensions`) 모델을 고른다. 1단계 측정은 `EvaluationRunTool` 의 새 모드, 2단계 채우기는 기존 `EventClusteringBackfillTool --backfill.embed-only=true` 다.
 - **이유**: (1) 실험이 운영과 **같은 임베딩 호출 코드**를 탄다(006 R1 의 원칙과 같다). (2) 새 라이브러리가 없다. TEI 는 개발용 컨테이너이고 앱 의존성이 아니다. (3) 공개 모델이 선정되면 운영도 같은 방식(추론 서버 + 같은 클라이언트)으로 붙일 수 있어 실험 결과가 그대로 이어진다.
 - **확인(2026-11-20, TEI README)**: 지원 구조에 Qwen3(Qwen3-Embedding)·XLM-RoBERTa(multilingual-e5-large-instruct)·BERT 가 있다. 이미지: x86 CPU `cpu-1.9`, Ada(RTX 40 시리즈) `89-1.9`, arm64 CPU `cpu-arm64-1.9`. Apple Silicon 의 Metal 은 Docker 로는 안 되고 `brew install text-embeddings-inference` 로 쓴다. 지시문 옵션 `--default-prompt` 가 있다.
-- **구현 때 확인할 것(작은 연결 시험)**: Spring AI 1.0 OpenAI 클라이언트가 TEI 에 `dimensions` 를 보내도 되는지(1024 모델은 `--spring.ai.openai.embedding.options.dimensions=1024` 로 맞춘다), 임베딩 전용 `api-key` 를 따로 줄 수 있는지(TEI 는 키가 필요 없고, 채팅 LLM 폴백은 진짜 OpenAI 키를 써야 한다). 안 되면 그때 결정 기록을 고친다.
+- **TEI 를 쓰는 근거(2026-11-26 정리)**: 후보 셋은 OpenAI API 로 부를 수 없는 공개 모델이고 Java 앱이 Hugging Face 모델을 직접 읽지 못하므로, 모델을 올려 줄 추론 서버가 필요하다.
+
+  | 근거 | 확인 상태(2026-11-26) |
+  |---|---|
+  | OpenAI 와 같은 `/v1/embeddings` 형식이라 운영과 같은 Spring AI 호출 코드로 잰다 | HTTP 호출 확인, Spring AI 1.0.0 `OpenAiEmbeddingProperties` 가 임베딩 `base-url`·`api-key` 를 채팅과 따로 받는 것 확인. Java 로 실제 호출은 T003 에서 확인 |
+  | 후보 세 모델의 구조(Qwen3·XLM-RoBERTa·BERT)를 모두 지원 | Qwen3 기동 확인, 나머지 둘은 README 확인(11-20) |
+  | 모델별 사용법(마지막 토큰 풀링, 지시문)을 서버가 처리해 Java 코드가 모델마다 갈라지지 않음 | `/info` 의 `pooling: last_token` 확인 |
+  | 개발 PC 에서 충분히 빠름 | Qwen3-0.6B 200건 1.3초(13,000토큰), GPU 메모리 약 1.3GB |
+
+  단점: 이미지·모델 다운로드 몇 GB, 한 요청 입력 수 기본 32건 제한(아래), 공개 모델이 선정되면 운영 맥북에도 추론 서버가 떠 있어야 한다(맥북은 Docker GPU 를 못 써 brew Metal 또는 CPU 이미지, 속도는 아직 안 잼). 아래 대안 (나)(다)는 직접 돌려 비교한 것이 아니라 문서로 판단했다.
+- **연결 시험 결과(2026-11-26, T001)**: `text-embeddings-inference:89-1.9`(1.9.4) + `--gpus all` 로 Qwen3-0.6B 기동. `/v1/embeddings` 가 1024차원을 돌려주고 `dimensions`·`encoding_format` 을 받는다. **한 요청의 입력은 기본 32건까지**인데 `EventClusteringBackfillTool` 은 200건씩 보내므로 TEI 에 `--max-client-batch-size 200` 을 줘야 한다(200건 요청 성공 확인).
+- **11-20 에 구현 때 확인하기로 한 것(위 결과로 해결)**: Spring AI 1.0 OpenAI 클라이언트가 TEI 에 `dimensions` 를 보내도 되는지(1024 모델은 `--spring.ai.openai.embedding.options.dimensions=1024` 로 맞춘다), 임베딩 전용 `api-key` 를 따로 줄 수 있는지(TEI 는 키가 필요 없고, 채팅 LLM 폴백은 진짜 OpenAI 키를 써야 한다). 안 되면 그때 결정 기록을 고친다.
 - **대안**: (가) Python + sentence-transformers — 이 plan 의 첫 판이었다. 운영과 다른 코드로 재게 돼 2026-11-20 사용자 지시로 기각. (나) Spring AI Transformers(ONNX) — 모델마다 ONNX 변환이 필요하고, Qwen3 의 마지막 토큰 풀링을 맞추기 어렵다. (다) Ollama — 후보 중 공식 배포가 있는 것이 일부뿐이라(BGE-m3-ko 없음) 변환이 필요하다.
 
 ## R4. 실행 환경과 비용
@@ -72,6 +83,7 @@ Query: "`. 대칭 비교라 모든 문장에 같은 지시문이 붙는다.
 
 - **결정**: 기준선을 한 번 더 재클러스터링해(같은 설정, LLM 폴백 켬) 기존 v6 결과와 고쳐진 쌍·새로 틀린 쌍을 비교한다. 서로 다른 쌍 수를 흔들림으로 쓴다. 후보의 점수 차가 그 범위 안이면 "차이 없음"이다.
 - **근거**: LLM 폴백은 온도 0 이어도 판정이 조금씩 달라진다. 2026-11-12 호우 튜닝에서 비호우 쌍이 ±1 로 바뀐 전례가 있다.
+- **점수의 정의(2026-11-26 갱신)**: 013 에서 대표 지표가 F1 에서 균형 정확도로 바뀌었다. 2단계의 "점수"는 균형 정확도이고 두 비율·F1 은 보조다. 위의 90.2점은 F1 이다.
 - **기준선 점수**: 272쌍 라벨이 2026-11-17 에 바뀌었으므로, 지금 라벨로 v6 를 다시 평가한 값(무료)을 기준선 점수로 쓴다. 2026-11-12 의 90.2점과 다를 수 있다.
 
 ## R9. 선정 표의 비용·운영 부담 항목 (spec FR-013)

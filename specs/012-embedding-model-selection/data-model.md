@@ -8,7 +8,7 @@
 
 | 이름 | 위치 | 내용 |
 |---|---|---|
-| 라벨 셋 | `backend/evaluation/datasets/cluster-eval-2026-11.json` | 272쌍. 쌍마다 `label`(SAME/DIFF/UNSURE), `relation`(같은 시군구/이웃 시군구/…), 두 알림의 `id`·`type`·`message` |
+| 라벨 셋 | 평가 사본 DB `evaluation_pair_label`(`dataset='cluster-eval-2026-11'`) | 272쌍. `label`(SAME/DIFF/UNSURE), `relation`(SAME_SIGUNGU/ADJACENT_SIGUNGU). 두 알림의 유형·본문은 `disaster_alert` 에서 읽는다 |
 | 유형 목록 | `backend/src/main/resources/application.yml` | `clustering.regional-types`, `clustering.sustained-types`(R1 대상 고르기) |
 | 기준선 저장 거리 | 평가 사본 `disaster_alert_eval_v6` | 대상 쌍마다 `embedding <=> embedding`(읽기 전용 SQL 로 CSV 추출) |
 

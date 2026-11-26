@@ -3,7 +3,7 @@
 **입력**: `specs/012-embedding-model-selection/` 의 설계 문서
 **선행 문서**: [plan.md](plan.md), [spec.md](spec.md), [research.md](research.md), [data-model.md](data-model.md), [contracts/experiment-cli.md](contracts/experiment-cli.md), [quickstart.md](quickstart.md)
 
-**테스트**: 새 순수 로직과 바뀌는 로직은 Red-Green 으로 한다(CLAUDE.md). Red 는 컴파일되고 실행되어 단언에서 실패해야 하며, `tdd-developer`(단계: RED)가 쓰고 커밋한다. 사용자가 Red 를 확인하기 전에는 Green 을 쓰지 않는다. Red 테스트는 핵심 동작 2~4개만 둔다.
+**테스트**: 새 순수 로직과 바뀌는 로직은 Red-Green 으로 한다(CLAUDE.md). Red 는 컴파일되고 실행되어 단언에서 실패해야 하며, `tdd-developer`(단계: RED)가 쓰고 스테이징한다(커밋은 사용자가 다음 단계를 말한 뒤, 2026-11-26 규칙). 사용자가 Red 를 확인하기 전에는 Green 을 쓰지 않는다. Red 테스트는 핵심 동작 2~4개만 둔다.
 
 **유료 작업**: `[유료]` 작업은 예상 비용을 먼저 보이고, 사용자가 그때 "진행해"라고 한 뒤에만 실행한다.
 
@@ -20,7 +20,7 @@
 
 ## Phase 1: 설정
 
-- [ ] T001 연결 시험. TEI 컨테이너 하나(`Qwen/Qwen3-Embedding-0.6B`, 포트 8081)를 [contracts/experiment-cli.md](contracts/experiment-cli.md) 1절 명령으로 띄우고 `curl` 로 `/v1/embeddings` 가 1024차원을 돌려주는지 확인한다(`dimensions` 를 받는지 포함). GPU 이미지(`89-1.9`)가 안 뜨면 `cpu-1.9` 로 바꾼다. Spring AI 1.0.0 `OpenAiEmbeddingProperties` 가 `spring.ai.openai.embedding.base-url`·`api-key` 를 채팅과 따로 받는지 jar 에서 확인한다. 결과를 `specs/012-embedding-model-selection/research.md` R3·R4 에 적는다. 따로 받지 못하면 대안을 R3 에 적고 사용자에게 알린 뒤 멈춘다.
+- [x] T001 연결 시험(2026-11-26 완료, 결과 research R3). TEI 컨테이너 하나(`Qwen/Qwen3-Embedding-0.6B`, 포트 8081)를 [contracts/experiment-cli.md](contracts/experiment-cli.md) 1절 명령으로 띄우고 `curl` 로 `/v1/embeddings` 가 1024차원을 돌려주는지 확인한다(`dimensions` 를 받는지 포함). GPU 이미지(`89-1.9`)가 안 뜨면 `cpu-1.9` 로 바꾼다. Spring AI 1.0.0 `OpenAiEmbeddingProperties` 가 `spring.ai.openai.embedding.base-url`·`api-key` 를 채팅과 따로 받는지 jar 에서 확인한다. 결과를 `specs/012-embedding-model-selection/research.md` R3·R4 에 적는다. 따로 받지 못하면 대안을 R3 에 적고 사용자에게 알린 뒤 멈춘다.
 
 ---
 
@@ -30,7 +30,7 @@
 
 **독립 테스트**: 리포트의 기준선 재현(`3small` 과 `stored` 쌍별 차이 0.01 이하)과 기준선 두 지점 값(같은 사건 81쌍 중 19·70쌍, 다른 사건 56쌍 중 1·30쌍)이 나온다.
 
-- [ ] T002 [US1] Red — `tdd-developer`(단계: RED)로 `backend/src/test/java/com/disaster/alert/alertapi/domain/event/evaluation/EmbeddingPairSubsetTest.java`(키 경로 유형이 한쪽이라도 있는 쌍·먼 시군구 쌍·사람 모르겠음 쌍이 빠지고 이유별로 세어짐)와 `.../evaluation/EmbeddingPairComparisonTest.java`(기준선이 기준 거리에서 붙이는 다른 사건 쌍 수 K 를 정하고, 후보 거리에서 K번째와 K+1번째 다른 사건 거리의 가운데 값을 기준으로 같은 사건 쌍 수를 셈, 바뀐 같은 사건 쌍을 돌려줌)를 쓰고, 뼈대 `backend/src/main/java/com/disaster/alert/alertapi/domain/event/evaluation/EmbeddingPairSubset.java`·`.../evaluation/EmbeddingPairComparison.java`(틀린 기본값 반환)와 함께 커밋한다. 근거: research R1·R2, data-model 2절.
+- [ ] T002 [US1] Red — `tdd-developer`(단계: RED)로 `backend/src/test/java/com/disaster/alert/alertapi/domain/event/evaluation/EmbeddingPairSubsetTest.java`(키 경로 유형이 한쪽이라도 있는 쌍·먼 시군구 쌍·사람 모르겠음 쌍이 빠지고 이유별로 세어짐)와 `.../evaluation/EmbeddingPairComparisonTest.java`(기준선이 기준 거리에서 붙이는 다른 사건 쌍 수 K 를 정하고, 후보 거리에서 K번째와 K+1번째 다른 사건 거리의 가운데 값을 기준으로 같은 사건 쌍 수를 셈, 바뀐 같은 사건 쌍을 돌려줌)를 쓰고, 뼈대 `backend/src/main/java/com/disaster/alert/alertapi/domain/event/evaluation/EmbeddingPairSubset.java`·`.../evaluation/EmbeddingPairComparison.java`(틀린 기본값 반환)와 함께 스테이징한다. 근거: research R1·R2, data-model 2절.
 
 **체크포인트(멈춤)**: 사용자에게 `./gradlew test --tests "*EmbeddingPair*"` 로 Red 를 확인해 달라고 하고, "Red 확인했다"고 할 때까지 T003 으로 가지 않는다.
 
@@ -47,13 +47,13 @@
 
 **독립 테스트**: 기준선 재실행의 흔들림(차이 쌍 수)과 후보 점수 차가 나란히 리포트에 있다.
 
-- [ ] T007 [US2] Red — `tdd-developer`(단계: RED)로 `backend/src/test/java/com/disaster/alert/alertapi/domain/event/service/EventClusteringServiceMergeDistanceTest.java` 를 쓰고 커밋한다: 설정이 없으면 거리 0.15 이하에 병합하고, `clustering.merge-max-distance=0.30` 이면 거리 0.20 에 병합한다. 뼈대: `EventClusteringService.java` 에 `@Value("${clustering.merge-max-distance:0.15}")` 필드만 더하고 판단은 아직 지역 변수 0.15 를 쓴다. 테스트 구성은 같은 폴더 기존 `EventClusteringService*Test` 를 따른다.
+- [ ] T007 [US2] Red — `tdd-developer`(단계: RED)로 `backend/src/test/java/com/disaster/alert/alertapi/domain/event/service/EventClusteringServiceMergeDistanceTest.java` 를 쓰고 스테이징한다: 설정이 없으면 거리 0.15 이하에 병합하고, `clustering.merge-max-distance=0.30` 이면 거리 0.20 에 병합한다. 뼈대: `EventClusteringService.java` 에 `@Value("${clustering.merge-max-distance:0.15}")` 필드만 더하고 판단은 아직 지역 변수 0.15 를 쓴다. 테스트 구성은 같은 폴더 기존 `EventClusteringService*Test` 를 따른다.
 
 **체크포인트(멈춤)**: 사용자에게 `./gradlew test --tests "*EventClusteringServiceMergeDistanceTest"` 로 Red 확인을 받는다.
 
 - [ ] T008 [US2] Green — `tdd-developer`(단계: GREEN, "사용자가 Red 를 확인했다")로 `backend/src/main/java/com/disaster/alert/alertapi/domain/event/service/EventClusteringService.java` 의 지역 변수 0.15 를 그 필드로 바꾸고, `CLAUDE.md` 이벤트 클러스터링 절의 "(설정이 아니라 코드에 고정)"을 "`clustering.merge-max-distance`(기본 0.15, 운영 설정 없음)"로 고친다. 운영 `application.yml` 에는 값을 넣지 않는다.
 - [ ] T009 [US2] [유료 약 $0.3] 흔들림 확인 — 지금 라벨로 `disaster_alert_eval_v6` 를 평가(무료)하고, v6 를 템플릿으로 `disaster_alert_eval_v6_rerun` 을 만들어 006 quickstart 3 절차로 재클러스터링 → 평가한다. 리포트 `backend/evaluation/reports/2026-11_<날짜>-embed-baseline.md`·`…-embed-baseline-rerun.md` 를 커밋하고 차이 쌍 수를 흔들림으로 적는다.
-- [ ] T010 [US2] [유료: `3large` 채우기 약 $0.8 + 재클러스터링 약 $0.3, 공개 모델은 재클러스터링만] 최종 후보마다 한 번: (1) `CREATE DATABASE disaster_alert_eval_e_<별칭> TEMPLATE disaster_alert_eval_v6`. 1024차원이면 HNSW 인덱스 삭제 → 임베딩 NULL → `vector(1024)`, `3large` 면 임베딩 NULL 만. (2) 후보 임베딩 설정으로 `EventClusteringBackfillTool --backfill.embed-only=true`, `count(*)`·`count(embedding)` 확인, 1024 사본은 HNSW 인덱스 재생성. (3) 006 재클러스터링 절차 + 후보 임베딩 설정 + `--clustering.merge-max-distance=<바로 병합 기준> --clustering.llm-fallback.distance-ceil=<LLM 후보 기준> --clustering.cross-region.similarity-floor=<1 − LLM 후보 기준>`(기준은 T005 리포트). (4) `--eval.labels=evaluation/datasets/cluster-eval-2026-11.json --eval.bcubed=evaluation/datasets/bcubed-2026-05.labels.json` 로 평가해 `backend/evaluation/reports/2026-11_<날짜>-embed-<별칭>.md` 에 쓴 설정과 함께 커밋한다. 근거: research R6·R7, quickstart 4.
+- [ ] T010 [US2] [유료: `3large` 채우기 약 $0.8 + 재클러스터링 약 $0.3, 공개 모델은 재클러스터링만] 최종 후보마다 한 번: (1) `CREATE DATABASE disaster_alert_eval_e_<별칭> TEMPLATE disaster_alert_eval_v6`. 1024차원이면 HNSW 인덱스 삭제 → 임베딩 NULL → `vector(1024)`, `3large` 면 임베딩 NULL 만. (2) 후보 임베딩 설정으로 `EventClusteringBackfillTool --backfill.embed-only=true`, `count(*)`·`count(embedding)` 확인, 1024 사본은 HNSW 인덱스 재생성. (3) 006 재클러스터링 절차 + 후보 임베딩 설정 + `--clustering.merge-max-distance=<바로 병합 기준> --clustering.llm-fallback.distance-ceil=<LLM 후보 기준> --clustering.cross-region.similarity-floor=<1 − LLM 후보 기준>`(기준은 T005 리포트). (4) `--eval.dataset=cluster-eval-2026-11 --eval.bcubed=evaluation/datasets/bcubed-2026-05.labels.json` 로 평가해 `backend/evaluation/reports/2026-11_<날짜>-embed-<별칭>.md` 에 쓴 설정과 함께 커밋한다. 근거: research R6·R7, quickstart 4.
 - [ ] T011 [US2] `backend/evaluation/reports/2026-11_<날짜>-embed-<별칭>.md` 의 후보 점수 − 기준선 점수를 T009 흔들림과 비교해 보고한다(흔들림 안이면 "차이 없음", spec FR-012). 고쳐진 쌍·새로 틀린 쌍을 원문으로 몇 개 보인다.
 
 ---
@@ -102,5 +102,5 @@ US1(1단계 리포트) → US2(최종 후보 재클러스터링) → US3(선정 
 ## 참고
 
 - 운영 DB·운영 앱·운영 `application.yml` 값은 어느 작업에서도 바꾸지 않는다(spec FR-018).
-- 지표는 "N쌍 중 M쌍", 두 비율(맞게 묶은 비율·빠짐없이 묶은 비율), 점수만 쓴다(spec FR-007).
+- 지표는 "N쌍 중 M쌍", 두 비율(맞게 묶은 비율·빠짐없이 묶은 비율), 점수만 쓴다(spec FR-007). 점수는 균형 정확도다(013, research R8).
 - 커밋은 `commit-message` 스킬로 하고, 푸시는 사용자가 요청할 때만 한다.
