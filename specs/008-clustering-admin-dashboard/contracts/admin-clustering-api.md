@@ -140,3 +140,4 @@
 
 - 채점 기록이 없는 버전은 `firstScoredDate`·`lastScoredDate` 가 null, `scoredDays` 0.
 - 정렬: 버전 목록 순서(최신 먼저).
+- **2026-11-26 변경([specs/014 계약 1절](../../014-judge-agreement-db/contracts/judge-agreement.md))**: 일치율·`measuredOn` 의 출처가 코드 상수에서 DB 측정 기록으로 바뀌고 두 필드가 더해졌다 — `recomputable`(라벨이 바뀌면 다시 계산되는 값인가, 합계만 옮긴 측정이면 false), `unmeasuredPairs`(셋에 SAME/DIFF 라벨이 있는데 그 측정에 판정이 없는 쌍 수, 합계만 있는 측정이면 null). 측정이 없거나 셀 수 없는 버전은 `measuredOn`·두 일치율·두 새 필드가 null 이다.

@@ -167,12 +167,12 @@ GROUP BY a.event_id ORDER BY dist LIMIT 3;
 
 **판사 일치율 측정** (`--eval.judge-agreement`, **유료 약 $0.86(사람 UNSURE 를 뺀 227쌍, 2026-11-17 실측. 리포트 금액은 캐시 할인을 뺀 상한) — 실행 전 승인**, 2026-11-17 구현)
 ```
-./gradlew bootRun --args='--spring.profiles.active=eval --spring.datasource.url=jdbc:postgresql://localhost:5432/disaster_alert_eval_v5 --server.port=0 --eval.dataset=cluster-eval-2026-11 --eval.judge-agreement --eval.report=<리포트 경로>'
+./gradlew bootRun --args='--spring.profiles.active=eval --spring.datasource.url=jdbc:postgresql://localhost:5432/disaster_alert_eval_v5 --server.port=0 --eval.dataset=cluster-eval-2026-11 --eval.judge-agreement'
 ```
 - 대상: 재확인을 마친 272쌍에서 사람 UNSURE 를 뺀 쌍. 운영 채점과 같은 `ClusteringJudge`(gpt-4o-mini, 온도 0 — 2026-11-18 전까지 gpt-4o)를 쌍마다 순차로 부르므로 `OPENAI_API_KEY` 가 필요하고 호출마다 요금이 든다. 채점은 하지 않고(`--eval.bcubed` 는 무시) 이 모드만 돈다. 두 알림의 발송 시각·유형·본문과 수신 시군구는 사본 DB 에서 읽고, 수신 지역 이름은 `legal_district` 의 시군구 행 이름(예: "충청북도 청주시")이다.
-- 출력(마크다운): 프롬프트 버전·모델·대상 쌍 수 → 같은 사건 쌍 일치율 `a/b (%)`·다른 사건 쌍 일치율 `c/d (%)`와 분모에서 빠진 쌍(판사 UNSURE·형식 실패·호출 실패 수) → 교차표(사람 라벨 × 판사 판정, 형식 실패는 UNSURE 와 별도 열) → 토큰 합과 추정 비용(gpt-4o-mini 단가 입력 $0.15/1M·출력 $0.60/1M, 모델을 바꾸면 `JudgeAgreementReport` 단가도 고친다) → **불일치 쌍 목록**(두 알림의 id·발송 시각·유형·본문 앞 100자, 사람 라벨·판사 판정) → 판사가 답하지 못한 쌍(UNSURE·형식 실패) 목록 → 호출 실패 쌍(id·사유).
-- 사람 UNSURE 쌍은 판정하지 않는다(교차표·일치율·토큰에 없음). 판사 호출이 예외로 끝난 쌍은 그 쌍만 호출 실패로 따로 세고 나머지는 계속한다(형식 실패와 섞지 않는다).
-- 결과를 보고 판사 버전 상수를 갱신한다. 2026-11-17 첫 실행(v1, 227쌍, $0.864)을 같은 날 두 차례 라벨 재확인 뒤 라벨로 다시 센 값 같은 사건 124/142 · 다른 사건 77/80 을 v1 상수로 뒀다(`backend/evaluation/reports/judge-agreement-2026-11-17.md`). 2026-11-18 같은 프롬프트를 gpt-4o-mini 로 잰 값 같은 사건 127/141 · 다른 사건 74/81($0.051)을 v2 상수로 두고 판사를 mini 로 바꿨다(`backend/evaluation/reports/judge-agreement-2026-11-18-mini.md`). 2026-11-11 2차(87.6%·95.1%)는 기준과 라벨이 달라 같은 범위 비교가 아니다.
+- 출력(2026-11-26 부터, specs/014): 마크다운 리포트 대신 **측정 1행 + 쌍별 판정**을 접속한 DB(`judge_agreement_run`·`judge_agreement_run_pair`)에 저장하고, 콘솔에 측정 id·같은 사건/다른 사건 일치율(분자/분모)·판사 UNSURE·형식 실패·호출 실패 수·교차표·토큰과 추정 비용(단가는 `JudgeVersionCatalog`)만 남긴다. `--eval.report`·`--eval.pair-labels-as-of` 를 함께 주면 판사를 부르기 전에 오류로 끝난다. 일치율은 관리자 대시보드 판사 버전 이력에서 저장한 판정과 **현재** 라벨로 다시 센 값을 본다. 이전 리포트(불일치 쌍 목록 등)는 `backend/evaluation/reports/judge-agreement-*.md` 에 당시 기록으로 남아 있다.
+- 사람 UNSURE 쌍은 판정하지 않는다(교차표·일치율·토큰에 없음). 판사 호출이 예외로 끝난 쌍은 그 쌍만 호출 실패(`CALL_FAILURE`)로 저장하고 나머지는 계속한다(형식 실패와 섞지 않는다).
+- 2026-11-26 까지는 결과를 보고 판사 버전 상수를 손으로 갱신했다(지금은 측정 기록이 곧 근거다 — 새 버전을 재면 로컬 측정 행을 시드 마이그레이션으로 운영에 넣는다). v1·v2 측정은 `V146__seed_judge_agreement_v1_v2.sql` 로 옮겼다. 2026-11-17 첫 실행(v1, 227쌍, $0.864)을 같은 날 두 차례 라벨 재확인 뒤 라벨로 다시 센 값 같은 사건 124/142 · 다른 사건 77/80 을 v1 상수로 뒀다(`backend/evaluation/reports/judge-agreement-2026-11-17.md`). 2026-11-18 같은 프롬프트를 gpt-4o-mini 로 잰 값 같은 사건 127/141 · 다른 사건 74/81($0.051)을 v2 상수로 두고 판사를 mini 로 바꿨다(`backend/evaluation/reports/judge-agreement-2026-11-18-mini.md`). 2026-11-11 2차(87.6%·95.1%)는 기준과 라벨이 달라 같은 범위 비교가 아니다.
 
 **일일 채점**
 - 판정 대상 쌍과 점수: 개발 DB에 하루치 사건 알림을 두고 판사를 목킹한 통합 테스트로 확인한다(대상 쌍 수, `PairCounter` 결과, 저장된 줄).
@@ -186,5 +186,5 @@ JOIN disaster_alert a ON a.disaster_alert_id = p.alert_a
 JOIN disaster_alert b ON b.disaster_alert_id = p.alert_b
 WHERE p.score_date = DATE '2026-12-01' AND p.disagreement IS NOT NULL;
 ```
-- 확인: 일치율 상수가 없는 판사 버전이면 채점이 돌지 않고 warn만 남는지. 하루를 빼먹은 뒤 다음 실행이 그날만 채우고 이미 있는 날은 다시 판정하지 않는지.
+- 확인: 판사 버전의 일치율을 셀 수 없으면(측정 기록 없음, 셋 라벨 0행) 채점이 돌지 않고 warn만 남는지. 하루를 빼먹은 뒤 다음 실행이 그날만 채우고 이미 있는 날은 다시 판정하지 않는지.
 

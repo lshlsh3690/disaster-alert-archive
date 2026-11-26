@@ -73,6 +73,20 @@ DB 에 저장된 이벤트 배정을 읽어 라벨과 비교한다. 클러스터
 - 비교용 복사본에서 `- 실행 시각: `으로 시작하는 한 줄만 제거하고 `git diff --no-index <이전 정규화본>.md <새 정규화본>.md`로 비교한다. 다른 머리글과 틀린 쌍 표는 제외하지 않는다. 틀린 쌍 표의 `-` 줄은 사라진 쌍, `+` 줄은 새로 틀린 쌍이다. 지표 변경만 검증할 때는 기존 세 개수·F1 값과 틀린 쌍 표가 같고 요약 밖에 차이가 없어야 한다. 실행 예시는 [013 quickstart 2절](../../specs/013-balanced-accuracy-metric/quickstart.md).
 - 과거 F1 리포트와 006 research 수치는 당시 기록으로 남기고 다시 만들지 않는다. 새 지표와 비교하려면 같은 라벨·배정을 새 기준으로 다시 잰다.
 
+### 판사 일치율 측정 (유료)
+
+판사(LLM)를 272쌍에 실제로 불러 일치율을 잰다. **호출마다 요금이 드니 실행 전에 승인을 받는다**(v2 225쌍 약 $0.05).
+
+```bash
+./gradlew bootRun --args="--spring.profiles.active=eval \
+  --spring.datasource.url=$EVAL_DB --server.port=0 \
+  --eval.dataset=cluster-eval-2026-11 --eval.judge-agreement"
+```
+
+- 결과는 파일이 아니라 접속한 DB 의 `judge_agreement_run`(측정 1행)·`judge_agreement_run_pair`(쌍별 판정)에 저장되고, 콘솔에 측정 id·일치율·교차표·비용 요약이 남는다(2026-11-26, specs/014). `--eval.report`·`--eval.pair-labels-as-of` 와 함께 쓰면 판사를 부르기 전에 오류로 끝난다.
+- 일치율은 저장한 판정과 **현재** 라벨로 관리자 대시보드에서 다시 센다 — 라벨을 고치면 판사를 다시 부르지 않고 값이 바뀐다.
+- 새 판사 버전을 운영에 쓰려면, 먼저 `JudgeVersionCatalog` 에 버전·모델·단가를 추가하고 위처럼 잰 뒤, 로컬 측정 행을 고정값 시드 마이그레이션으로 만들어 운영에 넣는다(예: `V146__seed_judge_agreement_v1_v2.sql`). 운영에 그 버전의 측정이 없으면 일일 채점은 건너뛴다.
+
 ### DB 에 저장된 불일치 쌍 사람 라벨로 평가
 
 관리자 대시보드에서 매긴 불일치 쌍 라벨(`clustering_pair_label`)을 파일 없이 바로 정답으로 쓴다. 평가 사본은 운영 덤프로 만들어 라벨 테이블이 함께 들어온다.

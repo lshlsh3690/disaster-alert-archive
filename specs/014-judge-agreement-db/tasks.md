@@ -86,7 +86,7 @@
 
 ## Phase 6: 마무리
 
-- [ ] T023 [P] 문서: `specs/006-clustering-evaluation/plan.md`(일치율 출처·측정 도구 출력), `specs/008-clustering-admin-dashboard/spec.md` FR-010 과 `contracts/admin-clustering-api.md` 의 `GET /judge-versions`(새 필드, 출처), `CLAUDE.md` 일일 채점 문장(일치율은 DB 측정 기록), `backend/evaluation/README.md` 의 판사 일치율 측정 절(리포트 없음, DB 저장, 운영 반영은 시드)을 고친다.
+- [x] T023 [P] 문서: `specs/006-clustering-evaluation/plan.md`(일치율 출처·측정 도구 출력), `specs/008-clustering-admin-dashboard/spec.md` FR-010 과 `contracts/admin-clustering-api.md` 의 `GET /judge-versions`(새 필드, 출처), `CLAUDE.md` 일일 채점 문장(일치율은 DB 측정 기록), `backend/evaluation/README.md` 의 판사 일치율 측정 절(리포트 없음, DB 저장, 운영 반영은 시드)을 고친다.
 - [ ] T024 전체 변경을 `code-reviewer` 로 한 번 검토받는다(T008·Phase 3 에서 본 부분은 빼고 추가분만). 결과를 사용자에게 보고한다.
 - [ ] T025 quickstart 1~5절을 다시 돌려 결과를 tasks.md 아래 "실행 기록"에 남긴다. 커밋·푸시·PR 은 사용자가 요청할 때 한다.
 - [ ] T026 배포 안내: 사용자가 운영 DB 에 `backend/evaluation/datasets/pair_label_data_2026_11.sql` 을 넣은 뒤(272행 확인) 배포하도록 PR 본문에 적는다. 배포 다음 날 채점 기록·일치율 확인(quickstart 6절, SC-004)은 사용자가 한다.
@@ -127,4 +127,5 @@ T023 문서 갱신                 |  T024 리뷰 준비
 - T016(2026-11-26): `useUpdateEvalLabel` 이 judge-versions 캐시도 무효화.
 - 운영 라벨(2026-11-26, 사용자 승인 "진행해라"): 운영 DB 에 `pair_label_data_2026_11.sql` 실행 — `INSERT 0 272`, SAME 144 · DIFF 81 · UNSURE 47, 순서 무관 중복 없음(272/272). 사전 확인: 덤프 알림 544개(272쌍 × 2, 겹침 없음) 모두 운영에 존재, 기존 라벨 0행. 이로써 FR-013 의 "배포 전 라벨" 조건이 충족됐다(T026 의 라벨 덤프 단계는 완료).
 - T018~T022(2026-11-26): `JudgeAgreementService.saveRun`(측정 1행 + 쌍별 행, 한 트랜잭션), 측정 실행기가 판정을 다 마친 뒤 저장하고 측정 id 반환·콘솔 요약(교차표·일치율·UNSURE/형식 실패/호출 실패·토큰·비용), 호출 실패는 CALL_FAILURE 로 저장, 판사 버전이 카탈로그에 없으면 호출 전 예외. `JudgeAgreementReport` 삭제, `JudgeAgreementCounter` 는 콘솔 요약용으로 남김. 평가 도구가 `--eval.report`·`--eval.pair-labels-as-of` 와의 동시 지정을 판사 호출 전에 거부. 테스트: `JudgeAgreementRunnerTest`(가짜 판사, 실제 빈 조립), `EvaluationRunToolJudgeAgreementTest`(순수 Mockito 2개). 이벤트 도메인 테스트는 기존 Red(`HybridCandidateRankerTest` 7개, 2026-10-11 뼈대)만 실패하고 나머지 177개 통과.
+- T023(2026-11-26): 006 plan(버전·일치율 측정·구조), 006 quickstart(측정 명령·출력·확인 문구), 008 spec(예외 상황·FR-010), 008 plan(당시 설계임을 밝힘), 008 계약 4절(새 필드·출처, 014 계약 링크), CLAUDE.md(일일 채점 일치율 출처), `backend/evaluation/README.md`(판사 일치율 측정 절 신설)를 고쳤다.
 

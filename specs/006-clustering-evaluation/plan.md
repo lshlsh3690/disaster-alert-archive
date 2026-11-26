@@ -99,8 +99,8 @@
 - **입력**: 두 문자 각각의 발송 시각·유형·수신 지역·본문 + 1절의 사실(발신 기관과 종류, 이 문자의 시군구, 두 문자의 시군구 관계, 간격, 같은 시설 후보). 시스템 설정·배정은 넣지 않는다.
 - **프롬프트**: `CLUSTERING_CRITERIA.md` 1절(원칙 1~3, 경계 사례 A~G·I, 적용 순서)을 옮긴다. few-shot 예시 없음. 사실 블록은 "규칙으로 계산한 값이며 판정이 아니다"라고 밝힌다. 기준 문서의 "이 순서로도 답이 갈리지 않으면 기준의 결함(라벨링을 멈춘다)"은 판사에게 "기준끼리 부딪칠 때만 UNSURE"로 옮긴다 — 본문 단서가 적다는 이유로 UNSURE 를 고르게 하면 그만큼 채점 대상이 소리 없이 줄어든다.
 - **모델**: `gpt-4o-mini`(2026-11-18 `gpt-4o` 에서 바꿈, 프롬프트 버전 v2 — 272쌍 일치율이 전체로 비슷하고 쌍당 비용 약 1/16. 근거 `backend/evaluation/reports/judge-agreement-2026-11-18-mini.md`), 온도 0, 최대 토큰 5. 응답이 정확히 `SAME`/`DIFF`/`UNSURE` 한 단어일 때만 받고, 그 밖은 "형식 실패"로 따로 센다(UNSURE로 바꾸지 않음).
-- **버전**: 프롬프트 본문이 바뀌면 버전 문자열을 올린다. 버전마다 272쌍 일치율(같은 사건 쌍·다른 사건 쌍 각각 분자/분모)을 코드 상수로 둔다. 상수가 없는 버전이면 일일 채점을 하지 않는다.
-- **일치율 측정**: `EvaluationRunTool`에 `--eval.judge-agreement` 모드를 더한다. 운영 채점과 **같은 판사 코드**로 272쌍(UNSURE 제외)을 판정해 교차표·일치율·형식 실패 수·토큰 비용을 리포트로 낸다. 유료라 실행마다 사용자 승인을 받는다. 결과를 보고 사람이 버전 상수를 갱신한다.
+- **버전**: 프롬프트 본문이 바뀌면 버전 문자열을 올린다. 버전별 모델·단가는 코드(`JudgeVersionCatalog`)에 두고, 272쌍 일치율(같은 사건 쌍·다른 사건 쌍 각각 분자/분모)은 **DB 측정 기록**(`judge_agreement_run`·`judge_agreement_run_pair`)의 쌍별 판정과 현재 사람 라벨로 그때그때 센다(2026-11-26, [specs/014](../014-judge-agreement-db/spec.md) — 그 전에는 코드 상수). 그 버전의 측정 기록이나 셋 라벨이 DB 에 없으면 일일 채점을 하지 않는다.
+- **일치율 측정**: `EvaluationRunTool`에 `--eval.judge-agreement` 모드를 더한다. 운영 채점과 **같은 판사 코드**로 272쌍(UNSURE 제외)을 판정한다. 유료라 실행마다 사용자 승인을 받는다. 2026-11-26 부터(specs/014) 결과는 마크다운 리포트가 아니라 측정 1행과 쌍별 판정으로 접속한 DB 에 저장되고, 콘솔에 교차표·일치율·형식 실패 수·토큰 비용 요약만 남는다. 운영에는 그 측정을 시드 마이그레이션으로 넣는다.
 
 ### 4. 일일 채점 (스토리 5)
 
@@ -169,10 +169,10 @@ backend/src/main/java/com/disaster/alert/alertapi/domain/event/
 │   ├── RecheckRunner              # 2절 --eval.recheck 모드
 │   ├── JudgeInputAssembler        # 판사 입력 조립 (일치율 측정·일일 채점 공용)
 │   ├── JudgeAgreementCounter, JudgeAgreementResult  # 3절 일치율 집계 (순수)
-│   ├── JudgeAgreementRunner, JudgeAgreementReport   # 3절 --eval.judge-agreement 모드·리포트
+│   ├── JudgeAgreementRunner       # 3절 --eval.judge-agreement 모드(2026-11-26 부터 DB 저장, 리포트 클래스는 삭제)
 │   └── EvaluationRunTool          # 모드 2개 추가
 ├── judge/
-│   ├── ClusteringJudge            # 3절 프롬프트 조립·호출·응답 해석, 버전·일치율 상수
+│   ├── ClusteringJudge            # 3절 프롬프트 조립·호출·응답 해석, 버전 상수(일치율은 DB 측정 기록, specs/014)
 │   └── JudgeVerdict
 ├── model/ClusteringDailyScore, ClusteringDailyScorePair
 ├── repository/ClusteringDailyScoreRepository, ClusteringDailyScorePairRepository
