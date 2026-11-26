@@ -15,17 +15,17 @@
 5. **비교**: 튜닝 전 리포트와 diff 한다(아래 "튜닝 전후 비교").
 
 ## 실행
-라벨은 JSON 파일에서 바로 읽는다(DB 적재 없음). 평가용 DB 사본에서 `eval` 프로필로 실행한다(OpenAI 호출 없음, 운영 DB 에는 실행하지 않는다). `backend/` 에서 루트 `.env.dev` 를 불러온 뒤 실행한다.
+라벨은 접속한 평가 사본 DB 의 `evaluation_pair_label` 에서 읽는다(적재 방법은 [backend/evaluation/README.md](../../backend/evaluation/README.md) 클러스터링 평가 절). 평가용 DB 사본에서 `eval` 프로필로 실행한다(OpenAI 호출 없음, 운영 DB 에는 실행하지 않는다). `backend/` 에서 루트 `.env.dev` 를 불러온 뒤 실행한다.
 ```
 set -a; . ../.env.dev; set +a
-./gradlew bootRun --args='--spring.profiles.active=eval --spring.datasource.url=jdbc:postgresql://localhost:5432/disaster_alert_eval_v5 --server.port=0 --eval.labels=<라벨 JSON 경로> --eval.report=<리포트 경로>'
+./gradlew bootRun --args='--spring.profiles.active=eval --spring.datasource.url=jdbc:postgresql://localhost:5432/disaster_alert_eval_v5 --server.port=0 --eval.dataset=cluster-eval-2026-11 --eval.report=<리포트 경로>'
 ```
 - `--spring.datasource.url`(사실상 필수): 평가 사본. 빼면 `.env.dev` 의 개발 DB 에 붙어 엉뚱한 배정을 읽는다. `--server.port=0` 은 실행 중인 다른 서버와 포트가 겹치지 않게 한다.
-- `--eval.labels`(필수): 라벨 JSON 경로.
+- `--eval.dataset`(필수, 또는 `--eval.pair-labels-as-of`): 평가 셋 이름. 그 DB 에 라벨이 없으면 실패한다.
 - `--eval.report`(선택): 마크다운 리포트 경로. 없으면 로그로만 출력한다.
-- `--eval.bcubed`(선택): B-cubed 정답 JSON 경로(예: `evaluation/datasets/bcubed-2026-05.labels.json`). 주면 리포트 맨 끝에 `## 알림 단위 점수` 절이 붙고, 안 주면 그 절이 없다. `unreviewed` 가 남았거나 형식이 틀리면 DB 를 건드리기 전에 즉시 실패한다. `--eval.labels` 는 이 옵션과 상관없이 계속 필수다.
+- `--eval.bcubed`(선택): B-cubed 정답 JSON 경로(예: `evaluation/datasets/bcubed-2026-05.labels.json`). 주면 리포트 맨 끝에 `## 알림 단위 점수` 절이 붙고, 안 주면 그 절이 없다. `unreviewed` 가 남았거나 형식이 틀리면 DB 를 건드리기 전에 즉시 실패한다. 이 옵션을 줘도 라벨 출처 옵션(`--eval.dataset` 또는 `--eval.pair-labels-as-of` 중 하나)은 계속 필수다.
 - 리포트 머리에는 데이터셋 이름과 실행 시각만 적고, 끝나면 애플리케이션이 종료된다.
-- 라벨 파일 형식 오류는 즉시 실패한다. 항목 검증 오류(숫자가 아니거나 없는 id, 같은 id, 알 수 없는 label, (a,b)/(b,a) 중복)는 "N번째 항목"을 함께 알려 주고, JSON 구문이 깨졌거나 최상위가 배열이 아니면 항목 번호 없이 알려 준다.
+- 라벨이 DB 에 없으면(0쌍) 채점을 시작하기 전에 실패한다.
 
 ## 쌍 하나가 어떻게 세어지나
 | 사람의 라벨 | 시스템 | 세는 이름 |
@@ -159,7 +159,7 @@ GROUP BY a.event_id ORDER BY dist LIMIT 3;
 
 **재확인 후보 추출** (`--eval.recheck`, 무료 — 2026-11-17 구현)
 ```
-./gradlew bootRun --args='--spring.profiles.active=eval --spring.datasource.url=jdbc:postgresql://localhost:5432/disaster_alert_eval_v5 --server.port=0 --eval.labels=evaluation/datasets/cluster-eval-2026-11.json --eval.bcubed=evaluation/datasets/bcubed-2026-05.labels.json --eval.recheck=D,E,G,I --eval.report=<후보 목록 경로>'
+./gradlew bootRun --args='--spring.profiles.active=eval --spring.datasource.url=jdbc:postgresql://localhost:5432/disaster_alert_eval_v5 --server.port=0 --eval.dataset=cluster-eval-2026-11 --eval.bcubed=evaluation/datasets/bcubed-2026-05.labels.json --eval.recheck=D,E,G,I --eval.report=<후보 목록 경로>'
 ```
 - `--eval.recheck` 를 주면 채점하지 않고 후보 목록만 낸다. `--eval.bcubed` 는 선택(주면 B-cubed 절이 붙음). 수신 시군구 코드는 라벨 JSON 에 없어 사본 DB 의 `disaster_alert_region` 에서 읽는다.
 - 출력: 규칙별 건수 요약 → 규칙별 후보. 272쌍은 쌍마다 두 알림의 id·발송 시각·유형·발신 기관(종류)·수신 시군구 수·본문과 현재 라벨(G 는 같은 시설 후보 이름도). B-cubed 는 걸린 알림이 든 묶음(정답 사건 / 혼자 알림 / 분류 불가) 전체를 알림 줄로 내고 걸린 알림에 **걸림** 표시, G 는 걸린 쌍(`a(묶음) ↔ b(묶음) · 같은 시설 후보`)도 낸다. B-cubed 의 D·E·I 는 알림 하나로, G 는 같은 유형 알림끼리의 쌍으로 판정하며, 분류 불가 알림도 판정한다(새 기준으로는 나뉠 수 있어서).
@@ -167,7 +167,7 @@ GROUP BY a.event_id ORDER BY dist LIMIT 3;
 
 **판사 일치율 측정** (`--eval.judge-agreement`, **유료 약 $0.86(사람 UNSURE 를 뺀 227쌍, 2026-11-17 실측. 리포트 금액은 캐시 할인을 뺀 상한) — 실행 전 승인**, 2026-11-17 구현)
 ```
-./gradlew bootRun --args='--spring.profiles.active=eval --spring.datasource.url=jdbc:postgresql://localhost:5432/disaster_alert_eval_v5 --server.port=0 --eval.labels=evaluation/datasets/cluster-eval-2026-11.json --eval.judge-agreement --eval.report=<리포트 경로>'
+./gradlew bootRun --args='--spring.profiles.active=eval --spring.datasource.url=jdbc:postgresql://localhost:5432/disaster_alert_eval_v5 --server.port=0 --eval.dataset=cluster-eval-2026-11 --eval.judge-agreement --eval.report=<리포트 경로>'
 ```
 - 대상: 재확인을 마친 272쌍에서 사람 UNSURE 를 뺀 쌍. 운영 채점과 같은 `ClusteringJudge`(gpt-4o-mini, 온도 0 — 2026-11-18 전까지 gpt-4o)를 쌍마다 순차로 부르므로 `OPENAI_API_KEY` 가 필요하고 호출마다 요금이 든다. 채점은 하지 않고(`--eval.bcubed` 는 무시) 이 모드만 돈다. 두 알림의 발송 시각·유형·본문과 수신 시군구는 사본 DB 에서 읽고, 수신 지역 이름은 `legal_district` 의 시군구 행 이름(예: "충청북도 청주시")이다.
 - 출력(마크다운): 프롬프트 버전·모델·대상 쌍 수 → 같은 사건 쌍 일치율 `a/b (%)`·다른 사건 쌍 일치율 `c/d (%)`와 분모에서 빠진 쌍(판사 UNSURE·형식 실패·호출 실패 수) → 교차표(사람 라벨 × 판사 판정, 형식 실패는 UNSURE 와 별도 열) → 토큰 합과 추정 비용(gpt-4o-mini 단가 입력 $0.15/1M·출력 $0.60/1M, 모델을 바꾸면 `JudgeAgreementReport` 단가도 고친다) → **불일치 쌍 목록**(두 알림의 id·발송 시각·유형·본문 앞 100자, 사람 라벨·판사 판정) → 판사가 답하지 못한 쌍(UNSURE·형식 실패) 목록 → 호출 실패 쌍(id·사유).

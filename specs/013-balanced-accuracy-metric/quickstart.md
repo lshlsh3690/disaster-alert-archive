@@ -29,7 +29,7 @@ cd backend
 ## 2. 리포트 회귀 (SC-002)
 
 1. 시작점 `d6cfb4ed`에서 같은 평가 사본·라벨로 `backend/evaluation/reports/013-before.md`를 만든다.
-2. 이 브랜치에서 동일한 명령으로 `013-after.md`를 만든다. `--eval.labels` 또는 `--eval.dataset` 중 같은 출처를 두 번 사용한다.
+2. 이 브랜치에서 동일한 명령으로 `013-after.md`를 만든다. `--eval.dataset` 의 같은 셋을 두 번 사용한다.
 3. 원본은 그대로 두고 실행 시각 한 줄만 제거한 복사본을 만든다. 다음은 저장소 루트에서 실행하는 예시다.
 
 ```bash
