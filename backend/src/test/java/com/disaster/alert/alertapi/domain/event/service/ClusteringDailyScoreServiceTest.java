@@ -1,7 +1,6 @@
 package com.disaster.alert.alertapi.domain.event.service;
 
 import com.disaster.alert.alertapi.domain.event.judge.ClusteringJudge;
-import com.disaster.alert.alertapi.domain.event.judge.ClusteringJudge.Agreement;
 import com.disaster.alert.alertapi.domain.event.judge.ClusteringJudge.JudgeInput;
 import com.disaster.alert.alertapi.domain.event.judge.ClusteringJudge.JudgeResult;
 import com.disaster.alert.alertapi.domain.event.judge.JudgeVerdict;
@@ -79,6 +78,13 @@ class ClusteringDailyScoreServiceTest {
                     code, "채점테스트 " + code);
         }
         jdbc.update("INSERT INTO region_adjacency(region_code, neighbor_code) VALUES ('99001', '99002'), ('99002', '99001')");
+
+        // 판사 일치율: 지금 판사 버전의 가장 늦은 측정으로 합계(11/12 · 13/14)를 넣어 둔다. 일치율은 DB 측정 기록 × 현재 라벨로
+        // 세는데(specs/014), 테스트 DB 에는 272쌍 라벨이 없어 시드(V146)의 측정만으로는 셀 수 없기 때문이다(그러면 채점을 건너뛴다)
+        jdbc.update("INSERT INTO judge_agreement_run(judge_version, model, dataset, origin, finished_at, prompt_tokens,"
+                + " completion_tokens, estimated_usd, has_pair_verdicts, legacy_same_num, legacy_same_den, legacy_diff_num,"
+                + " legacy_diff_den) VALUES (?, 'test-model', 'daily-score-test', 'LEGACY_IMPORT', '2099-01-01 00:00:00',"
+                + " 0, 0, 0, false, 11, 12, 13, 14)", ClusteringJudge.PROMPT_VERSION);
 
         // 판사 목: 입력의 두 본문("알림-<id>")에서 id 를 읽어 X 가 아닌 쪽의 준비된 판정을 돌려준다. 쌍마다 호출 횟수는 verify 로 센다
         when(judge.judge(any())).thenAnswer(inv -> {
@@ -175,13 +181,12 @@ class ClusteringDailyScoreServiceTest {
         // 검증: UNSURE 와 형식 실패는 원인이 달라 각각 따로 센다
         assertThat(day.getUnsureCount()).isEqualTo(1);
         assertThat(day.getFormatFailureCount()).isEqualTo(1);
-        // 검증: 판사 버전과 그 버전의 일치율 4개를 복사했다(상수를 직접 적지 않고 판사의 값과 견줘 버전이 올라도 깨지지 않게 한다)
-        Agreement agreement = ClusteringJudge.agreementOf(ClusteringJudge.PROMPT_VERSION).orElseThrow();
+        // 검증: 판사 버전과, 채점 순간 그 버전의 최신 측정으로 센 일치율 4개(준비에서 넣은 11/12 · 13/14)를 복사했다
         assertThat(day.getJudgeVersion()).isEqualTo(ClusteringJudge.PROMPT_VERSION);
-        assertThat(day.getAgreementSameNum()).isEqualTo(agreement.sameNum());
-        assertThat(day.getAgreementSameDen()).isEqualTo(agreement.sameDen());
-        assertThat(day.getAgreementDiffNum()).isEqualTo(agreement.diffNum());
-        assertThat(day.getAgreementDiffDen()).isEqualTo(agreement.diffDen());
+        assertThat(day.getAgreementSameNum()).isEqualTo(11);
+        assertThat(day.getAgreementSameDen()).isEqualTo(12);
+        assertThat(day.getAgreementDiffNum()).isEqualTo(13);
+        assertThat(day.getAgreementDiffDen()).isEqualTo(14);
         // 검증: 비용 확인용 토큰은 목 응답(호출당 100/1)을 6번 더한 값
         assertThat(day.getPromptTokens()).isEqualTo(600);
         assertThat(day.getCompletionTokens()).isEqualTo(6);

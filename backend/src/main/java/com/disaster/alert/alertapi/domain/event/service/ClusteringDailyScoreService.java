@@ -121,6 +121,7 @@ public class ClusteringDailyScoreService {
     private final ClusteringDailyScoreRepository scoreRepository;
     private final ClusteringDailyScorePairRepository pairRepository;
     private final TransactionTemplate transactionTemplate;
+    private final JudgeAgreementService agreementService;
 
     /**
      * 그날(created_at 이 그날 00:00 이상, 다음날 00:00 미만) 발송된 사건 알림을 채점해 저장한다.
@@ -130,15 +131,18 @@ public class ClusteringDailyScoreService {
      *
      * <p>판사 호출이 하나라도 예외를 내면 예외를 그대로 올리고 <b>아무것도 저장하지 않는다</b> - 일부만 저장하면 그날 점수가
      * 틀린 값으로 남고, 기록이 없어야 다음 실행이 그날을 다시 채점한다(R7). 이미 쓴 호출 비용은 버려진다.
-     * 판사 버전에 일치율 상수가 없으면 판사를 부르지 않고 warn 만 남긴다(R6).
+     * 판사 버전의 일치율을 DB 측정 기록에서 셀 수 없으면(측정 없음, 셋 라벨 0행) 판사를 부르지 않고 warn 만 남긴다(R6, specs/014).
+     * 일치율은 채점하는 순간 현재 사람 라벨로 센 값을 그날 행에 복사한다 — 뒤에 라벨을 고쳐도 이미 저장된 날은 바뀌지 않는다.
      *
      * @param date 채점할 날
      */
     public void score(LocalDate date) {
-        // 1) 일치율 상수가 없는 판사 버전은 채점하지 않는다 - 점수 옆에 붙일 신뢰도가 없다(R6). 판사를 부르기 전에 막아야 돈이 안 나간다
-        Optional<Agreement> agreement = ClusteringJudge.agreementOf(ClusteringJudge.PROMPT_VERSION);
+        // 1) 일치율을 셀 수 없는 판사 버전은 채점하지 않는다 - 점수 옆에 붙일 신뢰도가 없다(R6). 판사를 부르기 전에 막아야 돈이 안 나간다.
+        //    측정 기록이 없거나 셋 라벨이 이 DB 에 없으면(운영에 라벨 덤프를 넣기 전) 비어 있다. 행을 남기지 않아 다음 실행이 다시 채점한다
+        Optional<Agreement> agreement = agreementService.latest(ClusteringJudge.PROMPT_VERSION)
+                .map(JudgeAgreementService.VersionAgreement::agreement);
         if (agreement.isEmpty()) {
-            log.warn("클러스터링 일일 채점 건너뜀: 판사 버전 {} 에 272쌍 일치율 상수가 없다 (date={})",
+            log.warn("클러스터링 일일 채점 건너뜀: 판사 버전 {} 의 일치율을 셀 수 없다(측정 기록 또는 평가 셋 라벨 없음) (date={})",
                     ClusteringJudge.PROMPT_VERSION, date);
             return;
         }

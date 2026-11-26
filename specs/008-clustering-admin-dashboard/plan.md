@@ -50,7 +50,7 @@ develop 의 헌법(v1.1.0) 원칙 I~V 와, 다른 브랜치에서 개정 중인 
 
 ### 1. 판사 버전 목록 (한 곳에서 관리)
 
-지금 버전별 일치율은 `ClusteringJudge.agreementOf` 의 switch 에, 모델은 주석에, 단가는 `JudgeAgreementReport` 상수에 흩어져 있다. 대시보드가 "버전·모델·일치율·단가"를 함께 보여 줘야 하므로 순수 클래스 `JudgeVersionCatalog` 하나로 모은다.
+(2026-11-26 갱신: 아래는 008 당시 설계다. 일치율은 이후 [specs/014](../014-judge-agreement-db/plan.md) 로 DB 측정 기록에 옮겨, `JudgeVersionCatalog` 에는 버전·모델·단가만 남고 `agreementOf`·`JudgeAgreementReport` 는 없어졌다.) 지금 버전별 일치율은 `ClusteringJudge.agreementOf` 의 switch 에, 모델은 주석에, 단가는 `JudgeAgreementReport` 상수에 흩어져 있다. 대시보드가 "버전·모델·일치율·단가"를 함께 보여 줘야 하므로 순수 클래스 `JudgeVersionCatalog` 하나로 모은다.
 
 - 버전마다: 버전 이름, 모델, 272쌍 일치율(같은 사건·다른 사건 분자/분모), 입력·출력 단가(USD/1M 토큰), 측정일.
 - `ClusteringJudge.agreementOf`·`MODEL` 과 `JudgeAgreementReport` 단가는 이 목록을 읽게 바꾼다(동작 동일). 이렇게 하면 버전을 올릴 때 한 곳만 고친다.

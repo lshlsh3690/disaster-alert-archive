@@ -73,6 +73,7 @@ public class ClusteringDashboardService {
     private final ClusteringDailyCheckRepository checkRepository;
     private final ClusteringPairLabelRepository labelRepository;
     private final DisasterAlertService disasterAlertService;
+    private final JudgeAgreementService agreementService;
 
     /**
      * 날짜별 일일 채점. 범위의 모든 날을 최신 날짜 먼저로 내고, 기록 없는 날은 날짜와 상태(NO_RECORD)만 채운다.
@@ -189,8 +190,8 @@ public class ClusteringDashboardService {
     }
 
     /**
-     * 판사 버전 이력. 판사 버전 목록 순서(최신 먼저) 그대로, 버전마다 목록의 모델·일치율에 채점 기록에서 구한
-     * 첫날·마지막 날·채점 일수를 붙인다. 채점 기록이 없는 버전은 날짜 null, 일수 0 이다.
+     * 판사 버전 이력. 판사 버전 목록 순서(최신 먼저) 그대로, 버전마다 목록의 모델에 DB 측정 기록으로 센 일치율과 채점 기록에서
+     * 구한 첫날·마지막 날·채점 일수를 붙인다. 측정이 없거나 셀 수 없는 버전은 일치율 쪽이 null, 채점 기록이 없는 버전은 날짜 null·일수 0 이다.
      */
     public ClusteringDashboardJudgeVersionsResponse judgeVersions() {
         // 1) 채점 기록 전체에서 버전별 기간을 구한다 — 계산 규칙은 Metrics 에 있다
@@ -202,10 +203,17 @@ public class ClusteringDashboardService {
         List<ClusteringDashboardJudgeVersionsResponse.Version> versions = new ArrayList<>();
         for (JudgeVersionCatalog.Entry entry : JudgeVersionCatalog.all()) {
             VersionPeriod period = periods.get(entry.version());
+            // 일치율은 측정 기록 × 현재 라벨(specs/014). 셀 수 없으면 일치율 쪽만 비우고 기간은 그대로 보인다
+            JudgeAgreementService.VersionAgreement measured = agreementService.latest(entry.version()).orElse(null);
             versions.add(new ClusteringDashboardJudgeVersionsResponse.Version(
-                    entry.version(), entry.model(), entry.measuredOn(),
-                    ClusteringDashboardMetrics.ratio(entry.sameNum(), entry.sameDen()),
-                    ClusteringDashboardMetrics.ratio(entry.diffNum(), entry.diffDen()),
+                    entry.version(), entry.model(),
+                    measured == null ? null : measured.measuredOn(),
+                    measured == null ? null : ClusteringDashboardMetrics.ratio(
+                            measured.agreement().sameNum(), measured.agreement().sameDen()),
+                    measured == null ? null : ClusteringDashboardMetrics.ratio(
+                            measured.agreement().diffNum(), measured.agreement().diffDen()),
+                    measured == null ? null : measured.recomputable(),
+                    measured == null ? null : measured.unmeasuredPairs(),
                     period == null ? null : period.firstDate(),
                     period == null ? null : period.lastDate(),
                     period == null ? 0 : period.scoredDays()));
@@ -217,7 +225,7 @@ public class ClusteringDashboardService {
             }
             VersionPeriod period = periods.get(version);
             versions.add(new ClusteringDashboardJudgeVersionsResponse.Version(
-                    version, null, null, null, null, period.firstDate(), period.lastDate(), period.scoredDays()));
+                    version, null, null, null, null, null, null, period.firstDate(), period.lastDate(), period.scoredDays()));
         }
         return new ClusteringDashboardJudgeVersionsResponse(versions);
     }

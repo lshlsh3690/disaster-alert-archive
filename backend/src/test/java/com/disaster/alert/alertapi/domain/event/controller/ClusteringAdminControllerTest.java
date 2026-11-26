@@ -198,7 +198,8 @@ class ClusteringAdminControllerTest {
         assertThat(days.get(3).path("attention").asBoolean()).isTrue();
     }
 
-    // 결정(US4): 판사 버전 이력은 버전 목록(JudgeVersionCatalog)의 모델·일치율을 최신 버전 먼저로 내고, 버전마다 채점 기록에서 구한
+    // 결정(US4, specs/014 로 갱신): 판사 버전 이력은 버전 목록(JudgeVersionCatalog)의 모델을 최신 버전 먼저로 내고, 일치율은 그 버전의
+    // 가장 늦은 측정 기록에서 센다(합계만 있는 측정이면 그 합계, recomputable=false). 버전마다 채점 기록에서 구한
     // 첫날·마지막 날·채점 일수를 붙인다. 채점 기록이 없는 버전은 날짜 null, 일수 0 이다(관리자가 "아직 이 버전으로 채점한 날 없음"을 알게).
     // Red 에서는 뼈대가 버전을 빈 목록으로 돌려줘 첫 단언에서 실패한다.
     @Test
@@ -210,22 +211,31 @@ class ClusteringAdminControllerTest {
         // 준비: v1 로 03-02 와 03-04 두 날을 채점. v2 는 기록 없음
         score("2001-03-02", 1, 1, 1, 0, 0, "v1", 1, 1, 1, 1, 0, 0);
         score("2001-03-04", 1, 1, 1, 0, 0, "v1", 1, 1, 1, 1, 0, 0);
+        // 준비: 버전마다 가장 늦은 측정으로 합계만 있는 측정을 넣는다 — 로컬 DB 라벨 유무와 상관없이 값이 정해지게(쌍별 판정 계산은
+        // JudgeAgreementServiceTest 가 본다)
+        measured("v2", 21, 22, 23, 24);
+        measured("v1", 31, 32, 33, 34);
 
         // 실행
         JsonNode data = getData("/judge-versions");
 
-        // 검증: 목록의 모든 버전이 최신 먼저 순서로 나오고(v2 → v1), 모델·일치율은 목록 값이다
+        // 검증: 목록의 모든 버전이 최신 먼저 순서로 나오고(v2 → v1), 모델은 목록 값이다
         JsonNode versions = data.path("versions");
         assertThat(versions).hasSize(JudgeVersionCatalog.all().size());
         for (int i = 0; i < JudgeVersionCatalog.all().size(); i++) {
             JudgeVersionCatalog.Entry entry = JudgeVersionCatalog.all().get(i);
             assertThat(versions.get(i).path("version").asText()).isEqualTo(entry.version());
             assertThat(versions.get(i).path("model").asText()).isEqualTo(entry.model());
-            assertThat(versions.get(i).path("sameAgreement").path("numerator").asInt()).isEqualTo(entry.sameNum());
-            assertThat(versions.get(i).path("sameAgreement").path("denominator").asInt()).isEqualTo(entry.sameDen());
-            assertThat(versions.get(i).path("diffAgreement").path("numerator").asInt()).isEqualTo(entry.diffNum());
-            assertThat(versions.get(i).path("diffAgreement").path("denominator").asInt()).isEqualTo(entry.diffDen());
         }
+        // 검증: 일치율·측정일은 그 버전의 가장 늦은 측정 값이고, 합계만 있는 측정이라 다시 계산되지 않는다고 표시한다
+        JsonNode v2Agreement = versionNode(versions, "v2");
+        assertThat(v2Agreement.path("sameAgreement").path("numerator").asInt()).isEqualTo(21);
+        assertThat(v2Agreement.path("sameAgreement").path("denominator").asInt()).isEqualTo(22);
+        assertThat(v2Agreement.path("diffAgreement").path("numerator").asInt()).isEqualTo(23);
+        assertThat(v2Agreement.path("diffAgreement").path("denominator").asInt()).isEqualTo(24);
+        assertThat(v2Agreement.path("measuredOn").asText()).isEqualTo("2099-01-01");
+        assertThat(v2Agreement.path("recomputable").asBoolean()).isFalse();
+        assertThat(versionNode(versions, "v1").path("sameAgreement").path("numerator").asInt()).isEqualTo(31);
         // 검증: v1 은 첫날 03-02, 마지막 날 03-04, 채점 2일(03-03 은 기록이 없어 세지 않는다)
         JsonNode v1 = versionNode(versions, "v1");
         assertThat(v1.path("firstScoredDate").asText()).isEqualTo("2001-03-02");
@@ -236,6 +246,14 @@ class ClusteringAdminControllerTest {
         assertThat(isAbsentOrNull(v2.path("firstScoredDate"))).isTrue();
         assertThat(isAbsentOrNull(v2.path("lastScoredDate"))).isTrue();
         assertThat(v2.path("scoredDays").asInt()).isZero();
+    }
+
+    /** 그 버전의 가장 늦은 측정이 되도록 먼 미래 시각으로 합계만 있는 측정을 넣는다(테스트 끝에 롤백). */
+    private void measured(String version, int sameNum, int sameDen, int diffNum, int diffDen) {
+        jdbc.update("INSERT INTO judge_agreement_run(judge_version, model, dataset, origin, finished_at, prompt_tokens,"
+                + " completion_tokens, estimated_usd, has_pair_verdicts, legacy_same_num, legacy_same_den, legacy_diff_num,"
+                + " legacy_diff_den) VALUES (?, 'test-model', 'admin-test', 'LEGACY_IMPORT', '2099-01-01 00:00:00',"
+                + " 0, 0, 0, false, ?, ?, ?, ?)", version, sameNum, sameDen, diffNum, diffDen);
     }
 
     /** ADMIN 으로 GET 해 200 을 확인하고, ApiResponse 의 data 부분만 JSON 으로 꺼낸다. */

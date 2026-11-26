@@ -1,12 +1,13 @@
 <!--
 Sync Impact Report (최신 개정. 개정 이력 전체는 파일 맨 아래 절들에 누적)
-- Version change: 1.2.0 → 1.2.1
-- Modified principles: V의 스킬 참조 경로만 `.agents/skills`로 정정 — 규칙 내용은 바뀌지 않음
+- Version change: 1.2.1 → 1.3.0
+- Modified principles: 없음 — 개발 워크플로우의 TDD 커밋 예외만 바꿈
+- Modified sections: 개발 워크플로우 — RED 자동 커밋 상설 승인(2026-08-12)을 "단계마다 스테이징으로 검사, 다음 단계로 갈 때 커밋"으로 대체
 - Added sections: 없음
 - Removed sections: 없음
-- Templates requiring updates: 없음 — 규칙·템플릿 구조 변경 없음
-- Related guidance updated: CLAUDE.md, AGENTS.md, .codex/README.md
-- Historical references: 아래 과거 개정 이력의 당시 경로는 보존
+- Templates requiring updates: 없음
+- Related guidance updated: CLAUDE.md(팀 컨벤션 Red-Green 절), .claude/agents/tdd-developer.md
+- Historical references: 아래 과거 개정 이력은 당시 기록으로 보존
 - Follow-up TODOs: 없음
 -->
 
@@ -97,13 +98,13 @@ service 를 거친다(MUST). 맥락을 넘는 참조는 JPA 객체 연관(`@Many
 - 브랜치명은 성격에 따라 `feature/`, `fix/`, `chore/`, `docs/`, `ci/` 접두사를 사용한다.
 - 커밋/PR 생성은 사용자가 명시적으로 요청했을 때만 수행하며, 민감 파일(`.env`,
   `credentials.json`, `firebase-service-account.json` 등)은 절대 커밋하지 않는다.
-  - **예외(2026-08-12 사용자 상설 승인)**: `tdd-developer` agent는 RED 단계에서 테스트 작성을 마치면
-    되묻지 않고 `commit-message` 스킬로 바로 커밋한다(`.claude/agents/tdd-developer.md` RED 단계 커밋 절).
-    테스트 작성은 되돌리기 쉽고 결과물이 명확해 매번 확인을 받는 것이 왕복만 늘리기
-    때문이다. 이 예외의 범위는 **커밋까지이며 `git push`에는 적용되지 않는다.** 또한
-    스테이징 범위는 그 agent 가 작성한 테스트와 테스트 컴파일에 필요한 최소 스텁으로
-    제한되고, 다른 agent(GREEN 단계 구현 등)나 메인 에이전트의 커밋에는 확대되지
-    않는다.
+  - **예외 — TDD 단계 커밋(2026-11-26 사용자 지시, 2026-08-12 RED 자동 커밋 승인을 대체)**: Red-Green 은
+    단계마다 사용자 검사를 받는다. **검사를 맡길 때는 커밋하지 않고 그 단계의 변경을 스테이징해 둔다**
+    (`git add <파일명>`, 그 단계에서 만든·고친 파일만). 사용자가 **다음 단계로 진행하라고 하면 그때 직전 단계의
+    스테이징을 `commit-message` 스킬로 커밋**하고, 새 단계의 변경을 다시 스테이징해 검사를 받는다. **Red 를
+    시작하기 전에도 먼저 커밋해** 작업 트리에 남은 이전 변경을 정리하고, Red 의 스테이징에는 Red 변경(테스트와
+    테스트 컴파일에 필요한 최소 스텁)만 남게 한다. "다음 단계로 진행" 지시가 곧 직전 단계의 커밋 승인이다.
+    이 예외는 **커밋까지이며 `git push`에는 적용되지 않는다.** Red 와 Green 은 서로 다른 커밋이다.
 - 원격 브랜치는 PR이 머지되면 정리 대상이며, 머지되지 않은 브랜치를 삭제하기 전에는
   반드시 unmerged 커밋 여부를 확인하고 사용자에게 확인받는다.
 
@@ -116,7 +117,7 @@ PATCH는 표현 수정이나 오탈자 교정에 해당한다. 코드 리뷰(및
 원칙들과의 정합성을 확인해야 하며, 원칙을 벗어난 복잡성은 반드시 근거를 문서화해야 한다.
 런타임 개발 가이드는 `CLAUDE.md`를 따른다.
 
-**Version**: 1.2.1 | **Ratified**: 2026-07-03 | **Last Amended**: 2026-11-24
+**Version**: 1.3.0 | **Ratified**: 2026-07-03 | **Last Amended**: 2026-11-26
 
 ---
 
@@ -183,3 +184,14 @@ PATCH는 표현 수정이나 오탈자 교정에 해당한다. 코드 리뷰(및
 **버전**: PATCH — 원칙·권한·커밋 승인 범위는 바꾸지 않고 참조 경로만 고친다.
 
 **영향**: `CLAUDE.md`, `AGENTS.md`, `.codex/README.md`의 사용 안내를 함께 갱신한다. 명세·계획·태스크 템플릿 구조는 그대로이며, 기존 개정 이력은 당시 기록으로 보존한다.
+
+## Sync Impact Report — 1.2.1 → 1.3.0 (2026-11-26)
+
+**사유**: 사용자가 TDD 커밋 방식을 다시 정했다 — 검사를 맡길 때는 커밋하지 않고 스테이징 상태로 두고, 다음 단계로 진행할 때
+직전 단계를 커밋한 뒤 새 변경을 스테이징해 다시 검사를 받는다. Red 를 시작하기 전에도 먼저 커밋한다. 2026-08-12 의 "RED 는
+되묻지 않고 바로 커밋" 상설 승인은 이 규칙으로 대체된다. 같은 날 앞서 나온 "Red·Green 모두 스테이징만"·"Green 은 커밋"
+지시를 하나로 정리한 것이다.
+
+**버전**: MINOR — 원칙 I~VII 는 그대로이고, 개발 워크플로우의 커밋 승인 예외를 다시 정의한 실질적 변경.
+
+**영향**: `CLAUDE.md` 팀 컨벤션의 Red-Green 절과 `.claude/agents/tdd-developer.md` 의 RED·GREEN 커밋 절을 같은 규칙으로 고친다.

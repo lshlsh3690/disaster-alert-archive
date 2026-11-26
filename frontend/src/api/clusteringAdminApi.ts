@@ -122,13 +122,18 @@ export type ClusteringDailyChecksResponse = {
   days: ClusteringDailyCheckDay[];
 };
 
-/** 채점 기록에는 있는데 판사 버전 목록에 없는 버전은 model·measuredOn·일치율이 비어 있다. */
+/**
+ * 일치율은 그 버전 최신 측정의 쌍별 판정 × 현재 사람 라벨(라벨을 고치면 바뀜). 합계만 옮긴 옛 측정이면 recomputable=false.
+ * 측정이 없거나 셀 수 없는 버전, 목록에 없는 버전은 measuredOn·일치율·recomputable·unmeasuredPairs 가 비어 있다.
+ */
 export type ClusteringJudgeVersion = {
   version: string;
   model: string | null;
   measuredOn: string | null;
   sameAgreement: Ratio | null;
   diffAgreement: Ratio | null;
+  recomputable: boolean | null; // 라벨이 바뀌면 다시 계산되는 값인가
+  unmeasuredPairs: number | null; // 셋에 SAME/DIFF 라벨이 있는데 그 측정에 판정이 없는 쌍 수
   firstScoredDate: string | null;
   lastScoredDate: string | null;
   scoredDays: number;

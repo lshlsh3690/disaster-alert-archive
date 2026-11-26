@@ -553,7 +553,10 @@ export function HardPairGradesSection() {
 export function JudgeVersionsSection() {
   const { data, isLoading, error } = useClusteringJudgeVersions();
   return (
-    <Section title="판사 버전 이력" description="일치율은 사람 라벨 272쌍과 판사 판정을 견준 값입니다.">
+    <Section
+      title="판사 버전 이력"
+      description="일치율은 그 버전 최신 측정의 판사 판정을 지금의 사람 라벨 272쌍과 견준 값입니다. 라벨을 고치면 판사를 다시 부르지 않고 바로 다시 계산됩니다."
+    >
       <QueryState isLoading={isLoading} error={error} />
       {data && (
         <div className="overflow-x-auto">
@@ -565,6 +568,7 @@ export function JudgeVersionsSection() {
                 <th className={TH}>측정일</th>
                 <th className={TH}>같은 사건 일치율</th>
                 <th className={TH}>다른 사건 일치율</th>
+                <th className={TH}>비고</th>
                 <th className={TH}>채점 기간</th>
               </tr>
             </thead>
@@ -576,6 +580,15 @@ export function JudgeVersionsSection() {
                   <td className={TD}>{v.measuredOn ?? "-"}</td>
                   <td className={TD}>{formatRatio(v.sameAgreement)}</td>
                   <td className={TD}>{formatRatio(v.diffAgreement)}</td>
+                  <td className={TD}>
+                    {v.recomputable === false && (
+                      <span className="text-[var(--text-muted)]">합계만(라벨 변경 미반영)</span>
+                    )}
+                    {v.unmeasuredPairs != null && v.unmeasuredPairs > 0 && (
+                      <span className="text-[var(--coral)]">측정에 없는 쌍 {formatNumber(v.unmeasuredPairs)}</span>
+                    )}
+                    {v.recomputable !== false && !(v.unmeasuredPairs != null && v.unmeasuredPairs > 0) && "-"}
+                  </td>
                   <td className={TD}>
                     {v.firstScoredDate
                       ? `${v.firstScoredDate} ~ ${v.lastScoredDate} (${v.scoredDays}일)`

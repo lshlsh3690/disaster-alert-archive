@@ -9,6 +9,11 @@ export function useUpdateEvalLabel() {
   const queryClient = useQueryClient();
   return useMutation<EvalLabelResponse, Error, { id: number; body: UpdateEvalLabelRequest }>({
     mutationFn: ({ id, body }) => updateEvalLabel(id, body),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["admin", "clustering", "eval-labels"] }),
+    // 판사 일치율은 현재 라벨로 다시 세므로(specs/014) 판사 버전 이력도 새로 불러오게 한다
+    onSuccess: () =>
+      Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["admin", "clustering", "eval-labels"] }),
+        queryClient.invalidateQueries({ queryKey: ["admin", "clustering", "judge-versions"] }),
+      ]),
   });
 }
