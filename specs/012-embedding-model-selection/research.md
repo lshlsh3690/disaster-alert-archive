@@ -139,6 +139,17 @@ Query: "`. 대칭 비교라 모든 문장에 같은 지시문이 붙는다.
 | 호스팅형(Cloudflare AI Gateway, OpenRouter 등) | 외부 서비스 경유 | 기각. 로컬 TEI(localhost)로 보낼 수 없고, 요청이 외부 서비스를 거친다 — 조건 1·3 |
 | 직접 구현(Spring 에서 사용량 표에 기록) | 앱 코드 | 기각. 단가표·키별 예산 차단·화면을 새로 만들어야 한다 — 조건 2·6. 같은 일을 하는 도구가 있다 |
 
+**검토한 반론과 판단 (2026-11-27)** — 선택 이유를 받아 적은 뒤, 시니어 입장의 반론을 받고 사용자가 답했다.
+
+| 반론 | 사용자 판단 / 대응 |
+|---|---|
+| 들어가는 돈은 0 이지만 구성·검증에 반나절이 들었고, 지켜본 금액은 지금까지 $0.003·012 전체 약 $2.5 라 도구가 더 비싸다 | **나에게는 시간보다 돈이 더 중요하다.** 유지 |
+| 지금 후보는 OpenAI·TEI 모두 원래 OpenAI 형식이라 "묶어 준다"는 이점이 지금은 작다 | **OpenAI 만이 아니라 앞으로 여러 회사 모델을 통합 관리해야 해서, 확장 가능성을 보고 골랐다.** 유지 |
+| `main-stable` 태그는 받을 때마다 바뀌고, 무료 기능 경계가 버전마다 움직인다 | 이미지를 검증한 1.111.0 의 digest 로 고정(`docker-compose.dev.yml`). 올릴 때 이 절의 확인을 다시 한다 |
+| 프록시가 요청을 조용히 고칠 수 있다(`drop_params` 로 TEI 의 `dimensions` 를 버림) — 설정을 실수해도 에러 대신 다른 조건으로 돈 결과가 나올 수 있다 | (1) `drop_params` 는 TEI 세 모델에만, 전역으로 켜지 않는다(OpenAI 모델은 잘못된 파라미터가 에러로 난다). (2) 후보마다 큰 채우기 전에 같은 20건을 직접 호출과 프록시로 채워 같은 알림의 두 벡터 거리가 0.01 이하인지 본다(quickstart 2, tasks T011). (3) 채운 뒤 저장 벡터 차원과 프록시 기록의 `model_group`·`api_base` 가 의도한 모델인지 대조한다. 가상 키의 허용 모델이 다른 모델 호출을 막는다 |
+| 형식이 다른 회사(Claude 등)를 OpenAI 형식으로 번역해 부르면 고유 API 로 쓸 때와 결과가 달라질 수 있다 | 012 의 임베딩 후보는 모두 원래 OpenAI 형식이라 해당 없음. 다른 회사 모델을 비교할 때(예: LLM 판사·번역) — 번역 경로 대신 LiteLLM 의 고유 형식 통과(pass-through) 경로를 쓰고 앱은 그 회사의 Spring AI 모듈로 부른다(통과 경로의 범위·비용 기록은 **그때 문서와 실측으로 확인**). 비교 전에 같은 질문 20~30개를 고유 API 직접 호출과 프록시 경유로 보내 결과가 같은지 먼저 본다 |
+| Grafana·Prometheus 는 아직 없는 문제에 대한 대비이고, 알림 없는 대시보드는 열어 볼 때만 쓸모 있다 | 게이트웨이를 호출 경로에 둘 때의 트래픽 트러블슈팅 대비로 로컬에 설정만 해 둔 것(위 사용자 판단). 운영 도입 때 알림과 함께 다시 설계한다 |
+
 **운영 도입 때(추후)**: 프록시를 운영 호출 경로(수집 루프의 임베딩, LLM 폴백, 번역, 일일 채점)에 끼우면 프록시 장애가 곧 수집·클러스터링 장애가 된다. 그래서 운영은 LiteLLM 을 그대로 쓸지, 호출 경로 밖의 Langfuse 로 갈지를 다시 비교한다. 이때 위 "확인되지 않았다" 항목(Portkey 예산, Helicone 예산, Langfuse 의 새 AI Gateway)도 그 시점 문서로 다시 확인한다.
 
 **출처(2026-11-27 확인)**: LiteLLM Enterprise 기능 목록 https://docs.litellm.ai/docs/proxy/enterprise · LiteLLM Prometheus https://docs.litellm.ai/docs/proxy/prometheus · Portkey Gateway 2.0 https://portkey.ai/blog/gateway-2-0/ · Portkey 기능 비교 https://docs.portkey.ai/docs/product/product-feature-comparison · Helicone 셀프 배포 https://docs.helicone.ai/getting-started/self-deploy · Langfuse 셀프 호스팅 https://langfuse.com/self-hosting · Langfuse ClickHouse https://langfuse.com/resources/engineering/clickhouse-for-self-hosted-langfuse

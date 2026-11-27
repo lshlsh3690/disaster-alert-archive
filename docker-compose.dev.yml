@@ -56,7 +56,9 @@ services:
   litellm:
     profiles:
       - llm-usage
-    image: ghcr.io/berriai/litellm:main-stable
+    # 버전 고정(2026-11-27): 검증을 마친 LiteLLM 1.111.0(main-stable, 2026-11-25 빌드). 태그는 받을 때마다 바뀔 수 있어
+    # digest 로 묶는다 — 버전마다 파라미터 처리·무료 기능 범위가 달라질 수 있다(specs/012 research R11). 올릴 때는 R11 의 확인을 다시 한다
+    image: ghcr.io/berriai/litellm@sha256:ce00096d012719d58c52cecfa373f7c6256dd1b0ff08f6fa607e10e9628f1f46
     container_name: litellm
     command: ["--config", "/app/config.yaml", "--port", "4000"]
     ports:
