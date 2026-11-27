@@ -26,11 +26,15 @@
 5. 거리 파일과 리포트를 `backend/evaluation/reports/embedding-pairs-<날짜>/` 에 커밋한다.
 6. 기준선보다 LLM 후보 지점의 같은 사건 쌍을 더 넣은 후보 중 최대 2개를 2단계로 보낸다(사용자 확인). 없으면 6으로 간다(spec FR-008).
 
-## 3. 병합 거리 설정화 (운영 동작 불변)
+## 3. 병합 거리 설정화 (운영 동작 불변) — 2026-11-27 취소
+
+거리 기준을 모든 모델에 운영 값(0.15·0.40·0.6)으로 고정해 이 단계는 하지 않는다(research R10). 아래 내용은 기록으로 남긴다.
 
 - `clustering.merge-max-distance`(기본 0.15) Red → 사용자 Red 확인 → Green(research R7).
 
 ## 4. 2단계 재클러스터링 (유료, 사용자 승인 후)
+
+> 2026-11-27 방향 전환(research R10): 기준선 포함 다섯 모델 모두, 거리 설정은 운영 값 그대로(아래의 `--clustering.merge-max-distance`·`distance-ceil`·`similarity-floor` 덮어쓰기는 하지 않는다), 호출은 `--spring.ai.openai.base-url=http://localhost:4000 --spring.ai.openai.api-key=sk-012-run-<별칭>` 로 프록시를 거친다. 채운 임베딩은 `embedding_store.alert_embedding` 으로 내보내고, 다시 쓸 때는 거기서 가져온다. 순서는 tasks T010·T011.
 
 1. **흔들림 확인**(약 $0.3): v6 를 템플릿으로 `disaster_alert_eval_v6_rerun` 을 만들고 006 quickstart 3 절차로 재클러스터링 → 평가. 지금 라벨로 v6 자체도 평가(무료)해 둘을 비교한다(R8).
 2. **후보마다**:

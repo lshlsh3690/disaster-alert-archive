@@ -8,8 +8,8 @@
 
 지금 임베딩(`text-embedding-3-small`)과 후보 4개(`text-embedding-3-large`, `Qwen3-Embedding-0.6B`, `multilingual-e5-large-instruct`, `BGE-m3-ko`)를 사람 라벨로 비교해 바꿀지 판단할 근거를 만든다. 운영은 바꾸지 않는다.
 
-- **1단계(쌍 거리 실험, 1센트 미만)**: 272쌍 중 임베딩 거리로 병합이 정해지는 137쌍(같은 사건 81·다른 사건 56)만 다시 임베딩한다. "다른 사건은 지금만큼만 붙일 때 같은 사건을 몇 쌍 붙이나"를 두 지점에서 센다. 바로 병합 지점의 기준선은 같은 사건 81쌍 중 19쌍, LLM 후보 지점의 기준선은 70쌍이다.
-- **2단계(재클러스터링, 최대 2개, 약 $2)**: 평가 사본의 임베딩을 기존 백필 도구(`--backfill.embed-only`)로 후보 모델로 전부 채운 뒤, 기존 재클러스터링·평가 도구로 점수를 낸다. 운영 코드는 코드에 고정된 병합 거리 0.15 를 기본값 그대로 설정으로 빼는 것 하나만 바꾼다.
+- **1단계(쌍 거리 실험, 완료 2026-11-27)**: 272쌍 중 임베딩 거리로 병합이 정해지는 137쌍(같은 사건 81·다른 사건 56)을 다시 임베딩해 두 지점에서 셌다. 결과(77611dda)는 거르기가 아니라 모델별 거리 눈금 해석 자료로 쓴다.
+- **2단계(재클러스터링, 다섯 모델 모두, 약 $2.3, 2026-11-27 방향 전환 — research R10)**: 기준선(`3small`, 저장 임베딩)과 후보 4개를 모두 운영과 같은 거리 기준(0.15·0.40·0.6)으로 재클러스터링해 272쌍으로 채점한다. 후보 임베딩은 기존 백필 도구(`--backfill.embed-only`)로 채우고 별도 로컬 DB `embedding_store` 에 보관해 재사용한다. 모델마다 평가 사본을 따로 둔다. 모든 호출은 로컬 LiteLLM 프록시를 거치고 실행마다 가상 키(허용 모델·예산 상한)를 써서 비용을 실행별로 기록한다. 운영 코드는 바꾸지 않는다(백필 묶음 500 상수만 바꾼다).
 - **3단계**: 성능·전환 비용·운영 부담 표를 만들고 사용자가 고른다.
 
 모든 실험은 Java 로, 운영 클러스터링이 쓰는 Spring AI `EmbeddingModel` 그대로 한다. 공개 모델은 TEI(Hugging Face text-embeddings-inference) 컨테이너에 띄워 OpenAI 와 같은 형식의 주소로 부르고, 설정만 바꿔 모델을 고른다(research R3, 2026-11-20 사용자 지시로 Python 안을 기각). 기준선 재현 확인(다시 잰 `3-small` 거리가 저장 거리와 0.01 이내)으로 측정 경로가 운영과 같은지 확인한다.
@@ -22,7 +22,7 @@
 
 **저장소**: 로컬 Docker Postgres 의 평가 사본(`disaster_alert_eval_v6` 와 그 복제본). 운영 DB 는 읽기 전용 조회(규모 확인)만
 
-**테스트**: JUnit Red-Green — 대상 쌍 고르기(R1)와 두 지점 비교(R2) 순수 클래스, 병합 거리 설정화(R7). 측정 모드 전체는 기준선 재현 확인(SC-002)으로 검증한다
+**테스트**: JUnit Red-Green — 대상 쌍 고르기(R1)와 두 지점 비교(R2) 순수 클래스. 측정 모드 전체는 기준선 재현 확인(SC-002)으로 검증한다. (병합 거리 설정화 R7 은 2026-11-27 취소)
 
 **대상 플랫폼**: 개발 PC(Windows, RTX 4050 6GB, Docker). 맥북 운영 서버는 측정만(조건부, 승인 후)
 
@@ -32,7 +32,7 @@
 
 **제약사항**: 유료 호출은 명시 승인 후에만, 운영 임베딩 모델·운영 데이터·클러스터링 규칙 불변, 지표는 "N쌍 중 M쌍"과 두 비율·점수만
 
-**규모/범위**: 후보 5개, 1단계 대상 137쌍(알림 수백 건), 2단계 사본 최대 3개(흔들림 확인 1 + 후보 2)
+**규모/범위**: 후보 5개, 1단계 대상 137쌍(알림 274건), 2단계 사본 5개(기준선 1 + 후보 4, 각 2.7GB), 보관 DB 약 25만 행(1~1.5GB)
 
 ## 헌법 검사
 
@@ -76,19 +76,18 @@ backend/src/main/java/com/disaster/alert/alertapi/domain/event/
 ├── evaluation/EmbeddingPairComparison.java   # 두 지점 비교·바뀐 쌍(순수, R2)
 ├── evaluation/EmbeddingPairRunner.java       # 측정 모드: 조회 → EmbeddingModel 호출 → 거리 CSV / 요약 리포트
 ├── evaluation/EvaluationRunTool.java         # --eval.embedding-pairs, --eval.embedding-pairs-summary 추가
-└── service/EventClusteringService.java       # 병합 거리 0.15 → clustering.merge-max-distance(기본 0.15)
+└── tool/EventClusteringBackfillTool.java     # embed-only 묶음 200 → 500 (2026-11-27 사용자 결정)
 
 backend/src/test/java/com/disaster/alert/alertapi/domain/event/
 ├── evaluation/EmbeddingPairSubsetTest.java   # 순수 단위(Red-Green)
-├── evaluation/EmbeddingPairComparisonTest.java
-└── service/…                                 # 설정화 Red-Green
+└── evaluation/EmbeddingPairComparisonTest.java
 
 backend/evaluation/reports/
 ├── embedding-pairs-<날짜>/                    # 1단계 모델별 거리 CSV + 요약 리포트
 └── 2026-11_<날짜>-embed-<별칭>.md             # 2단계 평가 리포트(기존 도구 출력)
 
 backend/evaluation/README.md                  # 측정 모드·TEI 실행 예시
-CLAUDE.md                                     # "0.15 는 코드에 고정" 문구 갱신
+infra/llm-usage/litellm-config.yaml           # LLM 폴백 gpt-4o-mini 등록(가상 키 허용 모델)
 ```
 
 **구조 결정**: 측정 모드는 기존 평가 도구(`EvaluationRunTool`, `eval` 프로필)에 붙인다. 판사 일치율 측정(`JudgeAgreementRunner`)과 같은 모양이다. 평가 사본·TEI 캐시는 커밋하지 않고, 결과 파일만 커밋한다.
@@ -101,15 +100,13 @@ CLAUDE.md                                     # "0.15 는 코드에 고정" 문�
 | 2 | 1의 Green + 측정 모드(`EmbeddingPairRunner`, `EvaluationRunTool` 옵션) | 코드 리뷰(100줄 이상이면) |
 | 3 | TEI 연결 시험, `stored`·공개 모델 3개 측정(무료) | — |
 | 4 | OpenAI 2개 측정, 요약 리포트, 기준선 재현 확인, 결과 커밋 | **유료(1센트 미만) 사용자 승인** |
-| 5 | 1단계 결과 보고 → 2단계 후보(최대 2개) 확인 | **사용자 확인** |
-| 6 | `clustering.merge-max-distance` 설정화 Red | **사용자 Red 확인** |
-| 7 | 6의 Green + CLAUDE.md 문구 | — |
-| 8 | 흔들림 확인 재클러스터링(v6_rerun) | **유료(약 $0.3) 사용자 승인** |
-| 9 | 후보 사본 만들기·`embed-only` 채우기·재클러스터링·평가(후보당) | **유료(`3-large` 채우기 약 $0.8 + 재클러스터링 약 $0.3) 사용자 승인** |
-| 10 | 운영 규모 조회(읽기 전용), 공개 모델이 이겼으면 맥북 측정 | **맥북 측정은 사용자 승인** |
+| 5 | 1단계 결과 보고 → 다섯 모델 모두 재클러스터링으로 방향 전환(R10) | 완료(2026-11-27) |
+| 6 | 판정 기준 미정 항목 확정(결과 보기 전) | **사용자 결정** |
+| 7 | 백필 묶음 500 + TEI 재기동, 프록시에 gpt-4o-mini 등록, 가상 키 5개, 보관 DB 생성(무료) | — |
+| 8 | 기준선 `3small` 재클러스터링·평가, v6 기존 배정 평가 → 흔들림 | **유료(약 $0.3) 사용자 승인** |
+| 9 | 후보마다 사본·채우기(또는 보관본 가져오기)·보관·재클러스터링·평가 | **유료(`3-large` 채우기 약 $0.8 + 재클러스터링 회당 약 $0.3) 사용자 승인** |
+| 10 | 결과 보고(흔들림 대비, 키별 실제 비용), 공개 모델이 이겼으면 맥북 측정 | **맥북 측정은 사용자 승인** |
 | 11 | `decision.md` 표 작성 → 사용자 판정 | **사용자 결정** |
-
-1단계에서 어느 후보도 기준선보다 낫지 않으면 6~10을 건너뛰고 11로 간다. 결론은 "지금 모델 유지"와 그 근거 쌍이다.
 
 ## 복잡도 추적
 

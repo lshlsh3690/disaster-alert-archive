@@ -37,24 +37,22 @@
 - [x] T003 [US1] Green — `tdd-developer`(단계: GREEN, "사용자가 Red 를 확인했다")로 두 순수 클래스를 채운 뒤, 측정 모드를 더한다. `backend/src/main/java/com/disaster/alert/alertapi/domain/event/evaluation/EmbeddingPairRunner.java`(`@Profile("eval")`): `stored`(저장 임베딩 거리를 SQL 로), `<별칭>`(평가 사본 `disaster_alert.message` 를 주입받은 Spring AI `EmbeddingModel` 로 배치 임베딩 → 코사인 거리), 요약(CSV 들 → `EmbeddingPairComparison` → `embedding-pairs-summary.md`, 기준선 재현 실패면 맨 위 경고 + 종료 코드 1). 임베딩 주소가 `api.openai.com` 이고 `--eval.approve-paid-embedding` 이 없으면 예상 비용만 출력하고 호출하지 않는다. `backend/src/main/java/com/disaster/alert/alertapi/domain/event/evaluation/EvaluationRunTool.java` 에 `--eval.embedding-pairs`, `--eval.embedding-pairs-summary`, `--eval.approve-paid-embedding` 을 더한다(기존 `--eval.recheck`·`--eval.judge-agreement` 와 함께 주면 오류). 형식은 contracts 3절·data-model 2절. 변경이 100줄 이상이면 커밋 전에 `code-reviewer` 를 돌린다(`git diff` 와 줄 범위를 프롬프트에 넣어서).
 - [x] T004 [US1] 무료 측정 — `--eval.embedding-pairs=stored` 로 기준선 값을 확인하고, TEI 3개(`qwen3_06b` 8081, `e5_large_instruct` 8082, `bge_m3_ko` 8083, contracts 1절)를 띄워 contracts 2절 설정으로 각각 측정한다. 출력: `backend/evaluation/reports/embedding-pairs-<날짜>/embedding-pairs-<별칭>.csv`.
 - [x] T005 [US1] [유료 1센트 미만] `3small`·`3large` 를 `--eval.approve-paid-embedding` 없이 돌려 예상 비용을 보이고, 승인 뒤 측정한다. 요약 모드로 `backend/evaluation/reports/embedding-pairs-<날짜>/embedding-pairs-summary.md` 를 만들어 기준선 재현과 기준선 두 지점 값을 확인하고, 결과 폴더를 커밋한다.
-- [ ] T006 [US1] `embedding-pairs-summary.md` 결과를 "N쌍 중 M쌍"으로(화재 따로) 사용자에게 보고한다. 기준선보다 LLM 후보 지점의 같은 사건 쌍을 더 넣은 후보 중 2단계로 보낼 것(최대 2개)을 사용자가 정한다. 없으면 T012 로 간다(spec FR-008).
+- [x] T006 [US1] 1단계 결과를 "N쌍 중 M쌍"으로(화재 따로) 보고했다(2026-11-27). 사용자가 결과로 후보를 거르지 않고 다섯 모델 모두 재클러스터링하기로 했다(spec "2026-11-27 방향 전환", research R10). 1단계 결과는 거리 눈금 해석 자료로 남긴다.
 
 ---
 
-## Phase 3: 사용자 스토리 2 - 최종 후보로 실제 클러스터링을 다시 돌려 점수를 비교한다 (우선순위: P2)
+## Phase 3: 사용자 스토리 2 - 다섯 모델 모두 실제 클러스터링을 다시 돌려 점수를 비교한다 (우선순위: P2)
 
-**목표**: 최종 후보마다 평가 사본을 후보 임베딩으로 채워 재클러스터링하고 기준선과 같은 형식으로 점수를 낸다.
+**목표**: 기준선(`3small`)과 후보 4개를 운영과 같은 거리 기준(0.15·0.40·0.6)으로 모두 재클러스터링하고, 같은 형식으로 점수를 낸다. 임베딩은 보관 DB 에 남겨 재사용하고, 실행마다 LiteLLM 가상 키로 비용을 나눠 기록한다(research R10).
 
-**독립 테스트**: 기준선 재실행의 흔들림(차이 쌍 수)과 후보 점수 차가 나란히 리포트에 있다.
+**독립 테스트**: 기준선 재실행의 흔들림(v6 기존 배정 대비 점수 차)과 후보 점수 차가 나란히 리포트에 있고, 실행별 실제 비용이 가상 키 기록과 같다.
 
-- [ ] T007 [US2] Red — `tdd-developer`(단계: RED)로 `backend/src/test/java/com/disaster/alert/alertapi/domain/event/service/EventClusteringServiceMergeDistanceTest.java` 를 쓰고 스테이징한다: 설정이 없으면 거리 0.15 이하에 병합하고, `clustering.merge-max-distance=0.30` 이면 거리 0.20 에 병합한다. 뼈대: `EventClusteringService.java` 에 `@Value("${clustering.merge-max-distance:0.15}")` 필드만 더하고 판단은 아직 지역 변수 0.15 를 쓴다. 테스트 구성은 같은 폴더 기존 `EventClusteringService*Test` 를 따른다.
-
-**체크포인트(멈춤)**: 사용자에게 `./gradlew test --tests "*EventClusteringServiceMergeDistanceTest"` 로 Red 확인을 받는다.
-
-- [ ] T008 [US2] Green — `tdd-developer`(단계: GREEN, "사용자가 Red 를 확인했다")로 `backend/src/main/java/com/disaster/alert/alertapi/domain/event/service/EventClusteringService.java` 의 지역 변수 0.15 를 그 필드로 바꾸고, `CLAUDE.md` 이벤트 클러스터링 절의 "(설정이 아니라 코드에 고정)"을 "`clustering.merge-max-distance`(기본 0.15, 운영 설정 없음)"로 고친다. 운영 `application.yml` 에는 값을 넣지 않는다.
-- [ ] T009 [US2] [유료 약 $0.3] 흔들림 확인 — 지금 라벨로 `disaster_alert_eval_v6` 를 평가(무료)하고, v6 를 템플릿으로 `disaster_alert_eval_v6_rerun` 을 만들어 006 quickstart 3 절차로 재클러스터링 → 평가한다. 리포트 `backend/evaluation/reports/2026-11_<날짜>-embed-baseline.md`·`…-embed-baseline-rerun.md` 를 커밋하고 차이 쌍 수를 흔들림으로 적는다.
-- [ ] T010 [US2] [유료: `3large` 채우기 약 $0.8 + 재클러스터링 약 $0.3, 공개 모델은 재클러스터링만] 최종 후보마다 한 번: (1) `CREATE DATABASE disaster_alert_eval_e_<별칭> TEMPLATE disaster_alert_eval_v6`. 1024차원이면 HNSW 인덱스 삭제 → 임베딩 NULL → `vector(1024)`, `3large` 면 임베딩 NULL 만. (2) 후보 임베딩 설정으로 `EventClusteringBackfillTool --backfill.embed-only=true`, `count(*)`·`count(embedding)` 확인, 1024 사본은 HNSW 인덱스 재생성. (3) 006 재클러스터링 절차 + 후보 임베딩 설정 + `--clustering.merge-max-distance=<바로 병합 기준> --clustering.llm-fallback.distance-ceil=<LLM 후보 기준> --clustering.cross-region.similarity-floor=<1 − LLM 후보 기준>`(기준은 T005 리포트). (4) `--eval.dataset=cluster-eval-2026-11 --eval.bcubed=evaluation/datasets/bcubed-2026-05.labels.json` 로 평가해 `backend/evaluation/reports/2026-11_<날짜>-embed-<별칭>.md` 에 쓴 설정과 함께 커밋한다. 근거: research R6·R7, quickstart 4.
-- [ ] T011 [US2] `backend/evaluation/reports/2026-11_<날짜>-embed-<별칭>.md` 의 후보 점수 − 기준선 점수를 T009 흔들림과 비교해 보고한다(흔들림 안이면 "차이 없음", spec FR-012). 고쳐진 쌍·새로 틀린 쌍을 원문으로 몇 개 보인다.
+- [x] T007 [US2] (2026-11-27 확정 — 둘 다 나빠지지 않아야 나아짐, 화재도 따로 세어 둘 중 하나라도 늘면 탈락, research R10) 판정 기준의 미정 항목(최소 개선 폭, 과병합이 늘면 탈락 여부, 화재가 나빠지면 탈락 여부, 흔들림을 넘었을 때 성능·비용 맞바꿈)을 사용자와 정해 `specs/012-embedding-model-selection/research.md` R10 에 적는다. **재클러스터링 결과를 보기 전에** 정한다(spec FR-014).
+- [ ] T008 [US2] 백필 묶음 크기 200 → 500(2026-11-27 사용자 결정): `backend/src/main/java/com/disaster/alert/alertapi/domain/event/tool/EventClusteringBackfillTool.java` 의 `EMBED_BATCH_SIZE` 와 javadoc, contracts 1절 TEI 명령과 quickstart 의 `--max-client-batch-size` 를 500 으로. TEI 컨테이너 3개를 `--max-client-batch-size 500` 으로 다시 띄운다(모델 캐시 재사용). 1단계 측정기(`EmbeddingPairRunner`, 200)는 결과에 영향이 없어 그대로 둔다. 상수 변경이라 Red-Green 대상 아님.
+- [x] T009 [US2] (2026-11-27 완료 — 허용 모델 임베딩 성공·허용 밖 모델 거부 확인, `gpt-4o-mini` 실호출은 유료라 T010 첫 실행에서 확인) 무료 준비: (1) `infra/llm-usage/litellm-config.yaml` 에 `gpt-4o-mini`(LLM 폴백)를 등록하고 프록시 재시작. (2) R10 표대로 가상 키 5개 발급(키 값 지정, 허용 모델, 예산 상한) — `/key/generate`. (3) 보관 DB `embedding_store` 와 표 `alert_embedding` 생성(R10). (4) 키 하나로 임베딩·`gpt-4o-mini` 를 각 1회 불러 허용 모델·기록이 맞는지, 허용 밖 모델이 거부되는지 확인.
+- [ ] T010 [US2] [유료 약 $0.3] 기준선: 지금 라벨로 v6 기존 배정을 평가(무료) → `CREATE DATABASE disaster_alert_eval_e_3small TEMPLATE disaster_alert_eval_v6` → 006 quickstart 3 재클러스터링(프록시 주소 + 키 `sk-012-run-3small`, 거리 설정 운영 값) → `--eval.dataset=cluster-eval-2026-11 --eval.bcubed=evaluation/datasets/bcubed-2026-05.labels.json` 평가. 리포트 `backend/evaluation/reports/2026-11_<날짜>-embed-baseline-v6.md`·`…-embed-3small.md` 를 커밋하고, 두 점수 차이를 흔들림으로 적는다. LLM 폴백 판정 수·실패 수가 프록시를 거치기 전과 같은 수준인지 확인한다.
+- [ ] T011 [US2] [유료: `3large` 채우기 약 $0.8 + 재클러스터링 약 $0.3, 공개 모델은 재클러스터링만] 후보 4개마다 한 번(실행 전 예상 비용을 보이고 승인): (1) `CREATE DATABASE disaster_alert_eval_e_<별칭> TEMPLATE disaster_alert_eval_v6`. (2) 보관 DB 에 그 모델 행이 있으면 `COPY` 로 가져와 `disaster_alert.embedding` 갱신, 없으면 HNSW 인덱스 삭제 → 임베딩 NULL → (1024 모델이면) `vector(1024)` → `--backfill.embed-only=true`(프록시 + 그 키) → `count(*)`·`count(embedding)` 확인 → `(alert_id, embedding)` 을 보관 DB 로 `COPY`. (3) HNSW 인덱스 재생성. (4) 재클러스터링(프록시 + 그 키, 거리 설정 운영 값). (5) T010 과 같은 옵션으로 평가, `backend/evaluation/reports/2026-11_<날짜>-embed-<별칭>.md` 커밋. 근거: research R6·R10, quickstart 4.
+- [ ] T012 [US2] 다섯 리포트의 점수·두 비율을 T010 흔들림과 나란히 보고한다(흔들림 안이면 "차이 없음", spec FR-012). 가상 키별 실제 비용(채우기·LLM 폴백)과 고쳐진 쌍·새로 틀린 쌍 원문 몇 개를 함께 보인다. 눈금이 다른 모델(e5 등)은 1단계 거리 분포로 이유를 밝힌다.
 
 ---
 
@@ -62,45 +60,37 @@
 
 **목표**: 후보별 성능·비용·운영 부담 표로 사용자가 고른다.
 
-**독립 테스트**: 표의 비용이 단가 × 토큰으로 다시 계산되고, 점수가 리포트 파일과 같다(spec SC-004).
+**독립 테스트**: 표의 비용이 가상 키 기록·단가 × 토큰과 같고, 점수가 리포트 파일과 같다(spec SC-004·SC-007).
 
-- [ ] T012 [US3] `specs/012-embedding-model-selection/decision.md` 를 쓴다. 후보별 한 줄: 1단계 두 지점, 2단계 점수(했으면), 1회 전환 비용·매일 비용(평가 사본 알림 62,554건과 T004·T005 의 실제 토큰으로 추정하고 추정임을 밝힘), 스키마·코드 변경, 운영 부담, 헌법 개정 필요 여부(research R9). 공개 모델이 2단계에서 이겼으면 사용자 승인 뒤 맥북에서 TEI 로 알림 1건 임베딩 시간·메모리를 재어 함께 적는다(spec FR-001a). 버린 후보마다 이유 한 줄. 사용자에게 표를 보이고, 판정과 이유(표의 숫자로)를 받아 적은 뒤 커밋한다(spec FR-014·FR-015). 운영 교체는 하지 않는다.
+- [ ] T013 [US3] `specs/012-embedding-model-selection/decision.md` 를 쓴다. 모델별 한 줄: 재클러스터링 점수와 흔들림 대비 차이, 1단계 두 지점(참고), 1회 전환 비용·매일 비용(평가 사본 알림 62,554건과 실제 토큰으로 추정하고 추정임을 밝힘), 실행별 실제 비용(가상 키), 스키마·코드 변경, 운영 부담, 헌법 개정 필요 여부(research R9). 공개 모델이 이겼으면 사용자 승인 뒤 맥북에서 TEI 로 알림 1건 임베딩 시간·메모리를 재어 함께 적는다(spec FR-001a). T007 에서 정한 판정 기준으로 판정 초안을 적고, 사용자 판정과 이유를 받아 적은 뒤 커밋한다(spec FR-014·FR-015). 운영 교체는 하지 않는다.
 
 ---
 
 ## Phase 5: 마무리
 
-- [ ] T013 [P] `backend/evaluation/README.md` 에 측정 모드(`--eval.embedding-pairs`, `--eval.embedding-pairs-summary`, `--eval.approve-paid-embedding`)와 TEI 실행 예시를 더한다.
-- [ ] T014 끝나면 쓰지 않는 평가 사본(`disaster_alert_eval_v6_rerun`, `disaster_alert_eval_e_*`)과 TEI 컨테이너를 지울지 사용자에게 묻고 정한 대로 한다(지우기 전 대상 확인). 정리 결과를 `specs/012-embedding-model-selection/decision.md` 끝에 한 줄로 적는다.
+- [ ] T014 [P] `backend/evaluation/README.md` 에 측정 모드(`--eval.embedding-pairs`, `--eval.embedding-pairs-summary`, `--eval.approve-paid-embedding`), 보관 DB 재사용, 프록시·가상 키로 재클러스터링하는 예시를 더한다.
+- [ ] T015 끝나면 평가 사본(`disaster_alert_eval_e_*`), 보관 DB(`embedding_store`), TEI 컨테이너, 가상 키를 남길지 사용자에게 묻고 정한 대로 한다(지우기 전 대상 확인). 결과를 `decision.md` 끝에 한 줄로 적는다.
 
 ---
 
 ## 의존성 및 실행 순서
 
-- **T001** → **US1**: T002 → (사용자 Red 확인) → T003 → T004 → T005 → T006.
-- **US2**: T006 에서 후보가 정해진 뒤. T007 → (사용자 Red 확인) → T008 → T009 → 후보마다 T010 → T011.
-- **US3**: US1 만 끝났어도 가능(2단계 없이 "지금 모델 유지"). US2 를 했으면 그 뒤.
-- **T013**: T003 이후 언제든. **T014**: 마지막.
+- **T001** → **US1**: T002 → (사용자 Red 확인) → T003 → T004 → T005 → T006. (완료)
+- **US2**: T007(판정 기준, 결과 보기 전) → T008·T009(무료 준비, 병렬 가능) → T010(기준선, 흔들림) → 후보마다 T011 → T012.
+- **US3**: T012 뒤 T013.
+- **T014**: T011 이후 언제든. **T015**: 마지막.
 
 ### 병렬 처리 가능 지점
 
-- T004 의 TEI 컨테이너 3개는 함께 띄울 수 있다(GPU 6GB 가 모자라면 하나씩). 측정은 같은 사본을 쓰므로 차례로 돌린다.
-- T013 은 다른 작업과 병렬.
-- T010 의 후보 두 개는 GPU·비용 승인 때문에 하나씩 한다.
+- T008 과 T009 는 서로 독립이다.
+- T011 의 공개 모델 채우기는 TEI 컨테이너 3개가 함께 떠 있으면 차례로 바로 돈다. 재클러스터링은 LLM 비용 승인 때문에 하나씩 한다.
 
 ## 구현 전략
 
-### MVP 우선 (사용자 스토리 1만)
-
-1. T001 연결 시험 → US1(T002~T006). 비용 1센트 미만.
-2. **멈추고 확인**: 낫는 후보가 없으면 T012 로 가서 "지금 모델 유지"와 근거 쌍을 기록하고 끝낸다.
-
-### 점진적 전달
-
-US1(1단계 리포트) → US2(최종 후보 재클러스터링) → US3(선정 기록). 각 단계 결과가 리포트로 커밋된다.
+US1(완료) → T007 판정 기준 확정 → 무료 준비 → 기준선 → 후보 4개 → 보고 → 선정 기록. 각 실행의 리포트와 비용이 커밋·프록시 기록으로 남는다.
 
 ## 참고
 
-- 운영 DB·운영 앱·운영 `application.yml` 값은 어느 작업에서도 바꾸지 않는다(spec FR-018).
+- 운영 DB·운영 앱·운영 `application.yml` 값과 운영 코드는 어느 작업에서도 바꾸지 않는다(spec FR-010·FR-018). 거리 기준은 운영 값 그대로다(R10, 옛 T007·T008 병합 거리 설정화는 취소).
 - 지표는 "N쌍 중 M쌍", 두 비율(맞게 묶은 비율·빠짐없이 묶은 비율), 점수만 쓴다(spec FR-007). 점수는 균형 정확도다(013, research R8).
 - 커밋은 `commit-message` 스킬로 하고, 푸시는 사용자가 요청할 때만 한다.

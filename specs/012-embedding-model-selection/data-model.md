@@ -46,11 +46,13 @@
 | 사본 | 만드는 법 | 임베딩 |
 |---|---|---|
 | `disaster_alert_eval_v6` | 기존(호우 튜닝 반영) | `3-small` 1536, 그대로 둠 |
-| `disaster_alert_eval_v6_rerun` | v6 템플릿 복제 → 재클러스터링 | `3-small` 그대로(흔들림 확인, R8) |
-| `disaster_alert_eval_e_<별칭>` | v6 템플릿 복제 → 임베딩 교체 → 재클러스터링 | 후보 모델, 모든 행 채움(R6) |
+| `disaster_alert_eval_e_3small` | v6 템플릿 복제 → 재클러스터링 | `3-small` 그대로(기준선 재실행·흔들림, R8·R10) |
+| `disaster_alert_eval_e_<별칭>` | v6 템플릿 복제 → 임베딩 교체(보관본 또는 채우기) → 재클러스터링 | 후보 모델, 모든 행 채움(R6·R10) |
+
+**보관 DB `embedding_store`** (R10, 커밋하지 않음): 표 `alert_embedding(alert_id bigint, model text, dimensions int, embedding vector, created_at timestamptz, primary key (alert_id, model))`. 후보 4개 × 62,554건. 처음 채운 사본에서 `COPY` 로 내보내고, 다시 쓸 때 가져온다.
 
 - 1024차원 사본은 컬럼을 `vector(1024)` 로 바꾸고 HNSW 인덱스를 다시 만든다(R6).
-- 사본마다 쓴 임베딩 설정(주소·모델·차원)과 재클러스터링 때 넘긴 거리 설정 3개(`merge-max-distance`, `llm-fallback.distance-ceil`, `cross-region.similarity-floor`)를 리포트 머리에 적는다.
+- 사본마다 쓴 임베딩 설정(모델·차원), 가상 키 별칭과 그 키의 실제 비용을 리포트 옆 기록에 적는다. 거리 설정은 모든 사본이 운영 값 그대로다(R10).
 
 ## 4. 2단계 결과 (커밋)
 
@@ -67,8 +69,7 @@
 
 | 대상 | 변경 | 운영 영향 |
 |---|---|---|
-| `EventClusteringService` | 병합 거리 0.15 를 `clustering.merge-max-distance`(기본 0.15) 설정으로 | 없음(기본값 같음) |
+| `EventClusteringBackfillTool` | `embed-only` 묶음 200 → 500 (2026-11-27 사용자 결정) | 없음(수동 실행 도구) |
 | `EvaluationRunTool` + 새 `evaluation` 클래스 3개 | 1단계 측정 모드(`eval` 프로필 전용) | 없음(운영 프로필에서 뜨지 않음) |
-| `CLAUDE.md` 이벤트 클러스터링 절 | "0.15 는 설정이 아니라 코드에 고정" 문구 갱신 | 없음 |
 
 운영 임베딩 모델·운영 DB·`application.yml` 의 운영 값은 바꾸지 않는다(spec FR-018).
