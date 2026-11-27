@@ -56,7 +56,7 @@
 
 ## 이미 있는 것 (as-built, 이 계획에서 바꾸지 않음)
 
-- **스토리 3 — 튜닝 비교**: `EvaluationRunTool`(`--eval.labels`, `--eval.report`, `--eval.bcubed`), `PairCounter`, `BCubedScorer`, `ReportFormatter`. 실행·읽는 법은 [quickstart.md](quickstart.md).
+- **스토리 3 — 튜닝 비교**: `EvaluationRunTool`(`--eval.dataset`, `--eval.report`, `--eval.bcubed`), `PairCounter`, `BCubedScorer`, `ReportFormatter`. 실행·읽는 법은 [quickstart.md](quickstart.md).
 - **스토리 4 — 일일 구조 검사**: `ClusteringDailyCheckScheduler`(00:30 KST, 최근 7일 재검사, `clusteringCheckExecutor`) → `ClusteringDailyCheckService` → `clustering_daily_check`(V135).
 
 ## 설계
