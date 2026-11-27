@@ -105,3 +105,40 @@ Query: "`. 대칭 비교라 모든 문장에 같은 지시문이 붙는다.
   실행 명령에 `--spring.ai.openai.base-url=http://localhost:4000 --spring.ai.openai.api-key=<키>` 와 그 모델의 `--spring.ai.openai.embedding.options.model=…`·`dimensions=…` 를 준다. 상한에 걸리면 프록시가 호출을 막아 실행이 멈추고, 그 사본은 버리고 다시 돌린다.
 - **예상 비용**: `3large` 채우기 약 $0.7~0.8, 재클러스터링 LLM 폴백 회당 약 $0.3(모델마다 LLM 에 가는 쌍 수가 달라 조금씩 다름) × 5회. 합계 약 $2.2~2.3. 실행마다 예상 비용을 먼저 보이고 승인 뒤 실행한다(FR-016).
 - **판정 기준(2026-11-27 사용자 확정)**: (1) 기준선(`3small` 재실행)과 비교해 **과병합·과소병합 둘 다 늘지 않고, 적어도 하나가 줄어야 "나아짐"**이다. 하나가 줄고 다른 하나가 늘면 더 묶거나 덜 묶은 맞바꿈일 뿐이라 "나아짐"이 아니다 — 거리 기준을 운영 값으로 고정해(A) 눈금이 다른 모델은 덜 가리고도 더 묶어 균형 정확도가 오를 수 있기 때문이다(사용자: "과병합이 늘면 과소병합이 준다는 채점이 이상하다"). (2) 줄어든 차이는 흔들림(기준선 재실행 대 v6 기존 배정)보다 커야 인정한다. (3) 화재 쌍만 따로 세어 같은 규칙을 적용한다 — 화재의 과병합·과소병합을 각각 기준선과 비교해 **하나라도 늘면 탈락**(사용자: "둘 다 따로 보고 둘 다 나빠지지 않아야"). 화재는 문구 틀이 같고 번지만 다른 경우가 많아, 번지가 다른 화재가 묶인 쌍은 어느 모델에서든 원문과 함께 모아 클러스터링 로직(번지·주소 비교) 수정 작업의 입력으로 넘긴다(로직 수정은 012 밖). (4) 균형 정확도는 "나아짐"을 통과한 모델들 사이의 순위에만 쓴다. (5) 통과한 모델이 없으면 결론은 "지금 모델 유지"다. 성능과 비용의 맞바꿈은 통과한 모델이 있을 때 선정 표를 보고 사용자가 정한다. 리포트에는 272쌍 균형 정확도·두 비율·"N쌍 중 M쌍"·2026-05 B-cubed 점수를 함께 적는다.
+
+## R11. LLM 사용량 기록에 LiteLLM 프록시를 고른 이유 (2026-11-27)
+
+모델 비교 때 회사·모델별 토큰·비용을 화면으로 보고, 실행별 비용을 나누고, 유료 호출에 상한을 걸려고 게이트웨이를 들였다(사용자 결정, 로컬만·운영은 추후). 구성은 `infra/llm-usage/`.
+
+**고른 이유 (사용자 판단, 2026-11-27)**
+
+- **무료가 가장 중요했다.** 라이선스 없이 셀프 호스팅으로 쓸 수 있어야 했다.
+- **OpenAI 와 같은 인터페이스로 여러 모델을 묶어 준다.** 지금 OpenAI 플랫폼에서 발급한 API 키로 임베딩 모델도 OpenAI 모델을 쓰고 있어서, 같은 OpenAI 형식 그대로 프록시로 바꿔 붙이는 전환이 가장 낫다고 봤다(앱은 주소·키만 바꾼다).
+- **Grafana·Prometheus 는 게이트웨이의 트래픽 문제에 대비해 미리 둔 것이다.** LLM 게이트웨이를 호출 경로에 두면 트래픽 관련 트러블슈팅(지연, 실패, 몰림)이 생길 것으로 예상해, 그것까지 볼 수 있게 일단 로컬에 설정만 해 두었다. 지금 실험의 사용량 원본은 Grafana 가 읽는 DB 기록이고, Prometheus 지표는 그 대비용이다.
+- 실행마다 가상 키를 따로 발급해 쓰는 방식도 사용자 제안이다(R10).
+
+**검증한 것 — 위 판단을 뒷받침하는 사실(작성: Claude, 같은 날 확인)**
+
+필요 조건(이 프로젝트 기준):
+
+1. 로컬 셀프 호스팅·무료(라이선스 키 없이).
+2. OpenAI 형식 프록시 — Spring AI OpenAI 클라이언트의 `base-url` 만 바꿔 붙는다(앱 코드 변경 없음).
+3. 로컬 TEI(OpenAI 형식 `/v1/embeddings`)로도 보내고, **임베딩 호출**도 기록한다.
+4. 실행별 키에 **허용 모델과 예산 상한**을 걸어 승인 밖 유료 호출을 막는다(spec FR-016·FR-020).
+5. 30초 안팎으로 끝나는 배치 도구 호출도 빠짐없이 남는다(호출마다 DB 에 1행).
+6. 가볍다 — 개발 PC, 이미 있는 Postgres 컨테이너를 재사용.
+
+후보 비교:
+
+| 후보 | 방식 | 판단 |
+|---|---|---|
+| **LiteLLM 프록시** (`ghcr.io/berriai/litellm:main-stable`) | 프록시. 호출마다 `LiteLLM_SpendLogs` 1행(Postgres) | **채택.** 컨테이너 1개 + 기존 Postgres 의 DB 하나. 2026-11-27 직접 확인: TEI 3개·OpenAI·`gpt-4o-mini` 라우팅, 임베딩 토큰·비용 기록(`3small`·`3large` 비용이 토큰×단가와 같음), 가상 키의 허용 모델 제한(허용 밖 모델 거부)과 예산 상한 설정이 라이선스 없이 동작, Prometheus 지표(`litellm_input_tokens_metric_total` 등)도 나옴. 한계: TEI 모델에 `dimensions` 를 보내면 거부해 `drop_params` 필요, Prometheus 카운터는 재시작하면 0부터, 일부 기능의 라이선스 경계가 버전마다 다르다는 자료가 있다(검색 땐 Prometheus 지표를 Enterprise 로 적은 자료가 있었으나 이 버전에서는 나왔다) |
+| Portkey AI Gateway | 프록시(MIT) | 보류. 예산 한도를 2.0 에서 오픈소스로 넣는다는 발표가 있으나 pre-release 이고, 다른 공식 문서·엔터프라이즈 페이지는 키 예산을 엔터프라이즈 기능으로 적는다 — 조건 4 를 무료로 쓸 수 있는지 확인되지 않았다 |
+| Helicone | 관측(+ 별도 AI Gateway) | 기각. 셀프 호스팅이 Web·Worker·Jawn·Supabase·ClickHouse 5개 구성, 최소 4코어·8GB. 프록시는 별도 AI Gateway 를 함께 띄워야 한다(Jawn 의 프록시 경로 제거). 셀프 호스팅의 예산 상한은 확인하지 못했다 — 조건 6·4 |
+| Langfuse | 기록 수집(트레이싱), 호출 경로 밖 | 이번엔 기각, **운영 도입 때 재검토 후보.** 셀프 호스팅이 web·worker·Postgres·ClickHouse·Redis·S3 로 무겁고, 앱에 OpenTelemetry 계측을 더해야 하며, 호출을 막는 예산 상한은 게이트웨이 기능이라 해당 없다 — 조건 2·4·6. 장점은 호출 경로에 끼지 않아 운영 장애 지점을 늘리지 않는 것 |
+| 호스팅형(Cloudflare AI Gateway, OpenRouter 등) | 외부 서비스 경유 | 기각. 로컬 TEI(localhost)로 보낼 수 없고, 요청이 외부 서비스를 거친다 — 조건 1·3 |
+| 직접 구현(Spring 에서 사용량 표에 기록) | 앱 코드 | 기각. 단가표·키별 예산 차단·화면을 새로 만들어야 한다 — 조건 2·6. 같은 일을 하는 도구가 있다 |
+
+**운영 도입 때(추후)**: 프록시를 운영 호출 경로(수집 루프의 임베딩, LLM 폴백, 번역, 일일 채점)에 끼우면 프록시 장애가 곧 수집·클러스터링 장애가 된다. 그래서 운영은 LiteLLM 을 그대로 쓸지, 호출 경로 밖의 Langfuse 로 갈지를 다시 비교한다. 이때 위 "확인되지 않았다" 항목(Portkey 예산, Helicone 예산, Langfuse 의 새 AI Gateway)도 그 시점 문서로 다시 확인한다.
+
+**출처(2026-11-27 확인)**: LiteLLM Enterprise 기능 목록 https://docs.litellm.ai/docs/proxy/enterprise · LiteLLM Prometheus https://docs.litellm.ai/docs/proxy/prometheus · Portkey Gateway 2.0 https://portkey.ai/blog/gateway-2-0/ · Portkey 기능 비교 https://docs.portkey.ai/docs/product/product-feature-comparison · Helicone 셀프 배포 https://docs.helicone.ai/getting-started/self-deploy · Langfuse 셀프 호스팅 https://langfuse.com/self-hosting · Langfuse ClickHouse https://langfuse.com/resources/engineering/clickhouse-for-self-hosted-langfuse
