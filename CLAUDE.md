@@ -64,7 +64,7 @@ npm test         # jest (testEnvironment: node). 현재 src/api/alertApi.test.ts
 ```bash
 docker compose -f docker-compose.dev.yml up postgres redis   # Postgres(pgvector/pgvector:pg16, 운영과 동일) + Redis만, --profile docker 불필요
 ```
-`docker-compose.dev.yml`의 `frontend`/`backend` 서비스는 `docker` 프로필에 묶여 있습니다 — 로컬 개발 시에는 Postgres/Redis만 compose로 띄우고 백엔드/프론트엔드는 직접 실행하세요 (`./gradlew bootRun`, `npm run dev`).
+모델 비교 실험의 토큰·비용을 보는 LiteLLM 프록시·Prometheus·Grafana 는 `llm-usage` 프로필로 따로 띄웁니다(로컬 전용, 운영 미도입 — `infra/llm-usage/README.md`). `docker-compose.dev.yml`의 `frontend`/`backend` 서비스는 `docker` 프로필에 묶여 있습니다 — 로컬 개발 시에는 Postgres/Redis만 compose로 띄우고 백엔드/프론트엔드는 직접 실행하세요 (`./gradlew bootRun`, `npm run dev`).
 
 스키마는 Flyway로 관리합니다 (`backend/src/main/resources/db/migration/V*.sql`, `ddl-auto: validate`) — 이미 적용된 마이그레이션은 절대 수정하지 말고 새 `V{n}__description.sql`을 추가하세요. 법정동 번역 시딩과 여러 분기에 걸친 날씨 이력 백필용 시드 마이그레이션이 다수 존재합니다. `flyway.out-of-order: true`라 번호가 어긋난 미적용 마이그레이션도 실행됩니다.
 
