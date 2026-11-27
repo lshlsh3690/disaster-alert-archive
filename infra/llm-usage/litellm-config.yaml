@@ -14,6 +14,12 @@ model_list:
       model: openai/text-embedding-3-large
       api_key: os.environ/OPENAI_API_KEY
 
+  # 재클러스터링의 LLM 폴백(EventLLMDecisionService, 공용 채팅 모델). 012 실행별 가상 키가 이 모델을 함께 허용한다
+  - model_name: gpt-4o-mini
+    litellm_params:
+      model: openai/gpt-4o-mini
+      api_key: os.environ/OPENAI_API_KEY
+
   # TEI 컨테이너는 호스트 포트로 떠 있다(specs/012 contracts 1절). 프록시 컨테이너에서는 host.docker.internal 로 닿는다
   - model_name: Qwen/Qwen3-Embedding-0.6B
     litellm_params:
