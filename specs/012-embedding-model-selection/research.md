@@ -37,6 +37,7 @@
 
   | 근거 | 확인 상태(2026-11-26) |
   |---|---|
+  | 후보를 허깅페이스 MTEB 리더보드를 보고 정했고, 허깅페이스가 안내하는 실행 방법이 TEI 도커 컨테이너라 그대로 따른다(사용자 근거, 첫째 이유) | Qwen3-Embedding-0.6B 모델 카드에 "Text Embeddings Inference (TEI) Usage"(`docker run`) 절 확인. e5-large-instruct·BGE-m3-ko 는 카드 본문에는 없고 세 모델 모두 `text-embeddings-inference` 태그 확인 |
   | OpenAI 와 같은 `/v1/embeddings` 형식이라 운영과 같은 Spring AI 호출 코드로 잰다 | HTTP 호출 확인, Spring AI 1.0.0 `OpenAiEmbeddingProperties` 가 임베딩 `base-url`·`api-key` 를 채팅과 따로 받는 것 확인. Java 로 실제 호출은 T003 에서 확인 |
   | 후보 세 모델의 구조(Qwen3·XLM-RoBERTa·BERT)를 모두 지원 | Qwen3 기동 확인, 나머지 둘은 README 확인(11-20) |
   | 모델별 사용법(마지막 토큰 풀링, 지시문)을 서버가 처리해 Java 코드가 모델마다 갈라지지 않음 | `/info` 의 `pooling: last_token` 확인 |
@@ -53,7 +54,7 @@
 - **단가(2026-11-20, OpenAI 가격표 https://developers.openai.com/api/docs/pricing)**: `text-embedding-3-small` $0.02, `text-embedding-3-large` $0.13 / 100만 입력 토큰.
 - **1단계**: 대상 알림 수백 건(평균 76자). 토큰을 글자 수로 상한 추정해도 `3-large` 1센트 미만, `3-small` 그 이하. 공개 모델은 0원.
 - **2단계(최종 후보 최대 2개)**: 평가 사본 알림 62,554건 재임베딩(`3-large` 약 $0.8 상한, 공개 모델 0원), 재클러스터링 LLM 폴백 1회 약 $0.3(2026-11-12 호우 튜닝 980회 실측). 기준선 흔들림 확인용 재클러스터링 1회 포함 총 $2 안팎.
-- **승인**: 측정 모드는 OpenAI 주소를 가리킬 때 예상 토큰·비용만 출력하고, `--eval.approve` 가 있어야 호출한다(spec FR-016). `embed-only` 채우기(`3-large`)와 재클러스터링은 사용자가 명시 승인한 뒤에만 돌린다.
+- **승인**: 측정 모드는 OpenAI 주소를 가리킬 때 예상 토큰·비용만 출력하고, `--eval.approve-paid-embedding` 이 있어야 호출한다(spec FR-016). `embed-only` 채우기(`3-large`)와 재클러스터링은 사용자가 명시 승인한 뒤에만 돌린다.
 
 ## R5. 모델 입력 형식
 

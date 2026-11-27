@@ -14,7 +14,7 @@
 - 백엔드 코드: `backend/src/main/java/com/disaster/alert/alertapi/domain/event/`
 - 백엔드 테스트: `backend/src/test/java/com/disaster/alert/alertapi/domain/event/`
 - 실험 결과: `backend/evaluation/reports/`
-- 실행: `backend/` 에서 `./gradlew bootRun --args='--spring.profiles.active=eval --spring.datasource.url=jdbc:postgresql://localhost:5432/<사본> --server.port=0 …'`(006 quickstart 와 같은 방식)
+- 실행: `backend/` 에서 `./gradlew bootRun --args='--spring.profiles.active=eval --spring.datasource.url=jdbc:postgresql://localhost:5432/<사본> …'`(006 quickstart 와 같은 방식)
 
 ---
 
@@ -34,9 +34,9 @@
 
 **체크포인트(멈춤)**: 사용자에게 `./gradlew test --tests "*EmbeddingPair*"` 로 Red 를 확인해 달라고 하고, "Red 확인했다"고 할 때까지 T003 으로 가지 않는다.
 
-- [ ] T003 [US1] Green — `tdd-developer`(단계: GREEN, "사용자가 Red 를 확인했다")로 두 순수 클래스를 채운 뒤, 측정 모드를 더한다. `backend/src/main/java/com/disaster/alert/alertapi/domain/event/evaluation/EmbeddingPairRunner.java`(`@Profile("eval")`): `stored`(저장 임베딩 거리를 SQL 로), `<별칭>`(평가 사본 `disaster_alert.message` 를 주입받은 Spring AI `EmbeddingModel` 로 배치 임베딩 → 코사인 거리), 요약(CSV 들 → `EmbeddingPairComparison` → `embedding-pairs-summary.md`, 기준선 재현 실패면 맨 위 경고 + 종료 코드 1). 임베딩 주소가 `api.openai.com` 이고 `--eval.approve` 가 없으면 예상 비용만 출력하고 호출하지 않는다. `backend/src/main/java/com/disaster/alert/alertapi/domain/event/evaluation/EvaluationRunTool.java` 에 `--eval.embedding-pairs`, `--eval.embedding-pairs-summary`, `--eval.approve` 를 더한다(기존 `--eval.recheck`·`--eval.judge-agreement` 와 함께 주면 오류). 형식은 contracts 3절·data-model 2절. 변경이 100줄 이상이면 커밋 전에 `code-reviewer` 를 돌린다(`git diff` 와 줄 범위를 프롬프트에 넣어서).
+- [ ] T003 [US1] Green — `tdd-developer`(단계: GREEN, "사용자가 Red 를 확인했다")로 두 순수 클래스를 채운 뒤, 측정 모드를 더한다. `backend/src/main/java/com/disaster/alert/alertapi/domain/event/evaluation/EmbeddingPairRunner.java`(`@Profile("eval")`): `stored`(저장 임베딩 거리를 SQL 로), `<별칭>`(평가 사본 `disaster_alert.message` 를 주입받은 Spring AI `EmbeddingModel` 로 배치 임베딩 → 코사인 거리), 요약(CSV 들 → `EmbeddingPairComparison` → `embedding-pairs-summary.md`, 기준선 재현 실패면 맨 위 경고 + 종료 코드 1). 임베딩 주소가 `api.openai.com` 이고 `--eval.approve-paid-embedding` 이 없으면 예상 비용만 출력하고 호출하지 않는다. `backend/src/main/java/com/disaster/alert/alertapi/domain/event/evaluation/EvaluationRunTool.java` 에 `--eval.embedding-pairs`, `--eval.embedding-pairs-summary`, `--eval.approve-paid-embedding` 을 더한다(기존 `--eval.recheck`·`--eval.judge-agreement` 와 함께 주면 오류). 형식은 contracts 3절·data-model 2절. 변경이 100줄 이상이면 커밋 전에 `code-reviewer` 를 돌린다(`git diff` 와 줄 범위를 프롬프트에 넣어서).
 - [ ] T004 [US1] 무료 측정 — `--eval.embedding-pairs=stored` 로 기준선 값을 확인하고, TEI 3개(`qwen3_06b` 8081, `e5_large_instruct` 8082, `bge_m3_ko` 8083, contracts 1절)를 띄워 contracts 2절 설정으로 각각 측정한다. 출력: `backend/evaluation/reports/embedding-pairs-<날짜>/embedding-pairs-<별칭>.csv`.
-- [ ] T005 [US1] [유료 1센트 미만] `3small`·`3large` 를 `--eval.approve` 없이 돌려 예상 비용을 보이고, 승인 뒤 측정한다. 요약 모드로 `backend/evaluation/reports/embedding-pairs-<날짜>/embedding-pairs-summary.md` 를 만들어 기준선 재현과 기준선 두 지점 값을 확인하고, 결과 폴더를 커밋한다.
+- [ ] T005 [US1] [유료 1센트 미만] `3small`·`3large` 를 `--eval.approve-paid-embedding` 없이 돌려 예상 비용을 보이고, 승인 뒤 측정한다. 요약 모드로 `backend/evaluation/reports/embedding-pairs-<날짜>/embedding-pairs-summary.md` 를 만들어 기준선 재현과 기준선 두 지점 값을 확인하고, 결과 폴더를 커밋한다.
 - [ ] T006 [US1] `embedding-pairs-summary.md` 결과를 "N쌍 중 M쌍"으로(화재 따로) 사용자에게 보고한다. 기준선보다 LLM 후보 지점의 같은 사건 쌍을 더 넣은 후보 중 2단계로 보낼 것(최대 2개)을 사용자가 정한다. 없으면 T012 로 간다(spec FR-008).
 
 ---
@@ -70,7 +70,7 @@
 
 ## Phase 5: 마무리
 
-- [ ] T013 [P] `backend/evaluation/README.md` 에 측정 모드(`--eval.embedding-pairs`, `--eval.embedding-pairs-summary`, `--eval.approve`)와 TEI 실행 예시를 더한다.
+- [ ] T013 [P] `backend/evaluation/README.md` 에 측정 모드(`--eval.embedding-pairs`, `--eval.embedding-pairs-summary`, `--eval.approve-paid-embedding`)와 TEI 실행 예시를 더한다.
 - [ ] T014 끝나면 쓰지 않는 평가 사본(`disaster_alert_eval_v6_rerun`, `disaster_alert_eval_e_*`)과 TEI 컨테이너를 지울지 사용자에게 묻고 정한 대로 한다(지우기 전 대상 확인). 정리 결과를 `specs/012-embedding-model-selection/decision.md` 끝에 한 줄로 적는다.
 
 ---

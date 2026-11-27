@@ -22,7 +22,9 @@ Query: "
 
 ## 2. 모델 고르기 — 임베딩 설정만 바꾼다
 
-운영 클러스터링이 쓰는 Spring AI `EmbeddingModel` 빈을 그대로 쓰고, 명령줄 설정으로 가리키는 곳만 바꾼다. 채팅(LLM 폴백)은 바꾸지 않는다.
+**1단계 측정(3절)은 이 설정을 쓰지 않는다** (2026-11-27 사용자 결정, 실행 명령이 너무 길어져서). 후보마다 별칭·주소·모델·차원·단가를 `EmbeddingCandidates.ALL`(`backend/.../domain/event/evaluation/EmbeddingCandidates.java`)에 하드코딩하고, 측정기가 그 값으로 운영과 같은 `OpenAiEmbeddingModel` 을 만들어 부른다. 후보를 바꿀 때는 그 목록을 직접 고친다.
+
+아래 명령줄 설정은 **2단계 채우기(4절)** 용이다. 운영 클러스터링이 쓰는 Spring AI `EmbeddingModel` 빈을 그대로 쓰고, 가리키는 곳만 바꾼다. 채팅(LLM 폴백)은 바꾸지 않는다.
 
 | 별칭 | 덧붙이는 명령줄 설정 |
 |---|---|
@@ -34,22 +36,24 @@ Query: "
 
 ## 3. 1단계 측정 모드 — `EvaluationRunTool`
 
-라벨은 평가 사본 DB 의 평가 셋(`--eval.dataset`)에서 읽는다(JSON 읽기 `--eval.labels` 는 2026-11-24 에 삭제).
+라벨은 평가 사본 DB 의 평가 셋(`--eval.dataset`, `evaluation_pair_label` 테이블)에서 읽는다.
 
 ```bash
 # (a) 기준선 저장 거리: 평가 사본에 저장된 임베딩으로 거리만 잰다 (호출 없음)
 --eval.dataset=cluster-eval-2026-11 --eval.embedding-pairs=stored --eval.report=<폴더>
 
-# (b) 모델 하나로 다시 임베딩해 거리를 잰다 (위 2의 설정과 함께)
---eval.dataset=... --eval.embedding-pairs=<별칭> --eval.report=<폴더> [--eval.approve]
+# (b) 모델 하나로 다시 임베딩해 거리를 잰다 (주소·모델·차원은 EmbeddingCandidates 에서, 명령줄 설정 없음)
+--eval.dataset=... --eval.embedding-pairs=<별칭> --eval.report=<폴더> [--eval.approve-paid-embedding]
 
 # (c) 모은 거리 파일로 두 지점 비교 리포트를 만든다 (호출 없음)
---eval.dataset=... --eval.embedding-pairs-summary=stored,3small,3large,qwen3_06b,e5_large_instruct,bge_m3_ko --eval.report=<폴더>
+#     값 없이 주면 EmbeddingCandidates.ALL 전체, 일부만이면 =stored,3small,qwen3_06b 처럼
+--eval.dataset=... --eval.embedding-pairs-summary --eval.report=<폴더>
 ```
 
 - 대상 쌍은 research R1 규칙으로 고른다. 유형 목록은 `clustering.regional-types`·`clustering.sustained-types` 설정에서 읽는다.
 - 임베딩 입력은 평가 사본의 `disaster_alert.message` 다(운영 클러스터링과 같은 값).
-- (b)는 임베딩 주소가 OpenAI 일 때 대상 알림 수·예상 토큰(글자 수 상한)·예상 비용만 출력하고 끝낸다. `--eval.approve` 가 있어야 호출한다(spec FR-016).
+- 모르는 별칭은 쓸 수 있는 별칭 목록과 함께 오류로 끝난다.
+- (b)는 후보가 OpenAI 일 때 대상 알림 수·예상 토큰(글자 수 상한)·예상 비용만 출력하고 끝낸다. `--eval.approve-paid-embedding` 이 있어야 호출한다(spec FR-016).
 - (a)(b)의 출력은 `<폴더>/embedding-pairs-<별칭>.csv`: `alert_a, alert_b, label, type, relation, distance`.
 - (c)의 출력은 `<폴더>/embedding-pairs-summary.md`. 형식은 [data-model.md](../data-model.md) 2절. `3small` 과 `stored` 의 쌍별 거리 차이가 0.01 을 넘으면 리포트 맨 위에 "기준선 재현 실패 — 후보 비교 무효"를 적고 종료 코드 1.
 - `--eval.embedding-pairs` 와 `--eval.embedding-pairs-summary`, 그리고 기존 `--eval.recheck`·`--eval.judge-agreement` 는 함께 쓸 수 없다.

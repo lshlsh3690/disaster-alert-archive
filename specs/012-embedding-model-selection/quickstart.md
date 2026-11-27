@@ -2,12 +2,12 @@
 
 **명세**: [spec.md](spec.md) | **도구 계약**: [contracts/experiment-cli.md](contracts/experiment-cli.md) | **결정 기록**: [research.md](research.md)
 
-유료 단계(`--eval.approve`, `3-large` 채우기, 재클러스터링)는 **사용자가 그때 명시적으로 "진행해"라고 한 뒤에만** 실행한다. 운영 DB·운영 앱은 어느 단계에서도 건드리지 않는다.
+유료 단계(`--eval.approve-paid-embedding`, `3-large` 채우기, 재클러스터링)는 **사용자가 그때 명시적으로 "진행해"라고 한 뒤에만** 실행한다. 운영 DB·운영 앱은 어느 단계에서도 건드리지 않는다.
 
 ## 0. 준비
 
 - 로컬 Postgres 와 평가 사본 `disaster_alert_eval_v6`(2026-11-20 확인: 알림 62,554건, 임베딩 60,382건).
-- 모든 명령은 `backend/` 에서 `./gradlew bootRun --args='--spring.profiles.active=eval --spring.datasource.url=jdbc:postgresql://localhost:5432/<사본> --server.port=0 …'` 형태다(006 quickstart 와 같음).
+- 모든 명령은 `backend/` 에서 `./gradlew bootRun --args='--spring.profiles.active=eval --spring.datasource.url=jdbc:postgresql://localhost:5432/<사본> …'` 형태다(006 quickstart 와 같음).
 - 공개 모델은 TEI 컨테이너 3개를 띄운다([contracts](contracts/experiment-cli.md) 1절). `--max-client-batch-size 200` 을 빼면 채우기 도구의 200건 요청이 거부된다.
 
 ## 1. 연결 시험 (무료)
@@ -18,7 +18,7 @@
 
 1. `--eval.embedding-pairs=stored` → 기준선 저장 거리(무료). 확인 값: 다른 사건 56쌍 중 0.15 이하 1쌍·0.40 이하 30쌍, 같은 사건 81쌍 중 19쌍·70쌍.
 2. 공개 모델 3개 각각 `--eval.embedding-pairs=<별칭>`(무료).
-3. `3small`·`3large` 를 `--eval.approve` 없이 돌려 예상 비용 확인(1센트 미만) → 사용자 승인 → `--eval.approve` 로 실행.
+3. `3small`·`3large` 를 `--eval.approve-paid-embedding` 없이 돌려 예상 비용 확인(1센트 미만) → 사용자 승인 → `--eval.approve-paid-embedding` 로 실행.
 4. `--eval.embedding-pairs-summary=…` 로 리포트를 만든다. 확인:
    - 맨 위 **기준선 재현**: `3small` 과 `stored` 의 쌍별 차이 최댓값 0.01 이하(SC-002). 아니면 여기서 멈춘다.
    - 모델마다 두 지점의 "같은 사건 81쌍 중 M쌍"과 화재 값, 바로 병합 기준을 정한 다른 사건 쌍 두 개의 원문.
