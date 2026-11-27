@@ -8,7 +8,7 @@
 
 - 로컬 Postgres 와 평가 사본 `disaster_alert_eval_v6`(2026-11-20 확인: 알림 62,554건, 임베딩 60,382건).
 - 모든 명령은 `backend/` 에서 `./gradlew bootRun --args='--spring.profiles.active=eval --spring.datasource.url=jdbc:postgresql://localhost:5432/<사본> …'` 형태다(006 quickstart 와 같음).
-- 공개 모델은 TEI 컨테이너 3개를 띄운다([contracts](contracts/experiment-cli.md) 1절). `--max-client-batch-size 200` 을 빼면 채우기 도구의 200건 요청이 거부된다.
+- 공개 모델은 TEI 컨테이너 3개를 띄운다([contracts](contracts/experiment-cli.md) 1절). `--max-client-batch-size 500` 을 빼면(기본 32) 채우기 도구의 500건 요청이 거부된다(2026-11-27 200 → 500).
 
 ## 1. 연결 시험 (무료)
 

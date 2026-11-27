@@ -9,7 +9,7 @@
 docker run --rm --gpus all -p 8081:80 -v tei-cache:/data \
   ghcr.io/huggingface/text-embeddings-inference:89-1.9 \
   --model-id Qwen/Qwen3-Embedding-0.6B \
-  --max-client-batch-size 200 \
+  --max-client-batch-size 500 \
   --default-prompt "Instruct: Given a Korean emergency alert message, retrieve alerts that report the same incident
 Query: "
 ```
