@@ -27,7 +27,7 @@ EVAL_DB_NAME=disaster_alert_eval_v5
 EVAL_DB=jdbc:postgresql://localhost:5432/$EVAL_DB_NAME
 ```
 
-**`--spring.datasource.url` 을 빼면 `.env.dev` 의 개발 DB 에 붙는다.** 평가와 재클러스터링은 반드시 평가 사본을 지정한다. `--server.port=0` 은 띄워 둔 다른 서버와 포트가 겹치지 않게 한다.
+**`--spring.datasource.url` 을 빼면 `.env.dev` 의 개발 DB 에 붙는다.** 평가와 재클러스터링은 반드시 평가 사본을 지정한다. 포트는 도구 프로필(`eval`·`backfill` 등)에서 0(빈 포트)으로 정해져 있어 띄워 둔 서버와 겹치지 않는다(`application.yml` 맨 끝).
 
 ### 평가 사본 준비
 
@@ -60,7 +60,7 @@ DB 에 저장된 이벤트 배정을 읽어 라벨과 비교한다. 클러스터
 
 ```bash
 ./gradlew bootRun --args="--spring.profiles.active=eval \
-  --spring.datasource.url=$EVAL_DB --server.port=0 \
+  --spring.datasource.url=$EVAL_DB \
   --eval.dataset=cluster-eval-2026-11 \
   --eval.report=evaluation/reports/<새 리포트 이름>.md"
 ```
@@ -79,7 +79,7 @@ DB 에 저장된 이벤트 배정을 읽어 라벨과 비교한다. 클러스터
 
 ```bash
 ./gradlew bootRun --args="--spring.profiles.active=eval \
-  --spring.datasource.url=$EVAL_DB --server.port=0 \
+  --spring.datasource.url=$EVAL_DB \
   --eval.dataset=cluster-eval-2026-11 --eval.judge-agreement"
 ```
 
@@ -93,7 +93,7 @@ DB 에 저장된 이벤트 배정을 읽어 라벨과 비교한다. 클러스터
 
 ```bash
 ./gradlew bootRun --args="--spring.profiles.active=eval \
-  --spring.datasource.url=$EVAL_DB --server.port=0 \
+  --spring.datasource.url=$EVAL_DB \
   --eval.pair-labels-as-of=2026-11-25T00:00 \
   --eval.report=evaluation/reports/<새 리포트 이름>.md"
 ```
@@ -116,7 +116,7 @@ docker exec -i postgres psql -U postgres -d "$EVAL_DB_NAME" -c \
 
 # 2) 다시 묶기 — 'EventClusteringBackfillTool 완료' 로그가 나오면 Ctrl+C
 ./gradlew bootRun --args="--spring.profiles.active=backfill --backfill.recluster=true \
-  --spring.datasource.url=$EVAL_DB --server.port=0"
+  --spring.datasource.url=$EVAL_DB"
 
 # 3) 위의 클러스터링 평가를 실행해 이전 리포트와 비교
 ```
@@ -130,11 +130,11 @@ docker exec -i postgres psql -U postgres -d "$EVAL_DB_NAME" -c \
 ```bash
 # 임베딩만 배치로 저장 (빠름, 클러스터링 안 함)
 ./gradlew bootRun --args="--spring.profiles.active=backfill --backfill.embed-only=true \
-  --spring.datasource.url=$EVAL_DB --server.port=0"
+  --spring.datasource.url=$EVAL_DB"
 
 # 옵션 없음: 1건씩 임베딩 + 클러스터링 (느림). --backfill.limit=N 으로 건수를 제한할 수 있다
 ./gradlew bootRun --args="--spring.profiles.active=backfill --backfill.limit=100 \
-  --spring.datasource.url=$EVAL_DB --server.port=0"
+  --spring.datasource.url=$EVAL_DB"
 ```
 
 ## 사건/비사건 분류기 평가
@@ -143,7 +143,7 @@ docker exec -i postgres psql -U postgres -d "$EVAL_DB_NAME" -c \
 
 ```bash
 ./gradlew bootRun --args="--spring.profiles.active=alert-kind-eval \
-  --spring.datasource.url=$EVAL_DB --server.port=0 \
+  --spring.datasource.url=$EVAL_DB \
   --alert-kind-eval.labels=evaluation/datasets/alert-kind-test-labels.json,evaluation/datasets/alert-kind-r-labels.json \
   --alert-kind-eval.override=evaluation/datasets/alert-kind-recheck-labels.json"
 ```
@@ -158,7 +158,7 @@ docker exec -i postgres psql -U postgres -d "$EVAL_DB_NAME" -c \
 ```bash
 # 평가 사본 등 로컬 DB — 소량으로 먼저 확인한 뒤 --alert-kind.limit 을 뺀다
 ./gradlew bootRun --args="--spring.profiles.active=alert-kind-backfill \
-  --spring.datasource.url=$EVAL_DB --server.port=0 \
+  --spring.datasource.url=$EVAL_DB \
   --alert-kind.limit=100 --alert-kind.threads=4"
 ```
 
@@ -184,7 +184,7 @@ docker stop <컨테이너>
 원본 지역명에 `전남광주통합특별시`가 들어 있고 법정동 매핑이 하나도 없는 알림만 다시 매칭한다. 다른 지역의 미매핑 알림은 대상이 아니다.
 
 ```bash
-./gradlew bootRun --args="--spring.profiles.active=region-backfill --server.port=0"
+./gradlew bootRun --args="--spring.profiles.active=region-backfill"
 ```
 
 ## 누락 기간 알림 백필
@@ -192,7 +192,7 @@ docker stop <컨테이너>
 공공 API 에서 지정 날짜 이후의 알림을 다시 받아 빠진 것만 저장한다. 이미 있는 알림은 건너뛰고, 푸시·번역·클러스터링은 실행하지 않는다.
 
 ```bash
-BACKFILL_FROM_DATE=20260830 ./gradlew bootRun --args="--spring.profiles.active=alert-missing-backfill --server.port=0"
+BACKFILL_FROM_DATE=20260830 ./gradlew bootRun --args="--spring.profiles.active=alert-missing-backfill"
 ```
 
 날짜는 실제 누락 구간보다 하루 여유를 두고 지정한다.
