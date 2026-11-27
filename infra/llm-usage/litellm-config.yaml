@@ -2,7 +2,7 @@
 # 앱(평가 도구)은 OpenAI·TEI 대신 http://localhost:4000 을 부르고, 프록시가 아래 주소로 넘기며 호출마다
 # 모델·토큰·비용을 litellm DB 의 "LiteLLM_SpendLogs" 에 남긴다. Grafana 가 그 표를 읽어 화면을 그린다.
 #
-# model_name 은 실제 모델 ID 그대로 둔다 — EmbeddingCandidates 의 modelId 와 같아야 한다.
+# model_name 은 실제 모델 ID 그대로 둔다 — 앱이 요청에 넣는 모델 이름(spring.ai.openai.*.options.model)과 같아야 한다.
 # 로컬 모델(TEI)은 요금이 없으므로 단가를 0 으로 두고, 토큰만 기록한다.
 model_list:
   - model_name: text-embedding-3-small

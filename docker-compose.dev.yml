@@ -65,7 +65,7 @@ services:
       - ./infra/llm-usage/litellm-config.yaml:/app/config.yaml:ro
     environment:
       OPENAI_API_KEY: ${OPENAI_API_KEY}
-      # 로컬 전용 키(127.0.0.1 에만 열림). 앱의 EmbeddingCandidates 와 같은 값이다
+      # 로컬 전용 관리 키(127.0.0.1 에만 열림). 실험 실행에는 이 키로 발급한 가상 키를 쓴다(infra/llm-usage/README.md)
       LITELLM_MASTER_KEY: sk-local-llm-usage
       DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/litellm
       STORE_MODEL_IN_DB: "False"

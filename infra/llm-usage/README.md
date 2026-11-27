@@ -40,15 +40,15 @@ TEI 후보를 쓸 때는 TEI 컨테이너도 떠 있어야 한다(specs/012 cont
    - 로컬(TEI 등 OpenAI 형식 서버): `api_base: http://host.docker.internal:<포트>/v1`, `input_cost_per_token: 0`.
      TEI 는 `dimensions` 를 보내면 LiteLLM 이 거부하므로 `drop_params: true` 를 둔다.
 2. `docker restart litellm`.
-3. 임베딩 비교 후보라면 `EmbeddingCandidates.ALL` 에도 한 줄 더한다(주소는 `LITELLM_URL`).
+3. 그 모델을 쓸 실행 키가 있으면 허용 모델에 넣는다(아래 "실행별 가상 키").
 
 ## 읽는 법
 
 - **비용**은 LiteLLM 내장 단가표 × 응답의 실제 토큰이다. 실제 청구 금액의 원본은 OpenAI·Anthropic 대시보드다. 로컬 모델은 0.
 - **토큰 수를 모델끼리 바로 비교하지 않는다.** 토크나이저가 회사·모델마다 달라 같은 입력이라도 토큰 수가 다르다
-  (012 1단계 같은 274건: Qwen 22,319 · e5 20,035 · BGE 13,459). 모델끼리는 같은 입력의 비용으로 비교한다.
-- 평가 도구는 `x-litellm-tags` 헤더로 실험 이름과 후보 별칭을 붙인다(예: `012-embedding-pairs`, `qwen3_06b`).
-  대시보드 맨 위 "실험 태그" 로 거른다.
+  (2026-11-27 같은 알림 274건: Qwen 22,319 · e5 20,035 · BGE 13,459). 모델끼리는 같은 입력의 비용으로 비교한다.
+- 실험은 실행마다 **가상 키**를 따로 쓴다(아래). 기록의 `metadata.user_api_key_alias` 에 키 별칭이 남아, 대시보드 맨 위 "가상 키" 와
+  "실행(가상 키) × 모델" 표로 실행별 비용을 본다. 요청에 `x-litellm-tags` 헤더를 붙이면 "실험 태그" 로도 거를 수 있다.
 - 실패한 호출도 `status <> 'success'` 로 남는다(토큰 0). 요청·응답 본문은 저장하지 않는다(`store_prompts_in_spend_logs: false`).
 
 ## 직접 조회
@@ -65,5 +65,18 @@ select t as tag, model_group, count(*) calls, sum(prompt_tokens) tokens, sum(spe
 
 ## 확인한 것 (2026-11-27, `ghcr.io/berriai/litellm:main-stable`)
 
-- 프록시 경유 `qwen3_06b` 측정이 직접 측정과 쌍별 거리 최대 0.00039 차이(재현 허용치 0.01 보다 훨씬 작음)였고, 기록 토큰 22,319 가 측정 파일과 같았다.
+- 같은 알림 274건을 직접(TEI) 임베딩한 거리와 프록시 경유 거리가 쌍별 최대 0.0004 이내로 같았고, 기록 토큰이 응답 사용량과 같았다(Qwen·e5·BGE).
+- `3small`·`3large` 의 프록시 계산 비용(`spend`)이 토큰 × 단가와 같았다($0.000438, $0.002844).
+- 가상 키가 허용 밖 모델 호출을 거부했다.
 - Prometheus 지표(`litellm_input_tokens_metric_total` 등)는 라이선스 없이 나왔다. 엔드포인트는 프록시 키가 있어야 열린다.
+
+## 실행별 가상 키
+
+실험 실행마다 관리 키로 가상 키를 발급해 쓴다. 키마다 허용 모델과 예산 상한을 걸어, 상한을 넘는 호출은 프록시가 막는다.
+키 값은 로컬 전용이라 정해서 발급한다.
+
+```bash
+curl -s http://127.0.0.1:4000/key/generate -H "Authorization: Bearer sk-local-llm-usage" -H "Content-Type: application/json"   -d '{"key":"sk-012-run-qwen3_06b","key_alias":"012-run-qwen3_06b","models":["Qwen/Qwen3-Embedding-0.6B","gpt-4o-mini"],"max_budget":0.5}'
+```
+
+앱은 `--spring.ai.openai.base-url=http://localhost:4000 --spring.ai.openai.api-key=<가상 키>` 로 부른다. 012 의 키 5개는 specs/012 research R10 표.

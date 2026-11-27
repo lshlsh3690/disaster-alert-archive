@@ -12,6 +12,25 @@
   "templating": {
     "list": [
       {
+        "name": "key",
+        "label": "가상 키",
+        "type": "query",
+        "datasource": {
+          "type": "grafana-postgresql-datasource",
+          "uid": "litellm-postgres"
+        },
+        "query": "select distinct metadata->>'user_api_key_alias' from \"LiteLLM_SpendLogs\" where metadata->>'user_api_key_alias' is not null order by 1",
+        "definition": "keys",
+        "includeAll": true,
+        "allValue": "__all",
+        "multi": false,
+        "current": {
+          "text": "All",
+          "value": "$__all"
+        },
+        "refresh": 2
+      },
+      {
         "name": "tag",
         "label": "실험 태그",
         "type": "query",
@@ -57,7 +76,7 @@
           "format": "table",
           "rawQuery": true,
           "editorMode": "code",
-          "rawSql": "select coalesce(sum(spend),0) as \"비용\" from \"LiteLLM_SpendLogs\" where status = 'success' and $__timeFilter(\"startTime\") and ('${tag}' = '__all' or jsonb_exists(request_tags, '${tag}'))"
+          "rawSql": "select coalesce(sum(spend),0) as \"비용\" from \"LiteLLM_SpendLogs\" where status = 'success' and $__timeFilter(\"startTime\") and ('${tag}' = '__all' or jsonb_exists(request_tags, '${tag}')) and ('${key}' = '__all' or metadata->>'user_api_key_alias' = '${key}')"
         }
       ],
       "fieldConfig": {
@@ -100,7 +119,7 @@
           "format": "table",
           "rawQuery": true,
           "editorMode": "code",
-          "rawSql": "select coalesce(sum(prompt_tokens),0) as \"토큰\" from \"LiteLLM_SpendLogs\" where status = 'success' and $__timeFilter(\"startTime\") and ('${tag}' = '__all' or jsonb_exists(request_tags, '${tag}'))"
+          "rawSql": "select coalesce(sum(prompt_tokens),0) as \"토큰\" from \"LiteLLM_SpendLogs\" where status = 'success' and $__timeFilter(\"startTime\") and ('${tag}' = '__all' or jsonb_exists(request_tags, '${tag}')) and ('${key}' = '__all' or metadata->>'user_api_key_alias' = '${key}')"
         }
       ],
       "fieldConfig": {
@@ -143,7 +162,7 @@
           "format": "table",
           "rawQuery": true,
           "editorMode": "code",
-          "rawSql": "select count(*) as \"호출\" from \"LiteLLM_SpendLogs\" where status = 'success' and $__timeFilter(\"startTime\") and ('${tag}' = '__all' or jsonb_exists(request_tags, '${tag}'))"
+          "rawSql": "select count(*) as \"호출\" from \"LiteLLM_SpendLogs\" where status = 'success' and $__timeFilter(\"startTime\") and ('${tag}' = '__all' or jsonb_exists(request_tags, '${tag}')) and ('${key}' = '__all' or metadata->>'user_api_key_alias' = '${key}')"
         }
       ],
       "fieldConfig": {
@@ -185,7 +204,7 @@
           "format": "table",
           "rawQuery": true,
           "editorMode": "code",
-          "rawSql": "select count(*) as \"실패\" from \"LiteLLM_SpendLogs\" where status <> 'success' and $__timeFilter(\"startTime\") and ('${tag}' = '__all' or jsonb_exists(request_tags, '${tag}'))"
+          "rawSql": "select count(*) as \"실패\" from \"LiteLLM_SpendLogs\" where status <> 'success' and $__timeFilter(\"startTime\") and ('${tag}' = '__all' or jsonb_exists(request_tags, '${tag}')) and ('${key}' = '__all' or metadata->>'user_api_key_alias' = '${key}')"
         }
       ],
       "fieldConfig": {
@@ -240,7 +259,7 @@
           "format": "table",
           "rawQuery": true,
           "editorMode": "code",
-          "rawSql": "select model_group as \"모델\", count(*) as \"호출\", sum(prompt_tokens) as \"입력 토큰\",\n       sum(completion_tokens) as \"출력 토큰\", sum(spend) as \"비용 (USD)\",\n       round(avg(request_duration_ms)) as \"평균 지연 (ms)\"\n  from \"LiteLLM_SpendLogs\" where status = 'success' and $__timeFilter(\"startTime\") and ('${tag}' = '__all' or jsonb_exists(request_tags, '${tag}'))\n group by model_group order by \"비용 (USD)\" desc, \"입력 토큰\" desc"
+          "rawSql": "select model_group as \"모델\", count(*) as \"호출\", sum(prompt_tokens) as \"입력 토큰\",\n       sum(completion_tokens) as \"출력 토큰\", sum(spend) as \"비용 (USD)\",\n       round(avg(request_duration_ms)) as \"평균 지연 (ms)\"\n  from \"LiteLLM_SpendLogs\" where status = 'success' and $__timeFilter(\"startTime\") and ('${tag}' = '__all' or jsonb_exists(request_tags, '${tag}')) and ('${key}' = '__all' or metadata->>'user_api_key_alias' = '${key}')\n group by model_group order by \"비용 (USD)\" desc, \"입력 토큰\" desc"
         }
       ],
       "fieldConfig": {
@@ -273,7 +292,7 @@
           "format": "table",
           "rawQuery": true,
           "editorMode": "code",
-          "rawSql": "select t as \"태그\", model_group as \"모델\", count(*) as \"호출\", sum(prompt_tokens) as \"입력 토큰\",\n       sum(spend) as \"비용 (USD)\"\n  from \"LiteLLM_SpendLogs\", jsonb_array_elements_text(request_tags) t\n where status = 'success' and $__timeFilter(\"startTime\") and ('${tag}' = '__all' or jsonb_exists(request_tags, '${tag}')) and t not like 'User-Agent%'\n group by t, model_group order by t, model_group"
+          "rawSql": "select t as \"태그\", model_group as \"모델\", count(*) as \"호출\", sum(prompt_tokens) as \"입력 토큰\",\n       sum(spend) as \"비용 (USD)\"\n  from \"LiteLLM_SpendLogs\", jsonb_array_elements_text(request_tags) t\n where status = 'success' and $__timeFilter(\"startTime\") and ('${tag}' = '__all' or jsonb_exists(request_tags, '${tag}')) and ('${key}' = '__all' or metadata->>'user_api_key_alias' = '${key}') and t not like 'User-Agent%'\n group by t, model_group order by t, model_group"
         }
       ],
       "fieldConfig": {
@@ -282,6 +301,40 @@
       },
       "options": {},
       "description": "평가 도구는 x-litellm-tags 로 실험 이름(예: 012-embedding-pairs)과 후보 별칭을 붙인다."
+    },
+    {
+      "id": 10,
+      "title": "실행(가상 키) × 모델",
+      "type": "table",
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "litellm-postgres"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 20,
+        "w": 24,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "litellm-postgres"
+          },
+          "format": "table",
+          "rawQuery": true,
+          "editorMode": "code",
+          "rawSql": "select coalesce(metadata->>'user_api_key_alias', '(관리 키)') as \"가상 키\", model_group as \"모델\", count(*) as \"호출\",\n       sum(prompt_tokens) as \"입력 토큰\", sum(completion_tokens) as \"출력 토큰\", sum(spend) as \"비용 (USD)\"\n  from \"LiteLLM_SpendLogs\" where status = 'success' and $__timeFilter(\"startTime\") and ('${tag}' = '__all' or jsonb_exists(request_tags, '${tag}')) and ('${key}' = '__all' or metadata->>'user_api_key_alias' = '${key}')\n group by 1, 2 order by 1, 2"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "options": {},
+      "description": "012 재클러스터링은 실행마다 가상 키(sk-012-run-<별칭>)를 따로 써서, 임베딩 채우기와 LLM 폴백(gpt-4o-mini) 비용이 키별로 나뉜다."
     },
     {
       "id": 7,
@@ -293,7 +346,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 20,
+        "y": 28,
         "w": 12,
         "h": 8
       },
@@ -307,7 +360,7 @@
           "format": "time_series",
           "rawQuery": true,
           "editorMode": "code",
-          "rawSql": "select $__timeGroupAlias(\"startTime\", 1h), model_group as metric, sum(spend) as value\n  from \"LiteLLM_SpendLogs\" where status = 'success' and $__timeFilter(\"startTime\") and ('${tag}' = '__all' or jsonb_exists(request_tags, '${tag}')) group by 1, 2 order by 1"
+          "rawSql": "select $__timeGroupAlias(\"startTime\", 1h), model_group as metric, sum(spend) as value\n  from \"LiteLLM_SpendLogs\" where status = 'success' and $__timeFilter(\"startTime\") and ('${tag}' = '__all' or jsonb_exists(request_tags, '${tag}')) and ('${key}' = '__all' or metadata->>'user_api_key_alias' = '${key}') group by 1, 2 order by 1"
         }
       ],
       "fieldConfig": {
@@ -335,7 +388,7 @@
       },
       "gridPos": {
         "x": 12,
-        "y": 20,
+        "y": 28,
         "w": 12,
         "h": 8
       },
@@ -349,7 +402,7 @@
           "format": "time_series",
           "rawQuery": true,
           "editorMode": "code",
-          "rawSql": "select $__timeGroupAlias(\"startTime\", 1h), model_group as metric, sum(prompt_tokens) as value\n  from \"LiteLLM_SpendLogs\" where status = 'success' and $__timeFilter(\"startTime\") and ('${tag}' = '__all' or jsonb_exists(request_tags, '${tag}')) group by 1, 2 order by 1"
+          "rawSql": "select $__timeGroupAlias(\"startTime\", 1h), model_group as metric, sum(prompt_tokens) as value\n  from \"LiteLLM_SpendLogs\" where status = 'success' and $__timeFilter(\"startTime\") and ('${tag}' = '__all' or jsonb_exists(request_tags, '${tag}')) and ('${key}' = '__all' or metadata->>'user_api_key_alias' = '${key}') group by 1, 2 order by 1"
         }
       ],
       "fieldConfig": {
@@ -377,7 +430,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 28,
+        "y": 36,
         "w": 24,
         "h": 8
       },
@@ -391,7 +444,7 @@
           "format": "table",
           "rawQuery": true,
           "editorMode": "code",
-          "rawSql": "select \"startTime\" as \"시각(UTC)\", coalesce(nullif(model_group, ''), '(모델 없음)') as \"모델\", status as \"상태\",\n       left(coalesce(metadata->>'error_information', metadata::text), 200) as \"내용\"\n  from \"LiteLLM_SpendLogs\" where status <> 'success' and $__timeFilter(\"startTime\") and ('${tag}' = '__all' or jsonb_exists(request_tags, '${tag}'))\n order by \"startTime\" desc limit 50"
+          "rawSql": "select \"startTime\" as \"시각(UTC)\", coalesce(nullif(model_group, ''), '(모델 없음)') as \"모델\", status as \"상태\",\n       left(coalesce(metadata->>'error_information', metadata::text), 200) as \"내용\"\n  from \"LiteLLM_SpendLogs\" where status <> 'success' and $__timeFilter(\"startTime\") and ('${tag}' = '__all' or jsonb_exists(request_tags, '${tag}')) and ('${key}' = '__all' or metadata->>'user_api_key_alias' = '${key}')\n order by \"startTime\" desc limit 50"
         }
       ],
       "fieldConfig": {
