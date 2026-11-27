@@ -18,6 +18,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Profile;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
+import org.springframework.util.LinkedMultiValueMap;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -41,9 +42,9 @@ import java.util.stream.Stream;
  * 임베딩 모델 비교 1단계 측정({@code --eval.embedding-pairs}, {@code --eval.embedding-pairs-summary}, specs/012 contracts 3절).
  * 라벨 쌍 중 임베딩 거리로 병합이 정해지는 쌍(research R1)의 코사인 거리를 모델마다 재서 CSV 로 남기고,
  * 모은 CSV 로 두 지점 비교 리포트를 만든다. 후보(주소·모델·차원)는 {@link EmbeddingCandidates} 에 적어 두고, 운영과 같은
- * Spring AI OpenAI 임베딩 클라이언트를 후보마다 그 값으로 만들어 부른다(TEI 도 같은 /v1/embeddings 형식).
+ * Spring AI OpenAI 임베딩 클라이언트를 후보마다 그 값으로 만들어 로컬 LiteLLM 프록시로 부른다(사용량이 프록시에 기록된다).
  *
- * <p>후보가 OpenAI 이면 {@code --eval.approve-paid-embedding} 없이는 호출하지 않고 예상 비용만 보인다(spec FR-016).
+ * <p>후보가 유료(단가 &gt; 0)이면 {@code --eval.approve-paid-embedding} 없이는 호출하지 않고 예상 비용만 보인다(spec FR-016).
  * 접속한 DB 는 평가 사본이어야 한다 — 이 클래스는 읽기만 한다.
  */
 @Slf4j
@@ -64,9 +65,6 @@ public class EmbeddingPairRunner {
     private String regionalTypesCsv;
     @Value("${clustering.sustained-types:폭염,한파,대설,강풍,가축질병}")
     private String sustainedTypesCsv;
-    // OpenAI 후보만 쓴다. TEI 는 키를 보지 않는다
-    @Value("${spring.ai.openai.api-key:}")
-    private String openAiApiKey;
 
     /** 대상 쌍 선별 결과와, 쌍에 나온 알림의 값(유형·원문). */
     private record Targets(EmbeddingPairSubset.Result subset, Map<Long, AlertSnapshot> alerts) {
@@ -93,8 +91,8 @@ public class EmbeddingPairRunner {
             header.put("cost_usd", "0");
             rows = pairs.stream().map(p -> toRow(p, storedDistance(p))).toList();
         } else {
-            // 3) 다시 임베딩: OpenAI 후보면 승인 전에는 비용만 보이고 멈춘다
-            if (candidate.isOpenAi() && !approvePaidEmbedding) {
+            // 3) 다시 임베딩: 유료 후보면 승인 전에는 비용만 보이고 멈춘다
+            if (candidate.isPaid() && !approvePaidEmbedding) {
                 printEstimate(pairs, targets.alerts(), candidate);
                 return false;
             }
@@ -247,10 +245,10 @@ public class EmbeddingPairRunner {
         header.put("model", candidate.modelId());
         header.put("base_url", candidate.baseUrl());
         header.put("dimensions", String.valueOf(dimensions));
-        header.put("instruction", candidate.isOpenAi() ? "없음" : "서버(TEI --default-prompt) 설정이라 이 도구는 알 수 없음");
+        header.put("instruction", candidate.isPaid() ? "없음" : "서버(TEI --default-prompt) 설정이라 이 도구는 알 수 없음");
         header.put("run_at", LocalDateTime.now().toString());
         header.put("tokens", tokens == 0 ? "응답에 없음" : String.valueOf(tokens));
-        header.put("cost_usd", !candidate.isOpenAi() ? "0" : tokens == 0 ? "-"
+        header.put("cost_usd", !candidate.isPaid() ? "0" : tokens == 0 ? "-"
                 : String.format(Locale.ROOT, "%.6f", tokens * candidate.usdPerMillionTokens() / 1_000_000));
     }
 
@@ -258,7 +256,7 @@ public class EmbeddingPairRunner {
     private void printEstimate(List<TypedPair> pairs, Map<Long, AlertSnapshot> alerts, EmbeddingModelCandidate candidate) {
         List<Long> ids = distinctIds(pairs);
         long chars = ids.stream().mapToLong(id -> alerts.get(id).message().length()).sum();
-        log.info("OpenAI 후보({})라 호출하지 않았습니다. 대상 알림 {}건, 글자 {}자(토큰은 글자 수로 추정), 모델 {}, 예상 비용 {}",
+        log.info("유료 후보({})라 호출하지 않았습니다. 대상 알림 {}건, 글자 {}자(토큰은 글자 수로 추정), 모델 {}, 예상 비용 {}",
                 candidate.alias(), ids.size(), chars, candidate.modelId(),
                 String.format(Locale.ROOT, "$%.6f", chars * candidate.usdPerMillionTokens() / 1_000_000));
         log.info("호출하려면 --eval.approve-paid-embedding 을 더해 다시 실행하세요");
@@ -268,11 +266,15 @@ public class EmbeddingPairRunner {
         return pairs.stream().flatMap(p -> Stream.of(p.alertA(), p.alertB())).distinct().sorted().toList();
     }
 
-    // 후보의 주소·모델·차원으로 클라이언트를 만든다. 운영 EmbeddingModel 빈과 같은 OpenAiEmbeddingModel 이고, 입력은 본문 그대로(EMBED)
+    // 후보의 주소·모델·차원으로 클라이언트를 만든다. 운영 EmbeddingModel 빈과 같은 OpenAiEmbeddingModel 이고, 입력은 본문 그대로(EMBED).
+    // 프록시 키로 부르고, 프록시 기록에서 이 실험·후보만 걸러 볼 수 있게 x-litellm-tags 를 붙인다
     private EmbeddingModel buildModel(EmbeddingModelCandidate candidate) {
+        LinkedMultiValueMap<String, String> headers = new LinkedMultiValueMap<>();
+        headers.add("x-litellm-tags", EmbeddingCandidates.USAGE_TAG + "," + candidate.alias());
         OpenAiApi api = OpenAiApi.builder()
                 .baseUrl(candidate.baseUrl())
-                .apiKey(candidate.isOpenAi() ? openAiApiKey : "unused")
+                .apiKey(EmbeddingCandidates.LITELLM_KEY)
+                .headers(headers)
                 .build();
         OpenAiEmbeddingOptions options = OpenAiEmbeddingOptions.builder()
                 .model(candidate.modelId())

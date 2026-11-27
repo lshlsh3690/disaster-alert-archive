@@ -24,6 +24,8 @@ Query: "
 
 **1단계 측정(3절)은 이 설정을 쓰지 않는다** (2026-11-27 사용자 결정, 실행 명령이 너무 길어져서). 후보마다 별칭·주소·모델·차원·단가를 `EmbeddingCandidates.ALL`(`backend/.../domain/event/evaluation/EmbeddingCandidates.java`)에 하드코딩하고, 측정기가 그 값으로 운영과 같은 `OpenAiEmbeddingModel` 을 만들어 부른다. 후보를 바꿀 때는 그 목록을 직접 고친다.
 
+**호출은 모두 로컬 LiteLLM 프록시(`http://localhost:4000`)를 거친다** (2026-11-27). 프록시가 모델 이름으로 OpenAI·TEI 로 넘기고 호출마다 모델·토큰·비용을 기록해 Grafana 로 본다 — 띄우는 법과 모델 추가는 [infra/llm-usage/README.md](../../../infra/llm-usage/README.md). 측정 전에 프록시와 (TEI 후보면) TEI 컨테이너가 떠 있어야 한다. 유료 여부는 주소가 아니라 후보의 단가(> 0)로 가른다.
+
 아래 명령줄 설정은 **2단계 채우기(4절)** 용이다. 운영 클러스터링이 쓰는 Spring AI `EmbeddingModel` 빈을 그대로 쓰고, 가리키는 곳만 바꾼다. 채팅(LLM 폴백)은 바꾸지 않는다.
 
 | 별칭 | 덧붙이는 명령줄 설정 |
