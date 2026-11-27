@@ -22,10 +22,12 @@
 ## 2. 후보마다 (`3large`·`qwen3_06b`·`e5_large_instruct`·`bge_m3_ko`, 승인 후)
 
 1. `CREATE DATABASE disaster_alert_eval_e_<별칭> TEMPLATE disaster_alert_eval_v6`.
-2. 임베딩 비우기: HNSW 인덱스 삭제 → `UPDATE disaster_alert SET embedding = NULL` → 1024차원 모델이면 `ALTER TABLE disaster_alert ALTER COLUMN embedding TYPE vector(1024)`.
+2. 임베딩 비우기: v6 에서 임베딩이 비어 있던 행을 기록(`e012_baseline_null`, 2,172건 = 안내 1,757 + 사건 415) → HNSW 인덱스 삭제 → `UPDATE disaster_alert SET embedding = NULL` → 1024차원 모델이면 `ALTER TABLE disaster_alert ALTER COLUMN embedding TYPE vector(1024)` → 기록한 행에 임시 0 벡터를 넣어 채우기에서 뺀다(채운 뒤 다시 `NULL`). 재클러스터링은 `embedding IS NOT NULL` 인 알림만 처리하므로(2026-11-27 코드 확인), 이렇게 해야 후보도 기준선과 같은 60,382건을 처리한다 — 후보 사본에서만 사건 415건이 더 클러스터링되면 모델 외 차이가 섞인다.
 3. 임베딩 넣기 — 보관 DB 에 그 모델 행이 있으면 가져오고, 없으면 채운 뒤 보관한다.
    - 가져오기: `psql -d embedding_store -c "COPY (SELECT alert_id, embedding FROM alert_embedding WHERE model = '<model-id>') TO STDOUT"` 를 사본의 임시 표로 `COPY … FROM STDIN` → `UPDATE disaster_alert d SET embedding = t.embedding FROM <임시 표> t WHERE d.disaster_alert_id = t.alert_id`.
+   - **채우기 전 비교 확인(research R11, 프록시가 요청을 조용히 바꾸지 않는지)**: (a) 같은 채우기를 `--backfill.limit=20` 으로 **직접 호출**(TEI 는 `--spring.ai.openai.base-url=http://localhost:<포트> --spring.ai.openai.api-key=unused`, OpenAI 는 프록시 없이 `.env.dev` 키 — 20건이라 1센트에 한참 못 미치지만 유료라 승인 후) → (b) `CREATE TABLE smoke_direct AS SELECT disaster_alert_id, embedding FROM disaster_alert WHERE embedding IS NOT NULL` 후 그 20건을 다시 `NULL` → (c) `--backfill.limit=20` 으로 **프록시 + 그 키** → (d) `SELECT count(*), max(d.embedding <=> s.embedding) FROM disaster_alert d JOIN smoke_direct s USING (disaster_alert_id)` 가 20건·0.01 이하인지 확인 → `DROP TABLE smoke_direct`. 넘으면 여기서 멈춘다. 채우기는 남은 빈 행만 이어서 채운다.
    - 채우기: `--spring.profiles.active=backfill --backfill.embed-only=true` + 프록시 주소·그 키 + `--spring.ai.openai.embedding.options.model=<model-id> --spring.ai.openai.embedding.options.dimensions=<1536|1024>`(`3large` 는 약 $0.8). 확인: `count(*)`·`count(embedding)`(본문이 빈 알림 제외).
+   - 채운 뒤 대조: `SELECT DISTINCT vector_dims(embedding) FROM disaster_alert WHERE embedding IS NOT NULL` 이 기대 차원 하나뿐인지, LiteLLM 기록에서 그 키의 `model_group`·`api_base` 가 의도한 모델 하나뿐인지 본다.
    - 보관: `COPY (SELECT disaster_alert_id, '<model-id>', <차원>, embedding, now() FROM disaster_alert WHERE embedding IS NOT NULL) TO STDOUT` → `embedding_store` 의 `COPY alert_embedding FROM STDIN`.
 4. 인덱스 재생성: `CREATE INDEX idx_disaster_alert_embedding_hnsw ON disaster_alert USING hnsw (embedding vector_cosine_ops) WITH (m = 16, ef_construction = 64)`.
 5. 재클러스터링(약 $0.3): 006 절차 + 프록시 주소·그 키 + 같은 임베딩 모델 설정. 거리 설정은 운영 값 그대로.
