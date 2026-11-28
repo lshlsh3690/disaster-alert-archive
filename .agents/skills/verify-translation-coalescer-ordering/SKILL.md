@@ -67,9 +67,9 @@ TRANSLATION` ~ `\* END TRANSLATION`)를 다시 생성해야 한다:
 java -cp <tla2tools.jar 경로> pcal.trans Coalescer.tla
 ```
 
-결과를 읽을 때는 pstack `/statechart` 스킬을 쓴다 — 위반이 나오면 반례를 최단 경로로 보여주고,
-통과하면 상태 전이 그림을 그려준다(이름만 참조, 정확한 커맨드/옵션은 버전마다 달라지니 이 파일에
-베껴 쓰지 않는다).
+결과를 읽을 때는 statechart 스킬을 쓴다 — 위반이 나오면 반례를 최단 경로로 보여주고,
+통과하면 상태 전이 그림을 그려준다(이름만 참조, 정확한 호출 방법·커맨드/옵션은 도구·버전마다
+달라지니 이 파일에 베껴 쓰지 않는다 — CLAUDE.md/AGENTS.md의 스킬 호출 방식을 따른다).
 
 ## 검증 결과 (2026-11-28 확인)
 
@@ -82,10 +82,19 @@ java -cp <tla2tools.jar 경로> pcal.trans Coalescer.tla
 
 ## 범위와 한계 — 반드시 코드를 다시 봐야 하는 경우
 
-- **스레드 2개만 모델링했다.** `putIfAbsent`/`remove(k, v)`가 `ConcurrentHashMap`이 보장하는
-  원자적 연산이라는 전제 위에서, 3번째 이상의 동시 호출은 "이미 맵에 있음 → 합류자" 아니면
-  "맵에 없음 → 새 실행자"로 2개 스레드 케이스와 동형(symmetry)이다. `ConcurrentHashMap`의 원자성
-  자체는 이 모델이 검증하지 않고 JDK 계약으로 가정했다.
+- **스레드 2개만 모델링했고, 3개 이상으로 그냥 일반화할 수 없다.** 처음에는 "3번째 이상의 동시 호출도
+  맵 상태만 보면 합류자/새 실행자 둘 중 하나라 2스레드 케이스와 동형(symmetry)"이라고 적었으나, 틀린
+  주장이었다 — 이 모델은 future의 완료 여부를 세대(generation) 구분 없이 전역 변수 하나(`futureDone`)로
+  표현한다. 실제 코드에서는 합류자가 **등록 시점에 잡은 특정 `CompletableFuture` 레퍼런스**(`existing`)를
+  기다리므로, 그 뒤에 새 실행자가 다른 future로 등록해도 이미 완료된 레퍼런스는 영향을 받지 않는다. 하지만
+  이 모델을 그대로 3스레드로 확장하면(세대 구분 없는 전역 변수를 그대로 공유) 다음 순서에서 가짜 위반이
+  날 수 있다: 1) 스레드 1이 실행자로 등록·완료·제거, 2) 스레드 2가 등록 시 스레드 1의 future를 합류자로
+  잡고 대기, 3) 스레드 3이 새 실행자로 등록하며 전역 변수를 다시 `FALSE`로 되돌림 — 이때 스레드 2는 이미
+  끝난 future를 들고 있는데도 모델의 전역 변수만 보면 `Safe`가 깨진 것처럼 보인다. 이건 **모델의 단순화가
+  만든 인공물이지 실제 코드의 버그가 아니다** — 다만 이 모델은 세대를 구분하지 않으므로 3개 이상이 겹치는
+  조합은 **검증되지 않았다**. 필요해지면 future를 세대별 변수(예: `captured[t] \in done`)로 바꿔 다시
+  검증해야 한다. `putIfAbsent`/`remove(k, v)`가 `ConcurrentHashMap`이 보장하는 원자적 연산이라는 전제는
+  유지하되, 그 원자성 자체도 이 모델이 검증하지 않고 JDK 계약으로 가정했다.
 - **예외 경로(`completeExceptionally`)는 별도로 모델링하지 않았다.** 코드 구조상 `catch`(완료)도
   `finally`(제거)보다 먼저 실행되므로 순서는 성공 경로와 동일하지만, 모델이 직접 이를 체크하진
   않는다.
@@ -106,4 +115,4 @@ java -cp <tla2tools.jar 경로> pcal.trans Coalescer.tla
   (`CompleteFirst`/`RemoveAfterComplete`)이 새 순서와 맞는지 고치고, 다시 둘 다(통과/위반) 확인한
   뒤에만 sync-commit을 옮긴다.
 
-유지보수(지도를 최신으로 유지하는 루프)는 pstack `/maintain-formal-verification-skill`을 참고한다.
+유지보수(지도를 최신으로 유지하는 루프)는 maintain-formal-verification-skill 스킬을 참고한다.

@@ -2,7 +2,8 @@
 
 `/alerts`에서 걸린 필터 조건을 URL 쿼리로 이어받아, 유형별/경보단계별/지역별/일별/시간대별/날씨 상관 등
 다양한 차트 위젯으로 분석 결과를 보여주는 대시보드. 클라이언트 컴포넌트(`"use client"`)이고 `useSearchParams()`로
-`sido·sigungu·startDate·endDate·type·level·keyword·source`를 읽는다.
+`sido·sigungu·startDate·endDate·type·levelText·keyword·source`를 읽는다(`page.tsx:299` 확인 — URL 쿼리 키는
+`level`이 아니라 `levelText`다).
 
 ## Sub-features
 
@@ -34,5 +35,7 @@ Preconditions:
 - 위젯이 많아 전부 같은 조건(`sido`/`startDate`/`endDate`/`type`/`level`/`keyword`/`source`)에 enabled 조건부로
   걸려 있다 — alerts-list.md와 같은 "오늘만" 기본 날짜 필터 문제가 여기도 그대로 이어질 가능성이 높다(미확인).
 - 날씨 상관 위젯은 기간이 7일 이하일 때만 시간별 버전으로 바뀐다 — 긴 기간/짧은 기간을 각각 한 번씩 드라이브해야
-  두 버전을 다 봤다고 할 수 있다.
+  두 버전을 다 봤다고 할 수 있다. 위젯의 **초기 보기는 일별**이라, 짧은 기간(7일 이하)을 선택한 뒤에도 토글에서
+  **시간별을 직접 선택**해 결과를 확인하는 단계까지 거쳐야 시간별 버전을 실제로 본 것이다 — 짧은 기간 선택만으로
+  끝내지 않는다.
 - 이 파일은 코드 리딩만으로 작성됐다 — drive를 아직 한 번도 안 돌렸다.

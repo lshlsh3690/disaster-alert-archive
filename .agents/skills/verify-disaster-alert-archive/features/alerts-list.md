@@ -8,7 +8,9 @@
 - `alerts-default-view` 진입 시 시작일=종료일=오늘로 기본 필터가 걸려 그 날 수신분만 보인다.
 - `alerts-region-filter` 시/도 선택 시 시/군/구 select가 활성화되고 그 하위 목록으로 좁혀진다.
 - `alerts-keyword-filter` 키워드 검색어로 본문을 필터링한다.
-- `alerts-reset` "초기화" 버튼으로 모든 필터를 지운다.
+- `alerts-reset` "초기화" 버튼으로 지역/유형/경보단계/키워드/출처 필터는 지우고, 날짜는 빈 값이 아니라
+  **오늘로 되돌린다**(`AlertsClient.tsx:236-244` `onReset` 확인) — 넓힌 날짜 범위가 초기화 후에도 유지된다고
+  오해하지 말 것.
 - `alerts-pagination` 결과가 10건을 넘으면 페이지네이션 nav가 보인다.
 - `alerts-stats-summary` 우측 패널에 총 발생 건수·최다 발생 지역·유형·경보단계별 건수가 목록과 같은 조건으로 집계된다.
 
@@ -31,10 +33,15 @@ Preconditions:
   오늘자 수신분이 없다는 뜻**이다(Gotchas 참고).
 - **API로 실데이터 교차 확인.** `curl -s "http://localhost:8080/api/v1/alerts/search/combined?startDate=2020-01-01&endDate=2026-12-31&size=3" -o .verify-evidence/alerts-search-combined.json`.
   2026-11-28 런에서 200 OK, 1814바이트, 실제 재난문자 레코드 3건(`content[].message` 채워짐)을 확인 — 화면이
-  비어 보인 건 필터 탓이지 API/DB 단절이 아니라는 증거.
+  비어 보인 건 필터 탓이지 API/DB 단절이 아니라는 증거. **단, 이 호출은 넓은 기간(2020~2026)만 찔렀다 —
+  기본 필터인 "오늘" 날짜로도 같은 API가 200을 반환하는지(결과가 0건이라도 요청 자체는 성공하는지)는
+  별도로 확인해야 한다**: `curl -s -w "\n%{http_code}\n" "http://localhost:8080/api/v1/alerts/search/combined?startDate=<오늘>&endDate=<오늘>&size=3"`.
+  200 + 빈 리스트면 "진짜 오늘자가 없음", 200이 아니면 그제서야 "API가 날짜 필터 자체에서 깨짐"으로 구분한다.
 - **(아직 안 돌림) 지역 필터.** `select[name=sido]`에서 옵션 선택 → `select[name=sigungu]`가 `disabled` 해제되는지 확인.
 - **(아직 안 돌림) 키워드 필터.** `input[name=keyword]`에 입력 후 "검색" 버튼 클릭 → 목록이 좁혀지는지 확인.
-- **(아직 안 돌림) 페이지네이션.** 날짜 범위를 넓혀 10건 넘게 만든 뒤 `nav[aria-label*=pagination]`가 보이는지 확인.
+- **(아직 안 돌림) 페이지네이션.** 날짜 범위를 넓혀 10건 넘게 만든 뒤 `nav[aria-label="페이지 이동"]`가
+  보이는지 확인(`aria-label`은 `t("alertList.pagination")` 번역 키라 로케일마다 값이 다르다 — 로컬 기본
+  로케일인 한국어 기준 문자열이다, `frontend/src/constants/i18n.ts` 참고).
 
 ## Gotchas
 

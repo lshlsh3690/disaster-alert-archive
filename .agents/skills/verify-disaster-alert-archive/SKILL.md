@@ -16,21 +16,26 @@ curl로 직접 두드려 서버 쪽만 따로 증명할 수도 있다. 모바일
 (이 저장소는 로컬 개발에서 `docker-compose.dev.yml`의 `frontend`/`backend` 서비스를 안 쓴다 — `docker` 프로필 전용).
 
 ```bash
-# 1) DB/Redis (이미 떠 있으면 생략 — `docker ps`로 postgres/redis 컨테이너 확인)
+# 1) DB/Redis (이미 떠 있으면 생략 — `docker ps`로 postgres/redis 컨테이너 확인), 저장소 루트에서 실행
 docker compose -f docker-compose.dev.yml up -d postgres redis
 
-# 2) 백엔드 — 루트 .env.dev 를 셸에 export 하고 bootRun (gradlew 자체는 .env.dev 를 안 읽는다,
-#    .env.test 를 읽는 DotenvExtension 은 테스트 전용)
+# 2) 백엔드 — 터미널 A, 저장소 루트에서 시작. 루트 .env.dev 를 셸에 export 하고 bootRun
+#    (gradlew 자체는 .env.dev 를 안 읽는다, .env.test 를 읽는 DotenvExtension 은 테스트 전용)
 cd backend
 set -a && source ../.env.dev && set +a
 ./gradlew bootRun
+# bootRun 은 포그라운드로 계속 떠 있다 — 이 터미널은 그대로 두고 3)은 반드시 새 터미널에서 실행한다.
 # 준비 신호: 로그에 `Started BackendApplication in <N> seconds` (약 40~60초 소요, 법정동 캐시 로딩 포함)
 
-# 3) 프론트엔드 — frontend/.env.local 이 이미 localhost:8080 + 더미 Firebase 값으로 채워져 있다
-cd ../frontend
+# 3) 프론트엔드 — 터미널 B(새 터미널), 저장소 루트에서 시작. frontend/.env.local 이 이미
+#    localhost:8080 + 더미 Firebase 값으로 채워져 있다
+cd frontend
 npm run dev
 # 준비 신호: `Ready in <N>ms` (turbopack)
 ```
+
+Drive/Evidence 절의 명령은 터미널 A/B가 아니라 **터미널 C(또 다른 새 터미널, 저장소 루트에서 시작)**에서
+실행한다 — A/B는 서버를 띄운 채로 둬야 한다.
 
 **빈 데이터 디렉터리에서 "쓸 만한" 상태까지:** Flyway가 스키마 + 법정동 번역 시드(`V*__legal_district*.sql`)를
 자동 적용하므로 로그인·지역 선택 등은 빈 DB에서도 바로 동작한다. 하지만 **재난문자 본문(`disaster_alert`)은
@@ -84,9 +89,12 @@ node scripts/ui-screenshot.mjs /alerts .verify-evidence   # <path>는 localhost:
 
 ## Evidence
 
-- 스크린샷: `frontend/.verify-evidence/<path>__<profile>.png` (6개 프로필: iphone-se/iphone-12/galaxy-s24/tablet-768/desktop-1280/desktop-1920)
-- API 응답: 같은 디렉터리에 `curl ... -o frontend/.verify-evidence/<name>.json`으로 받아 화면에 보이는 값과
-  DB/서비스 레이어가 실제로 반환한 값을 교차 확인한다(화면이 비어 보일 때 "진짜 비었다"와 "API가 깨졌다"를 구분하는 용도).
+- 스크린샷: `frontend/.verify-evidence/<path>__<profile>.png` (6개 프로필: iphone-se/iphone-12/galaxy-s24/tablet-768/desktop-1280/desktop-1920).
+  저장소 루트 기준 경로이고, Drive 절처럼 이미 `frontend/`로 `cd`한 상태에서 실행한다면 `.verify-evidence/...`로
+  **`frontend/` 접두사 없이** 쓴다(두 번 겹쳐 `frontend/frontend/...`를 찾지 않도록).
+- API 응답: 같은 디렉터리에 `curl ... -o .verify-evidence/<name>.json`(이미 `frontend/`에 있을 때 기준, 저장소
+  루트에서 실행한다면 `frontend/.verify-evidence/<name>.json`)으로 받아 화면에 보이는 값과 DB/서비스 레이어가
+  실제로 반환한 값을 교차 확인한다(화면이 비어 보일 때 "진짜 비었다"와 "API가 깨졌다"를 구분하는 용도).
 - `.verify-evidence/`는 gitignore 대상이 아니므로 커밋하지 말고(`git status`로 확인), 다음 런 전에 지워도 된다 — 증빙은
   이 디렉터리 자체가 아니라 "그때 그 스크린샷·JSON"이 목적이므로, 보고할 때는 파일 내용을 인용하고 디렉터리는 치워도 무방하다.
 
