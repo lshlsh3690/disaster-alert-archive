@@ -80,20 +80,6 @@ def agent_content(source):
             "`Get-Content` 같은 읽기 명령을 사용할 수 있지만, "
             "파일 수정·프로젝트 스크립트·빌드·테스트·네트워크 호출은 하지 않는다.",
         )
-    if name == "coderabbit-responder":
-        body = body.replace(
-            "**이 agent를 부르는 것 자체가",
-            "**사용자가 이 agent의 CodeRabbit 처리 작업을 명시적으로 요청한 경우에만, 그 호출을",
-        )
-        body = body.replace(
-            "`./gradlew test`는 이 저장소에서 한글 경로 문제로 항상 실패하니 쓰지 않는다.",
-            "관련 단위 테스트도 실행한다. 한글 경로에서만 발생하는 CLI 제약과 "
-            "통합 테스트의 DB 의존성은 `AGENTS.md` 및 `CLAUDE.md`를 따른다.",
-        )
-        body = body.replace(
-            "`Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>` 트레일러.",
-            "실제 사용자·세션 설정에 따른 공동 작성자 표기(지정이 없으면 생략).",
-        )
     if name == "tdd-developer":
         body = body.replace(
             "판단 방법: 스테이징한 뒤 `git stash -k -u` 로 나머지를 치우고 "
