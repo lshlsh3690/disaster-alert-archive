@@ -58,7 +58,7 @@
 ## Phase 5: 마무리
 
 - [x] T014 [P] `backend/evaluation/README.md` 에 보관 DB 재사용, 프록시·가상 키로 채우기·재클러스터링하는 예시를 더한다.
-- [ ] T015 끝나면 평가 사본(`disaster_alert_eval_e_*`), 보관 DB(`embedding_store`), TEI 컨테이너, 가상 키를 남길지 사용자에게 묻고 정한 대로 한다(지우기 전 대상 확인). 결과를 `decision.md` 끝에 한 줄로 적는다.
+- [x] T015 끝나면 평가 사본(`disaster_alert_eval_e_*`), 보관 DB(`embedding_store`), TEI 컨테이너, 가상 키를 남길지 사용자에게 묻고 정한 대로 한다(지우기 전 대상 확인). 결과를 `decision.md` 끝에 한 줄로 적는다.
 
 ---
 

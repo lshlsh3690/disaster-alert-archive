@@ -246,4 +246,8 @@ e5 에서만 나온 15쌍은 뺐다(e5 는 눈금 문제라 로직 문제와 섞
 - 리포트(첫 채점): `backend/evaluation/reports/2026-11_2026-11-27-embed-{baseline-v6,3small,qwen3_06b,e5_large_instruct,bge_m3_ko,3large}.md`
 - 리포트(라벨 수정 뒤 재채점): 같은 이름 + `-relabel.md`
 - 후보 임베딩: 로컬 DB `embedding_store.alert_embedding`, 모델마다 60,382건
-- 평가 사본: `disaster_alert_eval_e_{3small,qwen3_06b,e5_large_instruct,bge_m3_ko,3large}` (T015 에서 남길지 정함)
+- 평가 사본: `disaster_alert_eval_e_3small`·`disaster_alert_eval_e_qwen3_06b` (라벨 2쌍 고친 상태)
+
+## 정리 (T015, 2026-11-28 사용자 결정)
+
+평가 사본은 기준선(`3small`)·`qwen3_06b` 만 남기고 e5·BGE·3large 사본 3개(약 8GB)를 지웠다(보관 DB 의 임베딩으로 API 호출 없이 다시 만들 수 있다). 보관 DB `embedding_store`·LiteLLM 가상 키 5개·TEI 모델 캐시 볼륨 `tei-cache` 는 남기고, TEI 컨테이너는 `tei-qwen3` 만 남겨 `tei-e5`·`tei-bge` 를 지웠다.
