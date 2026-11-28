@@ -219,6 +219,66 @@ Docker CPU(배치 토큰 1024) 측정값:
 | 운영 부담 | 운영 맥북 Docker 메모리 8GB 중 5GB 를 이 컨테이너가 차지한다. 임베딩 장애 지점이 OpenAI 에서 맥북 컨테이너로 옮겨 온다 |
 | 거리 기준 | 이번 실험은 운영 값(0.15·0.40)을 그대로 썼고, 그 값으로 "나아짐"이 나왔다. 바꾸지 않고 옮기면 실험과 같은 조건이다 |
 
+## 운영에서 기대하는 변화와 관측 방법
+
+교체 뒤 아래를 본다. 예상치는 평가 사본(2023-09 ~ 2026-10, 60,382건)에서 기준선 사본과 qwen 사본을 비교한 값이라 운영에서 같은 크기로 나온다는 보장은 없다. **교체 전 4주를 같은 쿼리로 먼저 기록해 기준점으로 삼는다.** 운영 쿼리는 맥북 `disaster-postgres` 에 읽기 전용(`BEGIN TRANSACTION READ ONLY`)으로 돌린다.
+
+### 기대하는 변화
+
+| 변화 | 평가 사본 예상 (3small → qwen) | 이유 |
+|---|---|---|
+| 단계별로 문자가 나오는 사건이 덜 쪼개진다 | 수도 이벤트 155 → 128개, 알림 1건짜리 126 → 90개, 이벤트당 알림 1.27 → 1.52건 / 정전 139 → 121개, 1.24 → 1.31건 | 단수 → 복구 → 급수 지연처럼 말이 달라진 후속 문자가 더 가깝게 놓인다(272쌍 과소병합 8 → 4) |
+| 다른 사건이 섞이는 정도는 그대로 | 화재 외 과병합 4 → 4 | |
+| 화재는 조금 더 묶일 수 있다 | 화재 이벤트 1,077 → 1,042개, 이벤트당 1.36 → 1.40건, 272쌍 화재 과병합 8 → 9 | 번지만 다른 화재는 어느 모델로도 가르지 못한다(부록 A). 로직 수정 전까지 지켜본다 |
+| 바로 병합이 늘고 LLM 판정이 준다 | `EMBEDDING` 447 → 707건, `LLM_FALLBACK` 662 → 570건, 새 이벤트(`SEED`) 7,296 → 7,128건, LLM 판정 호출 961 → 889회 | qwen 은 같은 사건 문자끼리 거리 0.15 안에 더 많이 들어온다 |
+| 임베딩 비용이 없어진다 | 매달 약 $0.003 → $0 | 금액으로는 거의 차이 없다 |
+| 새 알림 처리 시간이 늘 수 있다 | 임베딩 1건 약 0.7초(맥북 Docker CPU) | OpenAI 호출보다 느릴 수 있다. 수집 루프 안에서 동기로 돈다 |
+
+운영 규모가 작다. 최근 12개월 사건 알림은 한 달에 수도 약 12.5건, 정전 약 7.9건, 화재 약 60.8건이다. 그래서 수도·정전 변화는 하루 단위로는 보이지 않고, **최소 3개월치를 모아야** 차이를 말할 수 있다.
+
+### 관측 방법
+
+**1. 유형별 쪼개짐 (월 1회, 무료)** — 수도·정전의 "알림 1건짜리 이벤트 비율"이 내려가고 "이벤트당 알림 수"가 올라가면 기대대로다.
+
+```sql
+WITH e AS (
+  SELECT event_id, min(disaster_type) AS t, count(*) AS n, min(created_at) AS first_at
+  FROM disaster_alert WHERE event_id IS NOT NULL GROUP BY event_id)
+SELECT date_trunc('month', first_at) AS month, t,
+       count(*) AS events, sum((n = 1)::int) AS single, round(avg(n), 2) AS avg_size
+FROM e WHERE t IN ('수도', '정전', '화재')
+GROUP BY 1, 2 ORDER BY 1, 2;
+```
+
+**2. 일일 채점 (`clustering_daily_score`, 이미 매일 01:00 에 돈다)** — `missed`(과소병합)가 줄고 `over_merged`(과병합)는 그대로인지 본다. 판사 버전(`judge_version`)이 같은 기간끼리만 비교하고, 판사 일치율(`agreement_*`)을 함께 적는다. 하루 쌍 수가 적어 주·월로 합친다.
+
+```sql
+SELECT date_trunc('week', score_date) AS week, judge_version,
+       sum(pair_count) AS pairs, sum(correctly_merged) AS ok, sum(missed) AS missed, sum(over_merged) AS over_merged
+FROM clustering_daily_score GROUP BY 1, 2 ORDER BY 1;
+```
+
+화재 과병합은 `clustering_daily_score_pair` 에서 시스템이 같은 이벤트로 묶었는데 판사가 다르다고 한 쌍을 뽑아 원문을 읽는다(부록 A 와 같은 모양인지).
+
+**3. 병합 방식 분포 (월 1회, 무료)** — `EMBEDDING` 비중이 오르고 `LLM_FALLBACK`·`SEED` 비중이 내리면 기대대로다.
+
+```sql
+SELECT date_trunc('month', event_added_at) AS month, event_merge_method, count(*)
+FROM disaster_alert WHERE event_merge_method IS NOT NULL
+GROUP BY 1, 2 ORDER BY 1, 3 DESC;
+```
+
+**4. 처리 시간** — 백엔드 로그(LogTrace)의 `EventClusteringService.clusterNewAlert(..) time=…ms` 를 교체 전후로 비교한다. 임베딩과 LLM 판정 시간이 함께 들어 있다. 매분 수집 한 번에 처리한 시간이 1분에 가까워지면 문제다(호우 때처럼 알림이 몰리는 날을 따로 본다).
+
+**5. 안정성** — 임베딩 장애는 이제 TEI 컨테이너에서 난다.
+- `clustering_daily_check` 의 `no_embedding_count`·`unassigned_count`: 늘면 TEI 호출이 실패한 것이다(README "운영 일일 구조 검사").
+- `docker inspect disaster-tei-qwen3 --format '{{.State.OOMKilled}} {{.RestartCount}}'`, `docker stats`: 메모리 상한 5GB 근처까지 가거나 재시작이 생기는지.
+- 백엔드 로그의 임베딩 호출 예외.
+
+**6. 비용** — 운영 호출은 LiteLLM 을 거치지 않으므로 OpenAI 사용량 화면에서 임베딩 줄이 0이 되는지, `gpt-4o-mini` 사용량이 조금 주는지 본다.
+
+**판단**: 3개월 뒤 1·2·3 이 예상 방향이고 5 에 문제가 없으면 교체가 기대대로 된 것이다. 2 에서 과병합이 늘거나 5 에서 장애가 반복되면, 옛 임베딩으로 돌아갈지 정한다. 돌아가려면 다시 1536차원 재임베딩이 필요하므로, 교체 때 옛 `embedding` 값을 백업해 둔다.
+
 ## 부록 A. 번지가 다른 화재가 묶인 쌍 (클러스터링 로직 수정 입력, 012 밖)
 
 e5 에서만 나온 15쌍은 뺐다(e5 는 눈금 문제라 로직 문제와 섞인다). 어느 모델에서든 과병합된 화재 쌍 11쌍이다.
