@@ -5,7 +5,7 @@
 ## 1. 공개 모델 추론 서버 (TEI, 개발용 컨테이너)
 
 ```bash
-# RTX 40 시리즈 GPU 이미지. GPU 를 못 쓰면 이미지를 text-embeddings-inference:cpu-1.9 로
+# RTX 40 시리즈 GPU 이미지. GPU 를 못 쓰면 이미지를 text-embeddings-inference:cpu-1.9 로 바꾸고 --gpus all 도 뺀다
 docker run --rm --gpus all -p 8081:80 -v tei-cache:/data \
   ghcr.io/huggingface/text-embeddings-inference:89-1.9 \
   --model-id Qwen/Qwen3-Embedding-0.6B \

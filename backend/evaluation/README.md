@@ -220,7 +220,7 @@ echo "CREATE INDEX idx_disaster_alert_embedding_hnsw ON disaster_alert USING hns
   --eval.report=evaluation/reports/<날짜>-embed-$ALIAS.md"
 ```
 
-- 기준선 모델(`text-embedding-3-small`)도 같은 방식으로 사본을 만들어 다시 돌린다. 저장된 임베딩을 그대로 쓰므로 1)의 임베딩 비우기와 2)는 건너뛰고, 1)의 이벤트 비우기만 한다. v6 기존 배정과 이 재실행의 차이가 흔들림이다.
+- 기준선 모델(`text-embedding-3-small`)도 같은 방식으로 사본을 만들어 다시 돌린다. 저장된 임베딩을 그대로 쓰므로 1)의 임베딩 비우기와 2), 3)의 인덱스 재생성은 건너뛴다(HNSW 인덱스가 남아 있어 같은 이름으로 만들면 오류가 난다). 1)의 이벤트 비우기만 하고 3)의 재클러스터링·평가로 간다. v6 기존 배정과 이 재실행의 차이가 흔들림이다.
 - 거리 눈금이 좁은 모델은 운영 값으로 다른 사건도 바로 묶인다(012 의 e5: 다른 사건 거리 중앙값 0.062, LLM 판정 12회). 결과가 크게 나쁘면 먼저 이 눈금을 본다.
 - 운영 맥북에서 공개 모델을 재야 하면 Docker 안에서 메모리 상한을 걸어(`--memory 5g --max-batch-tokens 1024`) 돌린다. Docker 밖 실행은 메모리 상한이 없어 2026-11-28 운영 장애를 냈다(decision.md 맥북 측정).
 
