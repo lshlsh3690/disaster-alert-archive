@@ -1,0 +1,457 @@
+{
+  "uid": "llm-usage",
+  "title": "LLM 사용량 (로컬)",
+  "description": "LiteLLM 프록시를 거친 호출의 모델별 토큰·비용. 원본 표는 litellm DB 의 LiteLLM_SpendLogs. 설명은 infra/llm-usage/README.md.",
+  "schemaVersion": 39,
+  "time": {
+    "from": "now-7d",
+    "to": "now"
+  },
+  "refresh": "30s",
+  "timezone": "browser",
+  "templating": {
+    "list": [
+      {
+        "name": "key",
+        "label": "가상 키",
+        "type": "query",
+        "datasource": {
+          "type": "grafana-postgresql-datasource",
+          "uid": "litellm-postgres"
+        },
+        "query": "select distinct metadata->>'user_api_key_alias' from \"LiteLLM_SpendLogs\" where metadata->>'user_api_key_alias' is not null order by 1",
+        "definition": "keys",
+        "includeAll": true,
+        "allValue": "__all",
+        "multi": false,
+        "current": {
+          "text": "All",
+          "value": "$__all"
+        },
+        "refresh": 2
+      },
+      {
+        "name": "tag",
+        "label": "실험 태그",
+        "type": "query",
+        "datasource": {
+          "type": "grafana-postgresql-datasource",
+          "uid": "litellm-postgres"
+        },
+        "query": "select distinct t from \"LiteLLM_SpendLogs\", jsonb_array_elements_text(request_tags) t where t not like 'User-Agent%' order by 1",
+        "definition": "tags",
+        "includeAll": true,
+        "allValue": "__all",
+        "multi": false,
+        "current": {
+          "text": "All",
+          "value": "$__all"
+        },
+        "refresh": 2
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "title": "총 비용 (USD)",
+      "type": "stat",
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "litellm-postgres"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 6,
+        "h": 4
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "litellm-postgres"
+          },
+          "format": "table",
+          "rawQuery": true,
+          "editorMode": "code",
+          "rawSql": "select coalesce(sum(spend),0) as \"비용\" from \"LiteLLM_SpendLogs\" where status = 'success' and $__timeFilter(\"startTime\") and ('${tag}' = '__all' or jsonb_exists(request_tags, '${tag}')) and ('${key}' = '__all' or metadata->>'user_api_key_alias' = '${key}')"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "currencyUSD"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "textMode": "value"
+      },
+      "description": "LiteLLM 내장 단가표로 계산한 값. 실제 청구 금액은 OpenAI·Anthropic 대시보드가 원본이다. 로컬 모델(TEI)은 0."
+    },
+    {
+      "id": 2,
+      "title": "총 입력 토큰",
+      "type": "stat",
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "litellm-postgres"
+      },
+      "gridPos": {
+        "x": 6,
+        "y": 0,
+        "w": 6,
+        "h": 4
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "litellm-postgres"
+          },
+          "format": "table",
+          "rawQuery": true,
+          "editorMode": "code",
+          "rawSql": "select coalesce(sum(prompt_tokens),0) as \"토큰\" from \"LiteLLM_SpendLogs\" where status = 'success' and $__timeFilter(\"startTime\") and ('${tag}' = '__all' or jsonb_exists(request_tags, '${tag}')) and ('${key}' = '__all' or metadata->>'user_api_key_alias' = '${key}')"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "textMode": "value"
+      },
+      "description": "토크나이저가 회사·모델마다 달라 모델끼리 토큰 수를 바로 비교하지 않는다 — 같은 입력의 비용으로 비교한다."
+    },
+    {
+      "id": 3,
+      "title": "성공 호출 수",
+      "type": "stat",
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "litellm-postgres"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 0,
+        "w": 6,
+        "h": 4
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "litellm-postgres"
+          },
+          "format": "table",
+          "rawQuery": true,
+          "editorMode": "code",
+          "rawSql": "select count(*) as \"호출\" from \"LiteLLM_SpendLogs\" where status = 'success' and $__timeFilter(\"startTime\") and ('${tag}' = '__all' or jsonb_exists(request_tags, '${tag}')) and ('${key}' = '__all' or metadata->>'user_api_key_alias' = '${key}')"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "textMode": "value"
+      }
+    },
+    {
+      "id": 4,
+      "title": "실패 호출 수",
+      "type": "stat",
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "litellm-postgres"
+      },
+      "gridPos": {
+        "x": 18,
+        "y": 0,
+        "w": 6,
+        "h": 4
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "litellm-postgres"
+          },
+          "format": "table",
+          "rawQuery": true,
+          "editorMode": "code",
+          "rawSql": "select count(*) as \"실패\" from \"LiteLLM_SpendLogs\" where status <> 'success' and $__timeFilter(\"startTime\") and ('${tag}' = '__all' or jsonb_exists(request_tags, '${tag}')) and ('${key}' = '__all' or metadata->>'user_api_key_alias' = '${key}')"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "textMode": "value",
+        "colorMode": "background"
+      }
+    },
+    {
+      "id": 5,
+      "title": "모델별 사용량",
+      "type": "table",
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "litellm-postgres"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 4,
+        "w": 24,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "litellm-postgres"
+          },
+          "format": "table",
+          "rawQuery": true,
+          "editorMode": "code",
+          "rawSql": "select model_group as \"모델\", count(*) as \"호출\", sum(prompt_tokens) as \"입력 토큰\",\n       sum(completion_tokens) as \"출력 토큰\", sum(spend) as \"비용 (USD)\",\n       round(avg(request_duration_ms)) as \"평균 지연 (ms)\"\n  from \"LiteLLM_SpendLogs\" where status = 'success' and $__timeFilter(\"startTime\") and ('${tag}' = '__all' or jsonb_exists(request_tags, '${tag}')) and ('${key}' = '__all' or metadata->>'user_api_key_alias' = '${key}')\n group by model_group order by \"비용 (USD)\" desc, \"입력 토큰\" desc"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "options": {}
+    },
+    {
+      "id": 6,
+      "title": "실험 태그 × 모델",
+      "type": "table",
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "litellm-postgres"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 12,
+        "w": 24,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "litellm-postgres"
+          },
+          "format": "table",
+          "rawQuery": true,
+          "editorMode": "code",
+          "rawSql": "select t as \"태그\", model_group as \"모델\", count(*) as \"호출\", sum(prompt_tokens) as \"입력 토큰\",\n       sum(spend) as \"비용 (USD)\"\n  from \"LiteLLM_SpendLogs\", jsonb_array_elements_text(request_tags) t\n where status = 'success' and $__timeFilter(\"startTime\") and ('${tag}' = '__all' or jsonb_exists(request_tags, '${tag}')) and ('${key}' = '__all' or metadata->>'user_api_key_alias' = '${key}') and t not like 'User-Agent%'\n group by t, model_group order by t, model_group"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "options": {},
+      "description": "평가 도구는 x-litellm-tags 로 실험 이름(예: 012-embedding-pairs)과 후보 별칭을 붙인다."
+    },
+    {
+      "id": 10,
+      "title": "실행(가상 키) × 모델",
+      "type": "table",
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "litellm-postgres"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 20,
+        "w": 24,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "litellm-postgres"
+          },
+          "format": "table",
+          "rawQuery": true,
+          "editorMode": "code",
+          "rawSql": "select coalesce(metadata->>'user_api_key_alias', '(관리 키)') as \"가상 키\", model_group as \"모델\", count(*) as \"호출\",\n       sum(prompt_tokens) as \"입력 토큰\", sum(completion_tokens) as \"출력 토큰\", sum(spend) as \"비용 (USD)\"\n  from \"LiteLLM_SpendLogs\" where status = 'success' and $__timeFilter(\"startTime\") and ('${tag}' = '__all' or jsonb_exists(request_tags, '${tag}')) and ('${key}' = '__all' or metadata->>'user_api_key_alias' = '${key}')\n group by 1, 2 order by 1, 2"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "options": {},
+      "description": "012 재클러스터링은 실행마다 가상 키(sk-012-run-<별칭>)를 따로 써서, 임베딩 채우기와 LLM 폴백(gpt-4o-mini) 비용이 키별로 나뉜다."
+    },
+    {
+      "id": 7,
+      "title": "시간별 비용 (USD)",
+      "type": "timeseries",
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "litellm-postgres"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 28,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "litellm-postgres"
+          },
+          "format": "time_series",
+          "rawQuery": true,
+          "editorMode": "code",
+          "rawSql": "select $__timeGroupAlias(\"startTime\", 1h), model_group as metric, sum(spend) as value\n  from \"LiteLLM_SpendLogs\" where status = 'success' and $__timeFilter(\"startTime\") and ('${tag}' = '__all' or jsonb_exists(request_tags, '${tag}')) and ('${key}' = '__all' or metadata->>'user_api_key_alias' = '${key}') group by 1, 2 order by 1"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "currencyUSD",
+          "custom": {
+            "drawStyle": "bars",
+            "fillOpacity": 60,
+            "stacking": {
+              "mode": "normal"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {}
+    },
+    {
+      "id": 8,
+      "title": "시간별 입력 토큰",
+      "type": "timeseries",
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "litellm-postgres"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 28,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "litellm-postgres"
+          },
+          "format": "time_series",
+          "rawQuery": true,
+          "editorMode": "code",
+          "rawSql": "select $__timeGroupAlias(\"startTime\", 1h), model_group as metric, sum(prompt_tokens) as value\n  from \"LiteLLM_SpendLogs\" where status = 'success' and $__timeFilter(\"startTime\") and ('${tag}' = '__all' or jsonb_exists(request_tags, '${tag}')) and ('${key}' = '__all' or metadata->>'user_api_key_alias' = '${key}') group by 1, 2 order by 1"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "bars",
+            "fillOpacity": 60,
+            "stacking": {
+              "mode": "normal"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {}
+    },
+    {
+      "id": 9,
+      "title": "실패 호출 (최근 50건)",
+      "type": "table",
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "litellm-postgres"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 36,
+        "w": 24,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "litellm-postgres"
+          },
+          "format": "table",
+          "rawQuery": true,
+          "editorMode": "code",
+          "rawSql": "select \"startTime\" as \"시각(UTC)\", coalesce(nullif(model_group, ''), '(모델 없음)') as \"모델\", status as \"상태\",\n       left(coalesce(metadata->>'error_information', metadata::text), 200) as \"내용\"\n  from \"LiteLLM_SpendLogs\" where status <> 'success' and $__timeFilter(\"startTime\") and ('${tag}' = '__all' or jsonb_exists(request_tags, '${tag}')) and ('${key}' = '__all' or metadata->>'user_api_key_alias' = '${key}')\n order by \"startTime\" desc limit 50"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "options": {}
+    }
+  ]
+}

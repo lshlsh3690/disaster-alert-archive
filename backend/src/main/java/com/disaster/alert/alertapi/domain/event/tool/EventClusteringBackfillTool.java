@@ -62,8 +62,12 @@ public class EventClusteringBackfillTool implements ApplicationRunner {
     private final EventClusteringService eventClusteringService;
     private final JdbcTemplate jdbcTemplate;
 
-    /** 임베딩 배치 호출 크기 — OpenAI 한 번에 보낼 입력 수. */
-    private static final int EMBED_BATCH_SIZE = 200;
+    /**
+     * 임베딩 배치 호출 크기 — 한 번에 보낼 입력 수(2026-11-27 200 → 500, 사용자 결정: 6만 건 채우기 호출 313 → 126번).
+     * OpenAI 는 요청당 입력 2,048개까지 받는다. TEI 로 채울 때는 컨테이너를 --max-client-batch-size 500 이상으로 띄워야 한다(specs/012 contracts 1절).
+     * 토큰 수·비용·임베딩 결과는 묶음 크기와 무관하다.
+     */
+    private static final int EMBED_BATCH_SIZE = 500;
 
     @Override
     public void run(ApplicationArguments args) {
@@ -158,7 +162,7 @@ public class EventClusteringBackfillTool implements ApplicationRunner {
 
     /**
      * 임베딩만 배치로 생성·저장 (클러스터링 X). embedding IS NULL 대상.
-     * 200건씩 묶어 OpenAI 호출 → 43k건도 분 단위.
+     * {@link #EMBED_BATCH_SIZE}건씩 묶어 임베딩 호출 → 6만 건도 분 단위.
      */
     private void runEmbedOnly(Integer limit) {
         String sql = "SELECT disaster_alert_id, message FROM disaster_alert "

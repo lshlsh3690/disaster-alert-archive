@@ -48,9 +48,74 @@ services:
       - "6379:6379"
     networks:
       - disaster-net
-      
+
+  # ── LLM 사용량 기록(로컬 전용, 운영 아님) ─────────────────────────────────────────────
+  # 모델 비교 실험의 호출을 LiteLLM 프록시로 모아 모델별 토큰·비용을 Grafana 로 본다. 설명은 infra/llm-usage/README.md.
+  # 띄우기: docker compose --env-file .env.dev -f docker-compose.dev.yml --profile llm-usage up -d litellm prometheus grafana
+  # (DATABASE_URL 을 .env.dev 의 POSTGRES_USER·POSTGRES_PASSWORD 로 만들므로 --env-file 이 필요하다)
+  litellm:
+    profiles:
+      - llm-usage
+    # 버전 고정(2026-11-27): 검증을 마친 LiteLLM 1.111.0(main-stable, 2026-11-25 빌드). 태그는 받을 때마다 바뀔 수 있어
+    # digest 로 묶는다 — 버전마다 파라미터 처리·무료 기능 범위가 달라질 수 있다(specs/012 research R11). 올릴 때는 R11 의 확인을 다시 한다
+    image: ghcr.io/berriai/litellm@sha256:ce00096d012719d58c52cecfa373f7c6256dd1b0ff08f6fa607e10e9628f1f46
+    container_name: litellm
+    command: ["--config", "/app/config.yaml", "--port", "4000"]
+    ports:
+      - "127.0.0.1:4000:4000"
+    volumes:
+      - ./infra/llm-usage/litellm-config.yaml:/app/config.yaml:ro
+    environment:
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      # 로컬 전용 관리 키(127.0.0.1 에만 열림). 실험 실행에는 이 키로 발급한 가상 키를 쓴다(infra/llm-usage/README.md)
+      LITELLM_MASTER_KEY: sk-local-llm-usage
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/litellm
+      STORE_MODEL_IN_DB: "False"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      - postgres
+    networks:
+      - disaster-net
+
+  prometheus:
+    profiles:
+      - llm-usage
+    image: prom/prometheus:latest
+    container_name: prometheus
+    ports:
+      - "127.0.0.1:9090:9090"
+    volumes:
+      - ./infra/llm-usage/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    depends_on:
+      - litellm
+    networks:
+      - disaster-net
+
+  grafana:
+    profiles:
+      - llm-usage
+    image: grafana/grafana-oss:latest
+    container_name: grafana
+    ports:
+      - "127.0.0.1:3001:3000"
+    volumes:
+      - ./infra/llm-usage/grafana/provisioning:/etc/grafana/provisioning:ro
+      - grafana-data:/var/lib/grafana
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    depends_on:
+      - postgres
+      - prometheus
+    networks:
+      - disaster-net
+
 volumes:
   postgres-data:
+  prometheus-data:
+  grafana-data:
 
 
 networks:

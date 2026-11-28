@@ -43,7 +43,7 @@ bash .agents/scripts/run-speckit.sh check-prerequisites --json --paths-only
 
 ## 도구별 에이전트
 
-`code-reviewer`, `coderabbit-responder`, `docs-drift`, `tdd-developer`, `ui-checker`,
+`code-reviewer`, `docs-drift`, `tdd-developer`, `ui-checker`,
 `ui-fixer`의 Claude 정의는 `.claude/agents/*.md`, Codex 정의는 `.codex/agents/*.toml`에 둔다.
 Codex는 부모 세션의 모델·권한·MCP를 상속한다. 읽기 전용 역할의 제약은 지침이며,
 Claude의 도구 허용 목록과 같은 기술적 권한 격리를 보장하지는 않는다.

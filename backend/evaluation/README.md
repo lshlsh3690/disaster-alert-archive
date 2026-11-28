@@ -7,6 +7,7 @@
 | [클러스터링 평가](#클러스터링-평가) | `eval` | 없음 | 자동 종료 |
 | [재클러스터링](#재클러스터링) | `backfill` | 애매한 사고성 건만 LLM 호출 | 직접 종료 |
 | [임베딩 백필](#임베딩-백필) | `backfill` | 임베딩 호출 | 직접 종료 |
+| [다른 임베딩 모델로 재클러스터링](#다른-임베딩-모델로-재클러스터링) | `backfill` → `eval` | 모델 임베딩(유료 모델만) + LLM 판정 | 직접 종료 → 자동 종료 |
 | [사건/비사건 분류기 평가](#사건비사건-분류기-평가) | `alert-kind-eval` | 라벨 1건당 약 $0.0003 | 자동 종료 |
 | [사건/비사건 분류 백필](#사건비사건-분류-백필) | `alert-kind-backfill` | 미분류 1건당 약 $0.0003 | 직접 종료 |
 | [법정동 매핑 백필](#법정동-매핑-백필) | `region-backfill` | 없음 | 직접 종료 |
@@ -27,7 +28,7 @@ EVAL_DB_NAME=disaster_alert_eval_v5
 EVAL_DB=jdbc:postgresql://localhost:5432/$EVAL_DB_NAME
 ```
 
-**`--spring.datasource.url` 을 빼면 `.env.dev` 의 개발 DB 에 붙는다.** 평가와 재클러스터링은 반드시 평가 사본을 지정한다. `--server.port=0` 은 띄워 둔 다른 서버와 포트가 겹치지 않게 한다.
+**`--spring.datasource.url` 을 빼면 `.env.dev` 의 개발 DB 에 붙는다.** 평가와 재클러스터링은 반드시 평가 사본을 지정한다. 포트는 도구 프로필(`eval`·`backfill` 등)에서 0(빈 포트)으로 정해져 있어 띄워 둔 서버와 겹치지 않는다(`application.yml` 맨 끝).
 
 ### 평가 사본 준비
 
@@ -60,7 +61,7 @@ DB 에 저장된 이벤트 배정을 읽어 라벨과 비교한다. 클러스터
 
 ```bash
 ./gradlew bootRun --args="--spring.profiles.active=eval \
-  --spring.datasource.url=$EVAL_DB --server.port=0 \
+  --spring.datasource.url=$EVAL_DB \
   --eval.dataset=cluster-eval-2026-11 \
   --eval.report=evaluation/reports/<새 리포트 이름>.md"
 ```
@@ -79,7 +80,7 @@ DB 에 저장된 이벤트 배정을 읽어 라벨과 비교한다. 클러스터
 
 ```bash
 ./gradlew bootRun --args="--spring.profiles.active=eval \
-  --spring.datasource.url=$EVAL_DB --server.port=0 \
+  --spring.datasource.url=$EVAL_DB \
   --eval.dataset=cluster-eval-2026-11 --eval.judge-agreement"
 ```
 
@@ -93,7 +94,7 @@ DB 에 저장된 이벤트 배정을 읽어 라벨과 비교한다. 클러스터
 
 ```bash
 ./gradlew bootRun --args="--spring.profiles.active=eval \
-  --spring.datasource.url=$EVAL_DB --server.port=0 \
+  --spring.datasource.url=$EVAL_DB \
   --eval.pair-labels-as-of=2026-11-25T00:00 \
   --eval.report=evaluation/reports/<새 리포트 이름>.md"
 ```
@@ -116,7 +117,7 @@ docker exec -i postgres psql -U postgres -d "$EVAL_DB_NAME" -c \
 
 # 2) 다시 묶기 — 'EventClusteringBackfillTool 완료' 로그가 나오면 Ctrl+C
 ./gradlew bootRun --args="--spring.profiles.active=backfill --backfill.recluster=true \
-  --spring.datasource.url=$EVAL_DB --server.port=0"
+  --spring.datasource.url=$EVAL_DB"
 
 # 3) 위의 클러스터링 평가를 실행해 이전 리포트와 비교
 ```
@@ -130,12 +131,98 @@ docker exec -i postgres psql -U postgres -d "$EVAL_DB_NAME" -c \
 ```bash
 # 임베딩만 배치로 저장 (빠름, 클러스터링 안 함)
 ./gradlew bootRun --args="--spring.profiles.active=backfill --backfill.embed-only=true \
-  --spring.datasource.url=$EVAL_DB --server.port=0"
+  --spring.datasource.url=$EVAL_DB"
 
 # 옵션 없음: 1건씩 임베딩 + 클러스터링 (느림). --backfill.limit=N 으로 건수를 제한할 수 있다
 ./gradlew bootRun --args="--spring.profiles.active=backfill --backfill.limit=100 \
-  --spring.datasource.url=$EVAL_DB --server.port=0"
+  --spring.datasource.url=$EVAL_DB"
 ```
+
+`--backfill.embed-only` 는 빈 임베딩을 500건씩 한 요청으로 보낸다(`EventClusteringBackfillTool.EMBED_BATCH_SIZE`). 공개 모델 서버(TEI)는 `--max-client-batch-size 500` 이상으로 띄워야 한다(기본 32).
+
+## 다른 임베딩 모델로 재클러스터링
+
+임베딩 모델을 바꾸면 클러스터링이 어떻게 달라지는지 평가 사본에서 잰다. 2026-11-27 012 에서 이 순서로 다섯 모델을 비교했다(결과 [decision.md](../../specs/012-embedding-model-selection/decision.md), 절차 근거 [012 quickstart](../../specs/012-embedding-model-selection/quickstart.md)). 모델 호출은 모두 로컬 LiteLLM 프록시를 거쳐 실행마다 가상 키 하나로 비용을 나눈다. 비용·호출 수는 Grafana(`http://localhost:3001`, 대시보드 "LLM 사용량", 가상 키 필터)에서 본다.
+
+**준비**
+
+- 프록시·Prometheus·Grafana: `docker compose --env-file .env.dev -f docker-compose.dev.yml --profile llm-usage up -d litellm prometheus grafana`(레포 루트, [infra/llm-usage/README.md](../../infra/llm-usage/README.md)). 실행 중에는 이 compose 를 다시 올리지 않는다 — 프록시가 재생성되면 진행 중인 요청이 끊긴다.
+- 가상 키: 실행마다 하나, 그 실행의 임베딩 모델과 `gpt-4o-mini`(LLM 판정)만 허용하고 예산 상한을 건다(012 는 `sk-012-run-<별칭>`, infra README 의 가상 키 절).
+- 공개 모델이면 TEI 컨테이너를 띄운다. 명령·포트·지시문(`--default-prompt`, 줄바꿈이 든 문자열)은 [012 contracts 1절](../../specs/012-embedding-model-selection/contracts/experiment-cli.md) 그대로 쓴다.
+- 아래 변수(예: qwen):
+
+```bash
+ALIAS=qwen3_06b; MODEL=Qwen/Qwen3-Embedding-0.6B; DIMS=1024; KEY=sk-012-run-$ALIAS
+DB=disaster_alert_eval_e_$ALIAS
+EMB="--spring.ai.openai.embedding.options.model=$MODEL --spring.ai.openai.embedding.options.dimensions=$DIMS"
+PROXY="--spring.ai.openai.base-url=http://localhost:4000 --spring.ai.openai.api-key=$KEY"
+psql_db() { docker exec -i postgres psql -v ON_ERROR_STOP=1 -U postgres -d "$1"; }
+```
+
+**1) 사본 만들기, 이벤트·임베딩 비우기** — 템플릿 사본(`disaster_alert_eval_v6`)에 접속한 세션이 없어야 한다.
+
+```bash
+echo "CREATE DATABASE $DB TEMPLATE disaster_alert_eval_v6;" | psql_db postgres
+psql_db "$DB" <<SQL
+UPDATE disaster_alert SET event_id = NULL, event_sequence_no = NULL, event_similarity_score = NULL, event_merge_method = NULL, event_added_at = NULL WHERE event_id IS NOT NULL OR event_sequence_no IS NOT NULL;
+TRUNCATE disaster_event_translation, event_region_impact, region_risk_index;
+DELETE FROM disaster_events;
+SELECT setval(pg_get_serial_sequence('disaster_events', 'id'), 1, false);
+-- 기준선에서 임베딩이 없던 알림은 후보에서도 빼야 처리 대상이 같다(재클러스터링은 embedding IS NOT NULL 만 처리한다)
+CREATE TABLE e012_baseline_null AS SELECT disaster_alert_id FROM disaster_alert WHERE embedding IS NULL;
+DROP INDEX idx_disaster_alert_embedding_hnsw;
+UPDATE disaster_alert SET embedding = NULL;
+ALTER TABLE disaster_alert ALTER COLUMN embedding TYPE vector($DIMS);   -- 1536 모델이면 생략
+-- 채우기에서 빼려고 임시 0 벡터를 넣는다. 채운 뒤 다시 NULL 로 되돌린다
+UPDATE disaster_alert SET embedding = array_fill(0::real, ARRAY[$DIMS])::vector WHERE disaster_alert_id IN (SELECT disaster_alert_id FROM e012_baseline_null);
+SQL
+```
+
+**2) 임베딩 넣기** — 보관 DB(`embedding_store.alert_embedding`, 알림·모델 한 행씩)에 그 모델이 있으면 가져오고, 없으면 채운 뒤 보관한다.
+
+```bash
+# (가) 처음 쓰는 모델: 채우기 전에 같은 20건을 직접 호출·프록시로 채워 비교한다(프록시가 요청을 바꾸지 않는지, 거리 0.01 이하).
+#     012 quickstart 2절 3 참고. 그다음 전체 채우기 — 'embed-only 완료' 로그가 나오면 Ctrl+C
+./gradlew bootRun --args="--spring.profiles.active=backfill --spring.datasource.url=jdbc:postgresql://localhost:5432/$DB --backfill.embed-only=true $EMB $PROXY"
+psql_db "$DB" <<SQL
+UPDATE disaster_alert SET embedding = NULL WHERE disaster_alert_id IN (SELECT disaster_alert_id FROM e012_baseline_null);
+SELECT count(embedding), string_agg(DISTINCT vector_dims(embedding)::text, ',') FROM disaster_alert;   -- 012 는 60382, 기대 차원 하나
+COPY (SELECT disaster_alert_id, '$MODEL', $DIMS, embedding, now() FROM disaster_alert WHERE embedding IS NOT NULL) TO '/tmp/emb_$ALIAS.tsv';
+SQL
+psql_db embedding_store <<SQL
+DELETE FROM alert_embedding WHERE model = '$MODEL';
+COPY alert_embedding (alert_id, model, dimensions, embedding, created_at) FROM '/tmp/emb_$ALIAS.tsv';
+SQL
+docker exec postgres rm -f /tmp/emb_$ALIAS.tsv
+
+# (나) 보관된 모델 다시 쓰기(API 호출 없음) — 2026-11-28 내보내기·불러오기 COPY 형식만 임시 DB 로 확인(qwen 60,382건, 1024차원).
+#     사본에 실제로 넣어 재클러스터링한 적은 아직 없어, 처음 쓸 때 마지막 건수를 확인한다
+echo "COPY (SELECT alert_id, embedding FROM alert_embedding WHERE model = '$MODEL') TO '/tmp/emb_$ALIAS.tsv';" | psql_db embedding_store
+psql_db "$DB" <<SQL
+UPDATE disaster_alert SET embedding = NULL WHERE disaster_alert_id IN (SELECT disaster_alert_id FROM e012_baseline_null);
+CREATE TABLE e012_import (alert_id bigint PRIMARY KEY, embedding vector($DIMS));
+COPY e012_import FROM '/tmp/emb_$ALIAS.tsv';
+UPDATE disaster_alert d SET embedding = i.embedding FROM e012_import i WHERE d.disaster_alert_id = i.alert_id;
+DROP TABLE e012_import;
+SELECT count(embedding) FROM disaster_alert;
+SQL
+docker exec postgres rm -f /tmp/emb_$ALIAS.tsv
+```
+
+**3) 인덱스 재생성, 재클러스터링, 평가** — 거리 기준(`clustering.*`)은 운영 값 그대로 둔다.
+
+```bash
+echo "CREATE INDEX idx_disaster_alert_embedding_hnsw ON disaster_alert USING hnsw (embedding vector_cosine_ops) WITH (m = 16, ef_construction = 64);" | psql_db "$DB"
+# 'EventClusteringBackfillTool 완료' 로그가 나오면 Ctrl+C (LLM 판정 비용이 그 키에 기록된다, 6만 건에 약 $0.05)
+./gradlew bootRun --args="--spring.profiles.active=backfill --spring.datasource.url=jdbc:postgresql://localhost:5432/$DB --backfill.recluster=true $EMB $PROXY"
+./gradlew bootRun --args="--spring.profiles.active=eval --spring.datasource.url=jdbc:postgresql://localhost:5432/$DB \
+  --eval.dataset=cluster-eval-2026-11 --eval.bcubed=evaluation/datasets/bcubed-2026-05.labels.json \
+  --eval.report=evaluation/reports/<날짜>-embed-$ALIAS.md"
+```
+
+- 기준선 모델(`text-embedding-3-small`)도 같은 방식으로 사본을 만들어 다시 돌린다. 저장된 임베딩을 그대로 쓰므로 1)의 임베딩 비우기와 2), 3)의 인덱스 재생성은 건너뛴다(HNSW 인덱스가 남아 있어 같은 이름으로 만들면 오류가 난다). 1)의 이벤트 비우기만 하고 3)의 재클러스터링·평가로 간다. v6 기존 배정과 이 재실행의 차이가 흔들림이다.
+- 거리 눈금이 좁은 모델은 운영 값으로 다른 사건도 바로 묶인다(012 의 e5: 다른 사건 거리 중앙값 0.062, LLM 판정 12회). 결과가 크게 나쁘면 먼저 이 눈금을 본다.
+- 운영 맥북에서 공개 모델을 재야 하면 Docker 안에서 메모리 상한을 걸어(`--memory 5g --max-batch-tokens 1024`) 돌린다. Docker 밖 실행은 메모리 상한이 없어 2026-11-28 운영 장애를 냈다(decision.md 맥북 측정).
 
 ## 사건/비사건 분류기 평가
 
@@ -143,7 +230,7 @@ docker exec -i postgres psql -U postgres -d "$EVAL_DB_NAME" -c \
 
 ```bash
 ./gradlew bootRun --args="--spring.profiles.active=alert-kind-eval \
-  --spring.datasource.url=$EVAL_DB --server.port=0 \
+  --spring.datasource.url=$EVAL_DB \
   --alert-kind-eval.labels=evaluation/datasets/alert-kind-test-labels.json,evaluation/datasets/alert-kind-r-labels.json \
   --alert-kind-eval.override=evaluation/datasets/alert-kind-recheck-labels.json"
 ```
@@ -158,7 +245,7 @@ docker exec -i postgres psql -U postgres -d "$EVAL_DB_NAME" -c \
 ```bash
 # 평가 사본 등 로컬 DB — 소량으로 먼저 확인한 뒤 --alert-kind.limit 을 뺀다
 ./gradlew bootRun --args="--spring.profiles.active=alert-kind-backfill \
-  --spring.datasource.url=$EVAL_DB --server.port=0 \
+  --spring.datasource.url=$EVAL_DB \
   --alert-kind.limit=100 --alert-kind.threads=4"
 ```
 
@@ -184,7 +271,7 @@ docker stop <컨테이너>
 원본 지역명에 `전남광주통합특별시`가 들어 있고 법정동 매핑이 하나도 없는 알림만 다시 매칭한다. 다른 지역의 미매핑 알림은 대상이 아니다.
 
 ```bash
-./gradlew bootRun --args="--spring.profiles.active=region-backfill --server.port=0"
+./gradlew bootRun --args="--spring.profiles.active=region-backfill"
 ```
 
 ## 누락 기간 알림 백필
@@ -192,7 +279,7 @@ docker stop <컨테이너>
 공공 API 에서 지정 날짜 이후의 알림을 다시 받아 빠진 것만 저장한다. 이미 있는 알림은 건너뛰고, 푸시·번역·클러스터링은 실행하지 않는다.
 
 ```bash
-BACKFILL_FROM_DATE=20260830 ./gradlew bootRun --args="--spring.profiles.active=alert-missing-backfill --server.port=0"
+BACKFILL_FROM_DATE=20260830 ./gradlew bootRun --args="--spring.profiles.active=alert-missing-backfill"
 ```
 
 날짜는 실제 누락 구간보다 하루 여유를 두고 지정한다.

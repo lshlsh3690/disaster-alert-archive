@@ -34,7 +34,7 @@ import java.util.stream.Stream;
 /**
  * 클러스터링 평가 실행 진입점. 사용법은 specs/006-clustering-evaluation/quickstart.md "실행" 절.
  *
- * <p>라벨은 접속한 DB 에서만 읽어 이벤트 배정과 비교한다(라벨 JSON 파일 읽기는 2026-11-24 에 없앴다).
+ * <p>라벨은 접속한 DB 에서만 읽어 이벤트 배정과 비교한다.
  * {@code --eval.dataset=<셋 이름>} 은 관리자 화면에서 관리하는 평가 셋 라벨(evaluation_pair_label)을,
  * {@code --eval.pair-labels-as-of=<ISO 시각>} 은 DB 에 저장된 불일치 쌍 사람 라벨(그 시각까지 저장·수정된 것)을 정답으로 쓴다
  * (둘 중 정확히 하나가 필수, 함께 주면 오류). {@code --eval.report}(선택) 경로에 마크다운 리포트를 쓴다. {@code --eval.bcubed}(선택)에 B-cubed 정답 JSON 을
@@ -62,11 +62,16 @@ public class EvaluationRunTool implements ApplicationRunner {
 
     @Override
     public void run(ApplicationArguments args) throws IOException {
+        // 실행은 모두 backend/ 에서, eval 프로필로 평가 사본 DB 에 붙어 한다. 아래 예시의 사본은 disaster_alert_eval_v6.
         // 1) 라벨을 먼저 끝까지 읽는다 - 라벨이 없으면 채점(DB 배정 조회)을 시작하기 전에 실패한다. 출처는 둘 중 하나다
         //    · DB(--eval.dataset): 관리자 화면에서 관리하는 평가 셋 라벨(evaluation_pair_label), 셋 이름으로 고름
         //    · DB(--eval.pair-labels-as-of): 관리자가 대시보드에서 매긴 불일치 쌍 라벨(clustering_pair_label)
         //    → pairs   : [LabeledPair(25154, 28106, SAME), LabeledPair(24037, 28111, DIFF), ...]
         //    이름과 쌍 목록만 출처에 따라 다르고, 이후 채점·리포트·재확인·판사 일치율 흐름은 둘이 똑같다
+        //    예) 평가 셋 라벨로 채점:
+        //    ./gradlew bootRun --args='--spring.profiles.active=eval --spring.datasource.url=jdbc:postgresql://localhost:5432/disaster_alert_eval_v6 --eval.dataset=cluster-eval-2026-11 --eval.report=evaluation/reports/<새 리포트 이름>.md'
+        //    예) 불일치 쌍 사람 라벨로 채점:
+        //    ./gradlew bootRun --args='--spring.profiles.active=eval --spring.datasource.url=jdbc:postgresql://localhost:5432/disaster_alert_eval_v6 --eval.pair-labels-as-of=2026-11-25T00:00 --eval.report=evaluation/reports/<새 리포트 이름>.md'
         LabelSource source = readLabelSource(args);
         String dataset = source.datasetName();
         List<LabeledPair> pairs = source.pairs();
@@ -74,6 +79,8 @@ public class EvaluationRunTool implements ApplicationRunner {
         Path reportPath = args.containsOption("eval.report")
                 ? Path.of(singleValue(args, "eval.report", "--eval.report=<리포트 경로> 값이 비어 있습니다")) : null;
         //    B-cubed 정답(--eval.bcubed)도 같은 이유로 여기서 읽는다. 없으면 null(알림 단위 절을 쓰지 않음)
+        //    예) 쌍 채점 + 알림 단위 점수:
+        //    ./gradlew bootRun --args='--spring.profiles.active=eval --spring.datasource.url=jdbc:postgresql://localhost:5432/disaster_alert_eval_v6 --eval.dataset=cluster-eval-2026-11 --eval.bcubed=evaluation/datasets/bcubed-2026-05.labels.json --eval.report=evaluation/reports/<새 리포트 이름>.md'
         BCubedGold bcubedGold = readBCubedGold(args);
 
         //    두 모드를 같이 주면 한쪽이 조용히 빠지므로 막는다
@@ -90,6 +97,7 @@ public class EvaluationRunTool implements ApplicationRunner {
                     + args.getOptionValues("eval.judge-agreement") + ")");
         }
         //    --eval.recheck 가 있으면 채점 대신 재확인 후보 목록만 내고 끝낸다(무료, 판정 없음)
+        //    예) ./gradlew bootRun --args='--spring.profiles.active=eval --spring.datasource.url=jdbc:postgresql://localhost:5432/disaster_alert_eval_v6 --eval.dataset=cluster-eval-2026-11 --eval.bcubed=evaluation/datasets/bcubed-2026-05.labels.json --eval.recheck=D,E,G,I --eval.report=evaluation/reports/<후보 목록 이름>.md'
         if (args.containsOption("eval.recheck")) {
             Set<Rule> rules = RecheckRunner.parseRules(
                     singleValue(args, "eval.recheck", "--eval.recheck=<규칙 목록, 예: D,E,G,I> 값이 비어 있습니다"));
@@ -100,6 +108,8 @@ public class EvaluationRunTool implements ApplicationRunner {
 
         //    --eval.judge-agreement 가 있으면 채점 대신 판사 일치율만 재서 측정을 DB 에 저장한다(유료: 판사를 실제로 호출한다).
         //    라벨은 위에서 이미 읽었다. 결과는 파일이 아니라 DB(judge_agreement_run)에 남는다(specs/014)
+        //    예) (유료, 실행 전 승인) --eval.report 는 주지 않는다:
+        //    ./gradlew bootRun --args='--spring.profiles.active=eval --spring.datasource.url=jdbc:postgresql://localhost:5432/disaster_alert_eval_v6 --eval.dataset=cluster-eval-2026-11 --eval.judge-agreement'
         if (args.containsOption("eval.judge-agreement")) {
             judgeAgreementRunner.run(judgeAgreementDataset(args), pairs);
             System.exit(SpringApplication.exit(context, () -> 0));
@@ -217,11 +227,6 @@ public class EvaluationRunTool implements ApplicationRunner {
     // 라벨 출처를 정해 읽는다. 두 옵션 중 정확히 하나여야 한다 - 함께 주면 한쪽이 조용히 무시되고, 하나도 없으면 정답이 없다
     //   --eval.dataset=<셋 이름>(평가 셋 라벨, evaluation_pair_label) / --eval.pair-labels-as-of=<ISO 시각>(불일치 쌍 라벨)
     private LabelSource readLabelSource(ApplicationArguments args) {
-        //    없앤 옵션은 모르는 옵션이라 조용히 무시된다 - 옛 명령에 --eval.dataset 만 덧붙이면 파일 라벨로 채점된 줄 알게 되므로 막는다
-        if (args.containsOption("eval.labels")) {
-            throw new IllegalArgumentException("--eval.labels 는 없앴습니다(2026-11-24). 라벨은 DB 에서만 읽으니 "
-                    + "--eval.labels 를 빼고 --eval.dataset=<평가 셋 이름> 을 쓰세요");
-        }
         List<String> given = Stream.of("eval.pair-labels-as-of", "eval.dataset")
                 .filter(args::containsOption).toList();
         if (given.size() > 1) {
@@ -241,7 +246,7 @@ public class EvaluationRunTool implements ApplicationRunner {
                 .map(l -> new LabeledPair(l.getAlertAId(), l.getAlertBId(), l.getLabel()))
                 .toList();
         if (pairs.isEmpty()) {
-            throw new IllegalArgumentException("평가 셋 '" + dataset + "' 의 라벨이 이 DB 에 없습니다 — "
+            throw new IllegalArgumentException("평가 셋 '" + dataset + "' 의 라벨이 이 DB 의 evaluation_pair_label 테이블에 없습니다 — "
                     + "backend/evaluation/datasets/pair_label_data_*.sql 을 먼저 넣었는지 확인하세요");
         }
         return new LabelSource(dataset + " (DB, " + pairs.size() + "쌍)", pairs);
@@ -264,7 +269,7 @@ public class EvaluationRunTool implements ApplicationRunner {
         // 모르겠음은 채점에서 빠지므로, 같은 사건·다른 사건 라벨이 하나도 없으면 채점할 쌍이 없는 것과 같다 — 0/0 점수를 내지 않고 멈춘다
         long decided = pairs.stream().filter(p -> p.label() != LabelJson.Label.UNSURE).count();
         if (decided == 0) {
-            throw new IllegalArgumentException("기준 시각 " + asOf + " 까지 저장된 불일치 쌍 사람 라벨 중 같은 사건·다른 사건 라벨이 없습니다"
+            throw new IllegalArgumentException("기준 시각 " + asOf + " 까지 이 DB 의 clustering_pair_label 테이블에 저장된 불일치 쌍 사람 라벨 중 같은 사건·다른 사건 라벨이 없습니다"
                     + "(기준 시각까지 " + pairs.size() + "개, 전체 " + rows.size() + "개)");
         }
         return new LabelSource("불일치 쌍 사람 라벨(DB, 기준 " + asOf + ", " + pairs.size() + "쌍)", pairs);

@@ -1,0 +1,18 @@
+model	params	license	output_dim(hidden_size)	architecture
+BAAI/bge-m3		mit	1024	XLMRobertaModel
+NGA-KR/ko-embed-midm	2305517312	mit	1792	LlamaModel
+Qwen/Qwen3-Embedding-0.6B	595776512	apache-2.0	1024	Qwen3ForCausalLM
+codefuse-ai/F2LLM-v2-0.6B	596049920	apache-2.0	1024	Qwen3Model
+codefuse-ai/F2LLM-v2-1.7B	1720574976	apache-2.0	2048	Qwen3Model
+dragonkue/BGE-m3-ko	567754752	apache-2.0	1024	XLMRobertaModel
+dragonkue/multilingual-e5-small-ko-v2	117653760	apache-2.0	384	BertModel
+dragonkue/snowflake-arctic-embed-l-v2.0-ko	567754752	apache-2.0	1024	XLMRobertaModel
+intfloat/multilingual-e5-large-instruct	559890432	mit	1024	XLMRobertaModel
+jinaai/jina-embeddings-v5-omni-nano	985984512	cc-by-nc-4.0		JinaEmbeddingsV5OmniModel
+jinaai/jina-embeddings-v5-omni-small	1626268672	cc-by-nc-4.0		JinaEmbeddingsV5OmniModel
+jinaai/jina-embeddings-v5-text-nano	211766016	cc-by-nc-4.0	768	JinaEmbeddingsV5Model
+jinaai/jina-embeddings-v5-text-small	596049920	cc-by-nc-4.0	1024	JinaEmbeddingsV5Model
+microsoft/harrier-oss-v1-0.6b	596049920	mit	1024	Qwen3Model
+nlpai-lab/KURE-v1	567754752	mit	1024	XLMRobertaModel
+nlpai-lab/KoE5	559890432	mit	1024	XLMRobertaModel
+telepix/PIXIE-Rune-v1.5	567754752	apache-2.0	1024	XLMRobertaModel

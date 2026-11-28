@@ -80,7 +80,7 @@
   --eval.report=evaluation/reports/<새 리포트 이름>.md"
 ```
 
-- `--eval.pair-labels-as-of`: ISO 시각(KST). 이 시각까지 저장·수정된 불일치 쌍 사람 라벨만 쓴다. `--eval.dataset`(평가 셋 라벨)과 함께 주면 오류. (라벨 JSON 파일 옵션 `--eval.labels` 는 2026-11-24 에 없앴다.)
+- `--eval.pair-labels-as-of`: ISO 시각(KST). 이 시각까지 저장·수정된 불일치 쌍 사람 라벨만 쓴다. `--eval.dataset`(평가 셋 라벨)과 함께 주면 오류.
 - 리포트 머리의 데이터셋 이름: `불일치 쌍 사람 라벨(DB, 기준 2026-11-25T00:00, N쌍)`.
 - 같은 사건·다른 사건 라벨이 0개면(모르겠음만 있어도) 채점하지 않고 오류 종료(0 이 아닌 종료 코드).
 - 파일로 내보내는 HTTP 엔드포인트는 없다(research R8).

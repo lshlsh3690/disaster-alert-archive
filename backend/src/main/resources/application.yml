@@ -199,3 +199,12 @@ management:
     web:
       exposure:
         include: health,prometheus,metrics,caches
+---
+# 수동 실행 도구 프로필은 HTTP 요청을 받지 않으므로 빈 포트(0)로 띄운다 — 떠 있는 개발 서버(8080)와 겹치지 않게.
+# 예전에는 실행 명령마다 --server.port=0 을 붙였다(2026-11-27 설정으로 옮김). 명령줄에서 포트를 주면 그 값이 이긴다.
+spring:
+  config:
+    activate:
+      on-profile: eval | backfill | alert-kind-eval | alert-kind-backfill | region-backfill | alert-missing-backfill
+server:
+  port: 0

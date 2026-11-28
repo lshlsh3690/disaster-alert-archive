@@ -1,0 +1,13 @@
+# 로컬 전용. LiteLLM 프록시의 /metrics 를 긁는다.
+global:
+  scrape_interval: 15s
+
+scrape_configs:
+  - job_name: litellm
+    # /metrics 는 /metrics/ 로 307 리다이렉트되고, 프록시 키가 있어야 열린다(없으면 401)
+    metrics_path: /metrics/
+    authorization:
+      type: Bearer
+      credentials: sk-local-llm-usage   # docker-compose.dev.yml 의 LITELLM_MASTER_KEY(로컬 전용)
+    static_configs:
+      - targets: ["litellm:4000"]
